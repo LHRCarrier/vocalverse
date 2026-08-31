@@ -110,7 +110,7 @@ services/python/  语音管线 + LLM Agent + 推荐（FastAPI；Alembic 唯一 s
 services/java/    薄管理端（Spring Boot；JWT 签发）
 infra/            部署与 nginx 配置
 scripts/          dev.ps1 / bootstrap.ps1（Windows 一键）
-docs/             00~05 规划文档 + 06 技术框架决策（ADR 唯一权威）+ 07/08 拷问报告 + api/ 契约
+docs/             00~05 规划文档 + 06 技术框架决策（ADR 唯一权威）+ 07/08 拷问报告 + 09 框架评审 + api/ 契约
 worklog/          团队工作日志（VocalVerse工作日志.md，按日追加）
 ```
 
@@ -127,6 +127,7 @@ worklog/          团队工作日志（VocalVerse工作日志.md，按日追加�
 | **`docs/06-技术框架决策.md`** | **ADR 权威文档**：双子代理拷问产出 + 组长拍板（拓扑/版本/CI/契约/音频/指标口径/评分公式/合规），与 00~05 冲突以本文档为准 |
 | `docs/07-需求拷问报告.md` | 需求拷问官 **63 问原文**（范围/指标口径/评分口径/社区/合规/DoD）+ 38 条 ADR 建议——docs/06 的决策依据，答辩可引用 |
 | `docs/08-技术架构拷问报告.md` | 技术架构拷问官 **60 问原文**（目录/版本/CI/契约/音频/模型/DB/Windows 坑）+ AD-01~40 决策清单——docs/06 的决策依据 |
+| `docs/09-技术框架评审.md` | 资深架构视角框架评审：匹配度/性能预算审计（ASR 延迟为头号风险）/可维护性/评分表 + P0~P2 问题清单与按里程碑行动表 |
 
 ## 里程碑（详见 docs/04、docs/06）
 

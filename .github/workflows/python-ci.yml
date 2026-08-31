@@ -28,6 +28,9 @@ jobs:
       - name: Sync (frozen)
         run: uv sync --frozen
 
+      - name: Lockfile in sync
+        run: uv lock --check
+
       - name: Lint
         run: uv run ruff check .
 
@@ -37,7 +40,9 @@ jobs:
       - name: Tests
         run: uv run pytest -m "not gpu" -q
 
-      - name: Alembic heads consistency
+      - name: Alembic single head assert
         run: |
           uv run alembic heads
-          uv run alembic check || true
+          test "$(uv run alembic heads | grep -c '(head)')" -le 1 \
+            || { echo '::error:: alembic 出现多头，迁移历史必须线性单头（0 头=暂无迁移，允许）'; exit 1; }
+          # 注：alembic check（模型 vs 迁移一致）需连库执行；M2 接入 PG 后改为带 DB 的集成步骤再启用

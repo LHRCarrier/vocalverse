@@ -11,10 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl \
 
 WORKDIR /app
 
-# uv 安装依赖（锁文件冻结保证可复现）
+# uv 安装依赖（锁文件冻结保证可复现；不允许回退分支掩盖 lock 失配）
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-COPY pyproject.toml uv.lock* ./
-RUN uv sync --frozen --no-dev || uv sync --no-dev
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
 
 COPY . .
 
