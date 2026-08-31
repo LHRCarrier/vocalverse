@@ -1,0 +1,22 @@
+# ============================================================
+# 前端镜像构建上下文清单（Dockerfile context=./apps/web）
+# 目标：阻断 node_modules/（≈121MB）、dist/（镜像内重建）与本地 env 进 build context
+# 纪律：与 .gitignore 同步维护；.env.* 为本地开发配置（VITE_ 前缀），不入镜像
+# ============================================================
+
+# --- 依赖与产物 ---
+node_modules/
+dist/
+.vite/
+.vite-temp/
+coverage/
+*.tsbuildinfo
+
+# --- 本地环境文件 ---
+.env
+.env.*
+!.env.example
+
+# --- 与本镜像无关 ---
+.git/
+*.log

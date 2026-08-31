@@ -1,0 +1,28 @@
+# ============================================================
+# Python 服务镜像构建上下文清单（Dockerfile context=./services/python）
+# 目标：阻断本地产物/缓存/密钥进 build context（.venv ≈1.1GB、缓存目录、.env）
+# 纪律：与 .gitignore 同步维护；dotfiles 例外 ! 规则放最后
+# ============================================================
+
+# --- 本地虚拟环境与产物 ---
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# --- 密钥与环境（.env 含真实密钥，严禁进镜像上下文） ---
+.env
+.env.*
+!.env.example
+
+# --- 与本镜像无关 ---
+.git/
+tests/
+*.log
+*.md
+README.md
