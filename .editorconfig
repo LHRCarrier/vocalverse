@@ -1,0 +1,26 @@
+# VocalVerse EditorConfig
+# 前端 2 空格缩进；后端 4 空格（Java/Python）；行尾 LF（Windows .ps1/.bat 除外）
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{ts,vue,js,json,yml,yaml,md,html,css}]
+indent_style = space
+indent_size = 2
+
+[*.{py,java}]
+indent_style = space
+indent_size = 4
+
+[*.ps1]
+end_of_line = crlf
+
+[*.bat]
+end_of_line = crlf
+
+[*.md]
+trim_trailing_whitespace = false

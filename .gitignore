@@ -1,37 +1,75 @@
+# ============================================================
+# VocalVerse .gitignore —— 按路径忽略大文件/产物（不用裸后缀黑名单）
+# 豁免规则：data/seed/**、*.lrc、tests/fixtures/** 必须可提交
+# ============================================================
+
 # --- Node / 前端 ---
 node_modules/
 dist/
 *.local
 .vite/
+coverage/
+apps/web/.nuxt/
+apps/web/.output/
 
 # --- Python ---
 __pycache__/
 *.py[cod]
 .venv/
 venv/
-*.pth
-*.h5
-*.onnx
-*.safetensors
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+uv.lock.bak
+services/python/.eggs/
+*.egg-info/
+
+# --- Java ---
+services/java/target/
+*.class
 
 # --- 密钥与环境 ---
 .env
 .env.*
 !.env.example
+.idea/
+*.pem
+*.key
 
-# --- 数据与训练产物 ---
-data/
+# --- 数据与训练产物（按路径，而非裸后缀） ---
+data/audio/
+data/raw/
 models/
-*.wav
-*.mp3
-*.lrc
-*.csv
+services/python/models/
+*.pth
+*.h5
+*.onnx
+*.safetensors
+*.pt
+*.ckpt
 *.db
 *.sqlite3
 *.log
+htmlcov/
+*.coverage
+
+# --- 测试夹具、seed、歌词 必须可提交（豁免） ---
+!data/seed/
+!data/seed/**
+!**/*.lrc
+!**/tests/fixtures/
 
 # --- 系统 / IDE ---
 .DS_Store
 Thumbs.db
-.idea/
 .vscode/
+.idea/
+*.swp
+
+# --- 大音频不提交（样例音频走 fixture 目录豁免） ---
+*.wav
+*.mp3
+*.ogg
+*.m4a
+# 在豁免区下方重复豁免 fixture 目录，确保优先级
+!**/tests/fixtures/**

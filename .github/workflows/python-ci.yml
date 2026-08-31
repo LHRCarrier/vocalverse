@@ -1,0 +1,43 @@
+name: python-ci
+
+on:
+  pull_request:
+    paths:
+      - "services/python/**"
+      - ".github/workflows/python-ci.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: lint · test · alembic
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/python
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Sync (frozen)
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format check
+        run: uv run ruff format --check .
+
+      - name: Tests
+        run: uv run pytest -m "not gpu" -q
+
+      - name: Alembic heads consistency
+        run: |
+          uv run alembic heads
+          uv run alembic check || true

@@ -1,0 +1,9 @@
+# 默认评审人：组长；具体服务文件按目录归属
+* @LHRCarrier
+
+# 语音算法与训练代码由算法负责人优先评审
+/services/python/app/audio/** @xiaoqing-one
+/services/python/app/reco/** @xiaoqing-one
+
+# 前端代码由前端负责人优先评审
+/apps/web/** @Faust-sudo

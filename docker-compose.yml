@@ -1,0 +1,102 @@
+# ============================================================
+# VocalVerse Docker Compose —— dev 一键起：db → redis → python → java → web
+# 用法：docker compose up -d --build
+# 端口：PG 5432 / Redis 6379 / Python 8000 / Java 8080 / Web 8088
+# 注意：Web 默认映射 8088（80 端口在 Windows 需管理员权限）
+# ============================================================
+
+name: vocalverse
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vocalverse}
+      POSTGRES_USER: ${POSTGRES_USER:-vocalverse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vocalverse-dev}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vocalverse} -d ${POSTGRES_DB:-vocalverse}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  python-api:
+    build:
+      context: ./services/python
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vocalverse}:${POSTGRES_PASSWORD:-vocalverse-dev}@postgres:5432/${POSTGRES_DB:-vocalverse}
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/audio:/app/data/audio
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  java-api:
+    build:
+      context: ./services/java
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-vocalverse}
+      DB_USER: ${POSTGRES_USER:-vocalverse}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-vocalverse-dev}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      python-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  web:
+    build:
+      context: ./apps/web
+    ports:
+      - "8088:80"
+    depends_on:
+      python-api:
+        condition: service_healthy
+      java-api:
+        condition: service_healthy
+
+volumes:
+  pgdata:

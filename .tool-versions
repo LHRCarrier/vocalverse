@@ -1,0 +1,5 @@
+# Astral .tool-versions —— 版本基准（CI 与本地应一致）
+# 安装：uv tool install tool-versions 或按各自工具手动对齐
+nodejs 22.11.0
+python 3.12.7
+java temurin-21.0.5
