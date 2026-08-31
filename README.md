@@ -21,15 +21,86 @@ VocalVerse 面向不同年龄段英语学习者，基于大模型场景扮演（
 | 数据 | PostgreSQL（Alembic 唯一 schema 真源）· Redis（会话/缓存/限流） |
 | 部署 | Docker Compose（python 8000 / java 8080 / web 8088 / pg 5432 / redis 6379） |
 
-## 快速开始（Windows）
+## 启动指南（团队测试用）
+
+### 0. 先明确当前阶段能测什么（M1 骨架）
+
+- ✅ 能测：三服务连通性、录音组件（MediaRecorder → WebM/opus）、**stub 音频管线**（ASR/TTS/评分/LLM 均为 Fake，返回固定演示文本）、CI/镜像构建。
+- ⏳ 尚无：真实语音识别/合成/评分、场景扮演多轮对话、推荐/报表（M2~M3 接入，接口与数据模型已定，见 docs/06）。
+
+### 1. 一次性准备（工具链）
 
 ```powershell
-.\scripts\bootstrap.ps1    # 工具链自检（node/pnpm/python/uv/jdk/maven/docker/ffmpeg）
-.\scripts\dev.ps1          # docker compose 一键起全部服务
-# 前端 http://localhost:8088 · Python API http://localhost:8000/docs · Java http://localhost:8080/swagger-ui.html
+.\scripts\bootstrap.ps1        # 自检 node22/pnpm/python3.12/uv/jdk21/maven/docker/ffmpeg
+winget install ffmpeg          # 缺 ffmpeg 时（音频转码必需）
 ```
 
-本地热重载（推荐 M2 起）：Python 用 venv + uvicorn，前端 pnpm dev，见各服务 README。
+- 版本基准见 `.tool-versions` / `.nvmrc`（Node 22.11 / Python 3.12 / JDK 21）。
+
+### 2. 方式 A：Docker Compose 一键（体验/验收，最省事）
+
+```powershell
+cd 仓库根目录
+Copy-Item .env.example .env    # 可选；不填也能起（占位符），但 AI 功能保持 stub
+.\scripts\dev.ps1              # 构建并启动 5 个服务（首次较慢，见常见问题）
+```
+
+启动完成后：
+
+| 入口 | 地址 | 验证点 |
+|---|---|---|
+| 前端演示页 | http://localhost:8088 | 显示「VocalVerse 框架骨架」，Python/Java 状态为 ✓；点「开始录音」→ 允许麦克风 → 6 秒后显示 stub 转写 |
+| Python API 文档 | http://localhost:8000/docs | 可试 `POST /api/v1/asr`、`/tts`、`/score`、`/llm/chat`（返回 stub 结果） |
+| Python 健康检查 | http://localhost:8000/healthz 、/readyz | 返回 `{"status":"alive"}` / `code=0` |
+| Java API 文档 | http://localhost:8080/swagger-ui.html | `/actuator/health` 返回 UP |
+| 数据库 | localhost:5432 (PG) / 6379 (Redis) | 账号见根 `.env`（默认 vocalverse / vocalverse-dev） |
+
+停止：`docker compose down`（清数据加 `-v`）。
+
+### 3. 方式 B：本地开发热重载（M2 起日常开发用）
+
+数据库/缓存仍在容器里跑，三端各自本地起：
+
+```powershell
+docker compose up -d postgres redis        # 1. 只起依赖
+
+# 2. 前端（终端 1）
+cd apps/web; pnpm install; pnpm dev        # http://localhost:5173（代理已配 8000/8080）
+
+# 3. Python（终端 2）——首次 uv sync 会下载 CPU 版 torch，较慢
+cd services/python
+uv sync
+Copy-Item .env.example .env                # 填 DeepSeek/讯飞/Azure 密钥（M2 需要）
+uv run uvicorn app.main:app --reload --port 8000
+
+# 4. Java（终端 3）——首次先 mvn -N wrapper:wrapper 生成 mvnw
+cd services/java
+mvn spring-boot:run
+```
+
+> ⚠️ 方式 B 与方式 A 端口相同（8000/8080），**不要同时起**；各服务更多细节见 `services/*/README.md`。
+
+### 4. 启动成功判定（验收清单）
+
+- [ ] `docker compose ps` 五个服务全部 `healthy`；
+- [ ] 8088 演示页两个服务状态均为 ✓；
+- [ ] `GET /readyz` 返回 `code=0`、`data.status=ready`；
+- [ ] 录音演示能完成一次「录音→stub 转写」闭环（不出 413/500）；
+- [ ] （可选）本机 `mvn verify`、`pnpm test:run`、`pytest` 各自通过（CI 同款）。
+
+### 5. 常见问题（FAQ）
+
+| 现象 | 处理 |
+|---|---|
+| 端口 8088/8000/8080 被占用 | `Get-NetTCPConnection -LocalPort <port> -State Listen` 找 PID 释放；或改 compose 的 ports 映射 |
+| 前端请求 404 / 服务不可达 | 先确认对应服务容器 `healthy`；方式 B 下需先 `docker compose up -d postgres redis` |
+| Docker 卡顿/服务起不来（WSL2 默认内存 2GB） | 按 `infra/dev/.wslconfig` 示例设 `memory=8GB,processors=4`，执行 `wsl --shutdown` 后重启 Docker |
+| 首次 `dev.ps1` 很慢 | 正常：基础镜像 + Python 依赖（含 CPU torch ≈200MB）；网络差可给 Docker 配镜像加速 |
+| 语音接口返回固定文本 | 预期行为：M1 全部为 Fake 实现（`services/python/app/audio/stubs.py`），M2 替换为 faster-whisper / edge-tts / 讯飞 ISE |
+| Windows 长路径/编码问题 | `git config --global core.longpaths true`；`.gitattributes` 已强制 LF（.ps1/.bat 用 CRLF） |
+| `.env` 忘记填密钥 | M1 不阻塞（占位符可起）；M2 起 DeepSeek/讯飞必须填，且严禁提交 `.env` |
+
+详细决策与约定见各服务 README 与 `docs/06-技术框架决策.md`。
 
 ## 仓库结构
 
@@ -39,7 +110,8 @@ services/python/  语音管线 + LLM Agent + 推荐（FastAPI；Alembic 唯一 s
 services/java/    薄管理端（Spring Boot；JWT 签发）
 infra/            部署与 nginx 配置
 scripts/          dev.ps1 / bootstrap.ps1（Windows 一键）
-docs/             00~05 规划文档 + 06 技术框架决策（ADR 唯一权威）+ api/ 契约
+docs/             00~05 规划文档 + 06 技术框架决策（ADR 唯一权威）+ 07/08 拷问报告 + api/ 契约
+worklog/          团队工作日志（VocalVerse工作日志.md，按日追加）
 ```
 
 ## 文档索引
