@@ -17,8 +17,10 @@ from app import __version__
 from app.api.routes import audio, health
 from app.core.config import get_settings
 from app.core.response import BizError
+from app.core.trace import RequestIdLogFilter, RequestIdMiddleware
 
 logger = logging.getLogger("vocalverse")
+logger.addFilter(RequestIdLogFilter())  # 每条日志带 request_id（docs/06 §11）
 
 
 @asynccontextmanager
@@ -55,3 +57,4 @@ async def validation_error_handler(_: Request, exc: RequestValidationError) -> J
 
 app.include_router(health.router)
 app.include_router(audio.router)
+app.add_middleware(RequestIdMiddleware)  # X-Request-Id 透传（docs/06 §11）

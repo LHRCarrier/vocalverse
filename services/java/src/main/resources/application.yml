@@ -13,6 +13,11 @@ spring:
 server:
   port: 8080
 
+# 日志带 requestId（RequestIdFilter 写 MDC，docs/06 §11）
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:-}] %logger{36} - %msg%n"
+
 management:
   endpoints:
     web:
