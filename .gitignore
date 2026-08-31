@@ -9,6 +9,7 @@ dist/
 *.local
 .vite/
 coverage/
+*.tsbuildinfo
 apps/web/.nuxt/
 apps/web/.output/
 
