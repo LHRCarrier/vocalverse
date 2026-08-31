@@ -30,6 +30,7 @@
 - **脱敏**：参照项目为企业项目，名称已全库清理（含 git 历史核查，历史无引用）；docs/12、docs/06 §2.1/§14、README、worklog 一律以「同构 monorepo 参照项目」指代。
 - **trace 透传（可观测性，动作 F 落地）**：nginx（`$request_id` 兜底生成 + /api/v1 /manage /healthz /readyz 四 location 透传 + 响应头回写）→ Python（`app/core/trace.py` 纯 ASGI 中间件，兼容 SSE 流式；ContextVar + 日志 filter，每条日志带 request_id）→ Java（`RequestIdFilter` 写 MDC + logback 模式 `%X{requestId}`）；三端各配测试（py 2 条 / java 2 条）。docs/06 §11 承诺补齐为"已落地"，loguru/logback JSON 结构化列为 M2 待办。
 - **Java 契约对账（契约三关卡闭环）**：`apps/web/src/api/specs/java-openapi.json` 快照（初始由 `CONTRACT_SNAPSHOT_GENERATE=1` 跑 `ContractSnapshotTest` 生成）+ 该测试在 `mvn verify` 内用 springdoc MockMvc 实时渲染对账（servers 归一化排除）；`gen:api` 增 `java-api.d.ts`；`refresh-openapi.ps1` 升级为 4 步（Python+Java 双快照导出 + 双类型生成）；java-ci 触发路径补快照/生成文件。
+- **前端设计系统定版（docs/13）**：拍板 naive-ui + UnoCSS + 设计 token（三层分工）、B 多邻国活力配色（绿主色/柠檬黄激励/橙评分，本期仅浅色）、可视化栈 ECharts（报表）+ P5（仅品牌动效）+ D3（仅唱歌细图）、**Three.js 不引入**（docs/06 §9.2 2D 数字人拍板）。落地：`styles/tokens.ts`（token 唯一来源）+ `styles/theme.ts`（naive themeOverrides）+ `uno.config.ts` + 路由全表（`router/index.ts`，M2/M3 页面用占位页收敛）+ `UserLayout`/`AdminLayout`（管理端单 SPA 内路由）+ `LoginView`（P5 声波动效，懒加载+降级）+ `DemoView`（原演示页迁移 `/demo`）+ vitest 换 happy-dom（docs/09 P1-#10）。**两个版本坑**：vue-router 5.x 要求 Vite 7 → 钉 ^4.6；p5 2.x 与 @types/p5 1.x 类型不匹配 → 钉 ^1.11。版本已登记 docs/06 §3。
 
 ### 验证
 
@@ -37,6 +38,7 @@
 - [x] Python：`pytest` 15 passed；`ruff check` + `format --check` 通过（契约响应模型改动）。
 - [x] 前端：`typecheck / lint / test:run(2 passed) / build` 全绿；`pnpm install --frozen-lockfile` 通过（CI 同款）。
 - [x] **Java `mvn verify` 全绿**（spotless + 测试：含 `ContractSnapshotTest` 快照对账、`RequestIdFilterTest` 2 用例）。**Python `pytest` 17 passed**（含 trace 2 用例）、ruff 全过。**前端 `gen:api` 双文件生成 + typecheck/lint 全绿**。
+- [x] **前端设计系统骨架验证**：`pnpm typecheck / lint / test:run(2 passed) / build` 全绿；chunk 健康——p5（1MB）独立 chunk 仅登录页懒加载，naive-ui 主包 266KB（gzip 90KB），无首屏重依赖。
 - [x] **契约比对本地实测**：快照 vs `app.openapi()` → MATCH（CI 双关卡口径已核）；`scripts/refresh-openapi.ps1` 语法/路径核过（未实跑——需后端在跑）。
 - [x] `.dockerignore` 生效性：`docker compose build` 下一轮构建验证（本次未重建镜像）。
 - [x] vite/nginx 注释为纯注释，不影响 `pnpm typecheck/build` 与 nginx 语法（`nginx -t` 下次容器构建验证）。

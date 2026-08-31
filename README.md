@@ -125,7 +125,7 @@ services/python/  语音管线 + LLM Agent + 推荐（FastAPI；Alembic 唯一 s
 services/java/    薄管理端（Spring Boot；JWT 签发）
 infra/            部署与 nginx 配置
 scripts/          dev.ps1 / bootstrap.ps1（Windows 一键）
-docs/             00~05 规划文档 + 06 技术框架决策（ADR 唯一权威）+ 07/08 拷问报告 + 09 框架评审 + 10/11 数据库 + 12 同构Monorepo对比裁决 + api/ 契约
+docs/             00~05 规划文档 + 06 技术框架决策（ADR 唯一权威）+ 07/08 拷问报告 + 09 框架评审 + 10/11 数据库 + 12 同构Monorepo对比裁决 + 13 前端设计系统 + api/ 契约
 worklog/          团队工作日志（VocalVerse工作日志.md，按日追加）
 ```
 
@@ -146,6 +146,7 @@ worklog/          团队工作日志（VocalVerse工作日志.md，按日追加�
 | `docs/10-数据库设计.md` | 19 表库结构设计（用户/场景/歌曲/评分/埋点/工单…）+ 字段口径 |
 | `docs/11-数据库拷问报告.md` | 数据库拷问官报告：字段/索引/口径拷问与拍板 |
 | `docs/12-同构Monorepo对比与裁决.md` | 双子拷问官交叉拷问「能否按同构 monorepo 参照项目做」+ 多项修正 + 答辩口径；裁决已并入 docs/06 §2.1 |
+| `docs/13-前端设计系统.md` | 前端设计系统（naive-ui/UnoCSS/设计 token 三层分工 + B 多邻国活力配色 + 路由表 + 动效可视化栈 + 答辩口径） |
 
 ## 里程碑（详见 docs/04、docs/06）
 
