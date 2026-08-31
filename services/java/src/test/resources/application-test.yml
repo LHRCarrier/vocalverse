@@ -1,0 +1,7 @@
+# 测试环境：H2 内存库（不依赖外部 PostgreSQL；集成测试用 Testcontainers，@Tag("integration")）
+spring:
+  datasource:
+    url: jdbc:h2:mem:vocalverse;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
