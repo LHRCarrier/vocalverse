@@ -3,7 +3,25 @@
  *
  * - 语音/LLM 热路径：Python 8000（dev 下走 Vite 代理 /api/v1）
  * - 管理端/JWT：Java 8080（dev 下走 /manage 代理）
+ *
+ * 契约（docs/06 §7，2026-08-31 起）：
+ * - Python 侧 DTO 类型 = `src/api/generated/python-api.d.ts`（openapi-typescript 构建期生成，
+ *   由 `src/api/specs/python-openapi.json` 驱动 —— 后端改契约后跑 `pnpm gen:api` 重新生成，
+ *   typecheck 立即暴露断点，消灭手工同步）。
+ * - 契约真源是 Python `/openapi.json`；本文件仅含请求封装与错误语义，不手写 DTO。
  */
+
+import type { components } from './generated/python-api'
+
+/**
+ * 生成契约里的 DTO 集合（数据层类型，勿在此手改：
+ * 一切以 `pnpm gen:api` 生成文件为准）。
+ */
+export type ApiSchemas = components['schemas']
+export type AsrData = ApiSchemas['ASRResult']
+export type ScoreData = ApiSchemas['ScoreResult']
+export type TtsData = ApiSchemas['TTSResult']
+export type ChatData = ApiSchemas['ChatResult']
 
 export interface Envelope<T> {
   code: number
@@ -41,12 +59,12 @@ export function pingJava() {
   return request<{ service: string; status: string }>('/api/v1/ping', undefined, JAVA_BASE)
 }
 
-/** 上传录音到 Python ASR（M1 为 stub；M2 接入 faster-whisper） */
+/** 上传录音到 Python ASR（M1 为 stub；M2 接入 faster-whisper），DTO 类型来自生成契约 */
 export async function asr(audioBlob: Blob, language = 'en') {
   const form = new FormData()
   form.append('audio', audioBlob, 'recording.webm')
   form.append('language', language)
-  return request<{ text: string; language: string; confidence: number }>('/api/v1/asr', {
+  return request<AsrData>('/api/v1/asr', {
     method: 'POST',
     body: form,
   })
