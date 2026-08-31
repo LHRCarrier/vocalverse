@@ -1,0 +1,24 @@
+/* 全局基础样式（docs/13）：只做 reset 与 CSS 变量镜像；其余样式交给组件库/工具类 */
+:root {
+  --vv-bg: #f9fafb;
+  --vv-brand: #16a34a;
+  --vv-brand-deep: #15803d;
+  --vv-text: #101828;
+  --vv-text-secondary: #667085;
+  --vv-border: #e5e7eb;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--vv-bg);
+  color: var(--vv-text);
+  font-family:
+    'Nunito', ui-rounded, system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

@@ -1,11 +1,12 @@
 import { fileURLToPath, URL } from 'node:url'
 
 import vue from '@vitejs/plugin-vue'
+import UnoCSS from 'unocss/vite'
 import { defineConfig } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), UnoCSS()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -39,7 +40,8 @@ export default defineConfig({
     },
   },
   test: {
-    environment: 'node',
+    // P1-#10：组件测试挂载需要 DOM 环境（happy-dom，docs/13）
+    environment: 'happy-dom',
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
   },
 })
