@@ -20,10 +20,10 @@ pnpm build         # vue-tsc -b && vite build
 
 ## 契约维护（docs/06 §7）
 
-- 后端（Python）契约变更后，**一步刷新**：`.\scripts\refresh-openapi.ps1`（前提：Python 服务已起在 8000）
-- 产物链（均入库）：`src/api/specs/python-openapi.json`（契约快照）→ `src/api/generated/python-api.d.ts`（openapi-typescript 生成，`pnpm gen:api`）
-- **CI 双关卡**：python-ci 校验「快照 == 后端 OpenAPI」；frontend-ci 校验「生成文件 == 快照（重跑 `pnpm gen:api` 后零 diff）」——任一漂移即红，改契约必须重新生成并提交全链
-- 前端 DTO 类型一律从 `src/api/generated/python-api.d.ts` 导入（`client.ts` 的 `ApiSchemas`），不手写
+- 后端（Python/Java）契约变更后，**一步刷新**：`.\scripts\refresh-openapi.ps1`（前提：Python:8000、Java:8080 均已启动；Java 也可不启服务，用 `CONTRACT_SNAPSHOT_GENERATE=1` 跑 ContractSnapshotTest 重写快照）
+- 产物链（均入库）：`src/api/specs/python-openapi.json` + `java-openapi.json`（契约快照）→ `src/api/generated/python-api.d.ts` + `java-api.d.ts`（openapi-typescript 生成，`pnpm gen:api`）
+- **CI 三关卡**：python-ci 校验「Python 快照 == 后端 OpenAPI」；java-ci 校验「Java 快照 == springdoc 实时渲染」（ContractSnapshotTest，跑在 `mvn verify`）；frontend-ci 校验「生成文件 == 快照（重跑 `pnpm gen:api` 后零 diff）」——任一漂移即红，改契约必须重新生成并提交全链
+- 前端 DTO 类型一律从 `src/api/generated/*.d.ts` 导入（`client.ts` 的 `ApiSchemas`），不手写
 
 ## 关键约定（docs/06）
 

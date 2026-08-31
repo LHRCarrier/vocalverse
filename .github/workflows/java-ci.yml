@@ -5,6 +5,9 @@ on:
     paths:
       - "services/java/**"
       - ".github/workflows/java-ci.yml"
+      # 契约快照/生成文件变更也重新对账（ContractSnapshotTest，docs/06 §7）
+      - "apps/web/src/api/specs/java-openapi.json"
+      - "apps/web/src/api/generated/java-api.d.ts"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

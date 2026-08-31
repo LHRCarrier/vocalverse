@@ -15,7 +15,7 @@
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
-    "gen:api": "openapi-typescript src/api/specs/python-openapi.json -o src/api/generated/python-api.d.ts"
+    "gen:api": "openapi-typescript src/api/specs/python-openapi.json -o src/api/generated/python-api.d.ts && openapi-typescript src/api/specs/java-openapi.json -o src/api/generated/java-api.d.ts"
   },
   "dependencies": {
     "vue": "^3.5.13"
