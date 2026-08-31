@@ -1,0 +1,7 @@
+# WSL2 资源示例（Docker Desktop 后端使用 WSL2 时生效）
+# 用法：复制到 C:\Users\<你>\.wslconfig，然后 wsl --shutdown
+# 参考：docs/06 第 12 章（Windows 开发环境对策）
+[wsl2]
+memory=8GB
+processors=4
+swap=4GB
