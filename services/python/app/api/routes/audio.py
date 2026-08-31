@@ -7,15 +7,17 @@ POST /api/v1/tts   文本 → 合成音频（bytes）
 
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.audio.base import (
     ASRClient,
+    ASRResult,
+    ChatResult,
     LLMClient,
     ScorerClient,
+    ScoreResult,
     TTSClient,
+    TTSResult,
     get_asr_client,
     get_llm_client,
     get_scorer_client,
@@ -40,10 +42,10 @@ async def asr(
     language: str = Form("en"),
     client: ASRClient = Depends(get_asr_client),
     settings: Settings = Depends(get_settings),
-) -> Envelope[Any]:
+) -> Envelope[ASRResult]:
     data = await _read_bounded(audio, settings.max_upload_bytes)
     result = await client.transcribe(data, language=language)
-    return ok(result.__dict__)
+    return ok(result)
 
 
 @router.post("/score")
@@ -52,10 +54,10 @@ async def score(
     reference: str = Form(...),
     client: ScorerClient = Depends(get_scorer_client),
     settings: Settings = Depends(get_settings),
-) -> Envelope[Any]:
+) -> Envelope[ScoreResult]:
     data = await _read_bounded(audio, settings.max_upload_bytes)
     result = await client.score(data, reference)
-    return ok(result.__dict__)
+    return ok(result)
 
 
 @router.post("/tts")
@@ -64,15 +66,15 @@ async def tts(
     voice: str = Form("en-US-JennyNeural"),
     rate: str = Form("+0%"),
     client: TTSClient = Depends(get_tts_client),
-) -> Envelope[Any]:
+) -> Envelope[TTSResult]:
     audio_bytes = await client.synthesize(text, voice=voice, rate=rate)
-    return ok({"audio_bytes": audio_bytes.hex(), "length": len(audio_bytes)})
+    return ok(TTSResult(audio_bytes=audio_bytes.hex(), length=len(audio_bytes)))
 
 
 @router.post("/llm/chat")
 async def llm_chat(
     message: str = Form(...),
     client: LLMClient = Depends(get_llm_client),
-) -> Envelope[Any]:
+) -> Envelope[ChatResult]:
     reply = await client.chat([{"role": "user", "content": message}])
-    return ok({"reply": reply})
+    return ok(ChatResult(reply=reply))

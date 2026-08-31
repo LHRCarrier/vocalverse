@@ -28,6 +28,21 @@ class ScoreResult:
     word_level: list[dict[str, Any]] = field(default_factory=list)
 
 
+@dataclass
+class TTSResult:
+    """TTS 响应数据。M1 stub 为 hex 字符串；M2 真 TTS 改二进制/URL 时更新契约（docs/06 §8）。"""
+
+    audio_bytes: str  # hex（stub 阶段）
+    length: int
+
+
+@dataclass
+class ChatResult:
+    """LLM 场景扮演单轮回复。M2 多轮/流式扩展时更新契约（docs/06 §8）。"""
+
+    reply: str
+
+
 class ASRClient(abc.ABC):
     """语音识别接口（默认 faster-whisper small int8 CPU）。"""
 
