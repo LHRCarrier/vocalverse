@@ -1,0 +1,31 @@
+# ============================================================
+# VocalVerse pre-commit 配置 —— 仅纯 Python 钩子（Windows 可用）
+# 严禁任何 *.sh 钩子；安装：pip install pre-commit && pre-commit install
+# ============================================================
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^services/python/
+      - id: ruff-format
+        files: ^services/python/
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        exclude: ^(?!\.github/workflows/)
+      - id: check-json
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.0.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]

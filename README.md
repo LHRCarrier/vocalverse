@@ -9,26 +9,38 @@ VocalVerse 面向不同年龄段英语学习者，基于大模型场景扮演（
 - **个性化学习**：入学测试 + 学习画像 + 推荐算法，自动生成学习路径
 - **可视化报表**：口语/唱歌成绩多维度分析与趋势展示
 
-## 技术栈（规划）
+## 技术栈
 
 | 层 | 技术 |
 |---|---|
-| 前端 | **Vue**（Web 端界面；移动端 App 按课题文档为 Kotlin/Objective-C，作为后续扩展） |
-| 后端 | **Python**（数据处理、模型部署、语音管线 + LLM Agent 编排）· **Java**（系统架构、工单管理、业务接口） |
-| 大模型 | DeepSeek API（场景扮演 Agent、多轮对话、评测报告生成） |
-| 语音识别 | Whisper（API / faster-whisper 本地推理） |
-| 语音合成 | Edge-TTS / Azure / 火山 TTS（免训练） |
-| 发音评分 | 讯飞评测 API（基线）或 wav2vec2 微调（自研加分项，需小 GPU） |
-| 唱歌评分 | pyin/crepe 基频提取 + 音准/节奏对齐（自研，CPU 可跑） |
-| 模型训练 | **PyTorch / TensorFlow**（发音评分模型微调）+ **Scikit-learn**（推荐、口语水平预测，CPU） |
-| 数据 | PostgreSQL · Redis（可选） |
-| 部署 | Docker Compose |
+| 前端 | **Vue 3 + TypeScript(strict) + Vite 6 + pnpm**（Web 端；移动端以 PWA/响应式覆盖，原生 App 列为扩展） |
+| Python 服务 | **FastAPI**：ASR（faster-whisper small/int8/CPU）、TTS（edge-tts，Azure 备胎）、讯飞评测（发音评分基线）+ wav2vec2 微调（门禁化自研加分项）、唱歌评分（pyin + DTW）、DeepSeek LLM 场景扮演 Agent、推荐（sklearn） |
+| Java 服务 | **Spring Boot 3.3 / Java 21**（薄管理端）：用户管理、场景/歌曲库 CRUD、工单、JWT 签发 |
+| 大模型 | DeepSeek API（场景扮演、语法判定、评分报告生成） |
+| 模型训练 | **PyTorch**（CPU 推理；云 GPU 训练隔离环境）+ **Scikit-learn**（推荐、水平预测） |
+| 数据 | PostgreSQL（Alembic 唯一 schema 真源）· Redis（会话/缓存/限流） |
+| 部署 | Docker Compose（python 8000 / java 8080 / web 8088 / pg 5432 / redis 6379） |
 
-## 仓库与协作
+## 快速开始（Windows）
 
-- GitHub: https://github.com/LHRCarrier/vocalverse （公开仓库 + main 分支保护）
-- 成员：LHRCarrier（组长/全栈 Agent）、xiaoqing-one、Faust-sudo（协作者）
-- 协作规范见 `docs/05-GitHub协作规范.md`，分工与排期见 `docs/04-分工与里程碑.md`
+```powershell
+.\scripts\bootstrap.ps1    # 工具链自检（node/pnpm/python/uv/jdk/maven/docker/ffmpeg）
+.\scripts\dev.ps1          # docker compose 一键起全部服务
+# 前端 http://localhost:8088 · Python API http://localhost:8000/docs · Java http://localhost:8080/swagger-ui.html
+```
+
+本地热重载（推荐 M2 起）：Python 用 venv + uvicorn，前端 pnpm dev，见各服务 README。
+
+## 仓库结构
+
+```
+apps/web/         前端（Vue3+TS+Vite6；录音 / SSE / 埋点）
+services/python/  语音管线 + LLM Agent + 推荐（FastAPI；Alembic 唯一 schema 真源）
+services/java/    薄管理端（Spring Boot；JWT 签发）
+infra/            部署与 nginx 配置
+scripts/          dev.ps1 / bootstrap.ps1（Windows 一键）
+docs/             00~05 规划文档 + 06 技术框架决策（ADR 唯一权威）+ api/ 契约
+```
 
 ## 文档索引
 
@@ -38,12 +50,19 @@ VocalVerse 面向不同年龄段英语学习者，基于大模型场景扮演（
 | `docs/01-选题依据.md` | 课程案例 #7 原文要点 + 扩展方向（唱歌评分） |
 | `docs/02-功能规划.md` | 功能模块清单与 MVP 砍范围建议 |
 | `docs/03-技术选型.md` | 技术方案、API 选型、云 GPU 预算 |
-| `docs/04-分工与里程碑.md` | 三人分工与阶段里程碑 |
+| `docs/04-分工与里程碑.md` | 三人分工与阶段里程碑（M1~M4） |
 | `docs/05-GitHub协作规范.md` | 分支保护、PR 流程、commit 规范 |
+| **`docs/06-技术框架决策.md`** | **ADR 权威文档**：双子代理拷问产出 + 组长拍板（拓扑/版本/CI/契约/音频/指标口径/评分公式/合规），与 00~05 冲突以本文档为准 |
+| `docs/07-需求拷问报告.md` | 需求拷问官 **63 问原文**（范围/指标口径/评分口径/社区/合规/DoD）+ 38 条 ADR 建议——docs/06 的决策依据，答辩可引用 |
+| `docs/08-技术架构拷问报告.md` | 技术架构拷问官 **60 问原文**（目录/版本/CI/契约/音频/模型/DB/Windows 坑）+ AD-01~40 决策清单——docs/06 的决策依据 |
 
-## 开发计划（M1 ~ M4）
+## 里程碑（详见 docs/04、docs/06）
 
-1. **M1 骨架**（第 1 周）：仓库初始化、Python/Java 后端与 Vue 前端骨架、语音模块接口联调
-2. **M2 MVP**（第 2-3 周）：口语对话场景 + ASR/TTS + 发音评分
-3. **M3 特色**（第 4-5 周）：英文歌练唱评分、个性化推荐、报表
-4. **M4 联调**（第 6 周）：性能优化、演示数据、答辩材料
+1. **M1 骨架**（第 1 周）：本仓库脚手架 + 三端 CI + 语音三件套 stub 联调
+2. **M2 MVP**（第 2-3 周）：口语闭环（注册→入学测试→场景对话→录音→评分→建议→报告）
+3. **M3 特色**（第 4-5 周）：唱歌评分做深（音准/节奏/发音）+ 推荐/报表演示化 + 四指标看板；（门禁）wav2vec2 微调
+4. **M4 联调**（第 6 周）：性能 p95 达标、演示脚本、答辩材料
+
+## 红线（公开仓库）
+
+API Key、密码、真实用户数据、训练集原始文件、模型权重、原始音频、商用音乐 **严禁入库**；密钥只进 `.env`（已 gitignore）。
