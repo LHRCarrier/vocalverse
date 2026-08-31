@@ -36,10 +36,9 @@ jobs:
         with:
           context: ${{ matrix.context }}
           push: true
+          # 注意：Docker 仓库名必须小写；github.repository_owner 可能是大写（如 LHRCarrier），
+          # 故这里写死小写 owner；仓库迁移时同步更新。
+          # 注意：GHA 缓存（type=gha）需要 buildx 的 docker-container 驱动（默认 docker 驱动不支持）。
           tags: |
-            # 注意：Docker 仓库名必须小写；github.repository_owner 可能是大写（如 LHRCarrier），
-            # 故这里写死小写 owner；仓库迁移时同步更新。
             ghcr.io/lhrcarrier/${{ matrix.image }}:latest
             ghcr.io/lhrcarrier/${{ matrix.image }}:${{ github.sha }}
-          # 注意：GHA 缓存（type=gha）需要 buildx 的 docker-container 驱动；
-          # runner 默认 docker 驱动会报 "Cache export is not supported"。M1 阶段镜像小，先不缓存。
