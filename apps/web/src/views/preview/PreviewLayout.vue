@@ -84,8 +84,8 @@ function renderMenu(): MenuOption[] {
       </div>
       <n-menu :value="activeKey" :options="renderMenu()" />
       <div class="mt-auto border-t border-[#E5E7EB] px-4 py-3 text-xs leading-relaxed text-[#667085]">
-        预览工作流：静态高保真 → 视觉验收（docs/13 §8）→ 集成真实 view。<br>
-        右上角可切换"真实布局"模式，所见即生产。生产构建自动剔除本画廊。
+        预览工作流：静态高保真 → 视觉验收（docs/13 §8）→ 集成真实 view 后<b>删除本页</b>。<br>
+        生产构建自动剔除本画廊（零残留），无需上线操作。右上角可切"真实布局"模式（所见即生产）。
       </div>
     </n-layout-sider>
     <n-layout-content class="bg-[#F9FAFB] p-6">
