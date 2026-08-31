@@ -23,6 +23,18 @@ VocalVerse 面向不同年龄段英语学习者，基于大模型场景扮演（
 
 ## 启动指南（团队测试用）
 
+### 端口速查（前端两个端口对应两种方式，别混淆）
+
+| 端口 | 服务 | 属于 | 入口 |
+|---|---|---|---|
+| **5173** | 前端（Vite dev server） | **方式 B** 本地开发 | http://localhost:5173 |
+| **8088** | 前端（nginx，反代 API 同源） | **方式 A** 容器一键 | http://localhost:8088 |
+| 8000 | Python API（容器或本地均可） | A / B | /docs · /readyz |
+| 8080 | Java API（容器或本地均可） | A / B | /swagger-ui.html |
+| 5432 / 6379 | PostgreSQL / Redis | **仅容器**（A、B 共用） | - |
+
+> ⚠️ 本地 `pnpm dev` 开着 5173 是**正常的**；8088 只在方式 A 容器启动后才有。方式 B 不要两种入口混用（代理分别配好，见 `apps/web/vite.config.ts`）。
+
 ### 0. 先明确当前阶段能测什么（M1 骨架）
 
 - ✅ 能测：三服务连通性、录音组件（MediaRecorder → WebM/opus）、**stub 音频管线**（ASR/TTS/评分/LLM 均为 Fake，返回固定演示文本）、CI/镜像构建。
@@ -49,7 +61,7 @@ Copy-Item .env.example .env    # 可选；不填也能起（占位符），但 A
 
 | 入口 | 地址 | 验证点 |
 |---|---|---|
-| 前端演示页 | http://localhost:8088 | 显示「VocalVerse 框架骨架」，Python/Java 状态为 ✓；点「开始录音」→ 允许麦克风 → 6 秒后显示 stub 转写 |
+| 前端演示页（容器入口） | http://localhost:8088 | 显示「VocalVerse 框架骨架」，Python/Java 状态为 ✓；点「开始录音」→ 允许麦克风 → 6 秒后显示 stub 转写 |
 | Python API 文档 | http://localhost:8000/docs | 可试 `POST /api/v1/asr`、`/tts`、`/score`、`/llm/chat`（返回 stub 结果） |
 | Python 健康检查 | http://localhost:8000/healthz 、/readyz | 返回 `{"status":"alive"}` / `code=0` |
 | Java API 文档 | http://localhost:8080/swagger-ui.html | `/actuator/health` 返回 UP |
@@ -59,12 +71,13 @@ Copy-Item .env.example .env    # 可选；不填也能起（占位符），但 A
 
 ### 3. 方式 B：本地开发热重载（M2 起日常开发用）
 
-数据库/缓存仍在容器里跑，三端各自本地起：
+数据库/缓存仍在容器里跑（**Docker Desktop 必须先启动**，daemon 未运行会报 `failed to connect to the docker API`），三端各自本地起：
 
 ```powershell
 docker compose up -d postgres redis        # 1. 只起依赖
+docker compose ps                          #    确认 postgres、redis 均为 healthy 再继续
 
-# 2. 前端（终端 1）
+# 2. 前端（终端 1）——注意：本地 dev 端口是 5173（不是 8088）
 cd apps/web; pnpm install; pnpm dev        # http://localhost:5173（代理已配 8000/8080）
 
 # 3. Python（终端 2）——首次 uv sync 会下载 CPU 版 torch，较慢
@@ -92,6 +105,8 @@ mvn spring-boot:run
 
 | 现象 | 处理 |
 |---|---|
+| `docker compose` 报 `failed to connect to the docker API` | **Docker Desktop 没启动**：先启动 Docker Desktop 并等引擎就绪（任务栏鲸鱼图标转绿），再执行 compose |
+| `mvn spring-boot:run` 报 Hibernate `JdbcEnvironmentInitiator` / 数据库连接失败 | 方式 B 漏了起依赖：先 `docker compose up -d postgres redis` 且 `docker compose ps` 显示 healthy；若 Java 配置连的不是容器库，检查 `DB_HOST` 环境变量（默认 localhost:5432，见 `services/java` 的 `application.yml`） |
 | 端口 8088/8000/8080 被占用 | `Get-NetTCPConnection -LocalPort <port> -State Listen` 找 PID 释放；或改 compose 的 ports 映射 |
 | 前端请求 404 / 服务不可达 | 先确认对应服务容器 `healthy`；方式 B 下需先 `docker compose up -d postgres redis` |
 | Docker 卡顿/服务起不来（WSL2 默认内存 2GB） | 按 `infra/dev/.wslconfig` 示例设 `memory=8GB,processors=4`，执行 `wsl --shutdown` 后重启 Docker |
