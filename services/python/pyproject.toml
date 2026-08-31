@@ -60,6 +60,10 @@ src = ["app", "tests"]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["B008"]  # FastAPI 的 Depends 默认参数风格
 
+[tool.ruff.lint.per-file-ignores]
+# 迁移文件为（半）生成代码：autogenerate 输出天然超长行（docs/10 §7 迁移规范）
+"alembic/versions/*" = ["E501"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["gpu: 需要 GPU 的测试（CI 默认跳过）"]

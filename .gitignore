@@ -40,7 +40,8 @@ services/java/target/
 # --- 数据与训练产物（按路径，而非裸后缀） ---
 data/audio/
 data/raw/
-models/
+# 注意：必须锚定路径！裸 `models/` 会吞掉 services/python/app/models（schema 模型，必须入库）
+/models/
 services/python/models/
 *.pth
 *.h5

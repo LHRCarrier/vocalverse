@@ -43,6 +43,7 @@ jobs:
       - name: Alembic single head assert
         run: |
           uv run alembic heads
-          test "$(uv run alembic heads | grep -c '(head)')" -le 1 \
-            || { echo '::error:: alembic 出现多头，迁移历史必须线性单头（0 头=暂无迁移，允许）'; exit 1; }
+          # 项目从 0001 起必有且仅有一个头（docs/11 Q-A11：0 头=迁移缺失，必须红）
+          test "$(uv run alembic heads | grep -c '(head)')" -eq 1 \
+            || { echo '::error:: alembic 头数 != 1（0 头=迁移缺失；多头=历史分叉）'; exit 1; }
           # 注：alembic check（模型 vs 迁移一致）需连库执行；M2 接入 PG 后改为带 DB 的集成步骤再启用

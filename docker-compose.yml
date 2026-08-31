@@ -42,8 +42,8 @@ services:
         required: false
     environment:
       APP_ENV: development
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vocalverse}:${POSTGRES_PASSWORD:-vocalverse-dev}@postgres:5432/${POSTGRES_DB:-vocalverse}
-      REDIS_URL: redis://redis:6379/0
+      APP_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vocalverse}:${POSTGRES_PASSWORD:-vocalverse-dev}@postgres:5432/${POSTGRES_DB:-vocalverse}
+      APP_REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
     volumes:
