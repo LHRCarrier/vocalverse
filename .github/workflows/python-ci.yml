@@ -40,6 +40,29 @@ jobs:
       - name: Tests
         run: uv run pytest -m "not gpu" -q
 
+      - name: Contract: OpenAPI snapshot in sync
+        # 契约真源 = 运行中的后端 /openapi.json；前端快照（apps/web/src/api/specs/）必须与之一致。
+        # 后端契约变更后重跑 scripts/refresh-openapi.ps1 并提交快照，否则此步红。
+        run: |
+          uv run python - <<'EOF'
+          import json
+          from pathlib import Path
+
+          from app.main import app
+
+          snapshot = Path("../../apps/web/src/api/specs/python-openapi.json")
+          if not snapshot.exists():
+              raise SystemExit(f"契约快照缺失：{snapshot}")
+          committed = json.loads(snapshot.read_text(encoding="utf-8"))
+          live = app.openapi()
+          if committed != live:
+              raise SystemExit(
+                  "契约快照与后端 OpenAPI 不一致：后端契约变更后需重新导出并提交快照"
+                  "（scripts/refresh-openapi.ps1 + pnpm gen:api 生成的类型一并提交）"
+              )
+          print("ok：契约快照与后端 OpenAPI 一致")
+          EOF
+
       - name: Alembic single head assert
         run: |
           uv run alembic heads

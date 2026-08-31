@@ -35,6 +35,14 @@ jobs:
       - name: Install (frozen)
         run: pnpm install --frozen-lockfile
 
+      - name: Contract: regenerate types from snapshot
+        run: pnpm gen:api
+
+      - name: Contract: no generated-type drift
+        # 生成文件必须随契约快照入库：后端契约变更后跑 scripts/refresh-openapi.ps1 一步刷新。
+        # 只改了快照没重新生成（或反向）→ 此步红。
+        run: git diff --exit-code -- src/api/generated/
+
       - name: Lint
         run: pnpm lint
 
