@@ -1,0 +1,37 @@
+# --- Node / 前端 ---
+node_modules/
+dist/
+*.local
+.vite/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.pth
+*.h5
+*.onnx
+*.safetensors
+
+# --- 密钥与环境 ---
+.env
+.env.*
+!.env.example
+
+# --- 数据与训练产物 ---
+data/
+models/
+*.wav
+*.mp3
+*.lrc
+*.csv
+*.db
+*.sqlite3
+*.log
+
+# --- 系统 / IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
