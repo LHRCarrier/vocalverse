@@ -57,7 +57,7 @@
 | C | `openapi-typescript` 构建期生成前端类型（生成文件入库 + CI typecheck 兜底） | ✅ 已落地（2026-08-31） |
 | D | `/manage` 两处一致性守护（注释互指已加；CI 冒烟断言随 M2 前端冒烟） | ⏳ M2 |
 | E | 管理端 UI = `apps/web` `/admin` 路由 + admin 角色（等 docs/04 排期，不建独立 SPA） | ⏳ 排期 |
-| F | X-Request-Id 全链路透传（nginx 注入 + Java filter + Python middleware，logback/loguru 携入 JSON） | ⏳ 联调前 |
+| F | X-Request-Id 全链路透传（nginx 注入 + Java filter + Python middleware 已落地，各端有测试；logback/loguru JSON 结构化留待 M2） | ✅ 已落地（2026-08-31） |
 
 ## 5. 答辩口径（若被问"为什么不像参照项目那样做"）
 
