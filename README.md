@@ -85,9 +85,9 @@ cd apps/web; pnpm install; pnpm dev        # http://localhost:5173（代理已�
 cd services/python
 uv sync
 Copy-Item .env.example .env                # 填 DeepSeek/讯飞密钥（M2 真实管线需要；不填则走 Fake）
-alembic upgrade head                        # 建表（schema 真源=Alembic；M2 迁移 0001+0002）
+uv run alembic upgrade head                # 建表（schema 真源=Alembic；M2 迁移 0001+0002）
 uv run python -m app.db.seed               # 幂等 seed：8 套场景内容 + 入学测试题库
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8000   # 注意：uv 前缀不能省（Windows 下 venv 不在 PATH）
 
 # 4. Java（终端 3）——首次先 mvn -N wrapper:wrapper 生成 mvnw
 cd services/java
@@ -119,6 +119,9 @@ mvn spring-boot:run
 | 语音接口返回固定文本 | 预期行为：M1 全部为 Fake 实现（`services/python/app/audio/stubs.py`），M2 替换为 faster-whisper / edge-tts / 讯飞 ISE |
 | Windows 长路径/编码问题 | `git config --global core.longpaths true`；`.gitattributes` 已强制 LF（.ps1/.bat 用 CRLF） |
 | `.env` 忘记填密钥 | M1 不阻塞（占位符可起）；M2 起 DeepSeek/讯飞必须填，且严禁提交 `.env` |
+| seed/迁移报 `password authentication failed for user "vocalverse"` | **DB 密码与 compose 默认不一致**：`services/python/.env` 的 `APP_DATABASE_URL` 密码必须等于 `docker-compose.yml` 的 `${POSTGRES_PASSWORD:-vocalverse-dev}`（`.env.example` 默认已是 `vocalverse-dev`）；改密码需三处同步（compose 环境变量 / services/python/.env / 根 `.env` 的 `POSTGRES_PASSWORD`） |
+| `alembic` 命令不识别 | Windows 下 venv 不在 PATH：一律 `uv run alembic ...`（uv 前缀同样适用于 uvicorn/pytest） |
+| 8000 端口 `WinError 10013`（访问被拒） | 端口被占用（旧 uvicorn 实例等）：`Get-NetTCPConnection -LocalPort 8000 -State Listen` 找 PID 释放后再起 |
 
 详细决策与约定见各服务 README 与 `docs/06-技术框架决策.md`。
 
