@@ -312,6 +312,41 @@ def test_events_unknown_type_ignored(client, auth_headers):
     assert r.status_code == 200 and r.json()["data"]["dedup"] is True
 
 
+def test_event_types_all_10_insertable(client, auth_headers):
+    """docs/06 §9.1：10 类事件逐类可落库（防常量/CHECK 漂移）。"""
+    import time
+
+    from app.models.base import EventTypes
+
+    allowed = {v for k, v in vars(EventTypes).items() if k.isupper() and not k.startswith("__")}
+    assert len(allowed) == 10, f"事件类应有 10 个：{allowed}"
+    now = int(time.time())
+    for i, name in enumerate(sorted(allowed)):
+        r = client.post(
+            "/api/v1/events",
+            json={
+                "event_type": name,
+                "client_event_id": f"all-types-{i}",
+                "occurred_at": now,
+            },
+            headers=auth_headers,
+        )
+        assert r.status_code == 200, f"{name}: {r.text}"
+    # 维度快照列（docs/06 §9.1）同时带 payload 校验一次
+    r = client.post(
+        "/api/v1/events",
+        json={
+            "event_type": "corpus_hit",
+            "client_event_id": "all-types-99",
+            "occurred_at": now,
+            "scene_id": 1,
+            "payload": {"phrase": "I would like a coffee, please", "state": "ok"},
+        },
+        headers=auth_headers,
+    )
+    assert r.status_code == 200 and r.json()["data"]["dedup"] is False
+
+
 # ---------------------------------------------------------------------------
 # 限流：LLM 桶 429
 # ---------------------------------------------------------------------------
