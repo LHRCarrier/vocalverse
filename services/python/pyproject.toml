@@ -67,6 +67,7 @@ ignore = ["B008"]  # FastAPI 的 Depends 默认参数风格
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["gpu: 需要 GPU 的测试（CI 默认跳过）"]
+asyncio_mode = "auto"
 
 [tool.mypy]
 python_version = "3.12"

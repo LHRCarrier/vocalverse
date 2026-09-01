@@ -154,6 +154,7 @@ class LevelSources:
 class SessionKinds:
     DIALOG = "dialog"
     SING = "sing"
+    DEFENSE = "defense"  # 答辩会话（docs/14 §6.1，2026-09 拍板）
 
 
 class SessionStatus:
@@ -172,10 +173,14 @@ class AttemptKinds:
     DIALOG_SPEECH = "dialog_speech"
     FREE_PRACTICE = "free_practice"
     PLACEMENT_ITEM = "placement_item"
+    DEFENSE_ANSWER = "defense_answer"  # 答辩作答（docs/14 §6.1，2026-09 拍板）
 
 
 class EventTypes:
-    """埋点事件类型（docs/06 §9.1 定稿 9 类，新增须改本常量 + 迁移 + docs/06）。"""
+    """埋点事件类型（docs/06 §9.1 定稿 9 类 + corpus_hit 共 10 类）。
+
+    新增须改本常量 + 迁移 + docs/06。
+    """
 
     PAGE_VIEW = "page_view"
     SCENE_START = "scene_start"
@@ -186,6 +191,7 @@ class EventTypes:
     RECOMMEND_CLICK = "recommend_click"
     PRACTICE_COMPLETE = "practice_complete"
     FUN_ACTION = "fun_action"
+    CORPUS_HIT = "corpus_hit"  # 语言点覆盖度命中（docs/14 §6.3，2026-09 拍板）
 
 
 class TicketStatuses:

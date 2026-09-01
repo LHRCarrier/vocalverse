@@ -41,6 +41,7 @@ EXPECTED_TABLES = {
     "tickets",
     "listening_materials",
     "post_likes",
+    "defense_profiles",
 }
 
 
@@ -163,12 +164,15 @@ def test_alembic_offline_pg_render(capsys, monkeypatch):
 
 
 def test_alembic_offline_pg_downgrade(capsys, monkeypatch):
-    """PG 方言离线渲染 downgrade：逆序可编译（docs/10 §7.1 幂等逆序，FK 依赖安全）。"""
+    """PG 方言离线渲染 downgrade：head→base 全路径逆序可编译（docs/10 §7.1 幂等逆序，FK 依赖安全）。
+
+    覆盖 0002（含 CHECK 反转 + defense_profiles 回退），与 alembic 单头策略一致。
+    """
     monkeypatch.setenv(
         "APP_DATABASE_URL",
         "postgresql+psycopg://vocalverse:vocalverse-dev@localhost:5432/vocalverse",
     )
-    result = alembic_command.downgrade(_alembic_config(), "0001:base", sql=True)
+    result = alembic_command.downgrade(_alembic_config(), "head:base", sql=True)
     captured = capsys.readouterr()
     out = result if isinstance(result, str) else (captured.out + captured.err)
     assert not out.startswith("Traceback"), out[:2000]

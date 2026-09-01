@@ -18,6 +18,7 @@ from .content import (
     Song,
     SongPitchRef,
 )
+from .defense import DefenseProfile
 from .practice import Attempt, PostLike, Score, Session, SingAttempt
 from .tickets import Ticket
 from .user import Placement, RefreshToken, User, UserProfile
@@ -44,6 +45,8 @@ __all__ = [
     "Score",
     "SingAttempt",
     "PostLike",
+    # 答辩域
+    "DefenseProfile",
     # 分析/支持域
     "Event",
     "Report",

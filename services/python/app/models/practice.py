@@ -61,6 +61,11 @@ class Session(TimestampMixin, Base):
     song_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("songs.id", ondelete="SET NULL")
     )
+    # 答辩档案引用（docs/14 §6.1）：defense 会话指向 defense_profiles；
+    # 档案删除（软删）不影响历史；SET NULL 与 scenario_id/song_id 语义一致
+    profile_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("defense_profiles.id", ondelete="SET NULL")
+    )
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default=text(f"'{SessionStatus.ACTIVE}'")
     )
@@ -79,7 +84,10 @@ class Session(TimestampMixin, Base):
     channel: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("'web'"))
 
     __table_args__ = (
-        CheckConstraint(f"kind IN ('{SessionKinds.DIALOG}', '{SessionKinds.SING}')", name="kind"),
+        CheckConstraint(
+            f"kind IN ('{SessionKinds.DIALOG}', '{SessionKinds.SING}', '{SessionKinds.DEFENSE}')",
+            name="kind",
+        ),
         CheckConstraint(
             f"status IN ('{SessionStatus.ACTIVE}', '{SessionStatus.COMPLETED}', "
             f"'{SessionStatus.ABANDONED}')",
@@ -136,7 +144,7 @@ class Attempt(TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(
             f"kind IN ('{AttemptKinds.DIALOG_SPEECH}', '{AttemptKinds.FREE_PRACTICE}', "
-            f"'{AttemptKinds.PLACEMENT_ITEM}')",
+            f"'{AttemptKinds.PLACEMENT_ITEM}', '{AttemptKinds.DEFENSE_ANSWER}')",
             name="kind",
         ),
         Index("ix_attempts_user_created", "user_id", "created_at"),

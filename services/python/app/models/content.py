@@ -126,7 +126,7 @@ class ScenarioMessage(CreatedAtMixin, Base):
             name="origin",
         ),
         CheckConstraint(
-            "action IN ('demo', 'correction', 'retry') OR action IS NULL", name="action"
+            "action IN ('demo', 'correction', 'retry', 'hint') OR action IS NULL", name="action"
         ),
     )
 

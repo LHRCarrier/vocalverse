@@ -74,7 +74,7 @@ class Event(CreatedAtMixin, Base):
         CheckConstraint(
             "event_type IN ('page_view', 'scene_start', 'recording_start', "
             "'recording_complete', 'score_event', 'recommend_impression', "
-            "'recommend_click', 'practice_complete', 'fun_action')",
+            "'recommend_click', 'practice_complete', 'fun_action', 'corpus_hit')",
             name="event_type",
         ),
         CheckConstraint(
@@ -137,7 +137,7 @@ class Report(TimestampMixin, Base):
             "period_end",
             name="uq_reports_scope_period",
         ),
-        CheckConstraint("scope IN ('global', 'user', 'scene', 'song')", name="scope"),
+        CheckConstraint("scope IN ('global', 'user', 'scene', 'song', 'session')", name="scope"),
         CheckConstraint("period_end >= period_start", name="period_order"),
         Index("ix_reports_scope_period", "scope", "scope_id", "period_start"),
     )
