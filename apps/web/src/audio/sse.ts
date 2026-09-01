@@ -43,12 +43,13 @@ export function parseSseBuffer(buffer: string): [string, SseStreamEvent[]] {
 
 export function openSseFetch(
   url: string,
-  init: { method: string; body: FormData },
+  init: { method: string; body: FormData; headers?: HeadersInit },
   handlers: SseHandlers,
   signal?: AbortSignal,
 ): void {
   let buffer = ''
-  fetch(url, { method: init.method, body: init.body, signal, headers: { Accept: 'text/event-stream' } })
+  const headers = { Accept: 'text/event-stream', ...(init.headers ?? {}) }
+  fetch(url, { method: init.method, body: init.body, signal, headers })
     .then(async (resp) => {
       if (!resp.ok || !resp.body) {
         // 非 SSE 错误（409/429/413 等）：尝试读 JSON envelope

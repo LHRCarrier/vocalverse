@@ -75,7 +75,7 @@ export function streamTurn(
 ): void {
   openSseFetch(
     `/api/v1/sessions/${sessionId}/turns`,
-    { method: 'POST', body: form },
+    { method: 'POST', body: form, headers: authHeaders() },
     { onEvent, onError, onClose: () => undefined },
     signal,
   )
