@@ -108,6 +108,8 @@ mvn spring-boot:run
 | `docker compose` 报 `failed to connect to the docker API` | **Docker Desktop 没启动**：先启动 Docker Desktop 并等引擎就绪（任务栏鲸鱼图标转绿），再执行 compose |
 | `mvn spring-boot:run` 报 Hibernate `JdbcEnvironmentInitiator` / 数据库连接失败 | 方式 B 漏了起依赖：先 `docker compose up -d postgres redis` 且 `docker compose ps` 显示 healthy；若 Java 配置连的不是容器库，检查 `DB_HOST` 环境变量（默认 localhost:5432，见 `services/java` 的 `application.yml`） |
 | 端口 8088/8000/8080 被占用 | `Get-NetTCPConnection -LocalPort <port> -State Listen` 找 PID 释放；或改 compose 的 ports 映射 |
+| Java 启动日志结尾报 `APPLICATION FAILED TO START ... Port 8080 was already in use` | **机器上已有 Java 实例在跑，别开第二个**（第一个是活的，不是服务挂了；2026-09-01 实测踩坑：第二个实例失败、第一个一直正常服务）。`Get-NetTCPConnection -LocalPort 8080 -State Listen` 找 PID 确认；要换新版本就 `taskkill /PID <pid> /F` 后再起 |
+| Java 启动日志显示 `using Java 24.x` / IDE 直接跑但端口被自己占 | **`JAVA_HOME` 设错**：项目钉死 JDK 21（docs/06 §3），以 Temurin 21 为准：`[Environment]::SetEnvironmentVariable('JAVA_HOME','C:\Program Files\Eclipse Adoptium\jdk-21.0.8.9-hotspot','User')` 后**重开终端**；`mvn -version` 显示 Java 21.0.x 即对齐。Java 24 跑 Spring Boot 3.3 当前能起但有一串 native-access 警告（未来版本会直接拦截）且与 CI 环境不一致 |
 | 前端请求 404 / 服务不可达 | 先确认对应服务容器 `healthy`；方式 B 下需先 `docker compose up -d postgres redis` |
 | Docker 卡顿/服务起不来（WSL2 默认内存 2GB） | 按 `infra/dev/.wslconfig` 示例设 `memory=8GB,processors=4`，执行 `wsl --shutdown` 后重启 Docker |
 | 首次 `dev.ps1` 很慢 | 正常：基础镜像 + Python 依赖（含 CPU torch ≈200MB）；网络差可给 Docker 配镜像加速 |
