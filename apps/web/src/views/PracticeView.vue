@@ -6,7 +6,7 @@
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NButton, NProgress, NTag } from 'naive-ui'
+import { NButton, NCard, NProgress, NTag } from 'naive-ui'
 
 import { track } from '@/api/events'
 import { createSession, fetchScenarios, streamTurn, tts, type ScenarioItem } from '@/api/practice'
