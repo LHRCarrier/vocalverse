@@ -19,4 +19,5 @@ RUN uv sync --frozen --no-dev
 COPY . .
 
 EXPOSE 8000
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --workers 1 显式声明（docs/06 §8：whisper 多 worker 各载 ~500MB 模型且并发收益为负）
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

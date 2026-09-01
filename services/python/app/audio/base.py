@@ -70,7 +70,11 @@ class ScorerClient(abc.ABC):
 
 
 class LLMClient(abc.ABC):
-    """LLM 客户端（DeepSeek；场景扮演/语法判定/报告生成）。"""
+    """LLM 客户端（DeepSeek；场景扮演/语法判定/报告生成/答辩知识包）。
+
+    - ``chat``：非流式（答辩知识包生成、报告生成等一次性 JSON 输出）；
+    - ``stream``：流式（对话回复：纯文本 + 尾部 [-META-] 标记块，docs/14 §3.4）。
+    """
 
     @abc.abstractmethod
     async def chat(
@@ -81,26 +85,72 @@ class LLMClient(abc.ABC):
     ) -> str:
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def stream(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float = 0.6,
+        max_tokens: int = 512,
+    ):
+        """流式输出：异步迭代器逐段产出文本（含 [-META-] 尾部标记）。"""
+        raise NotImplementedError
+
 
 def get_asr_client() -> ASRClient:
-    from app.audio.stubs import FakeASRClient
+    settings = _settings()
+    if settings.testing or not settings.asr_model:
+        from app.audio.stubs import FakeASRClient
 
-    return FakeASRClient()
+        return FakeASRClient()
+    from app.audio.asr import FasterWhisperClient
+
+    return FasterWhisperClient(
+        model=settings.asr_model, device=settings.asr_device, compute_type=settings.asr_compute_type
+    )
 
 
 def get_tts_client() -> TTSClient:
-    from app.audio.stubs import FakeTTSClient
+    settings = _settings()
+    if settings.testing:
+        from app.audio.stubs import FakeTTSClient
 
-    return FakeTTSClient()
+        return FakeTTSClient()
+    from app.audio.tts import EdgeTTSClient
+
+    return EdgeTTSClient(voice=settings.tts_voice, rate=settings.tts_rate)
 
 
 def get_scorer_client() -> ScorerClient:
-    from app.audio.stubs import FakeScorerClient
+    settings = _settings()
+    if settings.testing or not (settings.ise_app_id and settings.ise_api_key):
+        from app.audio.stubs import FakeScorerClient
 
-    return FakeScorerClient()
+        return FakeScorerClient()
+    from app.audio.ise import ISEClient
+
+    return ISEClient(
+        app_id=settings.ise_app_id,
+        api_key=settings.ise_api_key,
+        api_secret=settings.ise_api_secret,
+    )
 
 
 def get_llm_client() -> LLMClient:
-    from app.audio.stubs import FakeLLMClient
+    settings = _settings()
+    if settings.testing or not settings.deepseek_api_key:
+        from app.audio.stubs import FakeLLMClient
 
-    return FakeLLMClient()
+        return FakeLLMClient()
+    from app.audio.llm import DeepSeekLLMClient
+
+    return DeepSeekLLMClient(
+        api_key=settings.deepseek_api_key,
+        base_url=settings.deepseek_base_url,
+        model=settings.deepseek_model,
+    )
+
+
+def _settings():
+    from app.core.config import get_settings
+
+    return get_settings()

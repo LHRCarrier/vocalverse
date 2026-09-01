@@ -37,3 +37,27 @@ class FakeLLMClient(LLMClient):
         max_tokens: int = 512,
     ) -> str:
         return "[stub] That sounds great! What size would you like?"
+
+    async def stream(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float = 0.6,
+        max_tokens: int = 512,
+    ):
+        """Fake 流式：分 3 段吐出回复文本 + 尾部 META（与真实现同协议，供全链路测试）。"""
+        from app.practice.meta import render_meta
+
+        chunks = [
+            "Of course! Would you like it hot ",
+            "or iced? ",
+            "That will be four dollars, please.",
+        ]
+        for c in chunks:
+            yield c
+        yield render_meta(
+            grammar={"score": 92, "errors": []},
+            coach_note="Nice and clear!",
+            corpus_hits=[{"phrase": "I would like a coffee, please", "state": "ok"}],
+            difficulty_delta=0,
+            conclude=False,
+        )

@@ -14,13 +14,29 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app import __version__
-from app.api.routes import audio, health
+from app.api.routes import audio, defense, events, health, placement, practice
 from app.core.config import get_settings
 from app.core.response import BizError
 from app.core.trace import RequestIdLogFilter, RequestIdMiddleware
 
 logger = logging.getLogger("vocalverse")
 logger.addFilter(RequestIdLogFilter())  # 每条日志带 request_id（docs/06 §11）
+
+
+def _prewarm_asr() -> None:
+    """预热 whisper（首个请求免 30s 卡顿）；失败仅告警不阻塞启动（docs/06 §8）。"""
+    try:
+        settings = get_settings()
+        if settings.testing or settings.asr_model == "":
+            return
+        from app.audio.base import get_asr_client
+
+        client = get_asr_client()
+        if client and getattr(client, "_get_model", None):
+            client._get_model()  # noqa: SLF001 - 预热专用
+            logger.info("whisper 模型预热完成")
+    except Exception as exc:
+        logger.warning("whisper 预热失败（不阻塞启动）: %s", exc)
 
 
 @asynccontextmanager
@@ -57,4 +73,8 @@ async def validation_error_handler(_: Request, exc: RequestValidationError) -> J
 
 app.include_router(health.router)
 app.include_router(audio.router)
+app.include_router(practice.router)
+app.include_router(defense.router)
+app.include_router(placement.router)
+app.include_router(events.router)
 app.add_middleware(RequestIdMiddleware)  # X-Request-Id 透传（docs/06 §11）

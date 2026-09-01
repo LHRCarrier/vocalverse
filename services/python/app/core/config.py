@@ -28,9 +28,10 @@ class Settings(BaseSettings):
     redis_required: bool = False  # False → 内存 fallback，省 Redis 也能起
 
     # 鉴权（Java 签发，Python 验签；内部调用 service-token）
-    jwt_secret: str = "change-me"
+    jwt_secret: str = "vocalverse-dev-jwt-secret-0123456789abcdef"
     jwt_algorithm: str = "HS256"
     service_token: str = "change-me-internal-service-token"
+    java_base_url: str = "http://localhost:8080"
 
     # LLM
     deepseek_api_key: str = ""
@@ -42,6 +43,8 @@ class Settings(BaseSettings):
     asr_device: str = "cpu"  # cpu | cuda
     asr_compute_type: str = "int8"
     tts_provider: str = "edge"  # edge | azure
+    tts_voice: str = "en-US-JennyNeural"
+    tts_rate: str = "+0%"
     azure_tts_key: str = ""  # 存在时切 Azure，见 docs/06 第 8 章
     ise_app_id: str = ""  # 讯飞评测 API（基线）
     ise_api_key: str = ""
@@ -51,9 +54,17 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 20 * 1024 * 1024  # 20MB
     max_speech_seconds: int = 60
     max_sing_seconds: int = 180
+    max_dialog_seconds: int = 15  # 对话单轮录音上限（docs/14 §3.2）
+    dialog_idle_seconds: int = 8  # 无录音救援触发（docs/14 §2.3）
+    # 限流（docs/06 §7：30 次/时；POC 失败回退两调用时提高至 60）
+    llm_rate_per_hour: int = 30
+    asr_rate_per_hour: int = 60
+    ise_rate_per_hour: int = 60
+    tts_rate_per_hour: int = 60
 
     # 音频保留（合规：默认 24h 清理）
     audio_ttl_hours: int = 24
+    audio_dir: str = "./data/audio"  # 本地卷存储（docs/06 §8）
 
 
 @lru_cache

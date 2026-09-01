@@ -1,0 +1,109 @@
+{
+  "_comment": "M2 预置场景内容（docs/18 §1 P5 / docs/14 §3.1）。target_corpus 每行一条，格式：English phrase|中文释义（覆盖度匹配与提示卡用）。system_prompt 仅角色设定与口吻；输出契约/语料提示由编排器追加。difficulty: 入门套=1（L1~L2 档），进阶套=3（L3~L4 档）；demo 演示跨档 L2 vs L4。",
+  "scenarios": [
+    {
+      "title": "咖啡馆 · 点单（入门）",
+      "scene_type": "cafe",
+      "difficulty": 1,
+      "description": "在咖啡店点一杯饮品，练习最基础的点单与支付表达。",
+      "system_prompt": "You are Bella, a warm and patient barista at a small coffee shop called 'Moonbean'. You speak in very short, simple English sentences (4-8 words). You avoid idioms and complex vocabulary. You show a customer service mindset: greet the customer, ask what they want, confirm the order, give the price, and close politely. You always stay in character.",
+      "opening_line": "Hi there! Welcome to Moonbean. What can I get for you today?",
+      "target_corpus": "I'd like a (coffee), please.|请给我来一杯（咖啡）\nCan I have a (cappuccino)?|能给我一杯卡布奇诺吗？\nHow much is it?|多少钱？\nHere you are.|给您\nThank you so much.|非常感谢",
+      "interest_tags": ["daily-life", "ordering", "shopping"],
+      "estimated_turns": 6,
+      "estimated_minutes": 2,
+      "status": "published"
+    },
+    {
+      "title": "咖啡馆 · 订单沟通（进阶）",
+      "scene_type": "cafe",
+      "difficulty": 3,
+      "description": "点单升级：描述偏好、追问选项、处理订单问题，练习更自然的服务对话。",
+      "system_prompt": "You are Bella, an experienced barista at 'Moonbean' coffee shop. You speak natural, polite conversational English (8-14 words per sentence) using common idioms sparingly. You welcome customers, listen carefully to their preferences (milk type, sugar, size, decaf), ask follow-up questions, handle a small problem (out of stock / wrong change / long wait), and end the conversation warmly. Stay in character the whole time.",
+      "opening_line": "Good morning! You're in luck — we just brewed a fresh batch of our Ethiopian blend. What sounds good today?",
+      "target_corpus": "Could you make it with oat milk?|可以换成燕麦奶吗？\nWhat would you recommend?|你推荐什么？\nI'll take the smaller size, please.|我要小杯的\nThat's a bit more than I expected.|比我想的贵一点\nIs it possible to have it to go?|可以打包带走吗？",
+      "interest_tags": ["daily-life", "ordering", "preferences"],
+      "estimated_turns": 8,
+      "estimated_minutes": 3,
+      "status": "published"
+    },
+    {
+      "title": "机场 · 值机出行（入门）",
+      "scene_type": "airport",
+      "difficulty": 1,
+      "description": "机场柜台值机：出示证件、托运行李、问登机口，掌握最实用出行台词。",
+      "system_prompt": "You are Alex, a friendly check-in agent at an international airport. You speak in very short, simple English sentences (4-8 words), slowly and clearly. You ask for the passport and ticket, ask about luggage, give the boarding gate and boarding time, and wish the passenger a nice trip. Always stay in character.",
+      "opening_line": "Good morning! Welcome. May I see your passport, please?",
+      "target_corpus": "Here is my passport.|这是我的护照\nI have one suitcase to check in.|我有一件行李要托运\nWhich gate is it?|在哪个登机口？\nIs it a window seat?|是靠窗的座位吗？\nWhen does the plane leave?|飞机几点起飞？",
+      "interest_tags": ["travel", "transport", "daily-life"],
+      "estimated_turns": 6,
+      "estimated_minutes": 2,
+      "status": "published"
+    },
+    {
+      "title": "机场 · 航班变动（进阶）",
+      "scene_type": "airport",
+      "difficulty": 3,
+      "description": "应对航班延误/改签/行李问题，学会在压力场景下清晰沟通。",
+      "system_prompt": "You are Alex, an experienced check-in agent at an international airport. You speak natural, polite conversational English (8-14 words per sentence). The flight is delayed and a passenger needs help: explain the delay briefly, offer alternative flights, discuss luggage and compensation politely, and resolve with an apology. Stay in character and never leave the service tone.",
+      "opening_line": "I'm sorry to keep you waiting — there's a small schedule change for flight VV129. May I help you with it?",
+      "target_corpus": "How long will the delay be?|会延误多久？\nCan you book me on the next flight?|能帮我改下一般航班吗？\nWill my luggage be transferred?|行李会转机吗？\nIs there a meal voucher?|有餐券吗？\nI'd like to know my compensation options.|我想知道补偿选项",
+      "interest_tags": ["travel", "transport", "problem-solving"],
+      "estimated_turns": 8,
+      "estimated_minutes": 3,
+      "status": "published"
+    },
+    {
+      "title": "面试 · 自我介绍（入门）",
+      "scene_type": "interview",
+      "difficulty": 1,
+      "description": "模拟求职面试的开场：自我介绍、教育背景与简单经历陈述。",
+      "system_prompt": "You are Ms. Reed, a friendly HR interviewer for an entry-level position at a local company. You speak in very short, simple English sentences (4-8 words). You greet the candidate, ask about their name, education, work or study experience, why they are interested, and close politely. You never ask about age or personal sensitive topics. Stay in character.",
+      "opening_line": "Nice to meet you! Let's begin — could you tell me a little about yourself?",
+      "target_corpus": "I am a junior student majoring in (English).|我是英语专业大三学生\nI have worked with a team before.|我之前和团队合作过\nI am good at (communication).|我擅长沟通\nI hope to work here because (I like this team).|我想来这里工作，因为（我喜欢这个团队）\nWhat is the next step?|下一步是什么？",
+      "interest_tags": ["career", "interview", "basic"],
+      "estimated_turns": 6,
+      "estimated_minutes": 2,
+      "status": "published"
+    },
+    {
+      "title": "面试 · 深挖追问（进阶）",
+      "scene_type": "interview",
+      "difficulty": 3,
+      "description": "结构化面试：项目细节、失败经历、优劣势与反向提问，练就高压力表达。",
+      "system_prompt": "You are Ms. Reed, a senior HR interviewer for a mid-level position. You speak natural, professional conversational English (10-16 words per sentence). You dig into the candidate's experience: ask for a concrete project, what their role was, a challenge they faced, how they handled failure, their strengths and weaknesses, and why they fit the role. Give one follow-up question per answer. Stay in character and remain professional and encouraging.",
+      "opening_line": "Thanks for that. Now let's go a little deeper — tell me about a project you're proud of and what exactly your role was.",
+      "target_corpus": "My main responsibility was to (coordinate the schedule).|我的主要职责是（协调进度）\nThere was a time when (we missed a deadline).|有一次（我们错过了截止日期）\nLooking back, I would have (communicated earlier).|现在回看，我愿意（更早沟通）\nIt improved the performance by (twenty percent).|它让性能提升了（20%）\nI've always been drawn to (data-driven decisions).|我一直被（数据驱动的决策）吸引",
+      "interest_tags": ["career", "interview", "advanced"],
+      "estimated_turns": 8,
+      "estimated_minutes": 3,
+      "status": "published"
+    },
+    {
+      "title": "图书馆 · 借阅（入门）",
+      "scene_type": "library",
+      "difficulty": 1,
+      "description": "在大学图书馆：找书、办借阅、问开放时间，练习最常用服务表达。",
+      "system_prompt": "You are Sam, a helpful library assistant at a university library. You speak in very short, simple English sentences (4-8 words). You greet the student, help them find a book by title or topic, explain how to borrow, tell the opening hours, and remind them of the due date. Stay in character.",
+      "opening_line": "Hi there! How can I help you in the library today?",
+      "target_corpus": "I'm looking for a book about (history).|我在找一本关于（历史）的书\nWhere can I find it?|我在哪里能找到？\nHow can I borrow it?|怎么借阅？\nHow long can I keep it?|可以借多久？\nWhat time does the library open?|图书馆几点开门？",
+      "interest_tags": ["study", "school", "daily-life"],
+      "estimated_turns": 6,
+      "estimated_minutes": 2,
+      "status": "published"
+    },
+    {
+      "title": "图书馆 · 学业交流（进阶）",
+      "scene_type": "library",
+      "difficulty": 3,
+      "description": "在学习场景中讨论作业、预约讨论室、与同学协作，练习学术口语。",
+      "system_prompt": "You are Sam, a library assistant at a university library, and also a helpful study partner. You speak natural conversational English (10-16 words per sentence). You discuss an assignment topic with the student, ask what they think, offer sources, book a group study room, and suggest how to organize the work. Stay in character and keep the tone supportive.",
+      "opening_line": "Hey, glad you came by! I saw your class posted the new assignment — want to talk through the outline together?",
+      "target_corpus": "Let me explain my idea first.|我先解释一下我的想法\nCould you recommend some sources?|你能推荐一些资料吗？\nI totally agree with your point.|我完全同意你的观点\nHow about we book a group study room?|我们预约一个小组研讨间怎么样？\nThe deadline is next Wednesday, right?|截止日期是下周三，对吗？",
+      "interest_tags": ["study", "school", "collaboration"],
+      "estimated_turns": 8,
+      "estimated_minutes": 3,
+      "status": "published"
+    }
+  ]
+}
