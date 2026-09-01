@@ -54,12 +54,43 @@ onMounted(async () => {
   }
 })
 
+/** 录音启动序号：用于作废「权限提示/埋点期间」尚未完成的启动，保证停止键任意时刻都有效 */
+let startSeq = 0
+
 async function startRecord() {
-  if (recording.value) return
+  if (recording.value) {
+    // 录音中点击 ■ = 立即停止（停止后经 onStop 上传已录片段）
+    stopRecord()
+    return
+  }
   error.value = null
+  const seq = ++startSeq
   recording.value = true
-  await track('recording_start', { page: '/placement' })
-  await recorder.start(15_000)
+  try {
+    await track('recording_start', { page: '/placement' })
+    if (seq !== startSeq) {
+      // 启动完成前收到停止 → 不再拉起录音
+      recording.value = false
+      return
+    }
+    await recorder.start(15_000)
+    if (seq !== startSeq) {
+      // start() 完成前收到停止 → 立即停掉刚启动的录音
+      recording.value = false
+      recorder.stop()
+    }
+  } catch (e) {
+    // getUserMedia 被拒/无麦克风等：复位按钮，避免按键永久卡在录音态
+    if (seq === startSeq) {
+      recording.value = false
+      error.value = (e as Error).message
+    }
+  }
+}
+
+function stopRecord() {
+  startSeq += 1 // 作废未完成的启动
+  recorder.stop()
 }
 
 async function upload(blob: Blob) {
@@ -138,7 +169,7 @@ function format(v?: number | null) {
         <NButton circle size="large" :type="recording ? 'error' : 'primary'" :disabled="uploading" @click="startRecord">
           {{ recording ? '■' : '🎙' }}
         </NButton>
-        <p class="mt-3 text-sm text-[#667085]">{{ recording ? '录音中…（≤15s）' : '点击录音朗读本句' }}</p>
+        <p class="mt-3 text-sm text-[#667085]">{{ recording ? '录音中…（≤15s 自动停止，点击 ■ 立即停止）' : '点击录音朗读本句' }}</p>
       </div>
     </NCard>
 
