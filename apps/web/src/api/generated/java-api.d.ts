@@ -23,7 +23,18 @@ export interface paths {
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        EnvelopePingData: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["PingData"];
+        };
+        PingData: {
+            status?: string;
+            service?: string;
+        };
+    };
     responses: never;
     parameters: never;
     requestBodies: never;
@@ -47,9 +58,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": {
-                        [key: string]: string;
-                    };
+                    "*/*": components["schemas"]["EnvelopePingData"];
                 };
             };
         };

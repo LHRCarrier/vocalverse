@@ -12,6 +12,7 @@
  */
 
 import type { components } from './generated/python-api'
+import type { components as javaComponents } from './generated/java-api'
 
 /**
  * 生成契约里的 DTO 集合（数据层类型，勿在此手改：
@@ -22,6 +23,8 @@ export type AsrData = ApiSchemas['ASRResult']
 export type ScoreData = ApiSchemas['ScoreResult']
 export type TtsData = ApiSchemas['TTSResult']
 export type ChatData = ApiSchemas['ChatResult']
+/** Java 侧 DTO（/manage，2026-09-01 起也由契约生成；ping 曾裸返回 → 见 docs/06 §7 记录） */
+export type PingData = javaComponents['schemas']['PingData']
 
 export interface Envelope<T> {
   code: number
@@ -56,7 +59,7 @@ export function readyz() {
 }
 
 export function pingJava() {
-  return request<{ service: string; status: string }>('/api/v1/ping', undefined, JAVA_BASE)
+  return request<PingData>('/api/v1/ping', undefined, JAVA_BASE)
 }
 
 /** 上传录音到 Python ASR（M1 为 stub；M2 接入 faster-whisper），DTO 类型来自生成契约 */

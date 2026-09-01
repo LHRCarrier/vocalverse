@@ -19,11 +19,13 @@ class PingControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @Test
-  void pingReturnsAlive() throws Exception {
+  void pingReturnsEnvelope() throws Exception {
     mockMvc
         .perform(get("/api/v1/ping"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("alive"))
-        .andExpect(jsonPath("$.service").value("vocalverse-java-api"));
+        .andExpect(jsonPath("$.code").value(0))
+        .andExpect(jsonPath("$.message").value("ok"))
+        .andExpect(jsonPath("$.data.status").value("alive"))
+        .andExpect(jsonPath("$.data.service").value("vocalverse-java-api"));
   }
 }

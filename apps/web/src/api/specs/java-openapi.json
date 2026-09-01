@@ -15,10 +15,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "type" : "object",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  }
+                  "$ref" : "#/components/schemas/EnvelopePingData"
                 }
               }
             }
@@ -27,5 +24,34 @@
       }
     }
   },
-  "components" : { }
+  "components" : {
+    "schemas" : {
+      "EnvelopePingData" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PingData"
+          }
+        }
+      },
+      "PingData" : {
+        "type" : "object",
+        "properties" : {
+          "status" : {
+            "type" : "string"
+          },
+          "service" : {
+            "type" : "string"
+          }
+        }
+      }
+    }
+  }
 }
