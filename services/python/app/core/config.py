@@ -52,6 +52,9 @@ class Settings(BaseSettings):
 
     # 限制（见 docs/api/error-codes.md）
     max_upload_bytes: int = 20 * 1024 * 1024  # 20MB
+    # 音频下界（40002）：挡住「空/近空录音」。前端停止键可用后，误触会产出 ~0ms 的 webm，
+    # 落库即推进题目/回合且不可重来；1KB 约等于不到半秒的 opus，正常作答不会触到。
+    min_upload_bytes: int = 1024
     max_speech_seconds: int = 60
     max_sing_seconds: int = 180
     max_dialog_seconds: int = 15  # 对话单轮录音上限（docs/14 §3.2）

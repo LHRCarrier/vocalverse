@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.audio.base import get_llm_client
+from app.audio.upload import validate_audio_bytes
 from app.core.auth import get_current_user_id
 from app.core.config import get_settings
 from app.core.ratelimit import bucket_limits, consume
@@ -133,8 +134,13 @@ async def post_turn(
     """
     settings = get_settings()
     data = await audio.read() if audio is not None else None
-    if data and len(data) > settings.max_upload_bytes:
-        raise BizError(http_status=413, code=41301, message="audio too large")
+    if data is not None:
+        # 带音频的回合先校验：空/近空录音会推进 current_turn 且不可重来（见 app/audio/upload.py）
+        data = validate_audio_bytes(
+            data,
+            min_bytes=settings.min_upload_bytes,
+            max_bytes=settings.max_upload_bytes,
+        )
     # 用户录音落盘（docs/14 §6.1：attempts.audio_url 引用；24h 惰性过期清理）
     audio_url = save_audio_bytes(data) if data else None
 
