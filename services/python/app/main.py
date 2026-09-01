@@ -43,6 +43,7 @@ def _prewarm_asr() -> None:
 async def lifespan(_: FastAPI):
     settings = get_settings()
     logger.info("vocalverse python-api %s starting (env=%s)", __version__, settings.app_env)
+    _prewarm_asr()  # whisper 预热（docs/06 §8：防首个请求卡 30s；testing/无模型跳过）
     yield
     logger.info("vocalverse python-api stopped")
 

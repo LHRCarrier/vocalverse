@@ -333,6 +333,7 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                 seq=seq_assistant,
                 role="assistant",
                 content=reply,
+                audio_url=(audio_urls[0] if audio_urls else None),
                 meta={
                     "grammar": grammar,
                     "coach_note": meta.coach_note,

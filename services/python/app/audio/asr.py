@@ -16,6 +16,14 @@ from app.audio.base import ASRClient, ASRResult
 _FFMPEG = "ffmpeg"
 
 
+def _ffmpeg_bin() -> str:
+    """ffmpeg 路径：默认 PATH 中的 ffmpeg；本机未装时可设 FFMPEG_BIN 指向
+    imageio-ffmpeg（pip 附带二进制，免管理员）等任意可执行文件路径。"""
+    import os
+
+    return os.environ.get("FFMPEG_BIN", _FFMPEG)
+
+
 class FasterWhisperClient(ASRClient):
     def __init__(self, model: str = "small", device: str = "cpu", compute_type: str = "int8"):
         self._model_name = model
@@ -54,7 +62,7 @@ class FasterWhisperClient(ASRClient):
         try:
             wav = src + ".wav"
             subprocess.run(
-                [_FFMPEG, "-y", "-i", src, "-ar", "16000", "-ac", "1", "-f", "wav", wav],
+                [_ffmpeg_bin(), "-y", "-i", src, "-ar", "16000", "-ac", "1", "-f", "wav", wav],
                 check=True,
                 capture_output=True,
             )

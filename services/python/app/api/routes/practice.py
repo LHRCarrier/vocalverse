@@ -27,6 +27,7 @@ from app.practice import events as ev
 from app.practice.orchestrator import (
     OrchestratorError,
     get_orchestrator,
+    save_audio_bytes,
 )
 from app.practice.service import complete_session, create_session
 from app.practice.state import get_state_store
@@ -134,6 +135,8 @@ async def post_turn(
     data = await audio.read() if audio is not None else None
     if data and len(data) > settings.max_upload_bytes:
         raise BizError(http_status=413, code=41301, message="audio too large")
+    # 用户录音落盘（docs/14 §6.1：attempts.audio_url 引用；24h 惰性过期清理）
+    audio_url = save_audio_bytes(data) if data else None
 
     store = get_state_store()
     state = await store.get(session_id)
@@ -151,7 +154,9 @@ async def post_turn(
 
     async def event_stream():
         try:
-            async for event in orchestrator.run(session_id, user_id, data, action, expected_turn):
+            async for event in orchestrator.run(
+                session_id, user_id, data, action, expected_turn, audio_url
+            ):
                 yield ev.sse_payload(event)
         except OrchestratorError as exc:
             yield ev.sse_payload(ev.StreamError(code=str(exc.status_code), recoverable=False))

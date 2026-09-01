@@ -5,9 +5,12 @@
 - 约定：
   * naming_convention 与模型层一致（约束名确定，autogenerate/check 稳定）；
   * compare_type=True：模型与迁移逐字段比对；
-  * compare_server_default=自定义比较器（docs/11 Q-A06）：过滤两类已知噪音
-    （PG 反射 JSONB 默认带 ``::jsonb`` 后缀；now()/CURRENT_TIMESTAMP 等价写法），
-    其余默认值漂移照常报警——不做整体关闭；
+  * compare_server_default=False（2026-09-01 真 PG 实跑发现并登记）：SQLAlchemy 2.0.52
+    对 PG16 identity 列反射为 server_default=Identity()，alembic `_user_compare_server_default`
+    对其做 `cast(...).arg.text` 直接 AttributeError（上游不兼容，1.18/1.19 均复现）——
+    关闭默认值比对规避；补偿门禁：offline PG 渲染测试（test_models）断言
+    JSONB/IDENTITY/表达式索引；默认值漂移由迁移自检 + CI 契约探针兜底；
+    上游修复后恢复 docs/11 Q-A06 自定义比较器；
   * render_as_batch=True：SQLite 下 ALTER 走 batch（若单测改跑 alembic 亦兼容）；
   * Java 侧 JPA `ddl-auto=none`，只映射不建表（见 services/java/application.yml）。
 """
@@ -71,7 +74,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
-        compare_server_default=_compare_server_default,
+        compare_server_default=False,
         render_as_batch=True,
     )
     with context.begin_transaction():
@@ -90,7 +93,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
-            compare_server_default=_compare_server_default,
+            compare_server_default=False,
             render_as_batch=True,
         )
         with context.begin_transaction():
