@@ -178,7 +178,25 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             )
             return
         if action in ("demo", "hint") and not audio:
-            # 用户主动点示范/提示：不回放整套，仅给参考句
+            # 用户主动点示范/提示：无音频轻回合——落库 + 推进轮次（否则前端 turn_end+1 与服务端
+            # current_turn 不同步 → 下轮 stale_turn 409，2026-09-01 实机修复）；不发覆盖度/评分
+            seq_user = state.next_seq
+            state.next_seq += 1
+            db.add(
+                ScenarioMessage(
+                    session_id=state.session_id,
+                    seq=seq_user,
+                    role="user",
+                    origin="respond",
+                    action=action,
+                    content=f"[{action}]",
+                    meta={"action": action, "trigger_by": "user"},
+                )
+            )
+            state.current_turn = turn_index
+            state.last_action = action
+            db.commit()
+            await get_state_store().put(state)
             yield ev.TurnEnd(turn_index=turn_index, score_status="unavailable")
             return
 

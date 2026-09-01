@@ -220,17 +220,11 @@ function onSseEvent(e: SseStreamEvent) {
   }
 }
 
-async function handleHint() {
-  if (!hintText.value) hintText.value = firstCorpusPhrase() ?? ''
-  await track('fun_action', { payload: { action: 'hint', trigger_by: 'user' } })
-  sendTurn('hint')
-}
-
-async function handleDemo() {
+async function playDemo() {
+  // 示范 = 只播放参考句音频，不产生回合（回合只在录音后发生——2026-09-01 修复无音频回合导致的 409）
   const phrase = hintText.value ?? firstCorpusPhrase() ?? ''
   if (phrase) playTts(phrase)
   await track('fun_action', { payload: { action: 'demo', trigger_by: 'user' } })
-  sendTurn('demo')
 }
 </script>
 
@@ -274,8 +268,8 @@ async function handleDemo() {
     >
       <p class="text-sm"><span class="text-[#B45309]">💡 试试这样说：</span>{{ hintText }}</p>
       <div class="flex gap-2">
-        <NButton size="small" round @click="handleDemo">🔊 示范</NButton>
-        <NButton size="small" round type="primary" @click="handleHint">继续对话</NButton>
+        <NButton size="small" round @click="playDemo">🔊 示范</NButton>
+        <NButton size="small" round type="primary" @click="startRecording">🎙 试试说</NButton>
       </div>
     </section>
 
@@ -336,7 +330,7 @@ async function handleDemo() {
 
     <div class="flex items-center justify-end gap-2">
       <NButton quaternary round @click="sendTurn('abandon')">结束并查看报告</NButton>
-      <NButton quaternary round @click="handleDemo">🔊 听示范</NButton>
+      <NButton quaternary round @click="playDemo">🔊 听示范</NButton>
       <NButton round type="primary" :disabled="phase !== 'ready'" @click="startRecording">继续对话 ←</NButton>
     </div>
   </div>
