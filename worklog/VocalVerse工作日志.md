@@ -3,6 +3,58 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-01 VocalVerse · M2 实施落地——双子拷问收敛 → 全链路实现 → 真环境联调（DoD 全绿）
+
+### 背景
+
+- 对组长 M2 场景对话草案（v1）派 **双子拷问官交叉拷问**（互不知晓、四层递进至穷尽）：需求/产品官 28 问（docs/15）+ 技术/架构官 37 问（docs/16），合流拍板记录 docs/17；规格修订为 docs/14 v2；实施计划 docs/18。
+- 拍板关键项：答辩 M2 W3 极简版 / defense_profiles **软删+脱敏** / 回答质量改**等级标签**（避开 docs/06 §9.3 冲突）/ LLM **流式回复 + `[-META-]` 尾部标记**（修复"假流式"首声超预算）/ 覆盖度口径（5 条、命中双态、retry 作废）。
+
+### 实施（按 docs/18 §3，3 人分工由组长一人代跑）
+
+1. **W1 前置**：3 个 POC 脚本（scripts/poc/：edge_tts_latency / deepseek_meta / whisper_rtf）+ 8 套场景内容（data/seed/scenarios.json：4 场景×入门/进阶，每套 5 语料含中文释义）+ 幂等 seed.py（含入学测试题库 5+1）。
+2. **Python**：迁移 `0002_m2_practice`（defense_profiles 新表、sessions.kind/attempts.kind/scenario_messages.action(+hint)/events.event_type(10 类)/reports.scope(+session) 五处 CHECK 扩展、sessions.profile_id SET NULL、**defense 题数复用 assigned_turns 快照**）；编排器 app/practice/（回合状态机、流式 text_delta + META 尾部拆解、评分并行、命中双态、2 级救场、会话锁、覆盖度）；答辩（异步知识包生成 6 条校验 + basis 提问依据 + `<untrusted_input>` 注入隔离 + 等级阶梯）；路由 10+（sessions/turns-SSE/reports/GET audio 鉴权+410 惰性过期/defense profiles/placement/events 幂等埋点/限流分桶）；真实客户端 DeepSeek/edge-tts/faster-whisper/讯飞 ISE（重依赖延迟导入，CI 零 Key 纪律不变）。
+3. **Java**：Spring Security + jjwt 认证最小集（register/login/refresh rotation/me/service-token 内部回写）；DemoSeeder 3 画像账号（demoadult/demoteen/demosenior，密码 demo123456）；HS256 与 Python 手写验签对齐。
+4. **前端**：sse.ts 重写（fetch 流解析器，6 单测）+ recorder 参数化 + 计时器 composable + auth store（pinia）+ 埋点封装；PracticeHub / PracticeView / ReportView / DefenseView / **PlacementView**（5 句+1 QA→综合分 S→水平档）；预览页平移后**删除+撤登记**（docs/13 §8 纪律）。
+5. **基础设施**：compose 一键 migrate 服务（alembic+seed）、python `--workers 1` + mem_limit 2g、Dockerfile `--workers 1`。
+
+### 验证（全部实测）
+
+| 检查 | 结果 |
+|---|---|
+| Python pytest | **41 passed**（含 M2 核心 20+4 seed+10 类事件防漂移）；ruff check + format ✓ |
+| Java `mvn verify` | BUILD SUCCESS（认证流程 3 用例 + 既有 5）；契约快照已重刷 |
+| 前端 | typecheck / lint / vitest **8 passed** / **build ✓**（p5 独立懒加载 chunk） |
+| 契约 | python/java 双快照已重生成，gen:api 零 diff 口径保持 |
+| **真 PG** | alembic upgrade head（0001+0002）✓；**alembic check 零 diff**（首次启用） |
+| **真环境联调**（scripts/poc/integration_check.py） | Java 登录→Python 验签互通 ✓ →场景 8 套/会话 ✓ →**真实 whisper 转写完整无误** ✓ →真实 edge-tts 4 段音频+回放鉴权（200/越权 401）✓ →报告 ✓ →埋点 SQL 核对（8 类非零）✓ |
+| POC-1（edge-tts 延迟） | 单句 mean **1.34s** / 3 句串行 4.12s → **FAIL 判据**，回退方案生效：并发预热+预合成开场，首声口径 3~6s |
+| POC-3（whisper RTF） | mean RTF **0.328**（短）/ **0.258**（长）→ **PASS**，演示话术「3~5s」成立 |
+
+### 踩坑记录（本轮重点，务必留存）
+
+1. 🚨 **alembic check 首次真 PG 即崩（上游不兼容，最大坑）**：SQLAlchemy 2.0.52 反射 PG16 **identity 列**为 `server_default=Identity()`，alembic `_user_compare_server_default` 对其 `cast(...).arg.text` → `AttributeError: 'Identity' object has no attribute 'arg'`（1.18.5/1.19.1 均复现，降级无解）。**处置**：env.py `compare_server_default=False` 规避 + docs/06 §10 登记；补偿门禁=offline PG 渲染测试 + 本轮真 PG 零 diff 实测；上游修复后恢复 docs/11 Q-A06 自定义比较器。**教训：迁移门禁必须真 PG 跑一次，离线渲染测试测不出运行时崩溃。**
+2. 🚨 **`services/python/.env` 里的 `APP_JWT_SECRET` 与 Java 默认值不一致 → Python 401「invalid token」**：JWT 互通联调失败时，单进程 decode 正常、运行中服务 401——查半天是**本地 .env 覆盖了 pydantic 默认值**（secret=change-me，仅 9 字节）。**处置**：两端默认值统一为 `vocalverse-dev-jwt-secret-0123456789abcdef`（≥32 字节，JJWT 硬性要求 256bit，弱密钥会 WeakKeyException）；.env.example 同步。**教训：联调类问题先核对"默认值 vs 本地 .env 覆盖"，再怀疑代码。**
+3. **edge-tts 逐句延迟超标**：单句 1.34s（网络往返+合成），3 句串行 4.12s——按句串行 TTS 会把回放拖垮。**处置**：逐句**并发合成** + 开场/常用句预合成 + 首句文本到达即启动。首声预算重估 3~6s（docs/06 §8 已登记实测值）。
+4. **HF 模型下载 xet 通道 401**：`cas-server.xethub.hf.co` 返回 401。**处置**：`HF_HUB_DISABLE_XET=1` 强制经典 HTTP 下载。**教训：新 pipeline 的下载通道要标注可绕过变量。**
+5. **SQLite vs PG 时区/事务差异**：① SQLite 返回 naive datetime 与 `now(UTC)` 相减 TypeError → started_at 归一化；② SQLite 单连接（StaticPool）下"外层 turn 事务未提交 + 嵌套 complete_session 新会话"→ 事务冲突 → 嵌套调用前先 `db.commit()`。**教训：跨方言/双会话路径，单测（sqlite）跑通 ≠ PG 无虞，两处都要在测试断言里覆盖。**
+6. **seed 测试被同库污染**：共享 in-memory 引擎里其它用例插入的场景让 `count==8` 断言变 10。**处置**：seed 测试用独立引擎 fixture。**教训：测试间的共享 DB 状态要显式隔离。**
+7. **测试命中 Redis 限流**：本地 Redis 在跑（容器），`_redis_consume` 的 incr 跨进程累计 → 单测 6 轮跑完 LLM 桶 429。**处置**：`get_redis()` 在 `APP_TESTING=true` 时直接返回 None（内存后端），测试 hermetic。
+8. **ffmpeg 缺失挡真实 ASR**：WinError 2；winget 需管理员。**处置**：asr.py 支持 `FFMPEG_BIN` 环境变量，本机用 pip 包 imageio-ffmpeg 的二进制路径（免管理员）。
+9. **JJWT 弱密钥**：`change-me` 仅 72 bit→`WeakKeyException`；统一 ≥256bit 长密钥（与坑 2 同源）。
+10. **Spotless 挡 verify**：新增 Java 文件未格式化 → `mvn verify` 在 check 阶段挂；先 `mvn spotless:apply` 再 verify；契约快照须 `CONTRACT_SNAPSHOT_GENERATE=1`（**环境变量**而非 -D！）重生成。
+11. **vitest include 只匹配 `*.test.ts`**：`sse.spec.ts` 不收集（一直"2 passed"骗了人）；改为 `.test.ts`。SSE 多 `data:` 行语义是按行+换行拼接为一条消息，JSON 内含未转义换行会解析失败——测试用"尾随空行"聚合场景。
+12. **GBK 控制台打印 emoji 崩**：`UnicodeEncodeError 'gbk' codec can't encode '\u2705'`（脚本尾打印 ✅）。**处置**：脚本输出用 ASCII 或 `$env:PYTHONIOENCODING='utf-8'`。
+13. **常量导出**：`app.models` 只再导出表（不导出 SessionKinds/EventTypes 等常量）→ 多处 `from app.models import ContentStatus` ImportError，统一从 `app.models.base` 导入。
+14. **后知后觉的 schema 缺口**：`reports.scope CHECK` 原为 ('global','user','scene','song')，会话级报告无处落袋 → 0002 迁移一并扩 'session'；`scenario_messages.action` 需 +'hint'（v1 草案漏项，拷问官抓到）。
+15. **abandon 早退分支不产报告**：调收尾前必须释放外层 DB 事务，且该分支自身不落任何消息——用户点"结束"要直接走 complete_session（冒烟脚本抓到）。
+
+### 提交
+
+- 分支 `feat/m2-implementation`（9 个 commit 已推送，最新 `118b507`）；文档链 docs/14(v2)/15/16/17/18 与 README 索引同步；按组长授权管理员直推 main（跳过 PR 评审）。
+
+---
+
 ## 2026-08-31 VocalVerse · 同构 Monorepo 参照对比评审——双子拷问官交叉拷问 + 拍板（不照搬、补 .dockerignore、契约生成化）
 
 ### 背景
