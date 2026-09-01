@@ -19,6 +19,9 @@
 
   <properties>
     <java.version>21</java.version>
+    <!-- 源码/报告编码钉死 UTF-8：Windows 中文环境默认 GBK，不声明则中文字符串字面量在编译期被按平台码读取而损坏（乱码/错字） -->
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <springdoc.version>2.6.0</springdoc.version>
     <spotless.version>2.43.0</spotless.version>
   </properties>

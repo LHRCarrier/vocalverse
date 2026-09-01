@@ -118,6 +118,7 @@ mvn spring-boot:run
 | 首次 `dev.ps1` 很慢 | 正常：基础镜像 + Python 依赖（含 CPU torch ≈200MB）；网络差可给 Docker 配镜像加速 |
 | 语音接口返回固定文本 | 预期行为：M1 全部为 Fake 实现（`services/python/app/audio/stubs.py`），M2 替换为 faster-whisper / edge-tts / 讯飞 ISE |
 | Windows 长路径/编码问题 | `git config --global core.longpaths true`；`.gitattributes` 已强制 LF（.ps1/.bat 用 CRLF） |
+| Java 日志中文乱码（如「演示账号就绪」变「婕旂ず璐」） | 双重错位：① 编译期 pom 未声明编码（已钉 `project.build.sourceEncoding=UTF-8`，改 pom 后重新编译生效）；② 运行期终端码页——VSCode 终端先 `chcp 65001` 再起 Java，或 `mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"`（Java 18+ 生效）；Python/edge-tts 脚本同理：`$env:PYTHONIOENCODING='utf-8'` |
 | `.env` 忘记填密钥 | M1 不阻塞（占位符可起）；M2 起 DeepSeek/讯飞必须填，且严禁提交 `.env` |
 | seed/迁移报 `password authentication failed for user "vocalverse"` | **DB 密码与 compose 默认不一致**：`services/python/.env` 的 `APP_DATABASE_URL` 密码必须等于 `docker-compose.yml` 的 `${POSTGRES_PASSWORD:-vocalverse-dev}`（`.env.example` 默认已是 `vocalverse-dev`）；改密码需三处同步（compose 环境变量 / services/python/.env / 根 `.env` 的 `POSTGRES_PASSWORD`） |
 | `alembic` 命令不识别 | Windows 下 venv 不在 PATH：一律 `uv run alembic ...`（uv 前缀同样适用于 uvicorn/pytest） |
