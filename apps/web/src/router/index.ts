@@ -29,22 +29,24 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '入学测试' },
       },
       {
-        path: 'practice/:sceneId',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: {
-          title: '场景对话',
-          desc: 'DeepSeek 多轮 + SSE 流式 + TTS 排队播放（docs/06 §8）——M2 主线',
-        },
-        meta: { title: '场景对话' },
+        path: 'practice',
+        component: () => import('@/views/PracticeHubView.vue'),
+        meta: { title: '练习', requiresAuth: true },
       },
       {
-        path: 'report/:attemptId',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: {
-          title: '评分报告',
-          desc: '音素级错误定位 + 正确示范 + 改进建议（docs/06 §9.3）——M2',
-        },
-        meta: { title: '评分报告' },
+        path: 'practice/:sceneId',
+        component: () => import('@/views/PracticeView.vue'),
+        meta: { title: '场景对话', requiresAuth: true },
+      },
+      {
+        path: 'defense',
+        component: () => import('@/views/DefenseView.vue'),
+        meta: { title: '答辩导师', requiresAuth: true },
+      },
+      {
+        path: 'report/:reportId',
+        component: () => import('@/views/ReportView.vue'),
+        meta: { title: '评分报告', requiresAuth: true },
       },
       {
         path: 'recommend',
@@ -124,6 +126,14 @@ routes.push({ path: '/:pathMatch(.*)*', redirect: '/demo' })
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+// 登录守卫：requiresAuth 路由无 token → 登录页（docs/18 §3-F3；token 恢复见 stores/auth）
+router.beforeEach((to) => {
+  if (to.meta.requiresAuth && !localStorage.getItem('vv_token')) {
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
+  return true
 })
 
 router.afterEach((to) => {

@@ -37,7 +37,7 @@ export class VoiceRecorder {
     return typeof MediaRecorder !== 'undefined'
   }
 
-  async start(): Promise<void> {
+  async start(maxMs: number = MAX_RECORD_MS): Promise<void> {
     if (!this.supported) throw new RecorderError('当前浏览器不支持录音')
     if (this.state === 'recording') return
 
@@ -54,10 +54,6 @@ export class VoiceRecorder {
       const durationMs = this.recordedMs
       stream.getTracks().forEach((t) => t.stop())
       this.setState('stopped')
-      if (blob.size > MAX_BYTES) {
-        this.onStop?.(blob, mime, durationMs)
-        return
-      }
       this.onStop?.(blob, mime, durationMs)
     }
 
@@ -66,8 +62,8 @@ export class VoiceRecorder {
     this.recorder.start()
     this.setState('recording')
 
-    // 自动停止：语音默认 60s（唱歌场景传入更长时长）
-    this.timer = setTimeout(() => this.stop(), MAX_RECORD_MS)
+    // 自动停止：按场景传入（对话 15s / 唱歌 180s / 默认 60s——docs/14 §3.2）
+    this.timer = setTimeout(() => this.stop(), maxMs)
   }
 
   stop(): void {

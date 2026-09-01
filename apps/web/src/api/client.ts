@@ -35,6 +35,17 @@ export interface Envelope<T> {
 const PYTHON_BASE = import.meta.env.VITE_PYTHON_BASE ?? ''
 const JAVA_BASE = import.meta.env.VITE_JAVA_BASE ?? '/manage'
 
+/** 全局访问令牌（由 auth store 写入；request 自动携带）。 */
+let authToken: string | null = null
+
+export function setAuthToken(token: string | null): void {
+  authToken = token
+}
+
+export function getAuthToken(): string | null {
+  return authToken
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly code: number,
@@ -45,8 +56,13 @@ export class ApiError extends Error {
   }
 }
 
+export function authHeaders(): HeadersInit {
+  return authToken ? { Authorization: `Bearer ${authToken}` } : {}
+}
+
 export async function request<T>(path: string, init?: RequestInit, base = PYTHON_BASE): Promise<Envelope<T>> {
-  const resp = await fetch(`${base}${path}`, init)
+  const headers = { ...(init?.headers ?? {}), ...authHeaders() }
+  const resp = await fetch(`${base}${path}`, { ...init, headers })
   const body = (await resp.json()) as Envelope<T>
   if (!resp.ok || body.code !== 0) {
     throw new ApiError(body.code ?? -1, body.message ?? `HTTP ${resp.status}`, resp.status)

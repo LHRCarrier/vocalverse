@@ -1,19 +1,40 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { NButton, NForm, NFormItem, NInput, useMessage } from 'naive-ui'
 
 import { useP5Wave } from '@/composables/useP5Wave'
+import { useAuthStore } from '@/stores/auth'
 
 const message = useMessage()
-const email = ref('')
+const router = useRouter()
+const auth = useAuthStore()
+
+const username = ref('')
 const password = ref('')
+const errorMsg = ref('')
+const loading = ref(false)
 const waveRef = ref<HTMLElement | null>(null)
 
 useP5Wave(waveRef, { height: 180 })
 
-function submit() {
-  // M2：接入 Java JWT 链路后替换（docs/06 §7：access 15min + refresh 7d httpOnly cookie）
-  message.info('登录接口 M2 接入（Java 签发 JWT，见 docs/api 契约）')
+async function submit() {
+  loading.value = true
+  errorMsg.value = ''
+  try {
+    await auth.login(username.value.trim(), password.value)
+    message.success(`欢迎回来！`)
+    router.push((router.currentRoute.value.query.redirect as string) ?? '/practice')
+  } catch (e) {
+    errorMsg.value = (e as Error).message
+  } finally {
+    loading.value = false
+  }
+}
+
+function fillDemo(account: string) {
+  username.value = account
+  password.value = 'demo123456'
 }
 </script>
 
@@ -37,17 +58,27 @@ function submit() {
       </p>
 
       <n-form label-placement="top" @keyup.enter="submit">
-        <n-form-item label="邮箱">
-          <n-input v-model:value="email" placeholder="you@example.com" />
+        <n-form-item label="用户名">
+          <n-input v-model:value="username" placeholder="demoadult" />
         </n-form-item>
         <n-form-item label="密码">
-          <n-input v-model:value="password" type="password" placeholder="••••••••" />
+          <n-input v-model:value="password" type="password" placeholder="demo123456" />
         </n-form-item>
       </n-form>
 
-      <NButton block round size="large" type="primary" @click="submit">登录</NButton>
+      <NButton block round size="large" type="primary" :loading="loading" @click="submit">
+        登录
+      </NButton>
+
+      <div class="mt-4 flex items-center justify-center gap-2 text-xs text-[#667085]">
+        <span>演示账号（密码 demo123456）：</span>
+        <NButton size="tiny" quaternary round @click="fillDemo('demoadult')">成年中级</NButton>
+        <NButton size="tiny" quaternary round @click="fillDemo('demoteen')">青少年初级</NButton>
+        <NButton size="tiny" quaternary round @click="fillDemo('demosenior')">老年高级</NButton>
+      </div>
+      <p v-if="errorMsg" class="mt-3 text-center text-xs text-[#B91C1C]">{{ errorMsg }}</p>
       <p class="mt-4 text-center text-xs text-[#667085]">
-        还没有账号？M2 注册/入学测试开放（docs/06 §9.2）
+        还没有账号？请先启动 Java 服务后注册（M2 认证已接入）
       </p>
     </section>
   </div>

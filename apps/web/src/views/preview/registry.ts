@@ -12,8 +12,6 @@ export interface PreviewPage {
 
 export const previewPages: PreviewPage[] = [
   { path: '/preview/home', label: '学习主页', group: '用户端', layout: 'user' },
-  { path: '/preview/practice', label: '场景对话 ★核心', group: '用户端', layout: 'user' },
-  { path: '/preview/report', label: '评分报告', group: '用户端', layout: 'user' },
   { path: '/preview/admin-dashboard', label: '评价看板（可视化）', group: '管理端', layout: 'admin' },
   { path: '/preview/admin-users', label: '用户管理', group: '管理端', layout: 'admin' },
 ]

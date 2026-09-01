@@ -15,13 +15,8 @@ export const previewRoute: RouteRecordRaw | null = import.meta.env.DEV
       component: () => import('@/views/preview/PreviewLayout.vue'),
       meta: { title: '前端预览画廊' },
       children: [
-        { path: '', redirect: '/preview/practice' },
+        { path: '', redirect: '/preview/home' },
         { path: 'home', component: () => import('@/views/preview/HomePreview.vue') },
-        {
-          path: 'practice',
-          component: () => import('@/views/preview/PracticePreview.vue'),
-        },
-        { path: 'report', component: () => import('@/views/preview/ReportPreview.vue') },
         {
           path: 'admin-dashboard',
           component: () => import('@/views/preview/AdminDashboardPreview.vue'),

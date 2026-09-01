@@ -1,17 +1,30 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { NButton } from 'naive-ui'
 import { useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/stores/auth'
+
 const router = useRouter()
+const auth = useAuthStore()
 
 const nav = [
   { label: '骨架演示', to: '/demo' },
-  { label: '场景练习', to: '/practice/cafe' },
+  { label: '练习', to: '/practice' },
+  { label: '答辩导师', to: '/defense' },
+  { label: '入学测试', to: '/placement' },
   { label: '唱吧 (M3)', to: '/sing' },
   { label: '报表 (M3)', to: '/stats' },
 ]
 
+const nickname = computed(() => auth.me?.nickname ?? '登录')
+
 function login() {
+  router.push('/login')
+}
+
+async function logout() {
+  auth.clear()
   router.push('/login')
 }
 </script>
@@ -33,8 +46,8 @@ function login() {
         >
           {{ link.label }}
         </RouterLink>
-        <NButton class="ml-auto" round size="small" type="primary" @click="login">
-          登录
+        <NButton class="ml-auto" round size="small" type="primary" @click="auth.token ? logout() : login()">
+          {{ auth.token ? nickname + ' · 退出' : '登录' }}
         </NButton>
       </nav>
     </header>
