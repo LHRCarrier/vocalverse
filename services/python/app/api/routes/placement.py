@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.audio.base import get_asr_client, get_scorer_client
+from app.audio.upload import validate_audio_bytes
 from app.core.auth import get_current_user_id
 from app.core.config import get_settings
 from app.core.ratelimit import consume
@@ -67,9 +68,14 @@ async def score_item(
     user_id: int = Depends(get_current_user_id),
 ):
     settings = get_settings()
+    # 先校验再扣额度：空/近空录音不该消耗 ASR/ISE 配额，也不该推进题目
+    data = validate_audio_bytes(
+        await audio.read(),
+        min_bytes=settings.min_upload_bytes,
+        max_bytes=settings.max_upload_bytes,
+    )
     await consume("asr", settings.asr_rate_per_hour, user_id)
     await consume("ise", settings.ise_rate_per_hour, user_id)
-    data = await audio.read()
     db = get_session_factory()()
     try:
         q = db.get(PlacementQuestion, item_id)

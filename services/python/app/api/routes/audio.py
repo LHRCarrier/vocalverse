@@ -23,17 +23,16 @@ from app.audio.base import (
     get_scorer_client,
     get_tts_client,
 )
+from app.audio.upload import validate_audio_bytes
 from app.core.config import Settings, get_settings
-from app.core.response import BizError, Envelope, ok
+from app.core.response import Envelope, ok
 
 router = APIRouter(prefix="/api/v1", tags=["audio"])
 
 
 async def _read_bounded(upload: UploadFile, max_bytes: int) -> bytes:
-    data = await upload.read()
-    if len(data) > max_bytes:
-        raise BizError(http_status=413, code=41301, message="audio too large")
-    return data
+    # 无状态管线端点：只守上界，下界沿用历史行为（min_bytes=0），见 app/audio/upload.py
+    return validate_audio_bytes(await upload.read(), min_bytes=0, max_bytes=max_bytes)
 
 
 @router.post("/asr")

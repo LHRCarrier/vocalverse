@@ -11,7 +11,7 @@ import { NButton, NProgress, NTag } from 'naive-ui'
 import { track } from '@/api/events'
 import { createSession, fetchScenarios, streamTurn, tts, type ScenarioItem } from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
-import { VoiceRecorder } from '@/audio/recorder'
+import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 import { useP5Wave } from '@/composables/useP5Wave'
 import { useTurnTimers } from '@/composables/useTurnTimers'
 
@@ -131,23 +131,40 @@ function playChunk(url: string) {
 }
 
 async function startRecording() {
+  if (recording.value) {
+    // 录音中点击 ■ = 立即停止（经 onStop → sendTurn 正常提交本回合）
+    stopRecording()
+    return
+  }
   if (phase.value !== 'ready') return
   hintText.value = null
   errorMsg.value = null
+  recording.value = true
   try {
-    recording.value = true
-    await track('recording_start', { sceneId: scenario.value?.id })
+    // 埋点不阻塞开录（track 内部已静默容错），也少一个「已点击但未开录」的竞态窗口
+    void track('recording_start', { sceneId: scenario.value?.id })
     await recorder.start(15_000)
   } catch (e) {
     recording.value = false
-    errorMsg.value = (e as Error).message
+    errorMsg.value = micErrorMessage(e)
   }
+}
+
+/** 停止键：录音中 → stop()（提交回合）；仍在权限提示窗口 → cancel()（不提交、不推进 turn） */
+function stopRecording() {
+  if (recorder.state === 'recording') recorder.stop()
+  else recorder.cancel()
 }
 
 recorder.onStateChange = (state) => {
   if (state !== 'recording') recording.value = false
 }
-recorder.onStop = (blob) => {
+recorder.onStop = (blob, _mime, durationMs) => {
+  // 误触保护：提交回合会推进 current_turn，太短的录音不能凭空吃掉一个回合
+  if (durationMs < MIN_RECORD_MS) {
+    errorMsg.value = `录音太短（${(durationMs / 1000).toFixed(1)}s），请说满约 ${MIN_RECORD_MS / 1000} 秒后再点 ■ 停止`
+    return
+  }
   void track('recording_complete', { sceneId: scenario.value?.id }).catch(() => undefined)
   void sendTurn('normal', blob)
 }
@@ -291,7 +308,7 @@ async function playDemo() {
         {{ recording ? '■' : '🎙' }}
       </NButton>
       <p class="mt-3 text-sm text-[#667085]">
-        {{ recording ? '录音中…（≤15s 自动停止）' : '点击说话 · ≤15s · 听到 AI 回复后继续' }}
+        {{ recording ? '录音中…（≤15s 自动停止，点击 ■ 立即停止）' : '点击说话 · ≤15s · 听到 AI 回复后继续' }}
       </p>
     </section>
 

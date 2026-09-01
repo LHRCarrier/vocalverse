@@ -3,7 +3,53 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
-## 2026-09-01 VocalVerse · 真机联调排障五连坑——"Unexpected end of JSON input" 迷雾 + 启动指引修复（commit 管理见文末）
+## 2026-09-01 PR #22 复审整改续：录音停止键三页统一 + 音频下界守卫 + **两条 CI 门禁其实从未跑过**
+
+### 背景
+
+PR #22（Faust-sudo，入学测试录音停止键）复审后发现补丁自身仍有三条破的边界路径，已整改（详见 `worklog/BUG实测/入学测试功能测试.md` BUG-001-R）。本条记录后续三项收尾。
+
+### 1. 停止键修复推广到 Practice / Defense
+
+BUG-001 踩坑记录 3 已标注这两页同模式。本轮统一：
+
+- `DefenseView.startAnswer()` 与修复前的 Placement **逐行同构**（`if (recording.value) return` + 无 try/catch），两个 bug 全中；
+- `PracticeView.startRecording()` 的守卫是 `phase !== 'ready'`，而 `phase` 在录音期间仍是 `'ready'`（只在 `sendTurn` 内才翻 `'busy'`），所以点 ■ 会重入 `startRecording()` 并被 `recorder.start()` 内部的 `state === 'recording'` 守卫吞掉 → 停止键同样失效。
+
+两页改为与 Placement 一致的「录音中 `stop()` / 启动窗口 `cancel()`」二选一，并接上 `micErrorMessage` 与 `MIN_RECORD_MS`。
+
+### 2. 服务端音频下界（40002）
+
+前端停止键修好后，**误触第一次成为可能**：原先停不下来，录音时长恒等于 15s。新增 `app/audio/upload.py::validate_audio_bytes` 统一上下界：
+
+- `placement.py`：**校验前置于限流扣减**——空录音不该消耗 ASR/ISE 配额，也不该推进题目；
+- `practice.py`：带音频的回合先校验（空录音会推进 `current_turn` 且不可重来）；
+- `/asr` `/score` 是无状态管线端点，保持 `min_bytes=0` 的历史行为，只共用上界实现。
+
+> **残留（已知未修）**：`practice.py` 的限流是 FastAPI `Depends`，依赖先于函数体执行，故该路径上配额仍先于下界校验被扣。要修需把 `consume` 移进函数体，会牵动既有 429 用例，本轮未做。
+
+### 3. ⚠️ `frontend-ci` 与 `python-ci` 从未真正执行过
+
+排查 PR CI 状态时发现两条工作流 `conclusion=failure` 但 **`jobs.total_count = 0`**——启动即失败，一个 step 都没跑。根因是 YAML 语法错误：
+
+```yaml
+- name: Contract: OpenAPI snapshot in sync    # ← 未加引号的标量里出现 ": "，非法
+```
+
+用 `yaml.safe_load` 逐个解析五条工作流：**恰好只有这两条 INVALID，也恰好只有这两条 jobs=0**，其余三条（java-ci / secret-scan / docker-build）正常。加引号后五条全部解析通过（python-ci 9 steps、frontend-ci 10 steps）。
+
+这意味着此前所有「门禁全绿」的结论（含上一条日志 2026-09-01 表格里的那一行）**都只是本地跑的**，GitHub 上这两条从来没验证过任何东西。顺带修掉门禁真正跑起来后立刻会红的一处存量问题：`alembic/versions/0002_m2_practice.py` 未过 `ruff format --check`。
+
+已按 CI 的九/十个步骤在本地逐条复跑：ruff check / ruff format --check / uv lock --check / pytest 45 / OpenAPI 契约快照一致 / alembic 单头 / pnpm gen:api 无漂移 / lint / typecheck / vitest 18 / build —— 全绿。
+
+### 踩坑记录（追加第 24~26 条）
+
+24. **CI「红」和 CI「没跑」是两回事**：`conclusion=failure` + `jobs.total_count=0` = 工作流启动失败，一个 step 都没执行。只看 PR 页面的红叉会误判成「某个测试挂了」。**排查工作流问题第一步查 jobs 数量，而不是翻日志**（日志根本不存在，`gh run view --log-failed` 会报 log not found）。
+25. **YAML 未加引号的标量里不能有 `": "`**：`name: Contract: OpenAPI snapshot in sync` 会被当成嵌套映射 → 整份工作流非法。这与踩坑 14（块标量里 `#` 不是注释）是同一家族：**YAML 的字符串比看上去更需要引号**。约定：step `name` 只要含 `:`、`#`、`{`、`[` 一律加引号，并在改动工作流后本地 `yaml.safe_load` 过一遍。
+26. **修好一个限制会解锁新的输入域**：停止键不可用时录音恒为 15s，修好后 200ms 的误触第一次成为可能，而上传即推进题目/回合且不可重来。**新增能力要同时补上它放开的输入域约束**（前端 `MIN_RECORD_MS` + 服务端 40002 双侧）。
+
+---
+
 
 ### 背景
 

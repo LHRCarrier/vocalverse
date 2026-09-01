@@ -17,7 +17,7 @@ import {
   type DefenseProfileView,
 } from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
-import { VoiceRecorder } from '@/audio/recorder'
+import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 
 const router = useRouter()
 
@@ -49,7 +49,12 @@ const recorder = new VoiceRecorder()
 recorder.onStateChange = (s) => {
   if (s !== 'recording') recording.value = false
 }
-recorder.onStop = (blob) => {
+recorder.onStop = (blob, _mime, durationMs) => {
+  // 误触保护：作答会推进答辩轮次，太短的录音不能凭空吃掉一题
+  if (durationMs < MIN_RECORD_MS) {
+    error.value = `录音太短（${(durationMs / 1000).toFixed(1)}s），请说满约 ${MIN_RECORD_MS / 1000} 秒后再点 ■ 停止`
+    return
+  }
   void answer(blob)
 }
 
@@ -147,11 +152,28 @@ function onSseEvent(e: SseStreamEvent) {
 }
 
 async function startAnswer() {
-  if (recording.value) return
+  if (recording.value) {
+    // 录音中点击 ■ = 立即停止（经 onStop → answer 正常提交本题作答）
+    stopAnswer()
+    return
+  }
   error.value = null
   recording.value = true
-  await track('recording_start', { targetType: 'defense', targetId: profileId.value ?? undefined })
-  await recorder.start(15_000)
+  try {
+    // 埋点不阻塞开录（track 内部已静默容错），也少一个「已点击但未开录」的竞态窗口
+    void track('recording_start', { targetType: 'defense', targetId: profileId.value ?? undefined })
+    await recorder.start(15_000)
+  } catch (e) {
+    // 权限被拒/无麦克风等：无条件复位按钮，再给中文提示
+    recording.value = false
+    error.value = micErrorMessage(e)
+  }
+}
+
+/** 停止键：录音中 → stop()（提交作答）；仍在权限提示窗口 → cancel()（不提交、不推进题目） */
+function stopAnswer() {
+  if (recorder.state === 'recording') recorder.stop()
+  else recorder.cancel()
 }
 
 async function answer(blob: Blob) {
@@ -265,7 +287,7 @@ async function nextQuestion() {
           {{ recording ? '■' : '🎙' }}
         </NButton>
         <NButton v-else round type="primary" @click="nextQuestion">下一题 →</NButton>
-        <p class="mt-3 text-sm text-[#667085]">{{ recording ? '录音中…（≤15s）' : '点击录音，用英语作答（结论先行 + 数据支撑）' }}</p>
+        <p class="mt-3 text-sm text-[#667085]">{{ recording ? '录音中…（≤15s 自动停止，点击 ■ 立即停止）' : '点击录音，用英语作答（结论先行 + 数据支撑）' }}</p>
       </template>
       <p v-else class="text-sm text-[#667085]">准备中…</p>
       <p v-if="error" class="mt-4 text-xs text-[#B91C1C]">{{ error }}</p>

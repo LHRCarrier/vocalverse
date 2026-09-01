@@ -9,7 +9,7 @@ import { NButton, NCard, NTag } from 'naive-ui'
 
 import { request } from '@/api/client'
 import { track } from '@/api/events'
-import { VoiceRecorder } from '@/audio/recorder'
+import { MIN_RECORD_MS, micErrorMessage, VoiceRecorder } from '@/audio/recorder'
 
 interface Q {
   id: number
@@ -39,7 +39,12 @@ const recorder = new VoiceRecorder()
 recorder.onStateChange = (s) => {
   if (s !== 'recording') recording.value = false
 }
-recorder.onStop = (blob) => {
+recorder.onStop = (blob, _mime, durationMs) => {
+  // 误触保护：上传成功即 index += 1，本页没有重录入口，短到没内容的录音不能吃掉一道题。
+  if (durationMs < MIN_RECORD_MS) {
+    error.value = `录音太短（${(durationMs / 1000).toFixed(1)}s），请说满约 ${MIN_RECORD_MS / 1000} 秒后再点 ■ 停止`
+    return
+  }
   void upload(blob)
 }
 
@@ -55,11 +60,34 @@ onMounted(async () => {
 })
 
 async function startRecord() {
-  if (recording.value) return
+  if (recording.value) {
+    // 录音中点击 ■ = 立即停止（停止后经 onStop 上传已录片段）
+    stopRecord()
+    return
+  }
   error.value = null
   recording.value = true
-  await track('recording_start', { page: '/placement' })
-  await recorder.start(15_000)
+  try {
+    // 埋点不阻塞开录：track() 内部已静默容错，await 它只会让麦克风晚一个 RTT 打开，
+    // 还凭空多出一个「已点击但录音未启动」的竞态窗口。
+    void track('recording_start', { page: '/placement' })
+    await recorder.start(15_000)
+  } catch (e) {
+    // 权限被拒/无麦克风等：无条件复位按钮（不能加任何守卫，否则又会卡死），再给中文提示
+    recording.value = false
+    error.value = micErrorMessage(e)
+  }
+}
+
+/**
+ * 停止键。两种语义由录音机的真实状态决定：
+ * - 已在录音 → stop()：正常收尾，经 onStop 上传本次录音；
+ * - 仍在启动窗口（权限提示未确认）→ cancel()：放弃本次启动，不录、不传、不推进题目。
+ * 启动期的竞态由 VoiceRecorder 内部的世代号处理，这里不再维护序号。
+ */
+function stopRecord() {
+  if (recorder.state === 'recording') recorder.stop()
+  else recorder.cancel()
 }
 
 async function upload(blob: Blob) {
@@ -138,7 +166,7 @@ function format(v?: number | null) {
         <NButton circle size="large" :type="recording ? 'error' : 'primary'" :disabled="uploading" @click="startRecord">
           {{ recording ? '■' : '🎙' }}
         </NButton>
-        <p class="mt-3 text-sm text-[#667085]">{{ recording ? '录音中…（≤15s）' : '点击录音朗读本句' }}</p>
+        <p class="mt-3 text-sm text-[#667085]">{{ recording ? '录音中…（≤15s 自动停止，点击 ■ 立即停止）' : '点击录音朗读本句' }}</p>
       </div>
     </NCard>
 

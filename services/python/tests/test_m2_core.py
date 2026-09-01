@@ -10,6 +10,10 @@ from app.practice.orchestrator import save_audio_bytes
 from app.practice.service import validate_bank
 from app.practice.state import StateStore
 
+# 合法录音体积占位：需过 settings.min_upload_bytes（40002 下界），
+# 这些用例验的是业务链路而非音频有效性，故取一个正常作答量级的字节数。
+FAKE_AUDIO = b"fake-audio-bytes" * 128
+
 
 # ---------------------------------------------------------------------------
 # 语料匹配（规则通道权威）
@@ -175,7 +179,7 @@ def test_full_dialog_turn_sse_flow(client, auth_headers):
     resp = client.post(
         f"/api/v1/sessions/{session_id}/turns",
         data={"action": "normal"},
-        files={"audio": ("a.webm", b"fake-audio-bytes", "audio/webm")},
+        files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
         headers=auth_headers,
     )
     assert resp.status_code == 200
@@ -194,7 +198,7 @@ def test_full_dialog_turn_sse_flow(client, auth_headers):
     resp2 = client.post(
         f"/api/v1/sessions/{session_id}/turns",
         data={"action": "normal"},
-        files={"audio": ("a.webm", b"fake-audio-bytes", "audio/webm")},
+        files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
         headers=auth_headers,
     )
     assert resp2.status_code == 200 and "turn_index" in resp2.text
@@ -226,7 +230,7 @@ def test_turn_stale_expected_turn_rejected(client, auth_headers):
     resp = client.post(
         f"/api/v1/sessions/{session_id}/turns",
         data={"action": "normal", "expected_turn": "99"},  # 过期轮次
-        files={"audio": ("a.webm", b"fake-audio-bytes", "audio/webm")},
+        files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
         headers=auth_headers,
     )
     assert resp.status_code == 409
@@ -360,8 +364,58 @@ def test_rate_limit_429(client, auth_headers, monkeypatch):
     resp = client.post(
         "/api/v1/sessions/1/turns",
         data={"action": "normal"},
-        files={"audio": ("a.webm", b"fake", "audio/webm")},
+        files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
         headers=auth_headers,
     )
     # 会话预检先于限流？依赖顺序先跑 → 429
     assert resp.status_code == 429
+
+
+# ---------------------------------------------------------------------------
+# 音频下界守卫（40002）：前端停止键可用后，误触会产出 ~0ms 的 webm
+# ---------------------------------------------------------------------------
+def test_placement_rejects_empty_audio(client, auth_headers):
+    """空/近空录音返回 400 + 40002，且**先于**题目查找与限流扣减发生。
+
+    刻意用一个不存在的 item_id：若守卫没有前置，会先撞 404 而不是 40002。
+    """
+    resp = client.post(
+        "/api/v1/placement/items/999999/audio",
+        files={"audio": ("a.webm", b"\x1aE\xdf\xa3", "audio/webm")},  # 近空 webm 头
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["code"] == 40002
+
+
+def test_placement_size_guard_lets_normal_audio_through(client, auth_headers):
+    """正常体积的录音不被下界拦下——此时才轮到题目查找（404）。"""
+    resp = client.post(
+        "/api/v1/placement/items/999999/audio",
+        files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404, resp.text
+
+
+def test_turn_rejects_empty_audio(client, auth_headers):
+    """对话回合同样挡空录音：否则会推进 current_turn 且不可重来。"""
+    resp = client.post(
+        "/api/v1/sessions/999999/turns",
+        data={"action": "normal"},
+        files={"audio": ("a.webm", b"\x1aE\xdf\xa3", "audio/webm")},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["code"] == 40002
+
+
+def test_stub_pipeline_endpoints_keep_no_lower_bound(client):
+    """/asr /score 是无状态管线端点，不消耗可耗尽资源 → 保持 min_bytes=0 的历史行为。"""
+    resp = client.post(
+        "/api/v1/asr",
+        files={"audio": ("tiny.wav", b"RIFF__tiny__", "audio/wav")},
+        data={"language": "en"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["code"] == 0
