@@ -40,7 +40,7 @@ jobs:
       - name: Tests
         run: uv run pytest -m "not gpu" -q
 
-      - name: Contract: OpenAPI snapshot in sync
+      - name: "Contract: OpenAPI snapshot in sync"
         # 契约真源 = 运行中的后端 /openapi.json；前端快照（apps/web/src/api/specs/）必须与之一致。
         # 后端契约变更后重跑 scripts/refresh-openapi.ps1 并提交快照，否则此步红。
         run: |

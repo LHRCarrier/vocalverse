@@ -53,9 +53,7 @@ def upgrade() -> None:
             server_default=sa.text("'{}'"),
             nullable=False,
         ),
-        sa.Column(
-            "bank_version", sa.SmallInteger(), server_default=sa.text("1"), nullable=False
-        ),
+        sa.Column("bank_version", sa.SmallInteger(), server_default=sa.text("1"), nullable=False),
         sa.Column(
             "status", sa.String(length=16), server_default=sa.text("'active'"), nullable=False
         ),
@@ -71,7 +69,9 @@ def upgrade() -> None:
             server_default=sa.text("CURRENT_TIMESTAMP"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_defense_profiles_user_id_users")),
+        sa.ForeignKeyConstraint(
+            ["user_id"], ["users.id"], name=op.f("fk_defense_profiles_user_id_users")
+        ),
         sa.CheckConstraint(
             "question_count BETWEEN 5 AND 8", name=op.f("ck_defense_profiles_question_count")
         ),
@@ -149,9 +149,7 @@ def downgrade() -> None:
         op.f("ck_reports_scope"), "reports", "scope IN ('global', 'user', 'scene', 'song')"
     )
 
-    op.execute(
-        "ALTER TABLE events DROP CONSTRAINT ck_events_event_type"
-    )
+    op.execute("ALTER TABLE events DROP CONSTRAINT ck_events_event_type")
     op.create_check_constraint(
         op.f("ck_events_event_type"),
         "events",
@@ -175,11 +173,11 @@ def downgrade() -> None:
     )
 
     op.drop_constraint(op.f("ck_sessions_kind"), "sessions", type_="check")
-    op.create_check_constraint(
-        op.f("ck_sessions_kind"), "sessions", "kind IN ('dialog', 'sing')"
-    )
+    op.create_check_constraint(op.f("ck_sessions_kind"), "sessions", "kind IN ('dialog', 'sing')")
 
-    op.drop_constraint(op.f("fk_sessions_profile_id_defense_profiles"), "sessions", type_="foreignkey")
+    op.drop_constraint(
+        op.f("fk_sessions_profile_id_defense_profiles"), "sessions", type_="foreignkey"
+    )
     op.drop_column("sessions", "profile_id")
 
     op.drop_index("ix_defense_profiles_user_status", table_name="defense_profiles")
