@@ -3,6 +3,59 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-01 VocalVerse · 真机联调排障五连坑——"Unexpected end of JSON input" 迷雾 + 启动指引修复（commit 管理见文末）
+
+### 背景
+
+- M2 全量合入后，按 README 方式 B 本机启动（三端 + PG/Redis 容器），浏览器实测登录/对话，一组**只在"经网关 + 浏览器"路径上才暴露**的坑连爆（同日）。排障方法论沉淀：**同一症状逐层二分（直连 8080 / 经 5173 网关 / 浏览器 DevTools Network），每层换一个变量再测**。
+
+### 排障链（症状 → 根因 → 修复）
+
+1. **登录 403 + 空响应** → ① Java 控制器误把路径写成 `/manage/auth`（网关 nginx/Vite 剥离 `/manage` 前缀后变成 `/auth/login`，无匹配）；② 更深一层：Spring Boot 3 默认把 `/error` 错误转发**也纳入安全过滤链**，控制器抛错（401/404）先跳 `/error` 而 `/error` 不在 permitAll → 任何异常都被织成 403 空响应。**修复**：控制器路径去掉 `/manage`（与 PingController `/api/v1` 同语义）+ `/error` permitAll；已在线验证：正确账密 200，错账密 401 带 JSON 体。
+2. **登录后对话 401 missing bearer token** → ① SSE 回合走 `openSseFetch` 直连 fetch，**绕过了 `request()` 的自动 `Authorization` 注入**；② 更隐蔽：`bootstrapAuth()`（localStorage→全局 token 恢复）**从没接线到启动流程**——任何一次 F5 之后全局 token 为空，全部 API 401（"重新登录又好、刷新又挂"的元凶）。**修复**：`openSseFetch` 支持 headers + `streamTurn` 带 `authHeaders()`；`main.ts` 启动调用 `bootstrapAuth()`。
+3. **连续对话报 stale turn 409** → 提示卡"继续对话"发出**无音频 hint 回合**：服务端早退分支**不推进 `current_turn`**，而前端**任何 `turn_end` 都 +1**——计数器双写不同步，下一轮 `expected_turn` 失配。**修复**：服务端 hint/demo 回合落库并推进轮次（兜底）；前端示范/提示卡改为**仅播音频 / 直接录音**（回合只在录音后发生），横幅按钮改「🎙 试试说 / 🔊 示范」。
+4. **启动报错三连**：`uv run uvicorn` 报 WinError 10013（8000 被旧实例占用，非 bug）；`alembic` 命令不识别（Windows 下 `uv run` 不激活 venv，裸命令不在 PATH）；seed 报 `password authentication failed`（`.env.example` 的 DB 密码是占位符 `change-me-db-password`，与 compose 默认回退值 `vocalverse-dev` 失配）。**修复**：`.env.example`/根 `.env.example` 默认值对齐 compose 回退；README 命令加 `uv run` 前缀 + FAQ 三行。
+5. **Java 日志中文乱码**（`婕旂ず璐`）→ 双重错位：pom 未声明 `project.build.sourceEncoding`（GBK 系统按平台码读源文件）+ 终端码页 cp936。**修复**：pom 钉 UTF-8 + `chcp 65001` / `-Dstdout.encoding=UTF-8`（README FAQ）。
+
+### 踩坑记录（追加第 16~23 条，与前文 15 条连续编号）
+
+16. **网关剥离前缀 vs 控制器路径**：Java 控制器若带 `/manage` 前缀，MockMvc/直连 curl 永远测不出（都能 200），**只有经 nginx/Vite 网关才暴露 403**。约定：Java 侧路径一律不带 `/manage`（网关剥离后命中），与 PingController 语义一致；改路径必同步：SecurityConfig 匹配器 / ServiceTokenFilter / Java 测试 / Python 回写 URL / 联调脚本。
+17. **Spring Boot 3 的 `/error` 也在安全链里**：自定义 `SecurityFilterChain` 后，任何控制器异常 → `/error` 转发 → 不在 permitAll → 织成 **403 空 body**（前端 `JSON.parse` 报 "Unexpected end of JSON input"，症状与真 403 无法区分）。**处置**：`/error` permitAll；排障时看 DevTools 响应体是否为空是判别信号。
+18. **直连 fetch 绕过公共客户端**：`openSseFetch` 这类专用请求路径必须显式携带 `authHeaders()`——**公共 `request()` 的鉴权不是全局中间件**；同理 `bootstrapAuth()` 必须接线（main.ts），否则刷新即丢全局 token。
+19. **计数器双写不同步**：同一"轮次"概念在服务端（当前轮）与前端（已收 turn_end 数）各维护一份，任何分支（hint/demo/错误降级）少推/多推一侧都会产生 stale turn；**原则：turn_end 的发送方 = 轮次推进方**，前端按事件数累加。
+20. **Vite 只绑 ::1**：`127.0.0.1:5173` 打不开但 `localhost:5173` 正常——不是错误，IPv6-only；排障时别把「localhost 通、127.0.0.1 不通」当异常。
+21. **`.env.example` 占位符 vs compose 回退值**：`change-me-db-password` 与 `${POSTGRES_PASSWORD:-vocalverse-dev}` 失配 → 复制即用必炸；**默认值必须与 compose 回退一致，且改密码三处同步**（compose 环境变量 / services/python/.env / 根 .env）。
+22. **Windows 裸命令不在 PATH**：`uv run` 不激活 venv——`alembic/uvicorn/pytest` 一律 `uv run` 前缀，README 已全部修正。
+23. **Java「编译期 + 运行期」双重编码**：pom `sourceEncoding=UTF-8`（编译期）+ `chcp 65001`/`-Dstdout.encoding`（运行期）；缺一都会乱码。另：**jar 被运行进程锁定**时 `mvn package` 报 `Unable to rename ... .original`——先停 Java 再打包（Windows 文件锁）。
+
+### 验证状态（本日结束时）
+
+| 路径 | 结果 |
+|---|---|
+| 5173 网关登录（demoadult） | 200 + Token ✓ |
+| 错账密/未知用户 | 401 带 JSON 体（不再是 403 空响应）✓ |
+| 对话回合（含连续 5+ 轮） | SSE 事件完备，无 stale turn ✓ |
+| 刷新页面后功能 | token 恢复接线，不再 401 ✓ |
+| Python/FE/Java 门禁 | pytest 41 / ruff / typecheck / vitest 8 / build / mvn verify 全绿 ✓ |
+
+### 提交管理（main 线，全部管理员直推）
+
+```
+7a6143f fix(practice): 无音频回合计数器同步 + 示范/提示卡只播不发送
+90f6941 fix(web): SSE 携带 JWT + 启动恢复会话 token
+218049a fix(auth): /error 加入 permitAll（401/404 不再被织成 403 空响应）
+69b0bd4 fix(auth): Java 控制器去 /manage 前缀（网关剥离语义对齐）
+1aa72e2 fix(java): 钉死 UTF-8 源码编码 + FAQ
+5007caf fix(dev): 启动指引默认值对齐（DB 密码 / uv run 前缀 / FAQ）
+9a0b3a6 docs: DoD 验收清单勾选
+323c581 docs(worklog): M2 实施记录（踩坑 1~15）
+（本条目 → 追加为最新）
+```
+
+每个修复 = 一个 commit（可回滚、可 review），无 squash 粘连；本条目单独成 commit。
+
+---
+
 ## 2026-09-01 VocalVerse · M2 实施落地——双子拷问收敛 → 全链路实现 → 真环境联调（DoD 全绿）
 
 ### 背景
