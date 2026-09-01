@@ -35,14 +35,14 @@ def check(label: str, cond: bool, detail: str = "") -> None:
 
 def login() -> str:
     r = httpx.post(
-        f"{JV}/manage/auth/login",
+        f"{JV}/auth/login",
         json={"username": SEED_USER, "password": SEED_PASS},
         timeout=10,
     )
     check(f"Java 登录 {SEED_USER}", r.status_code == 200, f"http={r.status_code}")
     token = r.json()["data"]["accessToken"]
     # 顺带验证 me（JWT 回验）
-    me = httpx.get(f"{JV}/manage/auth/me", headers={"Authorization": f"Bearer {token}"})
+    me = httpx.get(f"{JV}/auth/me", headers={"Authorization": f"Bearer {token}"})
     check("Java /me", me.status_code == 200 and me.json()["data"]["username"] == SEED_USER)
     return token
 

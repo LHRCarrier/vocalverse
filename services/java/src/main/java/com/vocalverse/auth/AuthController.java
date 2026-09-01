@@ -24,9 +24,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-/** 认证最小集（docs/18 §3-J1）：注册 / 登录 / 刷新 / 我的。用户表 Alembic 真源，JPA 纯映射。 */
+/**
+ * 认证最小集（docs/18 §3-J1）：注册 / 登录 / 刷新 / 我的。用户表 Alembic 真源，JPA 纯映射。 路径不带 /manage：网关（nginx/Vite）剥离
+ * /manage 前缀后命中（与 PingController /api/v1 同语义， docs/06 §2.1 注记 3；2026-09-01 修复曾误加前缀：网关路径 /auth/login
+ * 无匹配 → 403）。
+ */
 @RestController
-@RequestMapping("/manage/auth")
+@RequestMapping("/auth")
 public class AuthController {
 
   public record RegisterRequest(

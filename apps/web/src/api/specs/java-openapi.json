@@ -5,7 +5,7 @@
     "version" : "v0"
   },
   "paths" : {
-    "/manage/internal/level" : {
+    "/internal/level" : {
       "post" : {
         "tags" : [ "internal-level-controller" ],
         "operationId" : "setLevel",
@@ -33,7 +33,7 @@
         }
       }
     },
-    "/manage/auth/register" : {
+    "/auth/register" : {
       "post" : {
         "tags" : [ "auth-controller" ],
         "operationId" : "register",
@@ -61,7 +61,7 @@
         }
       }
     },
-    "/manage/auth/refresh" : {
+    "/auth/refresh" : {
       "post" : {
         "tags" : [ "auth-controller" ],
         "operationId" : "refresh",
@@ -89,7 +89,7 @@
         }
       }
     },
-    "/manage/auth/login" : {
+    "/auth/login" : {
       "post" : {
         "tags" : [ "auth-controller" ],
         "operationId" : "login",
@@ -117,7 +117,7 @@
         }
       }
     },
-    "/manage/auth/me" : {
+    "/auth/me" : {
       "get" : {
         "tags" : [ "auth-controller" ],
         "operationId" : "me",

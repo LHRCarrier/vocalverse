@@ -23,8 +23,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * 安全策略（docs/18 §3-J1）：/manage/auth/** 开放；其余 /manage/** 需 JWT； /manage/internal/** 需
- * service-token（Python 侧回写委托，docs/06 §2.2 内部 REST）。
+ * 安全策略（docs/18 §3-J1）：/auth/** 开放；其余需 JWT；/internal/** 需 service-token （Python 侧回写委托，docs/06 §2.2
+ * 内部 REST）。全部按**网关剥离 /manage 后**的路径匹配。
  */
 @Configuration
 @EnableWebSecurity
@@ -51,13 +51,13 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(
                         "/api/v1/ping",
-                        "/manage/auth/**",
+                        "/auth/**",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
                         "/swagger-ui.html",
                         "/actuator/health")
                     .permitAll()
-                    .requestMatchers("/manage/internal/**")
+                    .requestMatchers("/internal/**")
                     .hasRole("SERVICE")
                     .anyRequest()
                     .authenticated())
@@ -80,7 +80,7 @@ public class SecurityConfig {
         throws IOException, jakarta.servlet.ServletException {
       HttpServletRequest req = (HttpServletRequest) request;
       String path = req.getRequestURI();
-      if (path.startsWith("/manage/internal/")) {
+      if (path.startsWith("/internal/")) {
         String header = req.getHeader("Authorization");
         if (header == null
             || !header.startsWith("Bearer ")

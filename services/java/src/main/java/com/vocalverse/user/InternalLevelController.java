@@ -9,9 +9,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 内部委托接口（docs/18 §3-J1）：Python 入学测试完成后回写 user_profiles.cefr_level。 */
+/**
+ * 内部委托接口（docs/18 §3-J1）：Python 入学测试完成后回写 user_profiles.cefr_level。 网关剥离 /manage 前缀后命中，本服务路径不带
+ * /manage（与 /auth 同语义）。
+ */
 @RestController
-@RequestMapping("/manage/internal")
+@RequestMapping("/internal")
 public class InternalLevelController {
 
   public record LevelRequest(@NotNull Long userId, @NotNull String level) {}

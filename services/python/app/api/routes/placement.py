@@ -172,7 +172,7 @@ async def _callback_level(user_id: int, level: str) -> None:
     try:
         async with httpx.AsyncClient(timeout=3) as client:
             await client.post(
-                f"{settings.java_base_url}/manage/internal/level",
+                f"{settings.java_base_url}/internal/level",
                 json={"user_id": user_id, "level": level},
                 headers={"Authorization": f"Bearer {settings.service_token}"},
             )

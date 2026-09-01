@@ -34,7 +34,7 @@ class AuthFlowTest {
     String registerResp =
         mockMvc
             .perform(
-                post("/manage/auth/register")
+                post("/auth/register")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(registerBody))
             .andExpect(status().isOk())
@@ -48,7 +48,7 @@ class AuthFlowTest {
 
     // me（JWT）
     mockMvc
-        .perform(get("/manage/auth/me").header("Authorization", "Bearer " + access))
+        .perform(get("/auth/me").header("Authorization", "Bearer " + access))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.username").value("alice"));
 
@@ -57,7 +57,7 @@ class AuthFlowTest {
     String refreshResp =
         mockMvc
             .perform(
-                post("/manage/auth/refresh")
+                post("/auth/refresh")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
             .andExpect(status().isOk())
@@ -71,7 +71,7 @@ class AuthFlowTest {
     // 旧 refresh 已吊销
     mockMvc
         .perform(
-            post("/manage/auth/refresh")
+            post("/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
         .andExpect(status().isUnauthorized());
@@ -81,7 +81,7 @@ class AuthFlowTest {
   void loginRejectsBadPassword() throws Exception {
     mockMvc
         .perform(
-            post("/manage/auth/login")
+            post("/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"alice\",\"password\":\"wrong-password\"}"))
         .andExpect(status().isUnauthorized());
@@ -91,7 +91,7 @@ class AuthFlowTest {
   void internalLevelRequiresServiceToken() throws Exception {
     mockMvc
         .perform(
-            post("/manage/internal/level")
+            post("/internal/level")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":1,\"level\":\"L2\"}"))
         .andExpect(status().isUnauthorized());

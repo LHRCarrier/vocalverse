@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/manage/internal/level": {
+    "/internal/level": {
         parameters: {
             query?: never;
             header?: never;
@@ -20,7 +20,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/manage/auth/register": {
+    "/auth/register": {
         parameters: {
             query?: never;
             header?: never;
@@ -36,7 +36,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/manage/auth/refresh": {
+    "/auth/refresh": {
         parameters: {
             query?: never;
             header?: never;
@@ -52,7 +52,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/manage/auth/login": {
+    "/auth/login": {
         parameters: {
             query?: never;
             header?: never;
@@ -68,7 +68,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/manage/auth/me": {
+    "/auth/me": {
         parameters: {
             query?: never;
             header?: never;
