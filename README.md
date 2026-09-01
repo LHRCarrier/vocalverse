@@ -35,10 +35,11 @@ VocalVerse 面向不同年龄段英语学习者，基于大模型场景扮演（
 
 > ⚠️ 本地 `pnpm dev` 开着 5173 是**正常的**；8088 只在方式 A 容器启动后才有。方式 B 不要两种入口混用（代理分别配好，见 `apps/web/vite.config.ts`）。
 
-### 0. 先明确当前阶段能测什么（M1 骨架）
+### 0. 先明确当前阶段能测什么（M2 MVP 已落地）
 
-- ✅ 能测：三服务连通性、录音组件（MediaRecorder → WebM/opus）、**stub 音频管线**（ASR/TTS/评分/LLM 均为 Fake，返回固定演示文本）、CI/镜像构建。
-- ⏳ 尚无：真实语音识别/合成/评分、场景扮演多轮对话、推荐/报表（M2~M3 接入，接口与数据模型已定，见 docs/06）。
+- ✅ **能测（M2）**：注册/登录（Java JWT，演示账号 `demoadult`/`demoteen`/`demosenior`，密码 `demo123456`）→ 场景对话（录音 ≤15s → ASR 转写 → 三维评分 + 教练笔记 + 语言点覆盖度 + 救援提示卡 → 8 轮收尾）→ 评分报告（总分/覆盖度三栏/建议/再练）；自定义答辩导师（粘贴论文 → AI 评委英文提问 → 等级反馈）；埋点 10 类事件；SSE 流式（音频为时间轴权威、文本字幕）。
+- ⏳ 真实语音链路需 `.env` 密钥（DeepSeek/讯飞）+ ffmpeg + whisper 模型；缺省时全链路走 Fake（`APP_TESTING=true`），联调冒烟脚本：`python scripts/poc/demo_smoke.py`。
+- ⏳ M3（唱歌/推荐/报表/社区）仍为占位页。
 
 ### 1. 一次性准备（工具链）
 
@@ -83,7 +84,9 @@ cd apps/web; pnpm install; pnpm dev        # http://localhost:5173（代理已�
 # 3. Python（终端 2）——首次 uv sync 会下载 CPU 版 torch，较慢
 cd services/python
 uv sync
-Copy-Item .env.example .env                # 填 DeepSeek/讯飞/Azure 密钥（M2 需要）
+Copy-Item .env.example .env                # 填 DeepSeek/讯飞密钥（M2 真实管线需要；不填则走 Fake）
+alembic upgrade head                        # 建表（schema 真源=Alembic；M2 迁移 0001+0002）
+uv run python -m app.db.seed               # 幂等 seed：8 套场景内容 + 入学测试题库
 uv run uvicorn app.main:app --reload --port 8000
 
 # 4. Java（终端 3）——首次先 mvn -N wrapper:wrapper 生成 mvnw
@@ -127,7 +130,7 @@ services/python/  语音管线 + LLM Agent + 推荐（FastAPI；Alembic 唯一 s
 services/java/    薄管理端（Spring Boot；JWT 签发）
 infra/            部署与 nginx 配置
 scripts/          dev.ps1 / bootstrap.ps1（Windows 一键）
-docs/             00~05 规划文档 + 06 技术框架决策（ADR 唯一权威）+ 07/08 拷问报告 + 09 框架评审 + 10/11 数据库 + 12 同构Monorepo对比裁决 + 13 前端设计系统 + api/ 契约
+docs/             00~05 规划文档 + 06 技术框架决策（ADR 唯一权威）+ 07/08 拷问报告 + 09 框架评审 + 10/11 数据库 + 12 同构Monorepo对比裁决 + 13 前端设计系统 + 14 功能规格（v2 拍板）+ 15/16 双子拷问报告 + 17 合流与拍板记录 + 18 实施计划 + api/ 契约
 worklog/          团队工作日志（VocalVerse工作日志.md，按日追加）
 ```
 
@@ -149,6 +152,11 @@ worklog/          团队工作日志（VocalVerse工作日志.md，按日追加�
 | `docs/11-数据库拷问报告.md` | 数据库拷问官报告：字段/索引/口径拷问与拍板 |
 | `docs/12-同构Monorepo对比与裁决.md` | 双子拷问官交叉拷问「能否按同构 monorepo 参照项目做」+ 多项修正 + 答辩口径；裁决已并入 docs/06 §2.1 |
 | `docs/13-前端设计系统.md` | 前端设计系统（naive-ui/UnoCSS/设计 token 三层分工 + B 多邻国活力配色 + 路由表 + 动效可视化栈 + 答辩口径） |
+| `docs/14-M2场景对话与答辩导师规格.md` | **v2 拍板稿**：场景对话回合状态机/SSE 流式协议/prompt 模板/语言点覆盖度/教练双人格/2 级救场 + 答辩导师（W3 极简：三级题库/提问依据/等级标签阶梯/软删脱敏） |
+| `docs/15-M2场景对话需求拷问报告.md` | 需求/产品拷问官 28 问（覆盖缺口/达成度悖论/差异化立论/排期）+ 10 条拍板建议 |
+| `docs/16-M2场景对话技术拷问报告.md` | 技术/架构拷问官 37 问（假流式/LLM 调用预算/CHECK 迁移/安全注入/延迟复算）+ 量化表 |
+| `docs/17-M2场景对话拷问合流与拍板记录.md` | 双子拷问合流：交叉验证矩阵/分歧裁决（答辩极简·软删·等级标签）/v1→v2 对照/登记义务清单 |
+| `docs/18-M2实施计划.md` | M2 实施计划：DoD/契约冻结清单/三人任务分解（组长 Python+Java/算法/前端）/PR 拆分 12 条/pytest+vitest 矩阵/风险回退表/联调演示准备 |
 
 ## 里程碑（详见 docs/04、docs/06）
 
