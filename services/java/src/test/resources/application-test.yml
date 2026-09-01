@@ -5,3 +5,11 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop # 仅测试：H2 建表（生产 ddl-auto=none，schema 真源= Alembic）
+
+vocalverse:
+  jwt:
+    secret: vocalverse-dev-jwt-secret-0123456789abcdef
+  service-token: change-me-internal-service-token

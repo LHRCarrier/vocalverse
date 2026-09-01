@@ -18,6 +18,13 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:-}] %logger{36} - %msg%n"
 
+# 服务间契约密钥（docs/06 §11：Python 验签用同值；禁止提交真实值，.env 覆盖）
+vocalverse:
+  jwt:
+    secret: ${JWT_SECRET:vocalverse-dev-jwt-secret-0123456789abcdef}
+    access-ttl-seconds: 3600
+  service-token: ${SERVICE_TOKEN:change-me-internal-service-token}
+
 management:
   endpoints:
     web:
