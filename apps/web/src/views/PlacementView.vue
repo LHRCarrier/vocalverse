@@ -9,7 +9,7 @@ import { NButton, NCard, NTag } from 'naive-ui'
 
 import { request } from '@/api/client'
 import { track } from '@/api/events'
-import { VoiceRecorder } from '@/audio/recorder'
+import { MIN_RECORD_MS, micErrorMessage, VoiceRecorder } from '@/audio/recorder'
 
 interface Q {
   id: number
@@ -39,7 +39,12 @@ const recorder = new VoiceRecorder()
 recorder.onStateChange = (s) => {
   if (s !== 'recording') recording.value = false
 }
-recorder.onStop = (blob) => {
+recorder.onStop = (blob, _mime, durationMs) => {
+  // 误触保护：上传成功即 index += 1，本页没有重录入口，短到没内容的录音不能吃掉一道题。
+  if (durationMs < MIN_RECORD_MS) {
+    error.value = `录音太短（${(durationMs / 1000).toFixed(1)}s），请说满约 ${MIN_RECORD_MS / 1000} 秒后再点 ■ 停止`
+    return
+  }
   void upload(blob)
 }
 
@@ -54,9 +59,6 @@ onMounted(async () => {
   }
 })
 
-/** 录音启动序号：用于作废「权限提示/埋点期间」尚未完成的启动，保证停止键任意时刻都有效 */
-let startSeq = 0
-
 async function startRecord() {
   if (recording.value) {
     // 录音中点击 ■ = 立即停止（停止后经 onStop 上传已录片段）
@@ -64,33 +66,28 @@ async function startRecord() {
     return
   }
   error.value = null
-  const seq = ++startSeq
   recording.value = true
   try {
-    await track('recording_start', { page: '/placement' })
-    if (seq !== startSeq) {
-      // 启动完成前收到停止 → 不再拉起录音
-      recording.value = false
-      return
-    }
+    // 埋点不阻塞开录：track() 内部已静默容错，await 它只会让麦克风晚一个 RTT 打开，
+    // 还凭空多出一个「已点击但录音未启动」的竞态窗口。
+    void track('recording_start', { page: '/placement' })
     await recorder.start(15_000)
-    if (seq !== startSeq) {
-      // start() 完成前收到停止 → 立即停掉刚启动的录音
-      recording.value = false
-      recorder.stop()
-    }
   } catch (e) {
-    // getUserMedia 被拒/无麦克风等：复位按钮，避免按键永久卡在录音态
-    if (seq === startSeq) {
-      recording.value = false
-      error.value = (e as Error).message
-    }
+    // 权限被拒/无麦克风等：无条件复位按钮（不能加任何守卫，否则又会卡死），再给中文提示
+    recording.value = false
+    error.value = micErrorMessage(e)
   }
 }
 
+/**
+ * 停止键。两种语义由录音机的真实状态决定：
+ * - 已在录音 → stop()：正常收尾，经 onStop 上传本次录音；
+ * - 仍在启动窗口（权限提示未确认）→ cancel()：放弃本次启动，不录、不传、不推进题目。
+ * 启动期的竞态由 VoiceRecorder 内部的世代号处理，这里不再维护序号。
+ */
 function stopRecord() {
-  startSeq += 1 // 作废未完成的启动
-  recorder.stop()
+  if (recorder.state === 'recording') recorder.stop()
+  else recorder.cancel()
 }
 
 async function upload(blob: Blob) {
