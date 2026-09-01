@@ -21,12 +21,8 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'placement',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: {
-          title: '入学测试',
-          desc: '5 句固定朗读 + 1 轮 QA（docs/06 §9.2，题库 admin 预置）——M2 第 2 周',
-        },
-        meta: { title: '入学测试' },
+        component: () => import('@/views/PlacementView.vue'),
+        meta: { title: '入学测试', requiresAuth: true },
       },
       {
         path: 'practice',
