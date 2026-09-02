@@ -1,6 +1,8 @@
-package com.vocalverse.user;
+package com.vocalverse.user.controller;
 
 import com.vocalverse.common.dto.Envelope;
+import com.vocalverse.user.UserProfileEntity;
+import com.vocalverse.user.UserProfileRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;

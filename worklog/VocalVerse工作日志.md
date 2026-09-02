@@ -3,6 +3,84 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-09 PR#25 推荐系统落地 · 复审整改与合入（模型同步 / 契约快照 / CI 兜底）
+
+复审发现并修复 3 个阻断项（评审结论见 PR#25 review，2026-09-02）：
+1. **模型-迁移不同步**：迁移 0003 已扩 `sessions.kind='shadow'`、新增 `sessions.shadow_material_id`、扩 `attempts.kind='shadow_speech'`，但 `models/practice.py` 未同步 → shadow 会话落库 CHECK 违约；`mastery/service.py` 读 `session.shadow_material_id` 抛 AttributeError 被收尾钩子吞掉（动态水平/掌握度静默不更新）。已补模型同步 + 2 条回归测试（`tests/mastery/test_session_model_sync.py`：修复前 2 failed，修复后绿）。
+2. **合并冲突 + 契约快照未刷新**：worklog 与 main 后到 9/7~9/9 记录冲突（已合并解决；推荐系统 13 段记录按规范补署名）；`apps/web/src/api/specs/python-openapi.json` 缺 `/api/v1/recommendations`→ CI 契约步骤必红（已刷新快照 + `pnpm gen:api`）。
+3. **CI 从未运行**：PR #24/#25 打开与同步推送均 0 run（`pull_request` 触发当前未生效）→ python-ci 增加 `workflow_dispatch` 手动触发 + `push(main)` 自动兜底；合入前本地全量门禁复核通过（ruff / format / pytest 83 passed / alembic 单头 / 契约一致）。
+
+—— 执行人：LHRCarrier
+
+## 2026-09-07 Java 启动日志两坑修复（安全密码 WARN + spring-boot:run 中文乱码）
+
+用户实测暴露两个启动问题（commit `5ad2c8c` + `16a4e6b`）：
+
+1. **「Using generated security password」WARN**：项目是自定义 JWT 过滤器 + BCrypt（AuthController 自己校验），从不创建 `UserDetailsService` bean → Boot 的 `UserDetailsServiceAutoConfiguration` 兜底生成随机密码并打误导性 WARN。已 `exclude UserDetailsServiceAutoConfiguration` 消噪（测试证明 SecurityConfig 一直生效：链路失效则 /auth/** 被默认 basic auth 拦截，AuthFlowTest 必挂）。
+2. **DemoSeeder 中文乱码（verify 正常、spring-boot:run 乱码）**：logback sett UTF-8 字节后，**mvn spring-boot:run 的 fork 子进程 stdout 经管道由 Maven 主进程按平台编码（GBK）解码** → UTF-8 字节被读错乱码；surefire 转发路径无此环节所以 verify 正常。修复三层对齐：`logback-spring.xml charset=UTF-8` + `.mvn/jvm.config -Dfile.encoding=UTF-8`（Maven 主 JVM）+ `spring-boot-maven-plugin jvmArguments -Dstdout.encoding/-Dstderr.encoding=UTF-8`（fork 子 JVM）。Linux/容器无影响（本然 UTF-8）。
+3. 门禁：`mvn clean verify` 全绿（15 tests + spotless + 契约对账）。
+
+**踩坑（并入 32 待登记）**：Windows 中文编码是「字节流向 × 每层的解码器」问题——logback 只管字节（charset），Maven 管道转发按自己编码解码；修编码先分清「哪层转码」再动手，单改一层必然残留（第一轮只加 logback charset 时 verify 好了 run 没好的原因）。
+
+## 2026-09-07 Java 包结构按 Package-by-Feature 规范重整（专家子代理审计 + 实施）
+
+**触发**：组长检查发现上轮「Controller 统一收 controller/」后分层不明确（Controller 按层、Entity/Repository 按域 = 混合分层）。派专家子代理审计（35 主 + 9 测文件全量清单为输入，结论可复现）：
+
+- **诊断**：① 混合分层割裂——同域端点被拆到无归属层包（工单 = controller/TicketController + ticket/ 两地）；② ContentAdmin/QuestionAdmin 同属 content、InternalLevelController 实属 user，包名表达不了域归属；③ SecurityConfig/JwtService/JwtAuthFilter 是全局安全编织却塞在 auth 域；④ 测试主/镜像不一致（PingController 主在 controller/、测试在 health/）；⑤ AbstractAdminApiTest 跨域共享却放层包。
+- **方案（唯一推荐）**：Package by Feature——域内自包含（`域/controller/` 子包 + 域根 entity/repository），跨域安全/种子上移 `config/`、健康探针归 `health/`、共享视图 DTO 归 `ticket/dto/`；测试镜像到 `域/controller/` + `support/` 基座。豁免项：薄端无 service 层（唯 AuthController 的密码/refresh 逻辑越界已标记，后续可选抽 AuthService）、controller 内嵌 record DTO（跨端点复用的仅 TicketView 例外）。
+- **实施**：`117beef`（主代码 13 移 + 测试 4 移，git 识别 rename 90~100%）+ `28b5448`（测试镜像 import 同步）。**外部可见性零变化**：@RequestMapping 与内嵌 record 字段未动，`ContractSnapshotTest` 逐字通过（springdoc tag/operationId 不依赖包路径），前端契约/类型无需刷新。
+- **门禁**：`mvn clean verify` 全绿（15 tests + spotless + 契约对账）。
+
+**踩坑 31（实施自伤，已恢复）**：第一轮用 PowerShell `[regex]::Replace(..., "package $pkg;")` 替换 package 行——`.NET 正则替换的 replacement 中 `$pkg` 被解释为命名组引用`，导致整个文件被静默置换破坏（实测表现为源码字符错乱）→ 全量 `git checkout` 回滚后改用 `git mv` + **字面 `.Replace`（无 `$` 语法）** + 每步 `Contains` 校验，一次通过。教训：**批量改文本用字面替换 + 校验；正则 replacement 的 `$` 是陷阱**；另 `git mv` 会立刻 staged，别再用 `git add` 分批攒 commit（本次导致测试 rename 混入主代码 commit，无功能影响但分类不纯）。
+
+## 2026-09-07 系统设计 Day1：架构设计说明书 + 接口设计说明书（docs/20、docs/21）
+
+### 任务与产出
+
+按分工（09/07，A 全天）：系统架构设计（分层、服务边界、写方唯一性约束、数据流图）+ 接口契约梳理（OpenAPI）。产出《系统设计说明书》两份分册（09/09 设计评审交付）：
+
+| 交付物 | 文件 | 要点 |
+|---|---|---|
+| 架构分册 | `docs/20-系统架构设计说明书.md` | 系统上下文 DFD（mermaid）+ 五层划分 + 应用内三层端分层（route/service/port/adapter + 禁止规则 R1~R6）+ 服务职责边界表（含「新功能落位判据」）+ **表级单写方矩阵**（19 表 × 写方 × 现状代码）+ **守护机制设计 M-1~M-4**（DB 双角色 vv_python/vv_java/vv_seed、CI 静态探针、seed 只增不改 + slug 键、评审打回）+ 回合目标态时序图 + 报表流 + 写方边界图 + **D1~D14 设计决策/现状差异/排期表** |
+| 接口分册 | `docs/21-接口设计说明书.md` | 双快照对账：Python 20 ops / Java 6 ops 端点总清单（方法/路径/鉴权/限流/备注）+ SSE 回合契约（事件序列）+ **内部 REST 契约正式登记**（`POST /internal/level`：userId 键名/3s/幂等/调用方义务/双侧契约测试）+ 整改项 **R-1~R-16** 登记表 + 错误码对账 + 契约变更流程 |
+| 错误码补登记 | `docs/api/error-codes.md` | 补 40902/40903/41001/42202（代码已用未登记）+ 40901 预留 + 40301 语义扩注（越权统一按不存在处理） |
+
+### 现状盘点结论（先答「有没有做过类似工作」）
+
+- **分层/服务边界**：docs/06 §1、§2 已有文档级拓扑与职责表，但无设计说明书成文；docs/19 §1.1 是评审口径的现状速写（非设计）。
+- **写方唯一性**：docs/10 §3 矩阵 + §5 细则已相当完整，但 **P0-7 实锤只有文档没有机制**：`seed.py` 直接写 Java 独占表（scenarios/placement_questions）、两服务共用同一 DB 账号、无任何守护。
+- **数据流图**：此前**从未做过**正式 DFD（全仓无 mermaid/drawio），今天补齐 4 张（上下文/回合时序/报表流/写方边界）。
+- **OpenAPI 契约**：基础设施此前已远超小组水平（双快照 + openapi-typescript 生成 + CI 三关卡 + refresh-openapi.ps1 + docs/06 §7），本次补的是「设计先行」的接口清单、内部 REST 契约与对账落地。
+
+### 对账发现（2026-09-07 代码实测，全部登记进 R-1~R-16 / D1~D14）
+
+1. **Python OpenAPI 快照中没有任何 operation 带 `security`**：practice/placement/defense/events 的 `Depends(get_current_user_id)` 因用 `Depends` 而非 `Security` 未进 OpenAPI；`/asr /score /tts /llm/chat` 四端点是真的裸奔（与 docs/19 P0-4 一致，未修）。
+2. **docs/19 的 9 个 P0 经复核全部仍在**（2026-09-07 重查代码：进程内状态、同步 Session 跨 SSE、三处越权、裸接口、串行 TTS、`user_id` vs `userId`、seed 违例、reports 非 upsert、默认密钥/网关可达）——排期见 docs/20 §6 表（9/10~9/11 集中返工承接）。
+3. **三处文档与代码不符（新发现）**：① docs/06 §7 写 `/api/auth/refresh`，实际网关路径 `/manage/auth/refresh`（R-15）；② docs/06 §7「评分 30/h」，代码 `ise_rate_per_hour=60`（R-16）；③ 错误码表落后代码 4 个码（本次已补）。
+4. **快照口径修正**：Java 快照是服务原生路径，**对外契约以网关 `/manage/` 前缀为准**（docs/21 §2.2 已加说明）。
+
+### 踩坑记录（追加第 29 条）
+
+29. **「文档声称」必须与「代码事实」三方对账，不能拿 docs/06 当事实**：本次盘点靠逐条提取快照（PowerShell ConvertFrom-Json 列 paths + security）+ 关键行 grep 复核，发现 3 处 docs/06/docs/api 与代码不符（refresh 路径、ise 桶、错误码缺失）——这些差异如果只读文档永远不会暴露，而它们恰恰是接口设计说明书的「对账结论」最有价值的部分。做法：快照为唯一基准列端点，代码为唯一基准列鉴权/限流/字段名，docs 为第三列对比。
+
+### 同日补记：Java 薄端管理端提前落地（超出分工计划）
+
+把盘点出的 Java 缺口（admin 角色链路 / 用户管理 / 内容库 CRUD / 工单）全部实现，从 9/14~9/15 计划提前到设计日完成：
+
+| 提交 | 内容 |
+|---|---|
+| `c8cbba2` | feat(java)：管理端最小集 —— JWT 加 role claim + `/api/v1/admin/**` hasRole(ADMIN)；用户管理（列表/详情/禁用启用/档案，改档 source=manual）；scenarios/songs/lrc/listening_materials/placement_questions 实体+CRUD（DELETE=归档；LRC 整首重写 → seq 重排 + pitch_ref_status→missing 触发 Python 重提取；题库 exam_revision 版本化 + 重复题 409）；工单（用户提交/我的 + 管理侧前向状态机 open→processing→resolved→closed，回复即认领）；Controller 按 Spring Boot 分层规范统一收 `controller/` 包，entity/repository 按域 |
+| `b684e44` | test(java)：AdminUser/Content/Ticket 三组 API 测试（15 tests 全绿含既有） |
+| `07a28a4` | chore(contract)：Java 快照 6→33 ops + `pnpm gen:api` 前端类型（现有调用零改动） |
+
+门禁：`mvn verify` 全绿（15 tests + spotless + ContractSnapshotTest 对账新快照）；`pnpm typecheck` 通过（前端类型无破坏）。
+
+### 踩坑记录（追加第 30 条）
+
+30. **MockMvc `content(String)` 不是 UTF-8；Java 文本块里的 `\"` 是转义不是字面反斜杠**：单测两连坑——① 请求体含中文时 `content(String)` 按平台编码（ISO-8859-1）传输 → Jackson `JSON parse error` 400，必须 `content(body.getBytes(StandardCharsets.UTF_8))`；② 文本块（`"""`）中想表达 JSON 的 `\"` 实际是 `"`（转义生效），导致 `"interestTags":"["daily"]"` 这类 JSON 断裂——测试用 `[]` 或 `\\\"`。另：`git commit --amend` 会改 HEAD（上次 commit）不是任意 commit，错点后要用 `reset --soft` 重排队列。
+
+---
+
 ## 2026-09-02 推荐系统落地实现 · 阶段 5（演示数据播种 + 链路冒烟）——推荐系统主体完成
 
 > 阶段 0~4（地基/动态水平/素材难度/掌握度/推荐引擎）已交付。本阶段落地**演示播种**并做端到端冒烟，推荐系统主体代码闭环。**后续为前端联调 + Java 侧收尾（A-5.1 UserProfileEntity interest_tags 映射）。**
@@ -46,6 +124,7 @@
 
 **待办（后续）**：① 前端推荐位联调（impression/click 上报）；② Java UserProfileEntity 补 interest_tags 映射 + InternalLevelController 幂等 PUT（A-2.2）；③ 迁移 0003 在真 PG 上 `alembic upgrade` + `alembic check` 零 diff；④ docs/10 写权矩阵补 shadow_materials（A-2.3）；⑤ 3 张新表演示账号/难度标签的契约（C10/D7）待 M3 排期。
 
+—— 执行人：Faust-sudo
 ## 2026-09-02 推荐系统落地实现 · 阶段 4（规则推荐引擎 + 路由）
 
 > 阶段 3（掌握度 + 收尾挂钩）已交付。本阶段落地**体系三匹配**：`app/rec` 的 recommend_scenes/recommend_shadow + 路由 `GET /api/v1/recommendations`。**可按评审后进入阶段 5（演示数据播种 + 端到端联调）。**
@@ -93,6 +172,7 @@ L2 无 L4（C1/C8）/ 已掌握垫底（C9）/ 冷启动零档案返回默认（
 
 阶段 5：演示数据播种 + 端到端联调（`batch_calculate_difficulty --db` 预置 8 场景先验、3 个水平演示账号 L2/L3/L4 预置 user_skill_state、前端推荐位联调），并对齐 local/32 A-5.1~A-5.5 的演示前置。
 
+—— 执行人：Faust-sudo
 ## 2026-09-02 推荐系统落地实现 · 阶段 3（掌握度写入 + 会话收尾挂钩）
 
 > 阶段 2（素材难度专家规则）已交付。本阶段落地**体系三**：`app/mastery` 写 user_mastery（场景级）+ user_corpus_mastery（句级），并把 `update_user_level` + `update_session_mastery` 挂进 `complete_session` 收尾（A-3.3/A-6.5 完成）。**可按评审后进入阶段 4（推荐引擎 recommend_*）。**
@@ -133,6 +213,7 @@ L2 无 L4（C1/C8）/ 已掌握垫底（C9）/ 冷启动零档案返回默认（
 
 阶段 4：推荐引擎 `app/rec`（`recommend_scenes`/`recommend_shadow`，主查询 SQL + 扩档 + L4 复习席 + 曝光埋点 + Redis 缓存/主动失效 + 路由 `GET /api/v1/recommendations`）。前置于此：跑 `batch_calculate_difficulty --db` 把 8 场景先验写进 material_difficulty（推荐 SQL 靠它）。
 
+—— 执行人：Faust-sudo
 ## 2026-09-02 推荐系统落地实现 · 阶段 2（素材难度专家规则）
 
 > 阶段 1（update_user_level）已交付。本阶段落地**体系二**专家规则：三维度（词汇/句法/发音）+ CEFR 语义锚定 + 批量脚本。**可按评审后进入阶段 3（掌握度写入）。**
@@ -185,6 +266,7 @@ dim_to_100 / 词汇 CEFR 白名单修正（easy<3 且 hard>3）/ 句法嵌套 / 
 
 阶段 3：掌握度写入（`app/mastery`，user_mastery + user_corpus_mastery 会话收尾按 corpus_hit/attempts 聚合写入）。在此之前先补一个**演示前置**：`batch_calculate_difficulty --db` 要把 8 场景先验写进 material_difficulty（推荐 SQL 靠它，A-5.3）。
 
+—— 执行人：Faust-sudo
 ## 2026-09-02 推荐系统落地实现 · 阶段 1（`update_user_level` 核心函数）
 
 > 阶段 0（配置+5 表模型+迁移 0003）已交付并验证。本阶段落地**体系一核心** `app/skill/service.py`，含冷启动/滞回/低谷保护/难度归一化(符号修正)/幂等/事务。**可按评审后进入阶段 2（素材难度脚本）。**
@@ -240,6 +322,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 
 阶段 2：素材难度专家规则脚本（`app/difficulty/rules.py` + `batch_calculate_difficulty`，含 CEFR 锚定表 + 句法维度补全 local/32 A-1.2/A-1.3）。
 
+—— 执行人：Faust-sudo
 ## 2026-09-02 推荐系统落地实现 · 阶段 0（地基：配置 + 数据模型 + 迁移 0003）
 
 > 依据 local/31 §2（5 表 DDL）+ local/32 六维拷问修订（config 零落地/滞回/低谷保护等）。**可按评审通过后进入阶段 1（update_user_level）。** 每步均已验证。
@@ -287,6 +370,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 
 阶段 1：`app/skill/service.py` 的 `update_user_level(user_id)`（含冷启动/滞回/低谷保护/事务/幂等）。请先审本阶段，**确认 OK 再开下一阶段**。
 
+—— 执行人：Faust-sudo
 ## 2026-09-02 推荐系统六维火力拷问（算法侧交付物，归档 local/32）
 
 派 6 个子代理对 local/26~31 推荐系统设计做对抗式拷问（20 问 × 6 维度：数据冷启动/算法严谨/工程集成/边缘降级/验收演示/排期资源），全部实读代码+文档，产出 `local/32-语音链路现状与风险清单·推荐系统六维拷问.md`（正文 20 问逐项答辩 + 附录 A 六维度证据级增补）。**未改代码、未动现有文档。**
@@ -297,12 +381,14 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 
 待拍板（汇总）：① 验收口径修订（docs/06 §9.5 换 scope 还是扩候选）；② 推荐做多深（保底规则版 1~1.5 人日 vs 全量 P1 5~8）；③ 影子跟读身份（二期扩展 vs 主玩法）；④ 难度秒变入口归属（Python internal 接口）；⑤ 复习席 mastery>80% 触发；⑥ 通用化滞回 + 低谷保护列。建议开工前补 docs/20-M3 实施计划。
 
+—— 执行人：Faust-sudo
 ## 2026-09-02 推荐系统详细设计说明书（汇总定稿，归档 local/31）
 
 整合 local/26~30 全部讨论为一份可交付设计说明书（`local/31-推荐系统详细设计说明书.md`），作为 M3 实现与答辩的统一依据。结构：设计目标与约束（技术栈/写方唯一性矩阵/统一尺度/四水平消歧）→ 三套评价体系（5 张新表 DDL：user_skill_state / material_difficulty / user_mastery / user_corpus_mastery / shadow_materials）→ 联动数据流图 + 端到端旅程（甲 t0~t3 复算表）→ 核心算法伪代码（update_user_level 含滞回与幂等、batch_calibrate 含触发阈值、recommend_scenes/shadow 主查询 SQL）→ 冷启动与降级 7 层 → 验收标准（6 组 40+ 单测用例含 I1~I5 不变量与 local/30 修订回归）。
 
 **本文为准的三处修订**（相对 local/26~29）：① confidence 统一 `min(1, n/window)`（修 0.8→0.5 跳变）；② est_level 滞回带 [67,70)（skill_band_hysteresis=3，升即时/降滞后）；③ 空池兜底宁缺毋滥（限 L−1 档 + fallback 标记，<3 返回空态）。配置项汇总 18 项 + 待拍板 6 项集中到 §7.2。
 
+—— 执行人：Faust-sudo
 ## 2026-09-02 三套体系联动端到端数值模拟（算法侧交付物，归档 local/30）
 
 把 local/26/27/28/29 串成完整用户旅程并做数值验证（`local/30-三套体系联动·端到端数值模拟.md`），**全部数字脚本复算**（venv python）。
@@ -313,6 +399,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 - **模拟发现 3 个逻辑漏洞**：① local/27 confidence 不连续（n=4→0.8、n=5→0.5，两分支公式不一）→ 统一 conf=min(1,n/window)；② 档位边界震荡无滞回（est 70±0.5 → 推荐窗口整窗翻转）→ 滞回带 [67,70)，升即时/降滞后，skill_band_hysteresis=3 进配置；③ 极端空池兜底会推 L1 给 L3 → 宁缺毋滥（兜底限 L−1 档 + fallback 标记，池<3 返回空态）。
 - 不变量 I1~I5 全部成立（正常路径无"L3 用户被推 L1"）。待拍板 3 项：滞回设计、confidence 修订随 0003、宁缺毋滥兜底。
 
+—— 执行人：Faust-sudo
 ## 2026-09-02 规则推荐引擎详细实现（算法侧交付物，归档 local/29）
 
 承接 local/26~28，落地规则推荐引擎（`local/29-规则推荐引擎·详细实现.md`）。先实读核实：**user_corpus_mastery 不存在**（0001/0002 共 20 表），一并设计；user_mastery/user_skill_state/material_difficulty/shadow_materials 均为设计稿（迁移 0003+ 待落地）。
@@ -321,6 +408,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 
 交付：`user_corpus_mastery` DDL（句级明细，与 user_mastery 场景级快照分工：推荐直读 user_mastery，句级喂聚合/报告/复习调度）；`recommend_scenes(user_id, limit=6)` + `recommend_shadow(user_id, limit=3)` 完整 SQLAlchemy 实现（主查询+扩档+复习席+曝光埋点，只写 events）。待拍板 3 项：复习席比例/间隔窗口进配置、scenario_id 归档语义、L1~L3 是否也开复习席。
 
+—— 执行人：Faust-sudo
 ## 2026-09-02 素材难度评价分阶段实施策略（算法侧交付物，归档 local/28）
 
 承接 local/26 §4 + local/27 §1/§3/§7，产出素材难度两阶段实施策略（`local/28-素材难度评价·分阶段实施策略.md`）。先核实依赖：numpy 是直接依赖（pyproject.toml L24），但脚本刻意用纯 Python stdlib（40 条量级阈值映射无向量化收益，CI/单测零额外依赖）。
@@ -331,6 +419,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 - **DB 字段**：material_difficulty 增 difficulty_source('expert'|'blend'|'calibrated')/prior_score/calibrated_score/calibration_count/distinct_users/last_calibrated_at，features JSONB 存维度明细。
 - 待拍板 3 项：CEFR 词表白名单 vs 标定兜底、校准频率、source 三态展示口径。
 
+—— 执行人：Faust-sudo
 ## 2026-09-02 用户水平动态评价实现细节深化（算法侧交付物，归档 local/27）
 
 承接 local/26，深化动态水平体系为可落地实现（`local/27-用户水平动态评价·实现细节深化.md`）。先实读代码核实：练习轮 ISE 以 ASR 转写为参考（自参照评分，`orchestrator.py:161/454`）；`complete_session` 是会话收尾唯一咽喉（orchestrator 三处 + practice.py 路由）；回调先例 `placement.py::_callback_level`（httpx + service-token）；Java `InternalLevelController` 现为无条件覆盖（需扩 level_at 幂等 PUT，`user_profiles.cefr_level_at` 列已存在）。
@@ -339,6 +428,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 
 交付：完整 `update_user_level(user_id)`（SQLAlchemy，含冷启动分支、事务回滚、三层幂等：收敛重算/行锁/唯一约束）、`notify_java_level` httpx 回调（level_at 幂等 PUT，默认关、考试专属）、集成点 diff（complete_session 末尾 + placement finalize）、单测清单 7 条。事务回滚与幂等性已主动内建（预期追问项，未漏）。
 
+—— 执行人：Faust-sudo
 ## 2026-09-02 推荐系统整体框架设计（算法侧交付物，归档 local/26）
 
 算法负责人产出推荐系统整体框架设计稿，先实读代码核实约束再成稿：40 条场景语料 = `data/seed/scenarios.json` 8 场景 × 5 句（已逐条核对）；影子跟读素材尚无内容表。交付物（`local/26-推荐系统整体框架设计·三套评价体系与统一尺度映射.md`）：
@@ -349,6 +439,41 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 - 全程守写方唯一性：不写 `scenarios.difficulty` / `user_profiles.cefr_level`（只读映射兜底），动态档位只落 Python 表；推荐埋点复用既有 `events.recommend_impression/click`，CTR 口径复用 `reports`。
 
 待组长拍板：§9.3 开放项 4 条（场景难度聚合系数、0.75 锚点参数化、影子跟读是否进 sessions.kind、难度缺行兜底）。
+—— 执行人：Faust-sudo
+
+## 2026-09-02 lieflat-charts 表盘美化（预览高保真）：按技能选型规则出图，不"接入"库
+
+### 背景与产出
+
+用 [lieflat-charts](https://github.com/larashero3-dotcom/lieflat-charts)（AI Agent 用的数据可视化 Skill：
+`SKILL.md` 选型法典 + gallery 正本模板）为 VocalVerse 表盘数据做美化，示例数据口径与 docs/06 §9.1 一致，
+先出 preview（docs/13 §8：静态高保真 → 视觉验收 → 集成真实 view）：
+
+| 交付 | 文件 | 模式 / 体系 | 选型 |
+|---|---|---|---|
+| 管理端评价看板 | `apps/web/src/assets/lieflat/vv-admin-dashboard.html` | 图表模式 · Glance × PORCELAIN | 四指标 KPI 卡 + G8 / G3 / G4 / G13 / G14 |
+| 用户端学习报表 | `apps/web/src/assets/lieflat/vv-learning-report.html` | 报告模式 · R09 骨架 × PORCELAIN | 雷达（SKILL §7 例外）+ F2 / F4 / L15 + KPI 栏 |
+
+- 预览入口：dev 环境 `/preview/lieflat`（前端预览画廊，生产构建自动剔除）；渲染组件
+  `src/components/LieflatChart.vue`（sandbox iframe + srcdoc + postMessage 高度桥）。
+- 选型审计记录（含全部淘汰理由）与许可说明：`apps/web/src/assets/lieflat/README.md`。
+
+### 关键点
+
+1. **这是"用技能出图"，不是把库接进产品**：交付物是两份单文件 HTML，与前端渲染机制解耦；
+   M3 真实接口落地后替换数据即可，届时再决策"iframe 渲染 vs 移植 Vue SFC"。
+2. **选型按 SKILL.md 硬约束**：看板 = 用户明确要 dashboard → Glance 系入场（Lupi/Basics 不适配理由
+   已记录）；报表 = 报告模式 R09（淘汰 R12 依赖最重 / R03 无 KPI 槽位 / R05 密度不足 / R11 定尺太窄）；
+   页内图全部复用 gallery 正本结构（图脚标 REAL TEMPLATE），雷达按 §7 例外用 ECharts 原生换肤。
+3. **许可 ⚠️**：上游为 PolyForm Noncommercial 1.0.0（仅限非商业用途）。本项目作实训项目使用没问题；
+   **若未来商用，须向作者申请授权**，或在 M3 集成前重绘（ADR 决策点）。
+4. **踩坑 28（SFC 字面 `</script>`）**：`LieflatChart.vue` 桥接脚本字符串里的关闭标签必须写
+   `<\/script>`（反斜杠转义），且 **doc 注释里也不能出现字面 `</script>`**——@vue/compiler-sfc 按
+   字面序列切脚本块，注释里的字面串把块切在 40 行，报"`*/` expected"。另一处踩坑：交付 HTML 的
+   内联脚本按 SKILL 自检 7 用 `node --check` 抽检，抓到雷达 legend `fontFamily:'Inter','Noto Sans SC'`
+   逗号语法错误（改 `'Inter, Noto Sans SC'`）。
+
+---
 
 ## 2026-09-01 实训作业四件套 + 六路拷问：从"能不能跑"到"该不该这么做"的补课
 

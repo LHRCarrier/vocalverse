@@ -1,4 +1,4 @@
-package com.vocalverse.auth;
+package com.vocalverse.config;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * JWT 签发/校验（HS256；与 Python 侧 app/core/auth.py 手写验签对齐： base64url 无 padding + 标准 exp/iat；sub =
- * userId）。
+ * userId；role 为 2026-09 新增 claim，Python 验签不读取，向后兼容）。
  */
 @Service
 public class JwtService {
@@ -27,10 +27,12 @@ public class JwtService {
     this.accessTtlSeconds = accessTtlSeconds;
   }
 
-  public String generateAccessToken(Long userId) {
+  /** 签发 access token；role 值取 users.role（user/admin），写入 claim 供管理端授权（docs/06 §9.6）。 */
+  public String generateAccessToken(Long userId, String role) {
     Instant now = Instant.now();
     return Jwts.builder()
         .subject(String.valueOf(userId))
+        .claim("role", role)
         .issuedAt(Date.from(now))
         .expiration(Date.from(now.plusSeconds(accessTtlSeconds)))
         .signWith(key)
@@ -38,8 +40,11 @@ public class JwtService {
   }
 
   /** 解析并验签；失败抛 io.jsonwebtoken.JwtException（由过滤器转 401）。 */
+  public Claims parse(String token) {
+    return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+  }
+
   public Long parseUserId(String token) {
-    Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
-    return Long.parseLong(claims.getSubject());
+    return Long.parseLong(parse(token).getSubject());
   }
 }
