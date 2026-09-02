@@ -66,6 +66,11 @@ class Session(TimestampMixin, Base):
     profile_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("defense_profiles.id", ondelete="SET NULL")
     )
+    # 影子跟读素材引用（local/31 §2.4，迁移 0003）：scenario/song 之外的候选池第三类；
+    # 与 scenario_id/song_id 同语义（SET NULL，内容归档不影响历史）
+    shadow_material_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("shadow_materials.id", ondelete="SET NULL")
+    )
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default=text(f"'{SessionStatus.ACTIVE}'")
     )
@@ -85,7 +90,8 @@ class Session(TimestampMixin, Base):
 
     __table_args__ = (
         CheckConstraint(
-            f"kind IN ('{SessionKinds.DIALOG}', '{SessionKinds.SING}', '{SessionKinds.DEFENSE}')",
+            f"kind IN ('{SessionKinds.DIALOG}', '{SessionKinds.SING}', '{SessionKinds.DEFENSE}', "
+            f"'{SessionKinds.SHADOW}')",
             name="kind",
         ),
         CheckConstraint(
@@ -144,7 +150,8 @@ class Attempt(TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(
             f"kind IN ('{AttemptKinds.DIALOG_SPEECH}', '{AttemptKinds.FREE_PRACTICE}', "
-            f"'{AttemptKinds.PLACEMENT_ITEM}', '{AttemptKinds.DEFENSE_ANSWER}')",
+            f"'{AttemptKinds.PLACEMENT_ITEM}', '{AttemptKinds.DEFENSE_ANSWER}', "
+            f"'{AttemptKinds.SHADOW_SPEECH}')",
             name="kind",
         ),
         Index("ix_attempts_user_created", "user_id", "created_at"),
