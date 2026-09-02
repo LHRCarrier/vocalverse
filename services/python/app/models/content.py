@@ -311,3 +311,44 @@ class PlacementQuestion(TimestampMixin, Base):
         ),
         Index("ix_placement_questions_revision", "exam_revision"),
     )
+
+
+class ShadowMaterial(TimestampMixin, Base):
+    """影子跟读素材内容库（**Java 写**；local/26 §6 / local/31 §2.4，2026-09-02 设计）。
+
+    - 与 scenarios 并列的候选池第二类；难度先验由 Python 侧 material_difficulty 产出；
+    - level：内容方初评 1-4（与 scenarios.difficulty 同语义，仅作难度兜底 FALLBACK_LEVEL）；
+    - wpm：原声语速（流利度难度特征）；audio：示范音频（慢速由 TTS/变速派生，不另存大文件）；
+    - source 版权红线同 songs（docs/06 §9.7：商用音乐/音频严禁入库）；
+    - 人工标注审计（local/32 A-3.3）建议列，随 0003 评估（pending_review 走 material_difficulty）。
+    """
+
+    __tablename__ = "shadow_materials"
+
+    id: Mapped[int] = bigint_pk()
+    title: Mapped[str] = mapped_column(String(128), nullable=False)
+    level: Mapped[int] = mapped_column(SmallInteger, nullable=False)  # 内容方初评 1-4
+    text_content: Mapped[str] = mapped_column(Text, nullable=False)  # 跟读文本（逐句，供特征/字幕）
+    audio_url: Mapped[str] = mapped_column(String(512), nullable=False)
+    wpm: Mapped[int | None] = mapped_column(SmallInteger)  # 原声语速（词/分）
+    duration_s: Mapped[int | None] = mapped_column(BigInteger)
+    interest_tags: Mapped[dict] = mapped_column(
+        jsonb(), nullable=False, server_default=text("'[]'")
+    )
+    source: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default=text("'public_domain'")
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text(f"'{ContentStatus.DRAFT}'")
+    )
+
+    __table_args__ = (
+        CheckConstraint("level BETWEEN 1 AND 4", name="level"),
+        CheckConstraint("source IN ('public_domain', 'original', 'demo_only')", name="source"),
+        CheckConstraint(
+            f"status IN ('{ContentStatus.DRAFT}', '{ContentStatus.PUBLISHED}', "
+            f"'{ContentStatus.ARCHIVED}')",
+            name="status",
+        ),
+        Index("ix_shadow_materials_status_level", "status", "level"),
+    )
