@@ -182,19 +182,30 @@ def _candidates(db: Session, user_id: int, ctype: str, levels: set[str]) -> list
     return out
 
 
-def _diversify(items: list[dict], scene_type_key: bool, limit: int) -> list[dict]:
-    """同 scene_type 至多 2（top-6 互异）；影子无该约束。"""
+def _diversify(
+    items: list[dict],
+    scene_type_key: bool,
+    limit: int,
+    counts: dict[str, int] | None = None,
+) -> list[dict]:
+    """同 scene_type 至多 2（top-6 互异）；影子无该约束。
+
+    ``counts`` 为跨阶段累计的 scene_type 计数（主窗+扩档共用同一字典），保证
+    「同 scene_type ≤2」在**最终列表**上成立，而非仅在各阶段内部（local/31 §4.3）。
+    """
     if not scene_type_key:
         return items[:limit]
-    out, count = [], {}
+    if counts is None:
+        counts = {}
+    out = []
     for it in items:
         if len(out) >= limit:
             break
         key = it.get("scene_type") or "none"
-        if count.get(key, 0) >= 2:
+        if counts.get(key, 0) >= 2:
             continue
         out.append(it)
-        count[key] = count.get(key, 0) + 1
+        counts[key] = counts.get(key, 0) + 1
     return out
 
 
@@ -284,7 +295,8 @@ def _recommend(user_id: int, ctype: str, limit: int, db: Session | None) -> list
                 return cached
         tags = _user_tags(session, user_id)
         cands = _rank(_candidates(session, user_id, ctype, _effective_levels(lvl)), lvl, tags)
-        items = _diversify(cands, scene_type_key=(ctype == "scene"), limit=limit)
+        counts: dict[str, int] = {}
+        items = _diversify(cands, scene_type_key=(ctype == "scene"), limit=limit, counts=counts)
         if len(items) < limit:  # 扩档：先近后远
             for lv in _order(_effective_levels(lvl), lvl):
                 if len(items) >= limit:
@@ -295,6 +307,7 @@ def _recommend(user_id: int, ctype: str, limit: int, db: Session | None) -> list
                     [it for it in extra if it["id"] not in seen],
                     scene_type_key=(ctype == "scene"),
                     limit=limit - len(items),
+                    counts=counts,
                 )
         if lvl in REVIEW_LEVEL and len(items) < limit:  # 复习席
             got = _review_slots(session, user_id, lvl, ctype, max(1, limit // 3))
