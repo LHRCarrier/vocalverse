@@ -95,6 +95,12 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+        <!-- Windows 控制台中文根治（配合 .mvn/jvm.config + logback charset=UTF-8）：
+             fork 子 JVM 的 System.out 中文路径统一 UTF-8，避免 GBK 字节/解码错位；
+             本地与容器行为一致，Linux 无影响（本然 UTF-8） -->
+        <configuration>
+          <jvmArguments>-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8</jvmArguments>
+        </configuration>
       </plugin>
       <!-- Spotless：google-java-format，mvn verify 阶段 check（docs/06 第 4 章） -->
       <plugin>
