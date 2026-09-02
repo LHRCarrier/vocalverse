@@ -25,6 +25,10 @@ export const previewRoute: RouteRecordRaw | null = import.meta.env.DEV
           path: 'admin-users',
           component: () => import('@/views/preview/AdminUsersPreview.vue'),
         },
+        {
+          path: 'lieflat',
+          component: () => import('@/views/preview/LieflatPreview.vue'),
+        },
       ],
     }
   : null

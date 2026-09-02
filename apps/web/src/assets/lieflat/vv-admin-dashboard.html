@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>VocalVerse 评价看板 · 最近 7 天</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@6/dist/echarts.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  /* ═══════════════════════════════════════════════════════════════
+     VOCALVERSE 评价看板 · 图表模式（Glance 系 × PORCELAIN）
+     数据：演示数据，口径 = docs/06 §9.1 四项检查点指标
+     结构正本：templates/color/glance-porcelain.html（G3 G4 G8 G13 G14）
+     色板正本：color-presets.js PORCELAIN 一套，无新增色值。
+     单文件依赖：在线字体（Inter / Noto Sans SC）+ Chart.js / ECharts CDN。
+     ═══════════════════════════════════════════════════════════════ */
+  :root{--bg:#F7F2EB;--dark:#081F5C;--ink:#081F5C;--muted:rgba(8,31,92,.60);--faint:rgba(8,31,92,.40);--grid:rgba(8,31,92,.16);--lab:rgba(8,31,92,.72);--data:#334EAC}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);font-family:'Inter','Noto Sans SC',sans-serif;color:var(--ink);padding:40px;-webkit-font-smoothing:antialiased}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px;max-width:1400px;margin:0 auto}
+  .card{background:var(--bg);border-radius:24px;padding:28px 28px 20px}
+  .card.wide{grid-column:1/-1}
+  h2{font-weight:700;font-size:16.5px;letter-spacing:-.02em;margin-bottom:3px}
+  .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+  .src{font-size:9.5px;color:var(--faint);margin-top:10px;letter-spacing:.08em;font-weight:500}
+  .ch{height:320px}
+  .wrap{position:relative;height:320px}
+  svg text{font-family:'Inter','Noto Sans SC',sans-serif}
+
+  .pagehead{max-width:1400px;margin:0 auto 26px;padding:0 4px}
+  .pagehead h1{font-size:22px;letter-spacing:-.02em;font-weight:800}
+  .pagehead p{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.7}
+  .badge{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.08em;
+    padding:3px 10px;border-radius:99px;margin-bottom:10px}
+  .badge.pick{border:1.5px solid var(--ink);color:var(--ink)}
+
+  /* ── KPI 排（数据家具：排字 + 双段条，不占图额度）── */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;max-width:1400px;
+    margin:0 auto 22px}
+  .kpi{background:var(--bg);border-radius:24px;padding:22px 26px 20px}
+  .kpi .h{font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--muted)}
+  .kpi .v{font-size:30px;font-weight:800;letter-spacing:-.02em;margin-top:6px}
+  .kpi .d{font-size:11px;font-weight:600;margin-top:4px}
+  .kpi .d.up{color:#0E7C66}
+  .kpi .d.down{color:#B45309}
+  .kpi .bar{height:9px;margin-top:14px;display:flex;border-radius:99px;overflow:hidden}
+  .kpi .bar i{display:block;height:100%}
+  .kpi .bar .t{background:var(--data,#334EAC)}
+  .kpi .bar .s{background:rgba(8,31,92,.24)}
+
+  .foot{max-width:1400px;margin:26px auto 0;padding:0 6px;display:flex;
+    justify-content:space-between;gap:20px;font-size:9.5px;color:var(--faint);
+    letter-spacing:.1em;font-weight:600}
+
+  .pop{transform-box:fill-box;transform-origin:center;animation:pop .5s cubic-bezier(.2,.7,.3,1.3) both}
+  @keyframes pop{from{transform:scale(0)}to{transform:none}}
+  .fade{animation:fade .9s ease both}
+  @keyframes fade{from{opacity:0}}
+  .draw{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1s cubic-bezier(.4,0,.2,1) both}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  @media (prefers-reduced-motion:reduce){
+    .pop,.fade{animation:none}
+    .draw{animation:none;stroke-dasharray:none;stroke-dashoffset:0}
+  }
+  @media(max-width:900px){.kpis{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="pagehead">
+  <span class="badge pick">VOCALVERSE · OPS · DEMO</span>
+  <h1>评价看板 · 最近 7 天</h1>
+  <p>四项检查点指标口径见 docs/06 §9.1（点击率 · 完成率 · 互动率 · 跳出率）；指标卡为数据家具，不占图额度。全部为演示数据，接入真实埋点后替换。</p>
+</div>
+
+<!-- ══ KPI 排（数据家具）══ -->
+<div class="kpis" id="kpis"></div>
+
+<div class="grid2">
+
+  <!-- G8 · rainfall dual area -->
+  <div class="card">
+    <h2>投入越多，完成得越好</h2>
+    <div class="sub">每日互动率（自上而下柱）对照完成率（面积线）· 07-31 → 08-06</div>
+    <div class="ch" id="rainfall"></div>
+    <div class="src">G8 DUAL AREA · GLANCE-GALLERY.HTML · REAL TEMPLATE</div>
+  </div>
+
+  <!-- G3 · chunky bars -->
+  <div class="card">
+    <h2>咖啡馆里练得最多</h2>
+    <div class="sub">场景会话数 · 最近 7 天 · 每个场景一个排名档</div>
+    <div class="wrap"><canvas id="c3"></canvas></div>
+    <div class="src">G3 CHUNKY BARS · GLANCE-GALLERY.HTML · REAL TEMPLATE</div>
+  </div>
+
+  <!-- G4 · dot waffle -->
+  <div class="card">
+    <h2>六成会话花在口语场景</h2>
+    <div class="sub">会话类型构成 · 每点 = 1% 会话 · 最近 7 天</div>
+    <svg id="waffle" viewBox="0 0 380 300" width="100%" style="max-height:320px"></svg>
+    <div class="src">G4 DOT WAFFLE · GLANCE-GALLERY.HTML · REAL TEMPLATE</div>
+  </div>
+
+  <!-- G13 · big slice -->
+  <div class="card">
+    <h2>级别越高，练得越勤</h2>
+    <div class="sub">角 = 用户占比（按水平档）· 径 = 每周人均会话数 · 虚线环 4 / 8 / 12</div>
+    <div class="ch" id="custompie"></div>
+    <div class="src">G13 BIG SLICE · GLANCE-GALLERY.HTML · REAL TEMPLATE</div>
+  </div>
+
+  <!-- G14 · single axis -->
+  <div class="card wide">
+    <h2>午休和晚间是开口高峰</h2>
+    <div class="sub">星期 × 小时 · 每行一条独立轴 · 点大小 = 会话量</div>
+    <div class="ch" id="singleaxis"></div>
+    <div class="src">G14 SINGLE AXIS · GLANCE-GALLERY.HTML · REAL TEMPLATE</div>
+  </div>
+
+</div>
+
+<div class="foot">
+  <span>演示数据 · 口径 docs/06 §9.1</span>
+  <span>LIEFLAT CHARTS PORCELAIN · G-GALLERY 正本骨架</span>
+</div>
+
+<script>
+/* ── PORCELAIN 角色 token（与 color-presets.js 正本一致，无新增色值）── */
+const BG='#F7F2EB',DARK='#081F5C',TXT='#081F5C';
+const MUT='rgba(8,31,92,.60)',LAB='rgba(8,31,92,.72)',FAINT='rgba(8,31,92,.40)',QUIET='rgba(8,31,92,.15)',GRID='rgba(8,31,92,.16)';
+const DATA='#334EAC',DATA2='#7096D1',HERO='#081F5C';
+const FAINTDATA='#BAD6EB';
+const SER=['#334EAC','#081F5C','#7096D1','#BAD6EB','#D0E3FF','rgba(51,78,172,.4)'];
+const RAMP=['#D0E3FF','#BAD6EB','#7096D1','#334EAC','#081F5C'];
+const INK=TXT,PAPER=BG,MUTED=MUT;
+const rgb=h=>[0,2,4].map(i=>parseInt(h.slice(1).substr(i,2),16));
+const alpha=(h,a)=>h[0]==='#'?'rgba('+rgb(h).join(',')+','+a+')':h;
+const rnd=(i,k)=>Math.abs(((i*73856093)^(k*19349663))%1000)/1000;
+const D2R=Math.PI/180;
+const pol=(cx,cy,r,deg)=>[cx+r*Math.cos(deg*D2R),cy+r*Math.sin(deg*D2R)];
+const NS='http://www.w3.org/2000/svg';
+const el=(p,t,a)=>{const n=document.createElementNS(NS,t);for(const k in a)n.setAttribute(k,a[k]);p.appendChild(n);return n};
+const txt=(p,a,s)=>{const n=el(p,'text',a);n.textContent=s;return n};
+const tip=(n,s)=>{const t=document.createElementNS(NS,'title');t.textContent=s;n.appendChild(t)};
+const rampAt=(i,n)=>i===0?RAMP[4]:RAMP[Math.max(0,Math.min(3,3-Math.round((i-1)/Math.max(1,n-2)*3)))];
+const rankOf=a=>{const r=[...a].map((v,i)=>[v,i]).sort((x,y)=>y[0]-x[0]).map(d=>d[1]);return i=>r.indexOf(i)};
+const tipLight={backgroundColor:INK,borderWidth:0,textStyle:{color:PAPER,fontFamily:'Inter',fontSize:12},padding:[10,14]};
+
+/* ── 统一 reveal：滚入视野才播，点击重播；timer 清理防叠加 ── */
+const timers={};
+const obsReveal=(id,fn)=>{
+  const n=document.getElementById(id);
+  const go=()=>{(timers[id]||[]).forEach(clearInterval);timers[id]=[];fn(n)};
+  const io=new IntersectionObserver(es=>{if(es[0].isIntersecting){go();io.disconnect()}},{threshold:.3});
+  io.observe(n);n.style.cursor='pointer';n.addEventListener('click',go);
+};
+const keep=(id,t)=>{(timers[id]=timers[id]||[]).push(t)};
+const eReveal=(id,opt)=>obsReveal(id,elDom=>{
+  const g=echarts.getInstanceByDom(elDom)||echarts.init(elDom);
+  g.clear();g.setOption(opt);
+});
+const cjs={};
+const cReveal=(id,mkCfg)=>obsReveal(id,elDom=>{
+  cjs[id]?.destroy();
+  cjs[id]=new Chart(elDom,mkCfg());
+});
+
+Chart.defaults.color=MUTED;
+Chart.defaults.font.family='Inter';
+Chart.defaults.font.size=10.5;
+Chart.defaults.borderColor=GRID;
+Chart.defaults.plugins.legend.display=false;
+Chart.defaults.plugins.tooltip.backgroundColor=INK;
+Chart.defaults.plugins.tooltip.titleColor=BG;
+Chart.defaults.plugins.tooltip.bodyColor=alpha(BG,.72);
+Chart.defaults.plugins.tooltip.padding=12;
+Chart.defaults.plugins.tooltip.cornerRadius=12;
+Chart.defaults.plugins.tooltip.displayColors=false;
+
+/* ════ KPI 排（数据家具：排字 + 双段条，不占图额度）════
+   口径 docs/06 §9.1；演示数据。 */
+(()=>{
+const KPI=[
+  ['点击率 CTR','12.5%','↑ 1.2pt',.42,1],
+  ['完成率','68.4%','↑ 5.1pt',.74,1],
+  ['互动率','42.1%','↓ 0.8pt',.55,0],
+  ['跳出率','31.2%','↓ 3.4pt',.38,0],
+];
+const box=document.getElementById('kpis');
+KPI.forEach(([h,v,d,f,up])=>{
+  const k=document.createElement('div');
+  k.className='kpi';
+  k.innerHTML=`<div class="h">${h}</div><div class="v">${v}</div>
+    <div class="d ${up?'up':'down'}">${d}</div>
+    <div class="bar"><i class="t" style="width:${f*100}%"></i><i class="s" style="width:${(1-f)*56}%"></i></div>`;
+  box.appendChild(k);
+});
+})();
+
+/* ════ G8 · rainfall dual area ════
+   glance-gallery.html 正本结构：倒挂柱（投入，自上而下）+ 面积线（产出）。
+   数据：互动率（投入）→ 完成率（产出），口径 docs/06 §9.1。 */
+(()=>{
+const days=['07-31','08-01','08-02','08-03','08-04','08-05','08-06'];
+const rain=[44,49,41,52,47,53,51];      // 互动率 %
+const flow=[52,61,58,66,63,71,68.4];    // 完成率 %
+const RMAX=Math.max(...rain);
+eReveal('rainfall',{
+  animationDuration:1200,animationEasing:'quarticOut',
+  tooltip:{...tipLight,trigger:'axis',
+    formatter:p=>`${days[p[0].dataIndex]} — 互动率 ${rain[p[0].dataIndex]}% · 完成率 ${flow[p[0].dataIndex]}%`},
+  axisPointer:{link:[{xAxisIndex:'all'}],lineStyle:{color:FAINT}},
+  grid:[
+    {left:44,right:14,top:8,height:'26%'},
+    {left:44,right:14,top:'42%',bottom:26},
+  ],
+  xAxis:[
+    {gridIndex:0,type:'category',data:days,axisLine:{show:false},axisTick:{show:false},axisLabel:{show:false},position:'bottom'},
+    {gridIndex:1,type:'category',data:days,axisLine:{show:false},axisTick:{show:false},
+     axisLabel:{color:MUTED,fontFamily:'Inter',fontSize:9.5,interval:1,formatter:v=>String(v).slice(5)+' 日'}},
+  ],
+  yAxis:[
+    {gridIndex:0,inverse:true,max:RMAX+2,splitLine:{show:false},
+     axisLabel:{color:FAINT,fontFamily:'Inter',fontSize:9,formatter:'{value}%'},
+     axisLine:{show:false},axisTick:{show:false}},
+    {gridIndex:1,splitLine:{lineStyle:{color:GRID}},
+     axisLabel:{color:MUTED,fontFamily:'Inter',fontSize:9.5},
+     axisLine:{show:false},axisTick:{show:false}},
+  ],
+  series:[
+    {name:'互动率',type:'bar',xAxisIndex:0,yAxisIndex:0,
+     data:rain.map(v=>({value:v,itemStyle:{color:DATA2}})),
+     itemStyle:{borderRadius:[0,0,4,4]},barWidth:'55%'},
+    {name:'完成率',type:'line',xAxisIndex:1,yAxisIndex:1,data:flow,
+     smooth:.4,symbol:'none',lineStyle:{color:DATA,width:2.2},
+     areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,
+       colorStops:[{offset:0,color:alpha(DATA,.22)},{offset:1,color:alpha(DATA,0)}]}}},
+  ],
+});
+})();
+
+/* ════ G3 · chunky bars ════
+   glance-gallery.html 正本结构：粗柱 + 顶值 800 字重，排名档走 5 档序数梯。
+   数据：场景会话数（最近 7 天，演示）。 */
+(()=>{
+const V3=[420,351,286,198],rk3=rankOf(V3);
+cReveal('c3',()=>({
+  type:'bar',
+  data:{labels:['咖啡馆','面试','机场','图书馆'],
+    datasets:[{data:V3,
+      backgroundColor:V3.map((_,i)=>rampAt(rk3(i),4)),
+      borderRadius:{topLeft:99,topRight:99},borderSkipped:false,barPercentage:.52}]},
+  options:{
+    maintainAspectRatio:false,
+    animation:{duration:900,easing:'easeOutQuart',delay:c=>c.type==='data'?c.dataIndex*110:0},
+    plugins:{tooltip:{callbacks:{label:i=>i.raw+' 次会话'}}},
+    scales:{
+      x:{grid:{display:false},border:{display:false},ticks:{padding:8,font:{size:9,weight:600}}},
+      y:{display:false,suggestedMax:480},
+    },
+  },
+  plugins:[{
+    id:'topValues',
+    afterDatasetsDraw(chart){
+      const {ctx}=chart;
+      chart.getDatasetMeta(0).data.forEach((bar,i)=>{
+        ctx.save();ctx.font='700 13px Inter';ctx.fillStyle=INK;ctx.textAlign='center';
+        ctx.fillText(chart.data.datasets[0].data[i],bar.x,bar.y-10);ctx.restore();
+      });
+    },
+  }],
+}));
+})();
+
+/* ════ G4 · dot waffle ════
+   glance-gallery.html 正本结构：10×10 格点阵，1 格 = 1%，分类位逐段上色。 */
+(()=>{
+const D=[['口语场景',61],['唱歌',18],['答辩',12],['入学测试',9]];
+obsReveal('waffle',s=>{
+  s.innerHTML='';
+  const COLS=10,CELL=21,R=7.5,X0=8,Y0=10;
+  let idx=0;
+  D.forEach(([name,v],g)=>{
+    for(let k=0;k<v;k++){
+      const c=idx+k,row=Math.floor(c/COLS),col=c%COLS;
+      el(s,'circle',{cx:X0+col*CELL+R,cy:Y0+row*CELL+R,r:R,fill:SER[g%SER.length],
+        class:'pop',style:`animation-delay:${c*.008+g*.05}s`});
+    }
+    idx+=v;
+  });
+  D.forEach(([name,v],g)=>{
+    const y=26+g*40;
+    el(s,'circle',{cx:246,cy:y,r:6,fill:SER[g%SER.length]});
+    txt(s,{x:260,y:y-1,'font-size':10.5,'font-weight':600,fill:INK},name);
+    txt(s,{x:260,y:y+13,'font-size':15,'font-weight':800,fill:g<2?TXT:MUT},v+'%');
+  });
+});
+})();
+
+/* ════ G13 · big slice（custom pie）════
+   glance-gallery.html 正本结构：角 = 占比，径 = 强度，双编码；
+   强度排名走序数梯，虚线环标注刻度。 */
+(()=>{
+const D=[
+  ['L1',18,3.1],['L2',34,5.6],['L3',31,7.2],['L4',17,8.9],   // share% / 每周人均会话数
+];
+const SCALE=12;
+const TAU=Math.PI*2;
+const byShare=[...D].sort((a,b)=>b[1]-a[1]);
+const minsDesc=D.map(d=>d[2]).sort((a,b)=>b-a);
+let acc=0;
+const slices=byShare.map(([n,share,mins])=>{
+  const p0=-Math.PI/2+acc/100*TAU,p1=-Math.PI/2+(acc+share)/100*TAU;
+  acc+=share;
+  return {n,share,mins,p0,p1,color:rampAt(minsDesc.indexOf(mins),4)};
+});
+eReveal('custompie',{
+  animationDuration:900,animationEasing:'cubicOut',animationDelay:i=>i*130,
+  tooltip:{...tipLight,formatter:p=>{
+    const s=slices[p.dataIndex];
+    return s.n+' — '+s.share+'% 用户 · 每周人均 '+s.mins+' 次会话';
+  }},
+  xAxis:{show:false,min:-1,max:1},
+  yAxis:{show:false,min:-1,max:1},
+  grid:{left:0,right:0,top:0,bottom:0},
+  series:[{
+    type:'custom',
+    renderItem:(params,api)=>{
+      const s=slices[params.dataIndex];
+      const cx=api.getWidth()/2,cy=api.getHeight()/2+6;
+      const R=Math.min(api.getWidth(),api.getHeight())*.37;
+      const r0=R*.24;
+      const rOf=m=>r0+(R-r0)*m/SCALE;
+      const pm=(s.p0+s.p1)/2,lr=R+14;
+      const cos=Math.cos(pm);
+      const kids=[];
+      if(params.dataIndex===0){
+        [4,8,12].forEach(m=>kids.push({type:'circle',
+          shape:{cx,cy,r:rOf(m)},
+          style:{fill:'none',stroke:GRID,lineWidth:1,lineDash:[3,4]}}));
+      }
+      kids.push({type:'sector',
+        shape:{cx,cy,r0,r:rOf(s.mins),startAngle:s.p0,endAngle:s.p1,clockwise:true,cornerRadius:5},
+        style:{fill:s.color,stroke:BG,lineWidth:3},
+        enterFrom:{shape:{r:r0}}});
+      kids.push({type:'text',style:{
+        x:cx+cos*lr,y:cy+Math.sin(pm)*lr,
+        text:s.n+'  '+s.share+'% · '+s.mins+'/周',
+        font:'600 10px Inter',fill:LAB,
+        align:Math.abs(cos)<.25?'center':(cos>0?'left':'right'),
+        verticalAlign:'middle'},
+        enterFrom:{style:{opacity:0}}});
+      return {type:'group',children:kids};
+    },
+    data:slices.map(s=>s.share),
+  }],
+});
+})();
+
+/* ════ G14 · single axis ════
+   glance-gallery.html 正本结构：一工作日一行独立轴，点径 = 量。
+   确定性波形：工作日午间 + 晚间双峰，周末上午单峰（无随机）。 */
+(()=>{
+const days=['MON','TUE','WED','THU','FRI','SAT','SUN'];
+const hours=Array.from({length:24},(_,i)=>i);
+const mkRow=di=>hours.map(h=>{
+  const workday=di<5;
+  const noon=workday?(h===12||h===13?5:h===11||h===14?3:0):0;
+  const eve=workday?(h===20||h===21?4:h===19||h===22?2.5:0):0;
+  const morn=!workday?(h===10||h===11?3.5:h===9?2:0):0;
+  const v=Math.round(noon+eve+morn+(0.6+(h+di)%4*0.6)*((h>=8&&h<=22)?1:0));
+  return [h,v];
+}).filter(d=>d[1]>0);
+eReveal('singleaxis',{
+  animationDuration:500,animationEasing:'backOut',
+  tooltip:{...tipLight,formatter:p=>days[p.seriesIndex]+' '+String(p.value[0]).padStart(2,'0')+':00 — '+p.value[1]+' 次会话'},
+  title:days.map((d,i)=>({
+    text:d,textBaseline:'middle',top:(i+.5)*100/7-1+'%',left:0,
+    textStyle:{fontSize:9,fontWeight:700,fontFamily:'Inter',color:MUTED},
+  })),
+  singleAxis:days.map((d,i)=>({
+    left:52,right:14,type:'category',boundaryGap:false,
+    data:hours.map(h=>String(h).padStart(2,'0')),
+    top:i*100/7+6+'%',height:100/7-8+'%',
+    axisLine:{show:false},axisTick:{show:false},
+    axisLabel:{show:i===6,color:MUTED,fontFamily:'Inter',fontSize:8.5,interval:3},
+    splitLine:{show:false},
+  })),
+  series:days.map((d,i)=>({
+    singleAxisIndex:i,coordinateSystem:'singleAxis',
+    type:'scatter',
+    data:mkRow(i),
+    symbolSize:dd=>dd[1]*2.6,
+    itemStyle:{color:i<5?(i===0?SER[0]:SER[i]):FAINTDATA},
+    animationDelay:di=>i*160+di*14,
+  })),
+});
+})();
+</script>
+</body>
+</html>
