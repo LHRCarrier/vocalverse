@@ -1,4 +1,4 @@
-package com.vocalverse.controller;
+package com.vocalverse.support;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
