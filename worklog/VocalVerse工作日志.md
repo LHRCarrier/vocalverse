@@ -3,6 +3,42 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-09 唱歌相关文档归档 `docs/singing/`（组长要求整理）
+
+组长要求把唱歌相关文档统一收纳：新建模块目录 `docs/singing/`，迁入 7 份文件（原 `docs/22-*` 6 份 + 原 `docs/audit/英文歌打分-…轴线D…` 1 份；文件名与内容除路径引用外零改动）：
+
+- `docs/singing/22-英文歌打分系统集成拷问报告.md`（主报告）+ `-轴线A/B/C/E/F.md`（轴 A 算法 / B 契约 / C 数据 / E 前端 / F 运维）
+- `docs/singing/英文歌打分-系统集成拷问-轴线D-离线参考旋律提取与Java薄管理端边界.md`（轴 D 离线提取 × Java 边界；原按「音频类 → docs/audit」落位，现随唱歌模块归组）
+
+同步更新交叉引用：主报告/轴文件内互相引用路径、README 文档索引 7 行、docs/23 与 worklog 中的路径提及（已 grep 全仓验证 **0 处残留** `docs/22` / `docs/audit/英文歌` 旧路径）。唱歌文档均属 `docs/singing/` 子模块，编号 22 保留原样以便追溯；docs/23（前端重构调研）留在 `docs/` 根（其余系列文档与其并列，非唱歌模块）。
+
+—— 执行人：LHRCarrier
+
+## 2026-09-09 前端重构 · 市场同类设计调研（docs/23 · M3/M4 前置）
+
+组长提出「重新构建前端」，先做市场调研再动手。产出《前端重构市场设计调研报告》（`docs/23-前端重构市场设计调研报告.md`，已登记 README 文档索引）：
+
+- **现状盘点**：技术栈（Vue3.5+TS strict+Vite6+naive-ui+UnoCSS+Pinia+ECharts/p5/d3 + openapi 双快照生成）与页面表；引用 docs/19-M2 的 9 个 P0 交互问题与 FTUE 账（8 次点击 / 15s 强制等待 ≈ 90~120s 才开口）——**结论：重构主战场是交互层与信息架构，不是换皮**。
+- **商业调研**：① AI 口语类（Speak：目标清单/三级提示/无惩罚重说/轻纠正重复盘/开口量仪表盘——七条行业标配；ELSA：音素级 + CEFR 对齐 93.88% 可信度路线；流利说/Laoora/Praktika/BoldVoice/Duolingo Max Video Call 速览）；② 游戏化类（Duolingo 设计系统：Feather Green 色系/Nunito/路径/streak/任务/联赛，佐证 docs/13 方向；报表可视化 6 手法）；③ K 歌类（全民K歌/唱吧/Smule/Yousician/UltraStar/nightingale：滚动歌词/逐句色卡/音高双轨/分享卡/练唱两段式）。
+- **开源与技术**：LibreLingo（活跃度低，价值有限）；nightingale 与 docs/06 §9.4 口径同构（音高曲线 vs 参考旋律 + 星级 + 榜单）；AI 对话前端 8 条可迁移模式（LobeChat/Open WebUI/chat-ui 系）；管理端模板对照（naive-ui-admin 最省）；音频可视化选型（AnalyserNode 真波形 / wavesurfer.js 回放 / pitchy 实时音高 / D3 自绘音高曲线，勿用图表库）；移动端 8 条硬约束（iOS 手势内 getUserMedia、AudioContext suspended、autoplay 策略等）。
+- **重构建议**：四象限（P0 交互修复 → IA 重排 → 对话页 Speak 化 → 视觉收尾 → M3 页面）；推荐信息架构（新首页免登录试用卡/路径化 hub/激励三件套）；逐页设计参照表（首页/hub/对话/报告/唱歌/报表/管理端）；技术决策表（**保留** Vue3+naive-ui+UnoCSS 全栈，新增 AnalyserNode/wavesurfer/pitchy，SSE 状态机重做）；5 阶段 ≈9~12 人日；答辩口径。
+- **联动**：唱歌页设计依赖 docs/singing/22-英文歌打分系统集成拷问报告 已列 P0 未决项（逐帧 F0 是否落库等），前端 /sing 先静态高保真，等拍板。
+
+—— 执行人：LHRCarrier
+
+## 2026-09-09 英文歌打分模块 · 系统集成拷问（M3 预热）—— 前端架构调研员（AI 代笔）
+
+按组长分工「英文歌打分我们来做，参考 nightingale；Python 端做模块、Java 端只做薄管理端」，对 M3 唱歌模块做了**系统集成拷问**并成文档（供组员参阅）：
+
+- **产出**（均已登记 README 文档索引）：
+  - `docs/singing/22-英文歌打分系统集成拷问报告.md`——**主报告**：六轴（A 算法 / B 契约 / C 数据 / D 离线提取与 Java 边界 / E 前端 / F 运维）汇总 + 未决缺口 P0~P3 决策表 + 建议实施顺序。
+  - `docs/singing/22-…-轴线A/B/C/E/F.md` 与 `docs/singing/…-轴线D….md`——六轴逐问 Q/A 完整原文。
+- **关键结论**：schema（`songs/lrc/song_pitch_refs/sing_attempts`）与评分口径（docs/06 §9.4：`0.5音准+0.2节奏+0.3发音`、pyin、DTW）**已定稿并迁移**，但**实现层全空**（无评分器/无参考旋律提取器/无端点/`create_session` 不认 sing/无 song_id）。
+- **P0 阻塞（需组长拍板）**：① 参考旋律输入轨未定义（`songs.audio_url` 是本地路径、无独立人声/分离产物/无 `vocal_ref_url`）；② 用户逐帧 F0 是否落库（决定 D3 音准图能否画 & 评分器输出契约）；③ `songs.pitch_ref_status` 写归属冲突（songs 属 Java 独占、M-1 角色只授 Python SELECT → Python 物理写不了该列）。另：**逐句 ISE 发音限流配额炸弹**（一首歌 ≈几十句会打穿 60/h 桶）。
+- **踩坑**：`docs/21` 的 `sessions.kind∈practice/defense/placement` 与模型 `SessionKinds(dialog/sing/defense)` 矛盾；`SingAttempt` 已建模（勿再当「未建模」）。
+
+—— 执行人：前端架构调研员（AI 代笔；**正式署名待组长确认**，勿以本条目作为个人署名依据）
+
 ## 2026-09-09 PR#25 推荐系统落地 · 复审整改与合入（模型同步 / 契约快照 / CI 兜底）
 
 复审发现并修复 3 个阻断项（评审结论见 PR#25 review，2026-09-02）：
