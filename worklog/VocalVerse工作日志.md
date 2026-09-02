@@ -3,6 +3,59 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-02 推荐系统详细设计说明书（汇总定稿，归档 local/31）
+
+整合 local/26~30 全部讨论为一份可交付设计说明书（`local/31-推荐系统详细设计说明书.md`），作为 M3 实现与答辩的统一依据。结构：设计目标与约束（技术栈/写方唯一性矩阵/统一尺度/四水平消歧）→ 三套评价体系（5 张新表 DDL：user_skill_state / material_difficulty / user_mastery / user_corpus_mastery / shadow_materials）→ 联动数据流图 + 端到端旅程（甲 t0~t3 复算表）→ 核心算法伪代码（update_user_level 含滞回与幂等、batch_calibrate 含触发阈值、recommend_scenes/shadow 主查询 SQL）→ 冷启动与降级 7 层 → 验收标准（6 组 40+ 单测用例含 I1~I5 不变量与 local/30 修订回归）。
+
+**本文为准的三处修订**（相对 local/26~29）：① confidence 统一 `min(1, n/window)`（修 0.8→0.5 跳变）；② est_level 滞回带 [67,70)（skill_band_hysteresis=3，升即时/降滞后）；③ 空池兜底宁缺毋滥（限 L−1 档 + fallback 标记，<3 返回空态）。配置项汇总 18 项 + 待拍板 6 项集中到 §7.2。
+
+## 2026-09-02 三套体系联动端到端数值模拟（算法侧交付物，归档 local/30）
+
+把 local/26/27/28/29 串成完整用户旅程并做数值验证（`local/30-三套体系联动·端到端数值模拟.md`），**全部数字脚本复算**（venv python）。
+
+- 场景1（甲 L2→L3）：窗口均值 74 不直接定档，`est=0.142×62+0.858×74=72.30≥70→L3`；est 单调 62→66.4→68.5→72.3 无跳变；est_level=L3 与 cefr_level=L2 双档并存不循环（I5）。
+- 场景2（推荐动态）：变档后 top-6 档位重心 3×L2+3×L3 → 3×L3+1×L4+2×L2（L4 占位演示），重叠 5/6 不震荡，L3 用户最低见 L2（I1）。
+- 场景3（校准）：学业交流专家 3.5→74.38(L3)，100 用户实测 2.8→64.75(L2)，贝叶斯 (100×64.75+10×74.38)/110=65.62→L2 calibrated；降档后 L3 用户降位、L2 用户升位（I4）。
+- **模拟发现 3 个逻辑漏洞**：① local/27 confidence 不连续（n=4→0.8、n=5→0.5，两分支公式不一）→ 统一 conf=min(1,n/window)；② 档位边界震荡无滞回（est 70±0.5 → 推荐窗口整窗翻转）→ 滞回带 [67,70)，升即时/降滞后，skill_band_hysteresis=3 进配置；③ 极端空池兜底会推 L1 给 L3 → 宁缺毋滥（兜底限 L−1 档 + fallback 标记，池<3 返回空态）。
+- 不变量 I1~I5 全部成立（正常路径无"L3 用户被推 L1"）。待拍板 3 项：滞回设计、confidence 修订随 0003、宁缺毋滥兜底。
+
+## 2026-09-02 规则推荐引擎详细实现（算法侧交付物，归档 local/29）
+
+承接 local/26~28，落地规则推荐引擎（`local/29-规则推荐引擎·详细实现.md`）。先实读核实：**user_corpus_mastery 不存在**（0001/0002 共 20 表），一并设计；user_mastery/user_skill_state/material_difficulty/shadow_materials 均为设计稿（迁移 0003+ 待落地）。
+
+6 项决策：① `面试·自我介绍` +2 档高估 → **标定兜底**（P1 不引 CEFR 词表，登记 P2；影响面 1 场景且难度护栏 ±2 可容，标定是自适应修复 vs 词表一次性修复）；② 推荐 SQL = 一条 CTE 语句（动态定级→[L,L+1] 过滤→ROW_NUMBER 每 scene_type 限 2→未掌握/难度/兴趣/新鲜排序→LIMIT 6）；③ 校准频率 = 每日 UTC 03:00 定时 + 增量节流（难度是慢变量、reports 日聚合同窗口、n≥30 需攒数天）；④ 不足 3 个先上后下扩档（i+1 挑战优先），L1/L4 边界收敛；⑤ L4 复习席 = 1/3 席位给 L−1 已掌握且 ≥7 天未练（间隔复习+随机，防枯燥）；⑥ calibrated/blend 管理端三态展示、推荐侧不区分（source 是审计属性不进排序键）。
+
+交付：`user_corpus_mastery` DDL（句级明细，与 user_mastery 场景级快照分工：推荐直读 user_mastery，句级喂聚合/报告/复习调度）；`recommend_scenes(user_id, limit=6)` + `recommend_shadow(user_id, limit=3)` 完整 SQLAlchemy 实现（主查询+扩档+复习席+曝光埋点，只写 events）。待拍板 3 项：复习席比例/间隔窗口进配置、scenario_id 归档语义、L1~L3 是否也开复习席。
+
+## 2026-09-02 素材难度评价分阶段实施策略（算法侧交付物，归档 local/28）
+
+承接 local/26 §4 + local/27 §1/§3/§7，产出素材难度两阶段实施策略（`local/28-素材难度评价·分阶段实施策略.md`）。先核实依赖：numpy 是直接依赖（pyproject.toml L24），但脚本刻意用纯 Python stdlib（40 条量级阈值映射无向量化收益，CI/单测零额外依赖）。
+
+- **阶段一专家规则**：场景两维（词汇复杂度/发音难点，1~5）加权 `0.5·M(vocab)+0.5·M(pron)`，M(k)=40+(k−1)·13.75 对齐档位起点；影子跟读三维（语速 wps/停顿密度/连读密度，1~5 阈值表，停顿方向反转）权重 0.4/0.3/0.3。
+- **batch_calculate_difficulty() 已实跑验证**（`--json data/seed/scenarios.json`，venv python）：40 条语料全部打出初始分；8 场景中 3 个与内容方初评一致、4 个 ±1 档、1 个 +2 档（面试·自我介绍，学习者高频长词被"长词=难词"高估）→ 挂 pending_review。
+- **阶段二校准**：分箱插值 D_emp（按 user_skill_state.est_score 分箱，线性插值穿越 0.75 锚点）+ 贝叶斯平滑 `D_cal=(n·D_emp+κ·D_prior)/(n+κ)`（κ=10，主推），移动平均为增量备选；触发阈值 **n≥30 且 distinct_users≥5 且单用户占比≤30%**（SE≈0.079→难度分误差≈1.2 分<1 档的推导）；n≥100 转 calibrated。
+- **DB 字段**：material_difficulty 增 difficulty_source('expert'|'blend'|'calibrated')/prior_score/calibrated_score/calibration_count/distinct_users/last_calibrated_at，features JSONB 存维度明细。
+- 待拍板 3 项：CEFR 词表白名单 vs 标定兜底、校准频率、source 三态展示口径。
+
+## 2026-09-02 用户水平动态评价实现细节深化（算法侧交付物，归档 local/27）
+
+承接 local/26，深化动态水平体系为可落地实现（`local/27-用户水平动态评价·实现细节深化.md`）。先实读代码核实：练习轮 ISE 以 ASR 转写为参考（自参照评分，`orchestrator.py:161/454`）；`complete_session` 是会话收尾唯一咽喉（orchestrator 三处 + practice.py 路由）；回调先例 `placement.py::_callback_level`（httpx + service-token）；Java `InternalLevelController` 现为无条件覆盖（需扩 level_at 幂等 PUT，`user_profiles.cefr_level_at` 列已存在）。
+
+8 项决策：① 场景难度聚合 λ=0.5 进配置（可标定）；② 滑动窗口=10 个有效样本（≈1.5~2 会话，SE≈σ/√10 远小于档距）；③ 锚点 0.75 = 同一配置块成对参数化（anchor_score+anchor_rate 同次变更，防统一尺度断裂）；④ 定档分 vs 窗口均值固定 0.6:0.4 不合理 → 冷启动 w=0.7 随样本量衰减 + 满窗按遗忘曲线（半衰期 60 天）留 0.15 残余（依据练习幂律 + 遗忘曲线 + 自参照刻度差）；⑤ 影子跟读必须进 sessions.kind（砍掉会污染指标口径/难度标定/掌握度取数，迁移成本极低）；⑥ 冷启动 min_samples=5 定档分主导 + confidence 阶梯；⑦ 难度缺行兜底 FALLBACK_LEVEL 采纳（零冷启动/确定性/守写权/防 NULL/标定平滑接管）；⑧ 更新时机=会话收尾批量更新，非 practice_complete 埋点、非每轮。
+
+交付：完整 `update_user_level(user_id)`（SQLAlchemy，含冷启动分支、事务回滚、三层幂等：收敛重算/行锁/唯一约束）、`notify_java_level` httpx 回调（level_at 幂等 PUT，默认关、考试专属）、集成点 diff（complete_session 末尾 + placement finalize）、单测清单 7 条。事务回滚与幂等性已主动内建（预期追问项，未漏）。
+
+## 2026-09-02 推荐系统整体框架设计（算法侧交付物，归档 local/26）
+
+算法负责人产出推荐系统整体框架设计稿，先实读代码核实约束再成稿：40 条场景语料 = `data/seed/scenarios.json` 8 场景 × 5 句（已逐条核对）；影子跟读素材尚无内容表。交付物（`local/26-推荐系统整体框架设计·三套评价体系与统一尺度映射.md`）：
+
+- **三套评价体系三张表 DDL**（PG16/Alembic 对齐）：`user_skill_state`（动态水平，练习评分 EWMA，Python 写）/ `material_difficulty`（素材难度，特征先验 + 行为标定，Python 写）/ `user_mastery`（掌握度，匹配状态表，Python 写）；另附支撑表 `shadow_materials`（Java 写）及前置迁移项（`sessions.kind` 扩 'shadow'、`sessions.shadow_material_id`、`attempts.kind` 扩 'shadow_speech'）。
+- **统一尺度映射（显式给全）**：0-100 共轴、85/70/55 档界两端共用，难度分锚定「达标率 0.75 的用户能力分」，行为标定闭环回流。
+- **联动数据流图**（文字版）+ **`get_recommendations(user_id)` 伪代码**（Python/SQL 混合，严格分层优先级：未掌握 > 难度匹配 > 兴趣标签 > 新鲜度，含难度出界硬护栏与 top-3 互异）。
+- 全程守写方唯一性：不写 `scenarios.difficulty` / `user_profiles.cefr_level`（只读映射兜底），动态档位只落 Python 表；推荐埋点复用既有 `events.recommend_impression/click`，CTR 口径复用 `reports`。
+
+待组长拍板：§9.3 开放项 4 条（场景难度聚合系数、0.75 锚点参数化、影子跟读是否进 sessions.kind、难度缺行兜底）。
+
 ## 2026-09-01 实训作业四件套 + 六路拷问：从"能不能跑"到"该不该这么做"的补课
 
 ### 背景与产出
