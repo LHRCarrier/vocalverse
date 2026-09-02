@@ -1,4 +1,4 @@
-package com.vocalverse.common;
+package com.vocalverse.config;
 
 import com.vocalverse.user.UserEntity;
 import com.vocalverse.user.UserProfileEntity;

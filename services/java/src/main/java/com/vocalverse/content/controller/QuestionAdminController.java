@@ -1,4 +1,4 @@
-package com.vocalverse.controller;
+package com.vocalverse.content.controller;
 
 import com.vocalverse.common.dto.Envelope;
 import com.vocalverse.content.PlacementQuestionEntity;

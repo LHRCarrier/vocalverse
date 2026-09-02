@@ -1,4 +1,4 @@
-package com.vocalverse.controller;
+package com.vocalverse.health;
 
 import com.vocalverse.common.dto.Envelope;
 import org.springframework.web.bind.annotation.GetMapping;

@@ -1,4 +1,4 @@
-package com.vocalverse.auth;
+package com.vocalverse.config;
 
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;

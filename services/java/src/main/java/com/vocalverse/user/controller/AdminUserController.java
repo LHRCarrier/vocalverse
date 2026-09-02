@@ -1,4 +1,4 @@
-package com.vocalverse.controller;
+package com.vocalverse.user.controller;
 
 import com.vocalverse.common.dto.Envelope;
 import com.vocalverse.common.dto.PageView;

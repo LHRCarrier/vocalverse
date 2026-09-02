@@ -1,5 +1,6 @@
-package com.vocalverse.ticket;
+package com.vocalverse.ticket.dto;
 
+import com.vocalverse.ticket.TicketEntity;
 import java.time.Instant;
 
 /** 工单视图（用户侧与管理侧共用）。 */

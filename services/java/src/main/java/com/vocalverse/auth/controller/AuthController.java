@@ -1,7 +1,7 @@
-package com.vocalverse.controller;
+package com.vocalverse.auth.controller;
 
-import com.vocalverse.auth.JwtService;
 import com.vocalverse.common.dto.Envelope;
+import com.vocalverse.config.JwtService;
 import com.vocalverse.user.RefreshTokenEntity;
 import com.vocalverse.user.RefreshTokenRepository;
 import com.vocalverse.user.UserEntity;

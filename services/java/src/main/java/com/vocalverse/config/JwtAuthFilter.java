@@ -1,4 +1,4 @@
-package com.vocalverse.auth;
+package com.vocalverse.config;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;

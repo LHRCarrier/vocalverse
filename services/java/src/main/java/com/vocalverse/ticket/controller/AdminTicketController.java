@@ -1,10 +1,10 @@
-package com.vocalverse.controller;
+package com.vocalverse.ticket.controller;
 
 import com.vocalverse.common.dto.Envelope;
 import com.vocalverse.common.dto.PageView;
 import com.vocalverse.ticket.TicketEntity;
 import com.vocalverse.ticket.TicketRepository;
-import com.vocalverse.ticket.TicketView;
+import com.vocalverse.ticket.dto.TicketView;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
