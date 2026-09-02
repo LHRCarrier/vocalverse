@@ -185,3 +185,24 @@ def test_impression_logged_when_own_session() -> None:
         assert e.payload["items"]
     finally:
         db.close()
+
+
+def test_scene_type_cap_holds_across_expansion() -> None:
+    """C10：同 scene_type ≤2 在「主窗+扩档」组成的最终列表上也成立。
+
+    主窗 {L2,L3} 已被 2 个 cafe 占满；扩档 L1 再来一个 cafe 不得把 cafe 撑到 3（此前
+    _diversify 各阶段独立计数，扩档阶段会漏读主窗计数而溢出，违背 local/31 §4.3）。
+    """
+    uid = _mk_user(_L2, ["coffee"])
+    _mk_scene("cafeA", 2, _L2, ["coffee"])
+    _mk_scene("cafeB", 2, _L2, ["coffee"])
+    _mk_scene("cafeL1", 1, "L1", ["coffee"])  # L1 属扩档带（主窗为 {L2,L3}），独占第 3 条 cafe
+    db = get_session_factory()()
+    try:
+        items = recommend_scenes(uid, limit=6, db=db)
+        titles = [it["title"] for it in items]
+        # 演示 `_mk_scene` 固定 scene_type=cafe；主窗已 2 条 cafe，扩档不得再加第 3 条
+        assert titles.count("cafeA") + titles.count("cafeB") + titles.count("cafeL1") <= 2
+        assert "cafeL1" not in titles  # cafe 已满，L1 咖啡不再补
+    finally:
+        db.close()
