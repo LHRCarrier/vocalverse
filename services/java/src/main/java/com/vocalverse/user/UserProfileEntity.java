@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** 学习档案（Java 写；1:1 用户；cefr_level 为最近一次入学测试/人工校正快照）。 */
 @Entity
@@ -29,6 +31,11 @@ public class UserProfileEntity {
   @Column(name = "learning_goal", length = 255)
   private String learningGoal;
 
+  /** 兴趣标签 JSON 数组文本；应用层负责 JsonNode 转换（docs/10 §5.2 纯映射+校验）。 */
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "interest_tags", nullable = false)
+  private String interestTags;
+
   @Column(name = "voice_rate", nullable = false, length = 16)
   private String voiceRate;
 
@@ -38,8 +45,14 @@ public class UserProfileEntity {
   @Column(name = "preferred_difficulty")
   private Integer preferredDifficulty;
 
+  @Column(name = "avatar_url", length = 512)
+  private String avatarUrl;
+
   @Column(name = "cefr_level_source", nullable = false, length = 16)
   private String cefrLevelSource;
+
+  @Column(name = "cefr_level_at")
+  private Instant cefrLevelAt;
 
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
@@ -83,6 +96,14 @@ public class UserProfileEntity {
     this.learningGoal = learningGoal;
   }
 
+  public String getInterestTags() {
+    return interestTags;
+  }
+
+  public void setInterestTags(String interestTags) {
+    this.interestTags = interestTags;
+  }
+
   public String getVoiceRate() {
     return voiceRate;
   }
@@ -107,12 +128,28 @@ public class UserProfileEntity {
     this.preferredDifficulty = preferredDifficulty;
   }
 
+  public String getAvatarUrl() {
+    return avatarUrl;
+  }
+
+  public void setAvatarUrl(String avatarUrl) {
+    this.avatarUrl = avatarUrl;
+  }
+
   public String getCefrLevelSource() {
     return cefrLevelSource;
   }
 
   public void setCefrLevelSource(String cefrLevelSource) {
     this.cefrLevelSource = cefrLevelSource;
+  }
+
+  public Instant getCefrLevelAt() {
+    return cefrLevelAt;
+  }
+
+  public void setCefrLevelAt(Instant cefrLevelAt) {
+    this.cefrLevelAt = cefrLevelAt;
   }
 
   public Instant getCreatedAt() {

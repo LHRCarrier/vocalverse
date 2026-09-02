@@ -59,6 +59,7 @@ public class DemoSeeder implements CommandLineRunner {
     profile.setUserId(user.getId());
     profile.setAgeGroup(ageGroup);
     profile.setCefrLevel(level);
+    profile.setInterestTags("[]");
     profile.setVoiceRate(voiceRate);
     profile.setCefrLevelSource("manual");
     profile.setCreatedAt(now);

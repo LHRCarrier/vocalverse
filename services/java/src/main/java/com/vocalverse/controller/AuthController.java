@@ -1,5 +1,6 @@
-package com.vocalverse.auth;
+package com.vocalverse.controller;
 
+import com.vocalverse.auth.JwtService;
 import com.vocalverse.common.dto.Envelope;
 import com.vocalverse.user.RefreshTokenEntity;
 import com.vocalverse.user.RefreshTokenRepository;
@@ -93,13 +94,14 @@ public class AuthController {
     profile.setAgeGroup(
         body.ageGroup() == null || body.ageGroup().isBlank() ? "adult" : body.ageGroup());
     profile.setCefrLevel("L1");
+    profile.setInterestTags("[]"); // 列 NOT NULL（PG 由 server_default 兜底，Java 侧显式）
     profile.setVoiceRate("normal");
     profile.setCefrLevelSource("manual");
     profile.setCreatedAt(now);
     profile.setUpdatedAt(now);
     profiles.save(profile);
 
-    return Envelope.ok(issue(user.getId(), request));
+    return Envelope.ok(issue(user.getId(), user.getRole(), request));
   }
 
   @PostMapping("/login")
@@ -114,7 +116,7 @@ public class AuthController {
         || !passwordEncoder.matches(body.password(), user.getPasswordHash())) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "bad credentials");
     }
-    return Envelope.ok(issue(user.getId(), request));
+    return Envelope.ok(issue(user.getId(), user.getRole(), request));
   }
 
   @PostMapping("/refresh")
@@ -131,7 +133,12 @@ public class AuthController {
     }
     token.setRevokedAt(Instant.now()); // rotation：旧行吊销
     refreshTokens.save(token);
-    return Envelope.ok(issue(token.getUserId(), request));
+    String role =
+        users
+            .findById(token.getUserId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no such user"))
+            .getRole();
+    return Envelope.ok(issue(token.getUserId(), role, request));
   }
 
   @GetMapping("/me")
@@ -146,9 +153,9 @@ public class AuthController {
     return Envelope.ok(new MeView(user.getId(), user.getUsername(), user.getNickname(), level));
   }
 
-  private TokenResponse issue(Long userId, HttpServletRequest request) {
-    String access = jwt.generateAccessToken(userId);
-    String refresh = jwt.generateAccessToken(userId) + "-" + System.currentTimeMillis();
+  private TokenResponse issue(Long userId, String role, HttpServletRequest request) {
+    String access = jwt.generateAccessToken(userId, role);
+    String refresh = jwt.generateAccessToken(userId, role) + "-" + System.currentTimeMillis();
     RefreshTokenEntity entity = new RefreshTokenEntity();
     entity.setUserId(userId);
     entity.setTokenHash(sha256(refresh));

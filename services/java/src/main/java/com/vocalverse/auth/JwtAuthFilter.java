@@ -1,5 +1,6 @@
 package com.vocalverse.auth;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -12,7 +13,10 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/** JWT 请求过滤器：解析 Bearer 令牌 → 写入 SecurityContext（principal=userId）与 request attr。 */
+/**
+ * JWT 请求过滤器：解析 Bearer 令牌 → 写入 SecurityContext（principal=userId，authority=ROLE_&lt;role&gt;）与
+ * request attr。role 来自 JWT claim（2026-09 起签发），无 role claim 的旧令牌按 ROLE_USER 处理。
+ */
 public class JwtAuthFilter extends OncePerRequestFilter {
 
   private final JwtService jwt;
@@ -28,10 +32,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     String header = request.getHeader("Authorization");
     if (header != null && header.startsWith("Bearer ")) {
       try {
-        Long userId = jwt.parseUserId(header.substring(7));
+        Claims claims = jwt.parse(header.substring(7));
+        Long userId = Long.parseLong(claims.getSubject());
+        String role = claims.get("role", String.class);
+        String authority = "ROLE_" + (role == null ? "USER" : role.toUpperCase());
         var auth =
             new UsernamePasswordAuthenticationToken(
-                userId, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+                userId, null, List.of(new SimpleGrantedAuthority(authority)));
         SecurityContextHolder.getContext().setAuthentication(auth);
         request.setAttribute("userId", userId);
       } catch (JwtException | IllegalArgumentException e) {

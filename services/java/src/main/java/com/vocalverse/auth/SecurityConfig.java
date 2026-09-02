@@ -58,6 +58,9 @@ public class SecurityConfig {
                         "/actuator/health",
                         "/error")
                     .permitAll()
+                    // 管理端（docs/06 §9.6）：admin 角色专用；用户侧工单接口走 anyRequest().authenticated()
+                    .requestMatchers("/api/v1/admin/**")
+                    .hasRole("ADMIN")
                     .requestMatchers("/internal/**")
                     .hasRole("SERVICE")
                     .anyRequest()
