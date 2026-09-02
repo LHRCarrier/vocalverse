@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 Java 启动日志两坑修复（安全密码 WARN + spring-boot:run 中文乱码）
+
+用户实测暴露两个启动问题（commit `5ad2c8c` + `16a4e6b`）：
+
+1. **「Using generated security password」WARN**：项目是自定义 JWT 过滤器 + BCrypt（AuthController 自己校验），从不创建 `UserDetailsService` bean → Boot 的 `UserDetailsServiceAutoConfiguration` 兜底生成随机密码并打误导性 WARN。已 `exclude UserDetailsServiceAutoConfiguration` 消噪（测试证明 SecurityConfig 一直生效：链路失效则 /auth/** 被默认 basic auth 拦截，AuthFlowTest 必挂）。
+2. **DemoSeeder 中文乱码（verify 正常、spring-boot:run 乱码）**：logback sett UTF-8 字节后，**mvn spring-boot:run 的 fork 子进程 stdout 经管道由 Maven 主进程按平台编码（GBK）解码** → UTF-8 字节被读错乱码；surefire 转发路径无此环节所以 verify 正常。修复三层对齐：`logback-spring.xml charset=UTF-8` + `.mvn/jvm.config -Dfile.encoding=UTF-8`（Maven 主 JVM）+ `spring-boot-maven-plugin jvmArguments -Dstdout.encoding/-Dstderr.encoding=UTF-8`（fork 子 JVM）。Linux/容器无影响（本然 UTF-8）。
+3. 门禁：`mvn clean verify` 全绿（15 tests + spotless + 契约对账）。
+
+**踩坑（并入 32 待登记）**：Windows 中文编码是「字节流向 × 每层的解码器」问题——logback 只管字节（charset），Maven 管道转发按自己编码解码；修编码先分清「哪层转码」再动手，单改一层必然残留（第一轮只加 logback charset 时 verify 好了 run 没好的原因）。
+
 ## 2026-09-07 Java 包结构按 Package-by-Feature 规范重整（专家子代理审计 + 实施）
 
 **触发**：组长检查发现上轮「Controller 统一收 controller/」后分层不明确（Controller 按层、Entity/Repository 按域 = 混合分层）。派专家子代理审计（35 主 + 9 测文件全量清单为输入，结论可复现）：
