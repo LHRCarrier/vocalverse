@@ -3,6 +3,15 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-09 PR#25 推荐系统落地 · 复审整改与合入（模型同步 / 契约快照 / CI 兜底）
+
+复审发现并修复 3 个阻断项（评审结论见 PR#25 review，2026-09-02）：
+1. **模型-迁移不同步**：迁移 0003 已扩 `sessions.kind='shadow'`、新增 `sessions.shadow_material_id`、扩 `attempts.kind='shadow_speech'`，但 `models/practice.py` 未同步 → shadow 会话落库 CHECK 违约；`mastery/service.py` 读 `session.shadow_material_id` 抛 AttributeError 被收尾钩子吞掉（动态水平/掌握度静默不更新）。已补模型同步 + 2 条回归测试（`tests/mastery/test_session_model_sync.py`：修复前 2 failed，修复后绿）。
+2. **合并冲突 + 契约快照未刷新**：worklog 与 main 后到 9/7~9/9 记录冲突（已合并解决；推荐系统 13 段记录按规范补署名）；`apps/web/src/api/specs/python-openapi.json` 缺 `/api/v1/recommendations`→ CI 契约步骤必红（已刷新快照 + `pnpm gen:api`）。
+3. **CI 从未运行**：PR #24/#25 打开与同步推送均 0 run（`pull_request` 触发当前未生效）→ python-ci 增加 `workflow_dispatch` 手动触发 + `push(main)` 自动兜底；合入前本地全量门禁复核通过（ruff / format / pytest 83 passed / alembic 单头 / 契约一致）。
+
+—— 执行人：LHRCarrier
+
 ## 2026-09-07 Java 启动日志两坑修复（安全密码 WARN + spring-boot:run 中文乱码）
 
 用户实测暴露两个启动问题（commit `5ad2c8c` + `16a4e6b`）：
@@ -71,6 +80,366 @@
 30. **MockMvc `content(String)` 不是 UTF-8；Java 文本块里的 `\"` 是转义不是字面反斜杠**：单测两连坑——① 请求体含中文时 `content(String)` 按平台编码（ISO-8859-1）传输 → Jackson `JSON parse error` 400，必须 `content(body.getBytes(StandardCharsets.UTF_8))`；② 文本块（`"""`）中想表达 JSON 的 `\"` 实际是 `"`（转义生效），导致 `"interestTags":"["daily"]"` 这类 JSON 断裂——测试用 `[]` 或 `\\\"`。另：`git commit --amend` 会改 HEAD（上次 commit）不是任意 commit，错点后要用 `reset --soft` 重排队列。
 
 ---
+
+## 2026-09-02 推荐系统落地实现 · 阶段 5（演示数据播种 + 链路冒烟）——推荐系统主体完成
+
+> 阶段 0~4（地基/动态水平/素材难度/掌握度/推荐引擎）已交付。本阶段落地**演示播种**并做端到端冒烟，推荐系统主体代码闭环。**后续为前端联调 + Java 侧收尾（A-5.1 UserProfileEntity interest_tags 映射）。**
+
+### 5.1 新增 `app/db/seed_recommend.py`（幂等演示播种）
+
+| 播种项 | 说明 |
+|---|---|
+| 演示补充场景（L3/L4） | `面试 · 压力面（演示）` L3 + `商务谈判 · 深度磋商（演示）` L4（scene_type='other' 以过 CHECK；interest_tags 匹配 demo 账号）。**修 cross-exam A-5.2：现 seed 只有 difficulty 1/3、专家先验无 L4，L3/L4 账号无内容可推** |
+| `seed_material_difficulty` | 全部 published 场景专家先验（复用 `app.difficulty.batch`）；演示场景强制 L3/L4 |
+| `seed_demo_reco_accounts` | 3 个水平账号 `demo_reco_L2/L3/L4`：interest_tags + cefr_level + user_skill_state(est_level, confidence=1.0) |
+
+写方唯一性：demo user 按 **seed 单写豁免**创建（docs/11 Q-A15，与 scenarios 同先例）；Java 侧如改 CommandLineRunner 播种需同步 interest_tags 映射。
+
+### 5.2 `app/difficulty/batch.py` 微调
+
+`upsert_scenarios` 改为**调用方统一 COMMIT**（batch.main --db 与 seed_recommend 各管自己事务），不再内部 commit。
+
+### 5.3 新增 `tests/db/test_seed_recommend.py`（A-5.2 冒烟）
+
+播种 → `recommend_scenes` 三账号 → 断言 **L2/L3/L4 推荐互异 + L4 命中商务谈判**。该用例同时验证了阶段 2~4 全链路（专家先验→难度→推荐）在真实 8+2 场景上端到端可跑。
+
+### 5.4 验证
+
+`pytest 79 passed`（+1 demo）；`ruff check .` 通过；`format --check .` 74 文件 all formatted。
+
+### 5.5 踩坑记录（追加第 32 条）
+
+32. **场景 scene_type CHECK 只允许 cafe/airport/interview/library/other**（content.py，与 docs/06 §9.6 一致）：自造演示场景用 `business` 会过不了 CHECK 建表即崩。改用 `other`（需求本就用其他兜底）。**教训：造 seed 数据前先核对目标表 CHECK 枚举，别凭直觉写 scene_type。**
+
+### 5.6 阶段总览（0~5 完成，全部通过 ruff/format/pytest）
+
+| 阶段 | 交付 |
+|---|---|
+| 0 | config 41 参数 + 5 张表模型 + 迁移 0003 |
+| 1 | update_user_level（冷启动/滞回/低谷/幂等/事务，难度归一化符号修正） |
+| 2 | 素材难度专家规则（词汇 CEFR 锚定/句法补全/发音 + 批量脚本 + 维度 A-5.2 修正） |
+| 3 | 掌握度写入（user_mastery/user_corpus_mastery + 会话收尾挂钩，测试 DB 隔离修复） |
+| 4 | 推荐引擎（recommend_scenes/shadow + 路由 + 缓存/主动失效，扩档 ±1 裁决） |
+| 5 | 演示播种（L3/L4 场景 + 3 水平账号）+ 端到端冒烟 |
+
+**待办（后续）**：① 前端推荐位联调（impression/click 上报）；② Java UserProfileEntity 补 interest_tags 映射 + InternalLevelController 幂等 PUT（A-2.2）；③ 迁移 0003 在真 PG 上 `alembic upgrade` + `alembic check` 零 diff；④ docs/10 写权矩阵补 shadow_materials（A-2.3）；⑤ 3 张新表演示账号/难度标签的契约（C10/D7）待 M3 排期。
+
+—— 执行人：Faust-sudo
+## 2026-09-02 推荐系统落地实现 · 阶段 4（规则推荐引擎 + 路由）
+
+> 阶段 3（掌握度 + 收尾挂钩）已交付。本阶段落地**体系三匹配**：`app/rec` 的 recommend_scenes/recommend_shadow + 路由 `GET /api/v1/recommendations`。**可按评审后进入阶段 5（演示数据播种 + 端到端联调）。**
+
+### 4.1 新增 `app/rec/service.py` + `__init__.py`
+
+| 组件 | 说明 |
+|---|---|
+| `resolve_level` | 回退链 `user_skill_state.est_level(conf≥0.35) → user_profiles.cefr_level → L1` |
+| `_candidates` | published 内容 + 难度档 ∈ levels **（md 优先，缺行内容方初评兜底）** + 掌握度（ORM 跨 SQLite/PG，等价 local/31 §4.3 CTE 的 LEFT JOIN 语义） |
+| `_rank` | 排序 `未掌握(0)<进行中(1)<已掌握(2) → 难度距离 → 兴趣命中(↓) → 最近练过靠后` |
+| `_diversify` | 同 scene_type ≤2（top-6 互异）；影子无约束 |
+| `_order` | **扩档仅在 L±1 档内、距 L 近→远**（满足 local/32 C8 "L2 无 L4"；见下） |
+| `_review_slots` | 复习席：L−1、in_progress/mastered、距上次 ≥review_gap_days、最久未练优先 |
+| `_impression` | 写 `events.recommend_impression`（只追加；recommend_group_id + user_level + rule_version） |
+| `_cache_get/_set` | Redis 缓存 `rec:{uid}:{type}`，`testing→None` 走直达 SQL（hermetic）；写后主动失效 |
+| `recommend_scenes/shadow` | 主窗 [L,L+1] + 扩档 + 复习席 + 曝光埋点 + 缓存；对外返回**已清洗**（JSON 安全） |
+
+**写方唯一性**：只读 6 表；只写 events（曝光）。
+
+### 4.2 重要工程决策
+
+1. **用 SQLAlchemy ORM 而非 raw CTE SQL**：等价实现 local/31 §4.3 语义，但**跨 SQLite/PG** → 推荐逻辑可在单测里跑（cross-exam 强烈要求可单测）；PG 专属 jsonb 函数不引入。
+2. **扩档收窄为 ±1 档**：local/31 §5.3 写 [L−1, L+2]，但对 L2 会拉进 L4（违反 local/32 C8 "L2 用户不返回 L4"）。裁决：**扩档仅限于 L±1**（宁缺毋滥，不足就少返，不硬拉错档素材）。这解决了两处设计的真实冲突。
+3. **缓存值清洗**：raw items 含 `_tag_hit/_dist/interest_tags/aware datetime`（不可 JSON 序列化）→ `_clean` 剥离，保证 `json.dumps` 与接口响应安全。落码时发现并修复。
+4. **时间戳 aware 归一**：SQLite naive vs UTC aware 混比会 TypeError → `_aware` 统一。
+
+### 4.3 新增 `app/api/routes/recommendations.py` + `main.py` 注册
+
+`GET /api/v1/recommendations?type=scene|shadow&limit≤20`，`Depends(get_current_user_id)`，返回 `{type, items:[{id,content_type,title,scene_type,diff_level,mstatus,tag_hit}]}`。已验证 route 注册进 OpenAPI（`/api/v1/recommendations`）。
+
+### 4.4 新增 `tests/rec/test_recommend.py`（5 条，local/31 §6.3 C 组）
+
+L2 无 L4（C1/C8）/ 已掌握垫底（C9）/ 冷启动零档案返回默认（C7）/ L4 复习席补 L3（C3）/ 自有会话写曝光埋点（C5）。**全部用 function 级 `_fresh_db`（阶段 3 修的 isolation）跑，无跨测试泄漏。**
+
+### 4.5 验证
+
+`pytest 78 passed`（+5）；`ruff check .` 通过；`format --check .` 72 文件 all formatted；route 已在 OpenAPI。
+
+### 4.6 踩坑记录（追加第 31 条）
+
+31. **扩档与 cross-exam 冲突**：local/31 §5.3 的"先上后下 [L−1,L+2]"在 L2 用户会把 L4 拉进推荐（违反 local/32 C8）。**实现期用"扩档收窄 ±1 档 + 宁缺毋滥"裁决**，而非照抄文档数字——文档两处口径不一，以最新（cross-exam C8）+ 工程常识（不错档）为准。
+
+### 4.7 待评审确认后继续
+
+阶段 5：演示数据播种 + 端到端联调（`batch_calculate_difficulty --db` 预置 8 场景先验、3 个水平演示账号 L2/L3/L4 预置 user_skill_state、前端推荐位联调），并对齐 local/32 A-5.1~A-5.5 的演示前置。
+
+—— 执行人：Faust-sudo
+## 2026-09-02 推荐系统落地实现 · 阶段 3（掌握度写入 + 会话收尾挂钩）
+
+> 阶段 2（素材难度专家规则）已交付。本阶段落地**体系三**：`app/mastery` 写 user_mastery（场景级）+ user_corpus_mastery（句级），并把 `update_user_level` + `update_session_mastery` 挂进 `complete_session` 收尾（A-3.3/A-6.5 完成）。**可按评审后进入阶段 4（推荐引擎 recommend_*）。**
+
+### 3.1 新增 `app/mastery/service.py` + `__init__.py`
+
+| 函数 | 作用 |
+|---|---|
+| `_attempt_score` | 场景级综合分 `0.6·pron+0.4·flu`（缺分自然排除，不按 0 计） |
+| `_upsert_scene_mastery` | user_mastery：mastery_score = 会话均值增量混入、attempt_count/pass_count、`last_practiced_at`、status |
+| `_corpus_line_map` | parse_corpus → phrase→line_index 映射 |
+| `_upsert_corpus_mastery` | user_corpus_mastery：按 corpus_hit {phrase,state} 逐句 upsert（ok=100/达标、fix=30/待纠错） |
+| `update_session_mastery` | 主入口：素材级（scene/shadow）+ 句级（仅 dialog 场景） |
+
+**状态判定**（local/31 §5.1）：`mastered = 达标≥2 且均值≥75`；`in_progress = 60≤均值<75`；否则 not_mastered。**达标口径 = 会话级 S≥锚点(75)**（不是"任一轮达标"）——我初版按"any attempt≥75"误判为达标，实测后改为**会话均值**。
+
+### 3.2 会话收尾挂钩（`app/practice/service.py`）
+
+`complete_session` 在 `db.commit()`（报告）后新增 `_post_session_skills(db, session)`：try/except 守护调用 `update_session_mastery(db, session_id)` + `update_user_level(user_id, db)`；失败 `db.rollback()` + log 不阻塞报告（local/27 §9.4 降级纪律；A-6.5 独立 PR/全量回归）。
+
+### 3.3 新增 `tests/mastery/test_mastery.py`
+
+'句级+场景级' 端到端：达标句 mastered、待纠错句 not_mastered；场景级 pass_count=1/in_progress。
+
+### 3.4 关键修复：测试 DB 隔离（`tests/conftest.py`）
+
+**发现跨测试数据泄漏**：`test_mastery` 写 user_id=1，`test_skill` 的 `_mk_user` 又拿 id=1 → 其 attempts 崩入冷启动（est 66.7 而非 50）。根因 = `:memory:` + StaticPool 共享单连接，跨测试复用自增主键/数据。**修复**：conftest 的 `_create_schema` 从 session 级改为 **function 级 autouse** `_fresh_db`（`reset_engine()` + `create_all_for_tests()`）——每个测试一个全新 :memory: 库。这是测试隔离的正确做法（docs/06 第 6 章）。
+
+### 3.5 验证
+
+`pytest 73 passed`（含 master 1 + skill 6 + difficulty 7 等全部）；`ruff check .` 通过、`format --check .` 68 文件 all formatted。
+
+### 3.6 踩坑记录（追加第 30 条）
+
+30. **`reset_engine()` 不会重建表**——它只重置 global engine/session_factory，`:memory:` 单连接换 engine 后是**空库**，须再 `create_all_for_tests()`。conftest 的 `_fresh_db` 组合两者才算真正的"每测试隔离"。
+
+### 3.7 待评审确认后继续
+
+阶段 4：推荐引擎 `app/rec`（`recommend_scenes`/`recommend_shadow`，主查询 SQL + 扩档 + L4 复习席 + 曝光埋点 + Redis 缓存/主动失效 + 路由 `GET /api/v1/recommendations`）。前置于此：跑 `batch_calculate_difficulty --db` 把 8 场景先验写进 material_difficulty（推荐 SQL 靠它）。
+
+—— 执行人：Faust-sudo
+## 2026-09-02 推荐系统落地实现 · 阶段 2（素材难度专家规则）
+
+> 阶段 1（update_user_level）已交付。本阶段落地**体系二**专家规则：三维度（词汇/句法/发音）+ CEFR 语义锚定 + 批量脚本。**可按评审后进入阶段 3（掌握度写入）。**
+
+### 2.1 新增 `app/difficulty/rules.py`（纯函数，stdlib）
+
+| 维度 | 公式 | 来源 |
+|---|---|---|
+| 词汇 vocab | `0.5·CEFR 语义锚定 + 0.3·生词率 + 0.2·文本统计(词长/长词比/音节)` | local/32 A-1.1/A-1.2 |
+| 句法 syntax（**新补全**） | `0.5·平均句长 + 0.5·从属连词密度` | A-1.3 |
+| 发音 pron | 难音素模式 + 词末辅音 + 音节数（中文母语者） | local/28 |
+| 映射 | `M(k)=30+15(k−1)`（**不对称**，1→30/3→60/5→90，修 local/28 向心偏置） | A-1.2 |
+| 聚合 | 逐句 → 逐维度 `mean+λ(max−mean)` → `0.4·M(vocab)+0.2·M(syntax)+0.4·M(pron)` | A-1.3 |
+
+**CEFR 语义锚定**（A-1.1 标尺表写入 docstring：1=高中基础/2=初中高频/3=四级高频/4=六级职场/5=雅思学术）。无词频库 → 用"共同学习者白名单（COMMON_LEARNER）+ 学术后缀启发式"作代理（P2 可换真词表）。**这直接修了 cross-exam 的"长词=难词"误伤**（junior/student/majoring/communication/English 入白名单压实）。
+
+`shadow_prior`：影子跟读三维（语速/停顿/连读，0.4/0.3/0.3）；**停顿方向反转**（≥表：越少越难）。
+
+### 2.2 新增 `app/difficulty/batch.py`（批量标定 + CLI）
+
+- `compute_scenario_features`：解析 target_corpus → 专家先验 + `pending_review`（|先验档−初评档|≥2）+ `owner_level` + features；
+- `upsert_scenarios`：批量写 `material_difficulty`（source='expert'，features 落库）；**只写 Python 拥有的表**，不碰 scenarios.difficulty（Java）；
+- CLI：`--json`（打印）/ `--db`（读 published 场景 upsert）。
+- config.py：权重改 `difficulty_w_vocab=0.4 / difficulty_w_syntax=0.2(新增) / difficulty_w_pron=0.4`。
+
+### 2.3 40 条语料实跑结果（`--json data/seed/scenarios.json`，已实跑）
+
+| 场景 | 词汇 | 句法 | 发音 | 先验 | 档 | 初评 |
+|---|---|---|---|---|---|---|
+| 咖啡·点单 | 1.72 | 1.0 | 1.98 | 40.2 | L1 | L1 ✓ |
+| 咖啡·订单沟通 | 3.02 | 1.4 | 3.33 | 57.3 | L2 | L3 (−1) |
+| 机场·值机 | 2.42 | 1.4 | 2.7 | 49.92 | L1 | L1 ✓ |
+| 机场·航班变动 | 3.16 | 1.35 | 3.35 | 58.11 | L2 | L3 (−1) |
+| 面试·自我介绍 | 2.38 | 2.05 | 3.58 | 56.91 | L2 | L1 (+1) |
+| 面试·深挖追问 | 3.68 | 1.8 | 4.05 | 66.78 | L2 | L3 (−1) |
+| 图书馆·借阅 | 2.59 | 1.35 | 3.21 | 53.85 | L1 | L1 ✓ |
+| 图书馆·学业交流 | 3.45 | 1.3 | 3.63 | 61.38 | L2 | L3 (−1) |
+
+**关键**：`面试·自我介绍` 从 local/28 的 **+2 档高估 → 现在 +1 档**（CEFR 白名单把 junior/student/majoring/communication 压实）——cross-exam 的 A-1.2 修正落地成功。全部 8 场景落在 **±1 档内、0 个 pending_review**。入门全 L1、进阶全 L2（反映 corpus 实为 A1-A2，docs/19 事实，L3 偏宽）。
+
+### 2.4 新增 `tests/difficulty/test_rules.py`（7 条，local/31 §6.2 B 组）
+
+dim_to_100 / 词汇 CEFR 白名单修正（easy<3 且 hard>3）/ 句法嵌套 / 发音难音素 / 场景聚合 / 影子停顿方向 / 批量 upsert（SQLite 落库断言）。
+
+### 2.5 验证
+
+`ruff check .` 通过；`format --check .` 65 文件 all formatted；`pytest 72 passed`（+7）。`--json` 实跑结果如 §2.3。
+
+### 2.6 待评审确认后继续
+
+阶段 3：掌握度写入（`app/mastery`，user_mastery + user_corpus_mastery 会话收尾按 corpus_hit/attempts 聚合写入）。在此之前先补一个**演示前置**：`batch_calculate_difficulty --db` 要把 8 场景先验写进 material_difficulty（推荐 SQL 靠它，A-5.3）。
+
+—— 执行人：Faust-sudo
+## 2026-09-02 推荐系统落地实现 · 阶段 1（`update_user_level` 核心函数）
+
+> 阶段 0（配置+5 表模型+迁移 0003）已交付并验证。本阶段落地**体系一核心** `app/skill/service.py`，含冷启动/滞回/低谷保护/难度归一化(符号修正)/幂等/事务。**可按评审后进入阶段 2（素材难度脚本）。**
+
+### 1.1 新增 `app/skill/service.py`（Python 写方）
+
+核心函数 `update_user_level(user_id, db=None)`，实现 local/31 §4.1 + local/32 修订：
+
+| 模块 | 实现要点 |
+|---|---|
+| `_level_for` | 统一尺度纯分档 85/70/55 |
+| `_level_hysteresis` | **滞回定档（local/32 A-3.1 修复三缺陷）**：三档界(85/70/55)全部套 `[thr−h, thr)`，升档即时、**降档只降一档**（禁 L4→L2 跨档）、滞回带内保持 |
+| `_placement_score` | 定档分：`details.schema_version='2d'` → overall_score；否则 `level` → `BAND_MID`（兼容存量三维行） |
+| `_window_samples` | 最近 N 个有效样本（pron/flu 非空），缺分轮自然排除（不按 0 计，local/32 A-3.3 Q14）；**难度归一化 `s += (diff−70)`** |
+| `update_user_level` | 冷启动(n<5)/满窗(f 遗忘残余+floor)/**单次降幅钳制**/滞回+**低谷保护**/幂等写/事务 |
+
+**冷启动**：`est = w·P + (1−w)·mean`，`w=max(0.3, 0.7−0.1n)`；完全冷启动(无定档无样本)=50/L1/conf0。
+**满窗**：`est = f·P + (1−f)·mean`，`f=max(0.15·2^(−d/60), skill_placement_floor)`；confidence=`min(1, n/window)`（local/30 统一单调）。
+**低谷保护(A-3.2)**：`downgrade_streak` 连续降级计数，达 `skill_slump_streak=2` → 冻结档位 `slump_guard_until=now+7d`；冻结期内档位不动。
+**幂等三层**：attempts 不可变重算收敛 + `with_for_update` 行锁 + user_id 唯一约束；事务 try/except→rollback→raise。
+`notify_java_level`：异步委托 Java 回写权威档（默认关，level_at 幂等 PUT，失败 Q-B07 兜底）。
+`app/skill/__init__.py`：模块注释。
+
+### 1.2 **发现并修正设计缺陷：难度归一化符号反了（重要）**
+
+local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，符号**错误**：
+- 易素材（diff<70）`−` 变 `+` → 用户易素材高分被再抬高 → 能力分**虚高**；
+- 难素材（diff>70）`−` → 用户难素材低分被再压低 → 能力分**虚低**。
+正确应为 `s += (diff_score − 70)`（越难素材越拉低实测分，须加回难度溢价）。本步已按正确符号实现。**登记：local/27 §4.1 待修订为 +。**
+
+### 1.3 新增 `tests/skill/test_level.py`（核心单测，local/31 §6.1 A 组）
+
+| 用例 | 断言 | 状态 |
+|---|---|---|
+| test_cold_start_no_placement_no_samples | 双缺→(50,L1,conf=0) | ✅ |
+| test_placement_only_no_samples | 有定档无样本→est=62,L2,conf0 | ✅ |
+| test_confidence_monotonic | n=4→0.4、n=5→0.5（local/30 修订回归） | ✅ |
+| test_ji_journey_L2_to_L3 | 甲 P=62，窗口→74，est≈72.3→L3（local/30 §3 复算） | ✅ |
+| test_hysteresis_keeps_L3_at_upper_edge | est 68.9(raw=L2) 且 ≥67 → 保持 L3（A5） | ✅ |
+| test_difficulty_normalization_sign | diff=85 样本 raw60→归一 75 | ✅ |
+
+### 1.4 验证
+
+- `ruff check .` 全通过；`ruff format --check .` 61 文件 all formatted；
+- `pytest 65 passed`（含新增 6 条 skill 单测）；
+- 时间戳归一（SQLite naive→aware）已处理（docs/10 约定）。
+
+### 1.5 踩坑记录（追加第 29 条）
+
+29. **难度归一化方向易反**：`± (diff−70)` 是"能力估计"语境，越难素材（diff>70）用户实测分越低，要**加**回难度溢价；我初读设计（local/27 §4.1 写 `−`）差点照抄，实测后确认必须 `+`。**教训：涉及"估计/校正"的公式，落码前用极端值（diff=85 难/55 易）心算一遍方向。**
+
+### 1.6 待评审确认后继续
+
+阶段 2：素材难度专家规则脚本（`app/difficulty/rules.py` + `batch_calculate_difficulty`，含 CEFR 锚定表 + 句法维度补全 local/32 A-1.2/A-1.3）。
+
+—— 执行人：Faust-sudo
+## 2026-09-02 推荐系统落地实现 · 阶段 0（地基：配置 + 数据模型 + 迁移 0003）
+
+> 依据 local/31 §2（5 表 DDL）+ local/32 六维拷问修订（config 零落地/滞回/低谷保护等）。**可按评审通过后进入阶段 1（update_user_level）。** 每步均已验证。
+
+### 0.1 补齐配置项 `app/core/config.py`
+
+拷问发现"参数全部进配置"是纸面承诺（`config.py` 原为 0 个推荐参数）。本步一次性写入 41 项，全部 env 前缀 `APP_`（`APP_SKILL_WINDOW_SIZE` 等）：
+- **体系一（用户水平）**：`skill_window_size=10`/`skill_min_samples=5`/`skill_blend_placement=0.7`/`skill_blend_step=0.1`/`skill_placement_holdout=0.15`/`skill_placement_floor=0.10`（local/32 A-4.1 新增，防 f 无限衰减）/`skill_forgetting_halflife_days=60`/`skill_confidence_min=0.35`/`skill_band_hysteresis=3`（local/30 §7 滞回）/`skill_difficulty_normalize=True`/`skill_slump_streak=2`+`skill_slump_cooldown_days=7`（local/32 A-3.2 低谷保护）/`skill_trend_window=5`+`skill_trend_threshold=5`（A-4.3 趋势响应）/`skill_max_downgrade_per_update=5`（A-4.1 降幅钳制）/`skill_callback_enabled=False`（默认关=考试专属）+`skill_callback_retry_max=6`+`skill_callback_backoff_base_s=5`+`reconcile_schedule_s=30`（A-2.1 重试队列）。
+- **体系二（素材难度）**：`material_difficulty_lambda=0.5`/`difficulty_w_vocab=0.5`/`difficulty_w_pron=0.5`/`shadow_w_wps=0.4`/`shadow_w_pause=0.3`/`shadow_w_link=0.3`/`calibration_min_n=30`/`calibration_min_users=5`/`calibration_max_user_share=0.3`/`calibration_kappa=10`/`calibration_cap=500`/`skill_anchor_score=75`/`skill_anchor_rate=0.75`（成对变更）。
+- **体系三（匹配）**：`rec_cache_ttl_s=3600`（local/32 A-2.4 从 300s 改 1h）+`rec_limit_scenes=6`/`rec_limit_shadow=3`/`review_gap_days=7`/`review_ratio=0.33`/`review_mastery_threshold=0.8`（A-4.4）。
+- 验证：ruff check 通过（修 5 处 E501 注释超长）。
+
+### 0.2 枚举常量 `app/models/base.py`
+
+`SessionKinds.SHADOW`、`AttemptKinds.SHADOW_SPEECH`、新增 `DifficultySources(EXPERT/BLEND/CALIBRATED)`、`MasteryStatus(NOT_MASTERED/IN_PROGRESS/MASTERED)`。
+
+### 0.3 新增 4 个模型文件（Python 写方）
+
+- `models/skill.py`：`UserSkillState`——est_score=0.6·pron+0.4·flu、est_level（滞回）、confidence、sample_count、`downgrade_streak`/`slump_guard_until`（低谷保护）、source_version；
+- `models/difficulty.py`：`MaterialDifficulty`——diff_score/diff_level/difficulty_source 三态/prior_score/calibrated_score/calibration_count/distinct_users/last_calibrated_at/features/version；`(content_type,content_id)` 唯一，次生表无 FK；
+- `models/mastery.py`：`UserMastery`（场景级快照）+`UserCorpusMastery`（句级明细，`(user_id,scenario_id,line_index)` 唯一）；
+- `alembic/versions/0003_m_recommend.py`：5 张新表 + `sessions.kind` 扩 `'shadow'` + `sessions.shadow_material_id` FK SET NULL + `attempts.kind` 扩 `'shadow_speech'`。
+
+### 0.4 内容库追加 + 模型注册
+
+- `models/content.py`：追加 `ShadowMaterial`（Java 写内容库，Alembic 建表；level 初评 1-4、wpm、text_content、audit 见 local/32 A-3.3）；
+- `models/__init__.py`：注册 `ShadowMaterial/UserSkillState/MaterialDifficulty/UserMastery/UserCorpusMastery` 到 `__all__`。
+
+### 0.5 验证（全部通过）
+
+| 项 | 结果 |
+|---|---|
+| 模型导入 / metadata 注册 | 25 张表（原 20 + 新 5）全部注册 |
+| `create_all`（SQLite 单测路径） | OK，25 表，SQLite 兼容（bigint_pk with_variant） |
+| alembic heads | 单头 = 0003 |
+| alembic upgrade head --sql（PG 离线渲染） | 5 表 CREATE + sessions/attempts CHECK 扩展 + shadow_material_id FK 全部生成 |
+| ruff check + format | 通过（修 6 处 E501） |
+| pytest（models/health/seed） | 15 passed |
+
+### 0.6 踩坑记录（追加第 28 条）
+
+28. **本地 alembic upgrade 会连 PG 而非 SQLite**：`.env`/compose 设了 `APP_DATABASE_URL=postgresql+psycopg://...`，本地起 alembic upgrade 直接连 PG（未启动 → 挂 120s 超时）。**验证迁移用地**：显式 set `APP_DATABASE_URL=sqlite+pysqlite:///./_mig_test.db`，但 0002 的 `create_foreign_key` 在 SQLite 不支持（须 batch_alter_table），链条跑不动——**这是既有的**（项目 SQLite 测试用 `create_all_for_tests`，不走 alembic）。所以 SQLite 侧验证用 `create_all` + `alembic check` 不适用（需真 PG）；**PG 侧验证用离线 `alembic upgrade head --sql`**（无连接，纯渲染 PG 方言），已确认 5 表 + CHECK 扩展生成正确。
+
+### 0.7 待评审确认后继续
+
+阶段 1：`app/skill/service.py` 的 `update_user_level(user_id)`（含冷启动/滞回/低谷保护/事务/幂等）。请先审本阶段，**确认 OK 再开下一阶段**。
+
+—— 执行人：Faust-sudo
+## 2026-09-02 推荐系统六维火力拷问（算法侧交付物，归档 local/32）
+
+派 6 个子代理对 local/26~31 推荐系统设计做对抗式拷问（20 问 × 6 维度：数据冷启动/算法严谨/工程集成/边缘降级/验收演示/排期资源），全部实读代码+文档，产出 `local/32-语音链路现状与风险清单·推荐系统六维拷问.md`（正文 20 问逐项答辩 + 附录 A 六维度证据级增补）。**未改代码、未动现有文档。**
+
+最高优先级 3 条：① **config 参数零落地**（skill_*/material_difficulty_lambda 等全部不在 config.py；5 张新表/模型/路由/rec: 键全部零存在——"设计完备、代码空白"）；② **设计-代码脱节**（40303 门禁全仓零命中、complete_session 未调 update_user_level、InternalLevelController 无条件覆盖无 levelAt/source、demo 账号兴趣未映射+seed 无 difficulty=4 素材）；③ **2 个未入账块**（user_mastery+user_corpus_mastery 会话收尾写入；docs/06 §9.5 验收候选池"场景+歌曲+听力" vs 实现"场景+影子"的口径漂移——歌曲/新闻画像必挂）。
+
+其余关键实锤：权重分支阶跃（n=5 处 0.3→0.15 无理由跳变，比 confidence 不连续更隐蔽）、diff_dist 二值化抹平档内难度、Q-B07 只覆盖考试通道是 skill 通道伪兜底、推荐缓存无主动失效、demo 账号缺 L2、用例数"40+"实为 30 条、无覆盖率目标、难度秒变链路断（md 优先致 Java 改 scenarios.difficulty 不生效）、排期"4.5~7 人日"出处实为 local/24、推荐实际 P1≈5~8/全量≈7.5~12 人日、无 M3 实施计划文档、wav2vec2 ADR 已排序（推荐>唱歌>wav2vec2）。
+
+待拍板（汇总）：① 验收口径修订（docs/06 §9.5 换 scope 还是扩候选）；② 推荐做多深（保底规则版 1~1.5 人日 vs 全量 P1 5~8）；③ 影子跟读身份（二期扩展 vs 主玩法）；④ 难度秒变入口归属（Python internal 接口）；⑤ 复习席 mastery>80% 触发；⑥ 通用化滞回 + 低谷保护列。建议开工前补 docs/20-M3 实施计划。
+
+—— 执行人：Faust-sudo
+## 2026-09-02 推荐系统详细设计说明书（汇总定稿，归档 local/31）
+
+整合 local/26~30 全部讨论为一份可交付设计说明书（`local/31-推荐系统详细设计说明书.md`），作为 M3 实现与答辩的统一依据。结构：设计目标与约束（技术栈/写方唯一性矩阵/统一尺度/四水平消歧）→ 三套评价体系（5 张新表 DDL：user_skill_state / material_difficulty / user_mastery / user_corpus_mastery / shadow_materials）→ 联动数据流图 + 端到端旅程（甲 t0~t3 复算表）→ 核心算法伪代码（update_user_level 含滞回与幂等、batch_calibrate 含触发阈值、recommend_scenes/shadow 主查询 SQL）→ 冷启动与降级 7 层 → 验收标准（6 组 40+ 单测用例含 I1~I5 不变量与 local/30 修订回归）。
+
+**本文为准的三处修订**（相对 local/26~29）：① confidence 统一 `min(1, n/window)`（修 0.8→0.5 跳变）；② est_level 滞回带 [67,70)（skill_band_hysteresis=3，升即时/降滞后）；③ 空池兜底宁缺毋滥（限 L−1 档 + fallback 标记，<3 返回空态）。配置项汇总 18 项 + 待拍板 6 项集中到 §7.2。
+
+—— 执行人：Faust-sudo
+## 2026-09-02 三套体系联动端到端数值模拟（算法侧交付物，归档 local/30）
+
+把 local/26/27/28/29 串成完整用户旅程并做数值验证（`local/30-三套体系联动·端到端数值模拟.md`），**全部数字脚本复算**（venv python）。
+
+- 场景1（甲 L2→L3）：窗口均值 74 不直接定档，`est=0.142×62+0.858×74=72.30≥70→L3`；est 单调 62→66.4→68.5→72.3 无跳变；est_level=L3 与 cefr_level=L2 双档并存不循环（I5）。
+- 场景2（推荐动态）：变档后 top-6 档位重心 3×L2+3×L3 → 3×L3+1×L4+2×L2（L4 占位演示），重叠 5/6 不震荡，L3 用户最低见 L2（I1）。
+- 场景3（校准）：学业交流专家 3.5→74.38(L3)，100 用户实测 2.8→64.75(L2)，贝叶斯 (100×64.75+10×74.38)/110=65.62→L2 calibrated；降档后 L3 用户降位、L2 用户升位（I4）。
+- **模拟发现 3 个逻辑漏洞**：① local/27 confidence 不连续（n=4→0.8、n=5→0.5，两分支公式不一）→ 统一 conf=min(1,n/window)；② 档位边界震荡无滞回（est 70±0.5 → 推荐窗口整窗翻转）→ 滞回带 [67,70)，升即时/降滞后，skill_band_hysteresis=3 进配置；③ 极端空池兜底会推 L1 给 L3 → 宁缺毋滥（兜底限 L−1 档 + fallback 标记，池<3 返回空态）。
+- 不变量 I1~I5 全部成立（正常路径无"L3 用户被推 L1"）。待拍板 3 项：滞回设计、confidence 修订随 0003、宁缺毋滥兜底。
+
+—— 执行人：Faust-sudo
+## 2026-09-02 规则推荐引擎详细实现（算法侧交付物，归档 local/29）
+
+承接 local/26~28，落地规则推荐引擎（`local/29-规则推荐引擎·详细实现.md`）。先实读核实：**user_corpus_mastery 不存在**（0001/0002 共 20 表），一并设计；user_mastery/user_skill_state/material_difficulty/shadow_materials 均为设计稿（迁移 0003+ 待落地）。
+
+6 项决策：① `面试·自我介绍` +2 档高估 → **标定兜底**（P1 不引 CEFR 词表，登记 P2；影响面 1 场景且难度护栏 ±2 可容，标定是自适应修复 vs 词表一次性修复）；② 推荐 SQL = 一条 CTE 语句（动态定级→[L,L+1] 过滤→ROW_NUMBER 每 scene_type 限 2→未掌握/难度/兴趣/新鲜排序→LIMIT 6）；③ 校准频率 = 每日 UTC 03:00 定时 + 增量节流（难度是慢变量、reports 日聚合同窗口、n≥30 需攒数天）；④ 不足 3 个先上后下扩档（i+1 挑战优先），L1/L4 边界收敛；⑤ L4 复习席 = 1/3 席位给 L−1 已掌握且 ≥7 天未练（间隔复习+随机，防枯燥）；⑥ calibrated/blend 管理端三态展示、推荐侧不区分（source 是审计属性不进排序键）。
+
+交付：`user_corpus_mastery` DDL（句级明细，与 user_mastery 场景级快照分工：推荐直读 user_mastery，句级喂聚合/报告/复习调度）；`recommend_scenes(user_id, limit=6)` + `recommend_shadow(user_id, limit=3)` 完整 SQLAlchemy 实现（主查询+扩档+复习席+曝光埋点，只写 events）。待拍板 3 项：复习席比例/间隔窗口进配置、scenario_id 归档语义、L1~L3 是否也开复习席。
+
+—— 执行人：Faust-sudo
+## 2026-09-02 素材难度评价分阶段实施策略（算法侧交付物，归档 local/28）
+
+承接 local/26 §4 + local/27 §1/§3/§7，产出素材难度两阶段实施策略（`local/28-素材难度评价·分阶段实施策略.md`）。先核实依赖：numpy 是直接依赖（pyproject.toml L24），但脚本刻意用纯 Python stdlib（40 条量级阈值映射无向量化收益，CI/单测零额外依赖）。
+
+- **阶段一专家规则**：场景两维（词汇复杂度/发音难点，1~5）加权 `0.5·M(vocab)+0.5·M(pron)`，M(k)=40+(k−1)·13.75 对齐档位起点；影子跟读三维（语速 wps/停顿密度/连读密度，1~5 阈值表，停顿方向反转）权重 0.4/0.3/0.3。
+- **batch_calculate_difficulty() 已实跑验证**（`--json data/seed/scenarios.json`，venv python）：40 条语料全部打出初始分；8 场景中 3 个与内容方初评一致、4 个 ±1 档、1 个 +2 档（面试·自我介绍，学习者高频长词被"长词=难词"高估）→ 挂 pending_review。
+- **阶段二校准**：分箱插值 D_emp（按 user_skill_state.est_score 分箱，线性插值穿越 0.75 锚点）+ 贝叶斯平滑 `D_cal=(n·D_emp+κ·D_prior)/(n+κ)`（κ=10，主推），移动平均为增量备选；触发阈值 **n≥30 且 distinct_users≥5 且单用户占比≤30%**（SE≈0.079→难度分误差≈1.2 分<1 档的推导）；n≥100 转 calibrated。
+- **DB 字段**：material_difficulty 增 difficulty_source('expert'|'blend'|'calibrated')/prior_score/calibrated_score/calibration_count/distinct_users/last_calibrated_at，features JSONB 存维度明细。
+- 待拍板 3 项：CEFR 词表白名单 vs 标定兜底、校准频率、source 三态展示口径。
+
+—— 执行人：Faust-sudo
+## 2026-09-02 用户水平动态评价实现细节深化（算法侧交付物，归档 local/27）
+
+承接 local/26，深化动态水平体系为可落地实现（`local/27-用户水平动态评价·实现细节深化.md`）。先实读代码核实：练习轮 ISE 以 ASR 转写为参考（自参照评分，`orchestrator.py:161/454`）；`complete_session` 是会话收尾唯一咽喉（orchestrator 三处 + practice.py 路由）；回调先例 `placement.py::_callback_level`（httpx + service-token）；Java `InternalLevelController` 现为无条件覆盖（需扩 level_at 幂等 PUT，`user_profiles.cefr_level_at` 列已存在）。
+
+8 项决策：① 场景难度聚合 λ=0.5 进配置（可标定）；② 滑动窗口=10 个有效样本（≈1.5~2 会话，SE≈σ/√10 远小于档距）；③ 锚点 0.75 = 同一配置块成对参数化（anchor_score+anchor_rate 同次变更，防统一尺度断裂）；④ 定档分 vs 窗口均值固定 0.6:0.4 不合理 → 冷启动 w=0.7 随样本量衰减 + 满窗按遗忘曲线（半衰期 60 天）留 0.15 残余（依据练习幂律 + 遗忘曲线 + 自参照刻度差）；⑤ 影子跟读必须进 sessions.kind（砍掉会污染指标口径/难度标定/掌握度取数，迁移成本极低）；⑥ 冷启动 min_samples=5 定档分主导 + confidence 阶梯；⑦ 难度缺行兜底 FALLBACK_LEVEL 采纳（零冷启动/确定性/守写权/防 NULL/标定平滑接管）；⑧ 更新时机=会话收尾批量更新，非 practice_complete 埋点、非每轮。
+
+交付：完整 `update_user_level(user_id)`（SQLAlchemy，含冷启动分支、事务回滚、三层幂等：收敛重算/行锁/唯一约束）、`notify_java_level` httpx 回调（level_at 幂等 PUT，默认关、考试专属）、集成点 diff（complete_session 末尾 + placement finalize）、单测清单 7 条。事务回滚与幂等性已主动内建（预期追问项，未漏）。
+
+—— 执行人：Faust-sudo
+## 2026-09-02 推荐系统整体框架设计（算法侧交付物，归档 local/26）
+
+算法负责人产出推荐系统整体框架设计稿，先实读代码核实约束再成稿：40 条场景语料 = `data/seed/scenarios.json` 8 场景 × 5 句（已逐条核对）；影子跟读素材尚无内容表。交付物（`local/26-推荐系统整体框架设计·三套评价体系与统一尺度映射.md`）：
+
+- **三套评价体系三张表 DDL**（PG16/Alembic 对齐）：`user_skill_state`（动态水平，练习评分 EWMA，Python 写）/ `material_difficulty`（素材难度，特征先验 + 行为标定，Python 写）/ `user_mastery`（掌握度，匹配状态表，Python 写）；另附支撑表 `shadow_materials`（Java 写）及前置迁移项（`sessions.kind` 扩 'shadow'、`sessions.shadow_material_id`、`attempts.kind` 扩 'shadow_speech'）。
+- **统一尺度映射（显式给全）**：0-100 共轴、85/70/55 档界两端共用，难度分锚定「达标率 0.75 的用户能力分」，行为标定闭环回流。
+- **联动数据流图**（文字版）+ **`get_recommendations(user_id)` 伪代码**（Python/SQL 混合，严格分层优先级：未掌握 > 难度匹配 > 兴趣标签 > 新鲜度，含难度出界硬护栏与 top-3 互异）。
+- 全程守写方唯一性：不写 `scenarios.difficulty` / `user_profiles.cefr_level`（只读映射兜底），动态档位只落 Python 表；推荐埋点复用既有 `events.recommend_impression/click`，CTR 口径复用 `reports`。
+
+待组长拍板：§9.3 开放项 4 条（场景难度聚合系数、0.75 锚点参数化、影子跟读是否进 sessions.kind、难度缺行兜底）。
+—— 执行人：Faust-sudo
 
 ## 2026-09-02 lieflat-charts 表盘美化（预览高保真）：按技能选型规则出图，不"接入"库
 

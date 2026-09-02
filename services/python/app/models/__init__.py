@@ -15,11 +15,15 @@ from .content import (
     PlacementQuestion,
     Scenario,
     ScenarioMessage,
+    ShadowMaterial,
     Song,
     SongPitchRef,
 )
 from .defense import DefenseProfile
+from .difficulty import MaterialDifficulty
+from .mastery import UserCorpusMastery, UserMastery
 from .practice import Attempt, PostLike, Score, Session, SingAttempt
+from .skill import UserSkillState
 from .tickets import Ticket
 from .user import Placement, RefreshToken, User, UserProfile
 
@@ -34,6 +38,7 @@ __all__ = [
     # 内容域
     "Scenario",
     "ScenarioMessage",
+    "ShadowMaterial",
     "Song",
     "Lrc",
     "SongPitchRef",
@@ -47,6 +52,11 @@ __all__ = [
     "PostLike",
     # 答辩域
     "DefenseProfile",
+    # 推荐域（local/31 §2，2026-09-02 设计）
+    "UserSkillState",
+    "MaterialDifficulty",
+    "UserMastery",
+    "UserCorpusMastery",
     # 分析/支持域
     "Event",
     "Report",

@@ -183,9 +183,29 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
         )
         db.add(report)
         db.commit()
+        _post_session_skills(db, session)
         return int(report.id)
     finally:
         db.close()
+
+
+def _post_session_skills(db, session) -> None:
+    """会话收尾挂钩（local/27 §9.4 · local/31 §2.3）：更新动态水平 + 掌握度，失败不阻塞报告。
+
+    幂等：attempts 不可变重算收敛；掌握度/水平均行级 upsert；异常只影响本次，下次会话自愈。
+    """
+    try:
+        from app.mastery.service import update_session_mastery
+        from app.skill.service import update_user_level
+
+        update_session_mastery(db, int(session.id))
+        update_user_level(int(session.user_id), db)
+        db.commit()
+    except Exception:
+        logger.warning(
+            "post-session skills skipped session=%s (self-heal next practice)", session.id
+        )
+        db.rollback()
 
 
 def _f(v: Decimal | None) -> float | None:

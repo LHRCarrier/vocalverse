@@ -5,6 +5,14 @@ on:
     paths:
       - "services/python/**"
       - ".github/workflows/python-ci.yml"
+  # 兜底（PR#25 复审，2026-09-09）：本仓 pull_request 触发当前未生效（PR #24/#25 打开/同步均 0 run）。
+  # push(main) 保证合入后的真实代码必被门禁；workflow_dispatch 供手动补跑（gh workflow run python-ci）。
+  push:
+    branches: [main]
+    paths:
+      - "services/python/**"
+      - ".github/workflows/python-ci.yml"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

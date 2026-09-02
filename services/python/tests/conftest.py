@@ -12,14 +12,20 @@ os.environ.setdefault("APP_AUDIO_DIR", "./data/audio-test")
 
 import pytest  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
-from app.db import create_all_for_tests  # noqa: E402
+from app.db import create_all_for_tests, reset_engine  # noqa: E402
 from app.main import app  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 
-@pytest.fixture(scope="session", autouse=True)
-def _create_schema():
-    """会话级：SQLite 建全表（测试用 create_all，生产走 Alembic——docs/10 §7）。"""
+@pytest.fixture(autouse=True)
+def _fresh_db():
+    """每测试函数一个全新 :memory: 库（reset_engine + create_all）。
+
+    :memory: 与 StaticPool 共享单连接，若跨测试复用会导致自增主键/数据在测试间泄漏（如
+    test_mastery 写 user_id=1，后续 test_skill 的 user 又拿 id=1 撞上其 attempts）。
+    reset_engine 重建全局 engine/session_factory → 新 :memory:（docs/06 第 6 章：SQLite 单测）。
+    """
+    reset_engine()
     create_all_for_tests()
     yield
 

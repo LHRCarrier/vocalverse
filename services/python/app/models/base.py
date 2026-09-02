@@ -155,6 +155,7 @@ class SessionKinds:
     DIALOG = "dialog"
     SING = "sing"
     DEFENSE = "defense"  # 答辩会话（docs/14 §6.1，2026-09 拍板）
+    SHADOW = "shadow"  # 影子跟读会话（local/31 §2.4，2026-09-02 设计）
 
 
 class SessionStatus:
@@ -174,6 +175,23 @@ class AttemptKinds:
     FREE_PRACTICE = "free_practice"
     PLACEMENT_ITEM = "placement_item"
     DEFENSE_ANSWER = "defense_answer"  # 答辩作答（docs/14 §6.1，2026-09 拍板）
+    SHADOW_SPEECH = "shadow_speech"  # 影子跟读录音（local/31 §2.4，2026-09-02 设计）
+
+
+class DifficultySources:
+    """素材难度来源（local/28 §4；local/31 §2.2）。推荐侧只看 diff_level/diff_score，不区分来源。"""
+
+    EXPERT = "expert"  # 专家规则先验（样本 <30）
+    BLEND = "blend"  # 先验+行为标定混合（30 ≤ n < 100）
+    CALIBRATED = "calibrated"  # 行为主导（n ≥ 100，κ→1）
+
+
+class MasteryStatus:
+    """句级/场景级掌握度状态（local/29 §5.1）。"""
+
+    NOT_MASTERED = "not_mastered"
+    IN_PROGRESS = "in_progress"
+    MASTERED = "mastered"
 
 
 class EventTypes:

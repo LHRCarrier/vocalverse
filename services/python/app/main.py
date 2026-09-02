@@ -14,7 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app import __version__
-from app.api.routes import audio, defense, events, health, placement, practice
+from app.api.routes import audio, defense, events, health, placement, practice, recommendations
 from app.core.config import get_settings
 from app.core.response import BizError
 from app.core.trace import RequestIdLogFilter, RequestIdMiddleware
@@ -78,4 +78,5 @@ app.include_router(practice.router)
 app.include_router(defense.router)
 app.include_router(placement.router)
 app.include_router(events.router)
+app.include_router(recommendations.router)
 app.add_middleware(RequestIdMiddleware)  # X-Request-Id 透传（docs/06 §11）
