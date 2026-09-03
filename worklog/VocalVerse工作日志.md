@@ -3,6 +3,170 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-03 整合完善 · 修复 alembic 漂移 + C4/C6 建档→场景难度过滤
+
+### schema 一致性（alembic check 零 diff）
+- `app/models/skill.py`：`user_skill_state.user_id` 由 `unique=True`（生成 `uq_user_skill_state_user_id`）改为显式
+  `UniqueConstraint("user_id", name="uq_user_skill_state_user")`，与 **0003 迁移**实际名对齐（DB 名
+  `uq_user_skill_state_user`）→ 消除 `alembic check` 的"remove_constraint/add_constraint"漂移。
+- 验证：`alembic check` → **No new upgrade operations detected**（此前仍报 `user_skill_state` 漂移）。
+
+### C4/C6 建档→难度衔接
+- `PracticeHubView.vue`：新增 `visibleScenes`（仅显示 `[L, L+1]` 档场景，L=入学档 `cefr_level`→难度映射）；
+  无档则全部展示（顶部 NAlert 引导去入学测试）。把"入学档位"真正接入场景卡过滤（此前只当装饰）。
+
+### 门禁
+- Python 全量 `pytest -q` **155 passed**；`ruff check` + `ruff format --check` 全绿。
+- 前端 `lint` / `typecheck` / `test:run`(18) / `build` 全绿。
+
+—— 执行人：Faust-sudo
+
+## 2026-09-03 阶段E落地 · 入学测试前端 UX（双模式 / 试音示范重录跳过 / 等级条 / 未定档引导 / 错误文案）
+
+### 前端（apps/web）
+| 项 | 落点 | 依据 |
+|---|---|---|
+| API 模块 | 新增 `src/api/placement.ts`：status/retest/skip/questions/scoreItem/finalize 封装（本地 interface 声明响应） | docs/06 §9.2；C1/C5/C8 |
+| 错误文案映射 | 新增 `src/api/errorCopy.ts`：`ApiError.code → 中文`（40002/40302/40303/40910/42901/42902/42203…），未登记回退 `message(code N)` | docs/api/error-codes.md；docs/19 P0-6/P1-11 |
+| PlacementView 双模式 | 重写：intro（试音 🎙+回听）/ 答题（🔊 听示范 TTS + 🎙 录音 + 重录一次 + 下一题 + QA 参考提示 + 跳过）/ 结果（两维 S + L1~L4 + 去练习/再测）；retest 模式经 `startRetest()` 触发 40302/42902 gate | C1/C5/C8；docs/19 §3.5 敢开口包 |
+| 等级条 + 复测入口 + 未定档引导 | `PracticeHubView`：无 level → NAlert「去入学测试（可跳过）」CTA；有 level → 水平 NTag + 「重新测试」入口（status.can_retest）；用 `errorCopy` 消裸错误码 | docs/19 P1-1；C8 |
+
+### 后端（skip 支撑 C5 跳过）
+- 新增 `POST /api/v1/placement/skip`：无 completed → 建 **provisional** completed placement（level=L2、`details.skipped=True`）→ 使 `/sessions` 40303 门禁通过；幂等（已有 completed 返回现有）。
+- `_latest_real_completed`（冷却 gate 用，**忽略 skipped**）——跳过后可立即实测定级（否则 skip 会触发 42902冷却）。
+
+### 契约同步
+- Python OpenAPI 快照重导出（新增 /skip）+ `pnpm gen:api` 前端类型；python-ci 校验 MATCH。
+
+### 门禁
+- Python 全量 `pytest -q` **155 passed**（placement 32，含 skip 3 用例）；`ruff check`+`format --check` 全绿。
+- 前端 `lint` / `typecheck` / `test:run`(18 passed) / `build` 全绿（build 仅 chunk>500kB 告警，非错误）。
+
+—— 执行人：Faust-sudo
+
+## 2026-09-03 阶段D落地 · 入学测试断点修复（Java /internal/level 回写 + 前置 40303）
+
+**最重要断点：定档回写链路（P0-6/C2/C9）真正跑通。**
+
+| 项 | 落点 | 依据 |
+|---|---|---|
+| **D3 回调 payload 修复** | `placement.py:_callback_level`：键改 `userId`（原 `user_id` 致 400 被吞）+ `source='placement'` + `levelAt`；`raise_for_status()` + 失败**记日志告警**（不再静默）；不阻塞入学测试 | docs/19 P0-6；local/34 D-3；C2 |
+| **D2 Java 幂等 PUT** | `InternalLevelController.LevelRequest` 加 `source/levelAt`；仅当 `levelAt` 不早于 `cefrLevelAt` 才落（旧数据不覆盖）；`source` 缺省 `placement` | local/34 D-2；C9 |
+| **🔴 JwtAuthFilter 关键修复** | `/internal/**` 跳过 JWT 解析——否则 `Authorization: Bearer <service-token>` 被当 JWT 解析失败 → `clearContext()` 清掉 ServiceTokenFilter 的 ROLE_SERVICE → 403。这是回调不通的**深层根因**（非仅字段名） | SecurityConfig 过滤器链 |
+| **D1 前置 40303** | `create_session`：`kind=DIALOG` 需已有 completed placement，否则 40303（C5 跳过会建 provisional 档，故凡有档位即可） | local/34 D-1 |
+
+**契约同步（E-5，因变更了 Java LevelRequest 与 Python 端点而必须）**：重导出 `apps/web/src/api/specs/{python,java}-openapi.json` + `pnpm gen:api` 前端类型；`python-ci` 快照校验 MATCH、`ContractSnapshotTest` 通过、前端 `typecheck` 通过。
+**错误码登记**：40302（复测未获准）、40303（未定档）、40910（并发 run）、42203（read 不足）→ `docs/api/error-codes.md`。
+**新增测试**：`tests/placement/test_callback.py`（payload 键名 userId）、`InternalLevelControllerTest`（回写更新 + 幂等忽略旧数据 + 无 token 401）、`test_m2_core::test_dialog_session_requires_placement`（40303）。
+
+**门禁**：Python 全量 `pytest -q` **152 passed**；`ruff check` + `ruff format --check` 全绿；Java `mvn test` **18 passed**（含新 InternalLevelControllerTest 3/3，ContractSnapshotTest 已对账）；前端 `typecheck` 通过。
+
+—— 执行人：Faust-sudo
+
+## 2026-09-03 阶段C落地 · 入学测试复测=重考（eligible 预检 / 冷却 / 幂等）
+
+按冻结清单 C3t + C8（精简复测、无 XP 经验制）实现：
+
+| 项 | 落点 | 依据 |
+|---|---|---|
+| 冷却 gate(42902) | `_get_or_create_run` 新建 run 前：若已有 completed 定档且距其 < `placement_retest_cooldown_days` → 42902 | local/34 C-3；防频繁刷分 |
+| eligible 预检(40302) | `POST /api/v1/placement/retest`：无已完成基线 → 40302 | local/34 C-3 |
+| 复测入口 | `POST /api/v1/placement/retest`：40302/42902 通过后建立 in_progress run + 返回题型快照+`exam_revision`（取当前发布版本） | C5/C11 |
+| 资格预检 | `GET /api/v1/placement/status`：has_completed / completed_count / current_level / last_completed_at / can_retest / cooldown_remaining_days | local/34 C-5（精简） |
+| 配置 | `placement_retest_cooldown_days=1`（config.py） | — |
+| 语义 | latest completed placement 的 level = 当前档（`/status` 与回写按此）；复测生成新 completed 记录，`finalize` 幂等（B3）已复用 | C8 |
+
+**错误码登记**：`40302`（复测未获准：尚无已完成测试）、`42902`（复测冷却中）→ `docs/api/error-codes.md`。
+**门禁**：`pytest tests/placement/` 27 passed（+4 复测用例）；全量 `pytest -q` **149 passed**；`ruff check` + `ruff format --check` 全绿。
+**待办（E-5 契约同步，需起服务）**：新增 `GET /placement/status`、`POST /placement/retest` 两端点 → 需 `scripts/refresh-openapi.ps1` 刷新 `apps/web/src/api/specs/python-openapi.json` 并 `pnpm gen:api`（本阶段未做，避免无服务跑出错误快照）。
+
+—— 执行人：Faust-sudo
+
+## 2026-09-03 阶段A完善 + 阶段B落地 · 入学测试 run 状态机 / QA 标签 / 幂等
+
+### 阶段 A 完善
+- 新增 `tests/placement/test_grammar.py`（8 用例）：`judge_grammar` / `judge_qa_answer` 快路径（合法 JSON→{grammar,relevance}）、fail-open（非 JSON/空转写→None）、score 钳制、relevance 白名单、`_extract_json` 边界；用 stub LLM + `asyncio.run`（不依赖 anyio 插件）。
+- `placement.py:finalize` 加防御：`compute_s` 前校验 A/F 非空，缺任一 → 42203（不静默用部分数据判档）。
+
+### 阶段 B
+| 子任务 | 落点 | 依据 |
+|---|---|---|
+| B1 run 状态机 + 并发 | `_get_or_create_run`：评分首题惰性创建该用户 `in_progress` run（placements 行），后续题续用；`(user_id) WHERE status='in_progress'` 部分唯一索引兜底并发 → 40910 | local/34 B-1；docs/10 §6 B-2 |
+| B2 QA 相关度标签 | `grammar.py` 新增 `judge_qa_answer`（一次 LLM 调用返 `{grammar, relevance}`）；qa 分支落 `details.qa.relevance`；删除旧 `QA_REF` | local/34 B-2；C1 语法仅诊断；local/16 控次数 |
+| B3 finalize 幂等 | run 已 `completed` 直接返回缓存结果（不重复落库）；attempt 经 `placement_id` 作**消费标记**（不可被其他 placement 复用） | local/34 B-3；C9 |
+
+### schema / 迁移
+- `attempts.placement_id`（FK placements.id SET NULL）+ `ix_attempts_placement_id`（models/practice.py）。
+- `placements` 部分唯一索引 `uq_placements_user_inprogress`（models/user.py）。
+- 新增 `alembic/versions/0004_placement_run_state.py`（SQLite batch + PG partial index）。
+- 错误码：登记 `40910`（已有进行中的考试）。
+
+### 门禁
+- `pytest tests/placement/` 23 passed；全量 `pytest -q` **145 passed**；`ruff check` + `ruff format --check` 全绿。
+- 迁移：`alembic heads` 单头 `0004`；`alembic upgrade head --sql`（PG 离线编译）正确；**真 PG `alembic upgrade head` 已应用 0004**。
+- ⚠️ `alembic check` 仍报一处**既有无关漂移**：`user_skill_state` 唯一约束名 DB=`uq_user_skill_state_user` vs 模型=`uq_user_skill_state_user_id`（来自 0003 推荐迁移），非本阶段引入，建议另开 PR 修复（不在 A/B 范围）。本阶段涉及的 `attempts.placement_id`、`placements` 部分索引**无漂移**。
+
+—— 执行人：Faust-sudo
+
+## 2026-09-03 阶段A落地 · 考试域两维评分与 gram 修复（C1/C5/C11）
+
+按冻结任务清单（见下一条）实现阶段 A（P0）：两维综合分 + LLM 语法判定诊断 + config 单源。
+
+| 子任务 | 落点 | 依据 |
+|---|---|---|
+| A1 可复用 LLM 语法判定 | 新增 `app/placement/grammar.py`（`judge_grammar(transcript, reference)` → `{score, errors[]}`；fail-open） | local/34 A-1；C1；docs/06 §9.3 |
+| A2 评分通道分离 + gram 化 | `placement.py:score_item` — `kind='qa'` 只 ASR 不 ISE（不耗 ISE 桶）；read 走 ISE；read/qa 均补调 LLM 语法；`gram_score=None` 化 | C1；A2；docs/10 §4.3 不伪造分 |
+| A3 finalize 两维公式 | `placement.py:finalize` — `S=0.6·A+0.4·F`，`A=mean(read pron)`、`F=0.7·mean(flu)+0.3·mean(completeness)`；`min_read_items=1` 齐句校验（不足→42203）；`placements.exam_revision` 从所考题库版本写入 | C1/C5/C11；local/24 v4 §2.1、local/26 §2 |
+| A5 配置单源 | 新增 `Settings`：`score_w_accuracy/score_w_fluency/score_f_fluency/score_f_integrity/level_threshold_l4~l2/placement_min_read_items`；废弃硬编码 `_level_for` 常量 | C1；A5；C10 |
+| 错误码 | 登记 `42203`（入学测试已评分 read 题不足）到 `docs/api/error-codes.md` | AGENTS.md 先登记后使用 |
+| 模型 docstring | `models/user.py` Placement 注释改两维口径 | C1 |
+
+**新增文件**：`app/placement/__init__.py`、`app/placement/scoring.py`（纯函数：`compute_accuracy/compute_fluency/compute_s/level_for`）、`app/placement/grammar.py`。
+**新增测试**：`tests/placement/test_scoring.py`（公式/边界/completeness 缺失→仅 flu）、`tests/placement/test_placement_api.py`（qa 只 ASR、finalize 两维、42203、exam_revision 记录）。
+
+**门禁**：`pytest tests/placement/` 13 passed；全量 `pytest -q` 135 passed；`ruff check` + `ruff format --check` 全绿。
+（注：全量首跑 `test_save_audio_and_ownership` 偶发 410 vs 403，为该用例**顺序依赖 flake**（`./data/audio-test` 跨测试残留）、与本次改动无关，单跑与重跑均绿。）
+
+**A4 阈值标定** 未含在本次代码（需 ≥3 人 × 每档数据 + σ 实测，= F2 交付物，算法/组长）。
+
+—— 执行人：Faust-sudo
+
+## 2026-09-03 入学测试功能 · 需求分歧澄清与任务清单冻结（C1~C11 决策合流）
+
+**背景**：按「信息压缩 → 冲突澄清 → 任务拆解」推进入学测试功能。依据 docs/06 §9.2、docs/07、docs/10、docs/18、docs/20/21、docs/13/14/19，并核对 local/04~06 三份（需求规格/产品功能/成员分工 .docx）与推荐系统代码（`app/rec/service.py`、`app/rec/*`、local/26~31）。产出：开发词典、技术栈、冲突清单 → 逐项拍板 → 任务拆解表 + 分支命名 + ER 图。
+
+**已固化的拍板决策**：
+
+| 项 | 结论 |
+|---|---|
+| C1 | 考试域改**两维**，对齐推荐系统统一尺度：`S = 0.6·A + 0.4·F`，`A=mean(read pron)`、`F=0.7·mean(flu)+0.3·mean(integrity)`，档界 85/70/55；`kind='qa'` 只 ASR 不 ISE，**额外调 DeepSeek 判语法** → `gram_score`+错误类型进报告/教练反馈，**不进 S 权重**；DeepSeek 失效 → `gram_score=None`（禁静默 0）、QA fail-open、S 不变；权重/阈值进 `scoring_config` 单源 |
+| C2 | 修 `_callback_level`：`user_id→userId` + `raise_for_status`+log + 双侧契约测试（Java `@SpringBootTest` + Python `respx`） |
+| C3 | 推荐冷启动不落 `placement_level`，与水平预测目标错峰避循环（属 M3） |
+| C4 | 难度衔接：场景筛选读 `cefr_level`（入学档）；`preferred_difficulty` 仅覆盖难度映射、不动 `cefr_level` |
+| C5 | 入学测试「**可跳过 + 2 题迷你版**」：默认跳过发 L2 入门套；想定级的做 1 read + 1 QA，每题 🔊 示范 + 重录；QA 必须下发 `reference_answer`；`min_read_items=1` 齐句校验，A/F 对 read 题取均值 |
+| C6 | 档位快照产物 = `placements`(completed) + `user_profiles.cefr_level`；难度衔接在 `/practice` 按档读卡 |
+| C7 | DB 角色权限化（vv_python/vv_java/vv_seed）+ CI 静态探针，把单写方从约定变约束 |
+| C8 | 定期复测=**精简版**：可重做入学测试（新 `placements(kind=upgrade)` → latest completed 回写 `cefr_level`，配 eligible 预检/冷却/幂等）；**不做** XP 经济 / `level_progress` / `xp_ledger`（与 `user_skill_state` 动态水平重复、控范围） |
+| C9 | 档位对账：`cefr_level_source/cefr_level_at` + 幂等 PUT（level_at≤现值忽略）+ 读前对账 |
+| C11 | `placements.exam_revision` 在 finalize 从所考题库版本写入，可追溯 |
+
+（C10 公式/阈值集中 `scoring_config` 单源；C12 ISE 桶 60/h vs ADR 30/h 待评分子任务确认。）
+
+**冻结任务清单**（阶段 A→F，按依赖）：
+
+| 阶段 | 任务 | 端 | 决策 |
+|---|---|---|---|
+| A | A1 可复用 LLM 语法判定模块；A2 `score_item`（qa 只 ASR + 补调 LLM 语法，gram=None 化）；A3 `finalize` 两维公式 + `min_read_items=1`；A4 阈值标定；A5 配置单源 | Py/算法 | C1/C5/C10/C11 |
+| B | B1 run 状态机 + 并发 40910；B2 QA 端点 ASR+LLM 标签；B3 `finalize` 幂等 + 乐观锁 + 消费标记 | Py | C1/C9 |
+| C | C3t 复测=重考（预检 40302 / 冷却 42902 / latest completed 回写） | Py | C8 |
+| D | D1 `POST /sessions` 未定档 40303；D2 Java `/internal/level` 修 `user_id→userId` + 幂等 PUT | Py+Java | C2/C9 |
+| E | E1 `PlacementView` 双模式（试音/示范/重录/跳过/QA 参考）；E2 复测入口+等级条；E3 未定档强制跳+错误文案映射；E4 建档→/practice 难度衔接 | 前端 | C5/C8/C4/C6 |
+| F | F1 pytest（两维公式/落位/幂等/QA fail-open/对账）；F2 阈值标定报告；F3 文档同步+worklog | 组长/算法 | C1/C9/C10/C12 |
+
+**分支命名**：`feat/placement-scoring-2d`、`chore/placement-score-calibration`、`feat/placement-run-state-machine`、`feat/placement-qa-answer`、`feat/placement-retest`、`fix/placement-level-callback`、`feat/placement-gate`、`feat/placement-view-redesign`、`feat/placement-handoff`、`test/placement-e2e`、`chore/docs-sync`。
+
+—— 执行人：Faust-sudo
+
 ## 2026-09-09 PR#25 推荐系统落地 · 复审整改与合入（模型同步 / 契约快照 / CI 兜底）
 
 复审发现并修复 3 个阻断项（评审结论见 PR#25 review，2026-09-02）：
