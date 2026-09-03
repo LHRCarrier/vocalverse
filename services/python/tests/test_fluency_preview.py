@@ -60,4 +60,33 @@ def test_analyze_without_reference_skips_score() -> None:
         files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
     )
     assert r.status_code == 200
-    assert r.json()["data"]["score"] is None
+    data = r.json()["data"]
+    assert data["score"] is None
+    assert data["score_ref"] is None
+
+
+def test_analyze_uses_transcript_as_reference_when_flag_on() -> None:
+    """use_transcript_ref=true：无手动参考时用 ASR 转写喂 ISE（生产对话同款转写对转写）。"""
+    c = _mounted_client()
+    r = c.post(
+        "/api/v1/fluency-preview/analyze",
+        files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
+        data={"use_transcript_ref": "true"},
+    )
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert data["score"] is not None
+    assert data["score_ref"] == "transcript"
+    assert data["score"]["overall"] == 88.0  # FakeScorer 固定分
+
+
+def test_manual_reference_takes_priority_over_transcript_flag() -> None:
+    """手动 reference 优先于 use_transcript_ref（题卡原文 > 转写对转写）。"""
+    c = _mounted_client()
+    r = c.post(
+        "/api/v1/fluency-preview/analyze",
+        files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
+        data={"reference": "Hello there.", "use_transcript_ref": "true"},
+    )
+    assert r.status_code == 200
+    assert r.json()["data"]["score_ref"] == "manual"
