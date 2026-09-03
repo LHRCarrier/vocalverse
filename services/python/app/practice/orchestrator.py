@@ -16,7 +16,7 @@ import hashlib
 import logging
 
 from app.agent.domains.learner import get_rendered
-from app.agent.runtime.meta_executor import MetaExecutor
+from app.agent.runtime.meta_executor import MetaExecutor, compensate_meta
 from app.agent.runtime.turn_runner import TurnRunner
 from app.audio.base import ASRClient, LLMClient, ScorerClient, TTSClient
 from app.core.config import get_settings
@@ -239,6 +239,16 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                 logger.warning("META leak degraded: reply without meta (user=%s)", session.user_id)
         if meta is None:
             meta = MetaResult(reply=full_text, meta=None, ok=False)
+        if not meta.ok:
+            # META 缺失补偿（docs/26 §9.4）：流式未守契约 → 后置一次低温度提取调用；
+            # 仍失败 → 既有降级（rule conclude 兜底，不伪造元数据）
+            meta = await compensate_meta(
+                llm,
+                reply_text=full_text,
+                transcript=transcript,
+                action=action,
+                concluded_by_turn=(state.current_turn + 1 >= (session.assigned_turns or 8)),
+            )
         reply = meta.reply or full_text
         if not reply:
             reply = _fallback_reply(transcript)
