@@ -34,7 +34,6 @@ class _NoMetaLLM:
 
 @pytest.mark.anyio
 async def test_dialog_turn_missing_meta_goes_through_compensation() -> None:
-    from app.db import get_session_factory
 
     db = get_session_factory()()
     try:
@@ -42,7 +41,9 @@ async def test_dialog_turn_missing_meta_goes_through_compensation() -> None:
         db.add(uid)
         db.flush()
         sc = Scenario(
-            title="wiring-s", scene_type="cafe", difficulty=2,
+            title="wiring-s",
+            scene_type="cafe",
+            difficulty=2,
             system_prompt="You are Bella, a friendly barista.",
             opening_line="Hi there!",
             target_corpus="I'd like a coffee, please.|请给我来杯咖啡",
@@ -50,12 +51,14 @@ async def test_dialog_turn_missing_meta_goes_through_compensation() -> None:
         db.add(sc)
         db.flush()
         sess = DbSession(
-            user_id=int(uid.id), kind=SessionKinds.DIALOG, scenario_id=int(sc.id),
+            user_id=int(uid.id),
+            kind=SessionKinds.DIALOG,
+            scenario_id=int(sc.id),
             status=SessionStatus.ACTIVE,
         )
         db.add(sess)
         db.flush()
-        sid, sc_id = int(sess.id), int(sc.id)
+        sid = int(sess.id)
         db.commit()
     finally:
         db.close()
@@ -65,8 +68,14 @@ async def test_dialog_turn_missing_meta_goes_through_compensation() -> None:
 
     events: list = []
     async for event in _dialog_turn(
-        state, "normal", b"fake-audio", None,
-        FakeASRClient(), FakeScorerClient(), _NoMetaLLM(), FakeTTSClient(),
+        state,
+        "normal",
+        b"fake-audio",
+        None,
+        FakeASRClient(),
+        FakeScorerClient(),
+        _NoMetaLLM(),
+        FakeTTSClient(),
     ):
         events.append(event)
 

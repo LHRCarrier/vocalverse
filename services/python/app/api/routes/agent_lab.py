@@ -78,6 +78,7 @@ class _TurnOutcome:
     difficulty_delta: int
     conclude: bool
     ms: int
+    usage: dict | None = None  # 回合流用量（prompt/completion tokens，docs/26 §10.3②）
 
 
 async def _run_turn(
@@ -135,6 +136,7 @@ async def _run_turn(
         difficulty_delta=meta.difficulty_delta,
         conclude=meta.conclude,
         ms=ms,
+        usage=res.usage,
     )
 
 
@@ -170,6 +172,10 @@ async def turns(req: AgentTurnsRequest) -> Envelope[dict]:
         if out.conclude:
             break
     meta_ok = sum(1 for r in results if r["meta_ok"])
+    tokens = {
+        "prompt": sum((r.get("usage") or {}).get("prompt_tokens") or 0 for r in results),
+        "completion": sum((r.get("usage") or {}).get("completion_tokens") or 0 for r in results),
+    }
     return ok(
         {
             "results": results,
@@ -179,6 +185,7 @@ async def turns(req: AgentTurnsRequest) -> Envelope[dict]:
                 "meta_rate": round(meta_ok / len(results) * 100, 1) if results else 0,
                 "compensated": sum(1 for r in results if r["compensated"]),
                 "concluded": bool(results and results[-1]["conclude"]),
+                "tokens": tokens,
             },
         }
     )
