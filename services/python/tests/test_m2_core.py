@@ -51,6 +51,26 @@ def test_extract_meta_ok():
     assert result.coach_note == "Nice!"
 
 
+def test_extract_meta_semantic_subscores():
+    """③ 语义子分：content/vocab 解析 + 非 dict 防御（模型裸数字不崩、不伪造）。"""
+    meta = render_meta(
+        {"score": 90, "errors": []},
+        "Nice!",
+        [],
+        0,
+        False,
+        content={"score": 88, "note": "On-topic."},
+        vocab={"score": 84, "note": "Good variety."},
+    )
+    result = extract_meta("Hello. " + meta)
+    assert result.content == {"score": 88, "note": "On-topic."}
+    assert result.vocab == {"score": 84, "note": "Good variety."}
+    # 防御：裸数字/字符串 meta 项 → properties 返回 None（不崩、不伪造）
+    m2 = extract_meta("a [-META-]" + '{"content": 77, "vocab": "88", "conclude": false}')
+    assert m2.ok
+    assert m2.content is None and m2.vocab is None
+
+
 def test_extract_meta_missing_degrade():
     result = extract_meta("Just a plain reply without meta.")
     assert result.ok is False and result.reply == "Just a plain reply without meta."
@@ -273,6 +293,9 @@ def test_fluency_features_flow_into_attempt_and_report(client, auth_headers):
         headers=auth_headers,
     )
     assert resp.status_code == 200
+    # ③ 语义子分经 Fake META（stream_rich render_meta content/vocab）透出到 SSE
+    assert '"content": {"score": 88' in resp.text
+    assert '"vocab": {"score": 84' in resp.text
 
     db = get_session_factory()()
     try:
@@ -296,6 +319,12 @@ def test_fluency_features_flow_into_attempt_and_report(client, auth_headers):
     assert attempts[0]["wpm"] == 145.83
     assert attempts[0]["fluency_features"]["pause_count"] == 1
     assert attempts[0]["fluency_features"]["wpm"] == 145.83
+    # ③ 报告语义子分聚合（Fake META：content 88 / vocab 84，1 轮）
+    semantic = resp.json()["data"]["metrics"]["semantic"]
+    assert semantic == {
+        "content": {"score": 88.0, "turns": 1},
+        "vocab": {"score": 84.0, "turns": 1},
+    }
 
 
 def test_defense_profile_lifecycle(client, auth_headers):

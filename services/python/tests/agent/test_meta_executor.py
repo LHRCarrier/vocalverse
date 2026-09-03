@@ -136,3 +136,21 @@ def test_parse_meta_json_malformed_grammar_guarded() -> None:
     m = _parse_meta_json('{"grammar":90,"coach_note":"ok"}', "reply")
     assert m.ok is True
     assert ex.grammar_ok(m, []) is True  # 非 dict → 默认达意（不崩）
+
+
+def test_compensate_system_declares_semantic_subscores() -> None:
+    """③ 补偿链路同步：_COMPENSATE_SYSTEM 契约行含 content/vocab（与 META 主契约一致）。"""
+    from app.agent.runtime.meta_executor import _COMPENSATE_SYSTEM
+
+    assert '"content":{"score":0-100,"note":"<=20 words"}' in _COMPENSATE_SYSTEM
+    assert '"vocab":{"score":0-100,"note":"<=20 words"}' in _COMPENSATE_SYSTEM
+
+
+def test_compensate_meta_passes_semantic_fields_through() -> None:
+    """③ 补偿返回的 content/vocab 经 MetaResult properties 可读（端到端不丢字段）。"""
+    m = _parse_meta_json(
+        '{"content":{"score":70,"note":"ok"},"vocab":{"score":62,"note":"basic"},"conclude":false}',
+        "reply",
+    )
+    assert m.content == {"score": 70, "note": "ok"}
+    assert m.vocab == {"score": 62, "note": "basic"}
