@@ -63,7 +63,18 @@ export function authHeaders(): HeadersInit {
 export async function request<T>(path: string, init?: RequestInit, base = PYTHON_BASE): Promise<Envelope<T>> {
   const headers = { ...(init?.headers ?? {}), ...authHeaders() }
   const resp = await fetch(`${base}${path}`, { ...init, headers })
-  const body = (await resp.json()) as Envelope<T>
+  let body: Envelope<T>
+  try {
+    body = (await resp.json()) as Envelope<T>
+  } catch {
+    // 后端不可达（代理返回空体 5xx 等）：给可操作提示，而不是「Unexpected end of JSON input」
+    const who = base === JAVA_BASE ? 'Java（登录/管理端）' : 'Python（语音/LLM）'
+    throw new ApiError(
+      -1,
+      `${who}服务不可达（HTTP ${resp.status}，${base}${path}）——请确认对应后端已启动`,
+      resp.status,
+    )
+  }
   if (!resp.ok || body.code !== 0) {
     throw new ApiError(body.code ?? -1, body.message ?? `HTTP ${resp.status}`, resp.status)
   }

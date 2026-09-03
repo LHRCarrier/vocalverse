@@ -30,6 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.audio.base import get_asr_client, get_scorer_client
+from app.audio.fluency import compute_fluency_features
 from app.audio.upload import validate_audio_bytes
 from app.core.auth import get_current_user_id
 from app.core.config import get_settings
@@ -301,7 +302,10 @@ async def score_item(
         run = _get_or_create_run(db, user_id, q.exam_revision)  # B1
 
         asr = get_asr_client()
-        text = (await asr.transcribe(data)).text
+        asr_res = await asr.transcribe(data)
+        text = asr_res.text
+        # 流利度时间戳特征（docs/06 §9.3 辅助口径；与对话链路同源，origin/main 1fa86af 并入）
+        fluency = compute_fluency_features(asr_res.words or [], float(asr_res.duration or 0.0))
 
         # read 题：ISE 评 pron/flu/completeness；qa 题：不跑 ISE（只 ASR，A2）
         score = None
@@ -324,7 +328,6 @@ async def score_item(
                 relevance = qa.get("relevance")
         else:
             grammar = await judge_grammar(text, q.prompt)
-
         attempt = Attempt(
             user_id=user_id,
             kind=AttemptKinds.PLACEMENT_ITEM,
@@ -337,6 +340,7 @@ async def score_item(
             if grammar and grammar.get("score") is not None
             else None,
             overall_score=_dec(score.overall) if score else None,
+            wpm=_dec(fluency["wpm"]) if fluency else None,
             error={} if (score is not None or is_qa) else {"reason": "score_unavailable"},
             details={
                 "item_index": q.item_index,
@@ -345,6 +349,7 @@ async def score_item(
                 "prompt": q.prompt,
                 "grammar": grammar,  # 诊断快照（C11 可追溯依赖 exam_revision）
                 "qa": {"relevance": relevance} if is_qa else None,
+                "fluency": fluency,  # wpm/停顿时间戳特征（origin/main 并入）
             },
         )
         db.add(attempt)
@@ -360,6 +365,7 @@ async def score_item(
                 "completeness": float(completeness) if completeness is not None else None,
                 "gram": grammar["score"] if grammar and grammar.get("score") is not None else None,
                 "relevance": relevance,
+                "wpm": float(attempt.wpm) if attempt.wpm is not None else None,
             }
         )
     finally:

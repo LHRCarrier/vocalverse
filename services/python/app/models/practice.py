@@ -87,6 +87,11 @@ class Session(TimestampMixin, Base):
     assigned_turns: Mapped[int | None] = mapped_column(SmallInteger)
     duration_s: Mapped[int | None] = mapped_column(BigInteger)
     channel: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("'web'"))
+    # 摘要双轨（docs/26 §10.3①，迁移 0004；对照 ai4u agent_conversation.summary*）：
+    # summary=滚动摘要（收尾时=最终总结）；summary_failed_at=最近一次摘要生成失败（成功清空）
+    summary: Mapped[str | None] = mapped_column(Text)
+    summary_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    summary_failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
         CheckConstraint(

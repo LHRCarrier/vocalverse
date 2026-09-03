@@ -17,11 +17,21 @@ _FFMPEG = "ffmpeg"
 
 
 def _ffmpeg_bin() -> str:
-    """ffmpeg 路径：默认 PATH 中的 ffmpeg；本机未装时可设 FFMPEG_BIN 指向
-    imageio-ffmpeg（pip 附带二进制，免管理员）等任意可执行文件路径。"""
+    """ffmpeg 路径：① env FFMPEG_BIN → ② PATH 中 ffmpeg → ③ imageio-ffmpeg 自带二进制
+    （pip/uv 附带、免管理员，README 登记）→ ④ 兜底 "ffmpeg"（让 subprocess 报可读错误）。"""
     import os
+    import shutil
 
-    return os.environ.get("FFMPEG_BIN", _FFMPEG)
+    if os.environ.get("FFMPEG_BIN"):
+        return os.environ["FFMPEG_BIN"]
+    if shutil.which("ffmpeg"):
+        return _FFMPEG
+    try:
+        import imageio_ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return _FFMPEG
 
 
 class FasterWhisperClient(ASRClient):
@@ -42,13 +52,32 @@ class FasterWhisperClient(ASRClient):
 
     def transcribe_sync(self, wav_path: str, language: str = "en") -> ASRResult:
         model = self._get_model()
-        segments, info = model.transcribe(wav_path, language=language, beam_size=5)
+        # word_timestamps=True：词级时间戳（流利度时间戳特征数据源，docs/06 §9.3）；
+        # 注意 transcribe 返回**生成器**，先 list() 物化一次——重复迭代同一生成器
+        # 第二次永远为空（旧代码 segments 恒空、2026-09-04 联调发现 words 恒空的根因）
+        segments, info = model.transcribe(
+            wav_path, language=language, beam_size=5, word_timestamps=True
+        )
+        segments = list(segments)
         text = "".join(s.text for s in segments).strip()
+        words: list[dict] = []
+        for s in segments:
+            for w in s.words or []:
+                words.append(
+                    {
+                        "word": w.word,
+                        "start": float(w.start),
+                        "end": float(w.end),
+                        "probability": float(getattr(w, "probability", 0.0) or 0.0),
+                    }
+                )
         return ASRResult(
             text=text,
             language=info.language or language,
             confidence=float(getattr(info, "language_probability", 0.0) or 0.0),
             segments=[{"start": s.start, "end": s.end, "text": s.text} for s in segments],
+            words=words,
+            duration=float(getattr(info, "duration", 0.0) or 0.0),
         )
 
     async def transcribe(self, audio_bytes: bytes, language: str = "en") -> ASRResult:

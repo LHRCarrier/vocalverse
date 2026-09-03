@@ -20,12 +20,14 @@ from app.models import (
     Placement,
     Scenario,
     ScenarioMessage,
+    ShadowMaterial,
 )
 from app.models import (
     Session as DbSession,
 )
 from app.models.base import SessionKinds, SessionStatus
 from app.practice.corpus import parse_corpus
+from app.practice.shadow import split_sentences
 from app.practice.state import SessionState, get_state_store
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -49,8 +51,12 @@ async def create_session(
     profile_id: int | None,
     difficulty: int | None,
     turn_limit: int | None,
+    shadow_material_id: int | None = None,
 ) -> DbSession:
     db = get_session_factory()()
+    scenario = None  # dialog 分支赋值；defense/shadow 为 None（2026-09-04 修复未曾覆盖的
+    # UnboundLocalError——此前 defense 建会话同样会踩中，只是无测试覆盖）
+    material = None
     try:
         # D1：练习（对话）需先完成入学测试（有 level 定档）。C5 跳过路径会创建 provisional
         # completed placement，故凡有 completed 档位即可；无则 40303（未定档引导见 stage E-4）。
@@ -80,6 +86,14 @@ async def create_session(
             if not profile.knowledge_bank.get("questions"):
                 raise HTTPException(status_code=409, detail="knowledge bank not ready")
             assigned = turn_limit or profile.question_count
+        elif kind == SessionKinds.SHADOW:
+            material = db.get(ShadowMaterial, shadow_material_id) if shadow_material_id else None
+            if material is None or material.status != "published":
+                raise HTTPException(status_code=404, detail="shadow material not found")
+            sentences = split_sentences(material.text_content)
+            if not sentences:
+                raise HTTPException(status_code=409, detail="shadow material has no sentences")
+            assigned = turn_limit or len(sentences)
         else:
             raise HTTPException(status_code=400, detail="unsupported kind")
 
@@ -88,6 +102,7 @@ async def create_session(
             kind=kind,
             scenario_id=scenario_id,
             profile_id=profile_id,
+            shadow_material_id=shadow_material_id,
             status=SessionStatus.ACTIVE,
             assigned_turns=assigned,  # defense：设定题数快照（docs/18 实现决策）
             channel="web",
@@ -102,12 +117,16 @@ async def create_session(
             assembled={
                 "scenario_id": scenario_id,
                 "difficulty": difficulty,
-                "opening_text": (scenario.opening_line if scenario else None),
+                "opening_text": (getattr(scenario, "opening_line", None) if scenario else None),
                 "corpus": [
                     {"phrase": it.phrase, "gloss": it.gloss}
                     for it in parse_corpus(scenario.target_corpus)
                 ]
                 if scenario
+                else [],
+                "shadow_material_id": shadow_material_id,
+                "shadow_sentences": split_sentences(material.text_content)
+                if kind == SessionKinds.SHADOW
                 else [],
             },
         )
@@ -165,6 +184,7 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
             db.execute(select(Attempt).where(Attempt.session_id == session_id)).scalars()
         )
         coverage = _coverage_summary(msgs, attempts)
+        semantic = _semantic_summary(msgs)  # ③ 语义子分聚合（不进量化总分，docs/07 Q38）
         summary = summary_text or f"会话完成：{len(user_msgs)} 轮口头交流。"
 
         from app.models import Report
@@ -178,6 +198,7 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
             metrics={
                 "summary": summary,
                 "coverage": coverage,
+                "semantic": semantic,  # ③ 语义子分（content/vocab；不进总分，展示口径）
                 "kind": session.kind,
                 "assigned_turns": session.assigned_turns,
                 "user_turn_count": len(user_msgs),
@@ -192,6 +213,9 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
                         "fluency": _f(a.flu_score),
                         "grammar": _f(a.gram_score),
                         "overall": _f(a.overall_score),
+                        "wpm": _f(a.wpm),  # 语速辅助指标（docs/07 Q30）
+                        # 流利度时间戳特征（wpm/停顿/语速构成，docs/06 §9.3；无数据时缺省）
+                        "fluency_features": (a.details or {}).get("fluency"),
                         "details": a.details or {},
                         "error_present": bool(a.error),
                     }
@@ -199,6 +223,9 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
                 ],
             },
         )
+        # 摘要双轨落库（docs/26 §10.3①）：收尾最终总结写入 sessions.summary
+        session.summary = summary
+        session.summary_updated_at = now
         db.add(report)
         db.commit()
         _post_session_skills(db, session)
@@ -228,6 +255,14 @@ def _post_session_skills(db, session) -> None:
             "post-session skills skipped session=%s (self-heal next practice)", session.id
         )
         db.rollback()
+    # 学习者画像缓存失效（docs/26 ⑥）：会话完结后掌握度/水平已重算，下次注入须读到新画像。
+    # 独立于 skills 更新成败（数据已可能变化，按"保守失效"处理）；异常吞掉不阻塞收尾。
+    try:
+        from app.agent.domains.learner import invalidate as _learner_invalidate
+
+        _learner_invalidate(int(session.user_id))
+    except Exception:
+        pass
 
 
 def _f(v: Decimal | None) -> float | None:
@@ -255,6 +290,31 @@ def _coverage_summary(msgs: list[ScenarioMessage], attempts: list[Attempt]) -> d
         "needs_fix": sorted(set(fix)),
         "to_practice": [],
         "coverage_count": len(seen),
+    }
+
+
+def _semantic_summary(msgs: list[ScenarioMessage]) -> dict:
+    """③ 语义子分聚合（docs/07 Q38：LLM 判定、进展示**不进量化总分**）。
+
+    取 assistant 消息 meta 的 content/vocab（META 契约增量字段）；无数据 → score=None。
+    返回：{"content": {"score": avg|None, "turns": n}, "vocab": {...}}
+    """
+
+    def _avg(key: str) -> tuple[float | None, int]:
+        vals: list[float] = []
+        for m in msgs:
+            if m.role != "assistant":
+                continue
+            v = (m.meta or {}).get(key)
+            if isinstance(v, dict) and isinstance(v.get("score"), (int, float)):
+                vals.append(float(v["score"]))
+        return (round(sum(vals) / len(vals), 1) if vals else None), len(vals)
+
+    content_avg, content_n = _avg("content")
+    vocab_avg, vocab_n = _avg("vocab")
+    return {
+        "content": {"score": content_avg, "turns": content_n},
+        "vocab": {"score": vocab_avg, "turns": vocab_n},
     }
 
 
@@ -384,34 +444,29 @@ def build_llm_context(
     action: str,
     hits_so_far: list[str],
     concluded_by_turn: bool,
+    learner_profile: str = "",
+    rolling_summary: str = "",
 ) -> list[dict]:
-    """对话回合 system/user 消息（docs/14 §3.4：3 轮滚动摘要 + 输出契约 + 语料提示）。"""
-    from app.practice.meta import MARKER
+    """对话回合 system/user 消息（docs/14 §3.4）。
 
-    system = (
-        f"{scenario_prompt}\n"
-        "You are role-playing in an English speaking practice app. "
-        f"Target language level: difficulty {difficulty} — keep sentences short (≤3 sentences), "
-        f"simple words, natural and encouraging. Naturally steer the topic toward these target "
-        f"expressions WITHOUT reading them aloud: {corpus_text or '(none)'}\n"
-        f"Already used expressions — rephrase instead: {', '.join(hits_so_far) or '(none)'}\n"
-        "Output contract: reply as plain English text ONLY, then finish with a single line:\n"
-        f"{MARKER}{{}}\n"
-        "META JSON fields: grammar:{score:0-100,errors:[{word,fix}]}, coach_note(≤15 words), "
-        "corpus_hits:[{phrase,state:'ok'|'fix'}], difficulty_delta:-1|0|1, conclude(bool).\n"
-        f"If the conversation reached the limit or user ends, set conclude=true.\n"
-        f"Turn limit reached: {concluded_by_turn}\n"
-        f"Recent turns:\n{chr(10).join(state.digest[-3:]) or '(conversation start)'}"
+    兼容薄壳：实现已迁至 Agent 框架层 `app.agent.runtime.context_builder.build_context`
+    （docs/26：静态 system + user 尾部 [context]（画像/摘要/难度/语料/命中）+ ⑤契约稳定）；
+    本函数保留签名供既有引用，新代码一律直调框架层。
+    """
+    from app.agent.runtime.context_builder import build_context
+
+    return build_context(
+        state,
+        scenario_prompt,
+        corpus_text,
+        difficulty,
+        user_text,
+        action,
+        hits_so_far,
+        concluded_by_turn,
+        learner_profile=learner_profile,
+        rolling_summary=rolling_summary,
     )
-    user_msg = (
-        f"user said (ASR): {user_text or '(no speech)'}\n"
-        f"action: {action} (retry/hint = learner needs help; be kind and short)\n"
-        "word_errors: " + str(_count_errors(state.assembled.get("last_errors", [])))
-    )
-    return [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user_msg},
-    ]
 
 
 def _count_errors(errors: list) -> int:

@@ -12,6 +12,12 @@ const report = ref<ReportPayload | null>(null)
 const error = ref<string | null>(null)
 
 const overall = ref<{ pron: number; flu: number; gram: number } | null>(null)
+/** 流利度辅助指标（docs/06 §9.3：语速 wpm + 停顿，来自 ASR 词级时间戳）。
+ *  attempt 条目：{wpm, fluency_features:{pause_count,...}}，无数据时为 null/缺省。 */
+const wpmAvg = ref<number | null>(null)
+const pauseAvg = ref<number | null>(null)
+/** ③ 语义子分（LLM 判定；进展示不进量化总分，docs/07 Q38） */
+const semantic = ref<{ content: number | null; vocab: number | null; turns: number } | null>(null)
 
 onMounted(async () => {
   try {
@@ -21,6 +27,32 @@ onMounted(async () => {
     if (scored.length) {
       const avg = (k: string) => scored.reduce((s, a) => s + Number(a[k] ?? 0), 0) / scored.length
       overall.value = { pron: Math.round(avg('pronunciation')), flu: Math.round(avg('fluency')), gram: Math.round(avg('grammar') ?? 0) }
+      const wpmVals = scored
+        .map((a) => Number(a.wpm ?? 0))
+        .filter((v) => v > 0)
+      if (wpmVals.length) {
+        wpmAvg.value = Math.round(wpmVals.reduce((s, v) => s + v, 0) / wpmVals.length)
+      }
+      const pauseVals = scored
+        .map((a) => {
+          const f = a.fluency_features as Record<string, unknown> | undefined
+          return f ? Number(f.pause_count ?? 0) : 0
+        })
+        .filter((v) => v > 0)
+      if (pauseVals.length) {
+        pauseAvg.value = Math.round((pauseVals.reduce((s, v) => s + v, 0) / pauseVals.length) * 10) / 10
+      }
+      // ③ 语义子分：metrics.semantic = {content:{score,turns}, vocab:{score,turns}}
+      const sem = report.value.metrics.semantic as
+        | { content?: { score?: number; turns?: number }; vocab?: { score?: number } }
+        | null
+      if (sem && (sem.content?.score != null || sem.vocab?.score != null)) {
+        semantic.value = {
+          content: sem.content?.score ?? null,
+          vocab: sem.vocab?.score ?? null,
+          turns: sem.content?.turns ?? 0,
+        }
+      }
     }
   } catch (e) {
     error.value = (e as Error).message
@@ -51,12 +83,31 @@ onMounted(async () => {
         <div class="text-center">
           <div class="text-2xl font-bold text-[#B45309]">{{ overall.flu }}</div>
           <div class="mt-1 text-xs text-[#667085]">流利度</div>
+          <div v-if="wpmAvg !== null" class="mt-1 text-[11px] text-[#667085]">
+            语速 ≈ {{ wpmAvg }} 词/分<template v-if="pauseAvg !== null"> · 停顿 ≈ {{ pauseAvg }} 次/轮</template>
+          </div>
         </div>
       </NCard>
       <NCard size="small">
         <div class="text-center">
           <div class="text-2xl font-bold text-[#0EA5E9]">{{ overall.gram }}</div>
           <div class="mt-1 text-xs text-[#667085]">语法</div>
+        </div>
+      </NCard>
+    </section>
+
+    <!-- ③ 语义子分（LLM 判定 · 展示口径，不进量化总分 · docs/07 Q38） -->
+    <section v-if="semantic" class="mb-4 grid grid-cols-2 gap-4">
+      <NCard size="small">
+        <div class="text-center">
+          <div class="text-2xl font-bold text-[#334EAC]">{{ semantic.content ?? '—' }}</div>
+          <div class="mt-1 text-xs text-[#667085]">内容相关度（{{ semantic.turns }} 轮）</div>
+        </div>
+      </NCard>
+      <NCard size="small">
+        <div class="text-center">
+          <div class="text-2xl font-bold text-[#7096D1]">{{ semantic.vocab ?? '—' }}</div>
+          <div class="mt-1 text-xs text-[#667085]">词汇多样性 · 均分</div>
         </div>
       </NCard>
     </section>

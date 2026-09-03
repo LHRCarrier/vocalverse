@@ -28,6 +28,10 @@ export interface MetaBlockEvent {
   corpus_hits: Array<{ phrase: string; state: 'ok' | 'fix' }>
   difficulty_delta: number
   conclude: boolean
+  /** ③ 语义子分：内容相关度 {score,note}（LLM 判定，不进总分） */
+  content?: { score?: number; note?: string } | null
+  /** ③ 语义子分：词汇多样性 {score,note}（LLM 判定，不进总分） */
+  vocab?: { score?: number; note?: string } | null
   /** defense：作答等级 green/yellow/red */
   level?: string | null
   /** defense：要点命中 {hits: string[], total: number} */

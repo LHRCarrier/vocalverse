@@ -15,31 +15,41 @@ import asyncio
 import hashlib
 import logging
 
+from app.agent.domains.learner import get_rendered
+from app.agent.domains.summarizer import SummarizerService, get_session_summary
+from app.agent.domains.usage import log_usage
+from app.agent.runtime.meta_executor import MetaExecutor, compensate_meta
+from app.agent.runtime.turn_runner import TurnRunner
 from app.audio.base import ASRClient, LLMClient, ScorerClient, TTSClient
+from app.audio.fluency import compute_fluency_features
 from app.core.config import get_settings
 from app.db import get_session_factory
 from app.models import (
     Attempt,
     Scenario,
     ScenarioMessage,
+    ShadowMaterial,
 )
 from app.models import (
     Session as DbSession,
 )
 from app.models.base import AttemptKinds, SessionKinds
 from app.practice import events as ev
-from app.practice.corpus import match_rule, parse_corpus
-from app.practice.meta import MARKER, MetaResult, extract_meta
+from app.practice.corpus import parse_corpus
+from app.practice.meta import MetaResult
 from app.practice.service import (
     build_llm_context,
     complete_session,
     tts_sentences,
 )
+from app.practice.shadow import coach_note, shadow_scores, split_sentences
 from app.practice.state import SessionState, get_state_store
 from fastapi import HTTPException
 from sqlalchemy import select
 
 logger = logging.getLogger("vocalverse")
+
+_meta_executor = MetaExecutor()
 
 
 class OrchestratorError(HTTPException):
@@ -109,6 +119,9 @@ async def run_turn(
                 state, action, audio, audio_url, asr, scorer, llm, tts
             ):
                 yield event
+        elif state.kind == SessionKinds.SHADOW:
+            async for event in _shadow_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
+                yield event
         else:
             async for event in _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                 yield event
@@ -136,11 +149,18 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         # 1) ASR（rescue 轮跳过）
         transcript = ""
         asr_meta: dict = {}
+        fluency: dict = {}
         if action in ("normal", "retry") and audio:
             try:
                 res = await asr.transcribe(audio)
                 transcript = res.text.strip()
-                asr_meta = {"asr_seconds": round(len(audio) / 16000, 1)}
+                # 流利度时间戳特征（docs/06 §9.3 辅助口径：wpm/停顿；数据源 = 词级时间戳）
+                fluency = compute_fluency_features(res.words or [], float(res.duration or 0.0))
+                asr_meta = {
+                    "asr_seconds": round(len(audio) / 16000, 1),
+                    "wpm": fluency["wpm"],
+                    "pause_count": fluency["pause_count"],
+                }
             except Exception as exc:
                 logger.warning("asr failed: %s", exc)
                 yield ev.StreamError(code="asr_failed", recoverable=True)
@@ -209,69 +229,54 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             action,
             state.corpus_done,
             concluded_by_turn=(state.current_turn + 1 >= (session.assigned_turns or 8)),
+            learner_profile=get_rendered(int(session.user_id)),
+            rolling_summary=get_session_summary(state.session_id) or "",
         )
-        # LLM 流式：边收边转发 text_delta；尾部 [-META-] 拆出解析（失败降级，不重试——
-        # 流式不可回放；POC-2 判定 <90% 成功率时切换「两调用」方案，见 docs/18 §6）
-        full_buf: list[str] = []
-        meta_buf = ""
-        held = ""
-        meta_done = False
+        # LLM 流式：交 TurnRunner（docs/26 runtime/turn-runner：边界拆分 + META 泄漏门）；
+        # 失败降级不重试（流式不可回放；POC-2 判定 <90% 成功率时切换「两调用」方案，docs/18 §6）
+        runner = TurnRunner(llm)
+        caught = False
         try:
-            async for chunk in llm.stream(messages):
-                if meta_done:
-                    meta_buf += chunk
-                    continue
-                payload = held + chunk
-                idx = payload.find(MARKER)
-                if idx >= 0:
-                    pre, post = payload[:idx], payload[idx:]
-                    full_buf.append(pre)
-                    meta_buf = post
-                    if pre.strip():
-                        yield ev.TextDelta(text=pre)
-                    meta_done = True
-                    continue
-                keep = _partial_marker_len(payload)
-                emit = payload[:-keep] if keep else payload
-                full_buf.append(emit)
-                if emit:
-                    yield ev.TextDelta(text=emit)
-                held = payload[-keep:] if keep else ""
-            if not meta_done and held:
-                full_buf.append(held)
-                yield ev.TextDelta(text=held)
-            full_text = "".join(full_buf)
-            meta = (
-                extract_meta(full_text + MARKER + meta_buf)
-                if meta_done
-                else extract_meta(full_text)
-            )
+            async for delta in runner.run(messages):
+                yield ev.TextDelta(text=delta)
         except Exception as exc:
+            caught = True
             logger.warning("llm failed: %s", exc)
             yield ev.StreamError(code="llm_failed", recoverable=True)
-            full_text, meta = (
-                _fallback_reply(transcript),
-                MetaResult(reply=_fallback_reply(transcript), meta=None, ok=False),
-            )
+        if caught:
+            full_text = _fallback_reply(transcript)
+            meta = MetaResult(reply=full_text, meta=None, ok=False)
+        else:
+            res = runner.result
+            assert res is not None
+            full_text = res.reply_text
+            meta = res.meta
+            if res.leaked:
+                logger.warning("META leak degraded: reply without meta (user=%s)", session.user_id)
+            if res.usage:
+                log_usage(
+                    "turn",
+                    res.usage,
+                    meta={"session_id": int(state.session_id), "turn": turn_index},
+                )
         if meta is None:
             meta = MetaResult(reply=full_text, meta=None, ok=False)
+        if not meta.ok:
+            # META 缺失补偿（docs/26 §9.4）：流式未守契约 → 后置一次低温度提取调用；
+            # 仍失败 → 既有降级（rule conclude 兜底，不伪造元数据）
+            meta = await compensate_meta(
+                llm,
+                reply_text=full_text,
+                transcript=transcript,
+                action=action,
+                concluded_by_turn=(state.current_turn + 1 >= (session.assigned_turns or 8)),
+            )
         reply = meta.reply or full_text
         if not reply:
             reply = _fallback_reply(transcript)
 
-        # 4) 命中（规则权威 + LLM 兜底；retry/hint/demo 作废）
-        hits: list[dict] = []
-        if action in ("normal", "retry"):
-            rule_hits = match_rule(transcript, corpus)
-            grammar_ok = _grammar_ok(meta, last_errors)
-            hits = [{"phrase": p, "state": "ok" if grammar_ok else "fix"} for p in rule_hits]
-            seen = set(rule_hits)
-            for h in meta.corpus_hits or []:
-                phrase = h.get("phrase") if isinstance(h, dict) else h
-                if phrase and phrase not in seen:
-                    state_hit = h.get("state", "ok") if isinstance(h, dict) else "ok"
-                    hits.append({"phrase": str(phrase), "state": state_hit})
-                    seen.add(str(phrase))
+        # 4) 命中（MetaExecutor：规则权威 + LLM 兜底；retry/hint/demo 作废——docs/26 §⑤）
+        hits = _meta_executor.apply_hits(transcript, corpus, meta, action, last_errors)
 
         # 5) 逐句 TTS（并发；失败静默降级字幕）
         audio_urls: list[str] = []
@@ -282,13 +287,15 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                 yield ev.AudioChunk(url=url)
 
         # 6) 后置元数据 + 迟到的评分徽章
-        grammar = meta.grammar or (last_errors and {"score": 60, "errors": last_errors} or None)
+        grammar = _meta_executor.effective_grammar(meta, last_errors)
         yield ev.MetaBlock(
             grammar=grammar,
             coach_note=(meta.coach_note or None),
             corpus_hits=hits,
             difficulty_delta=meta.difficulty_delta,
             conclude=meta.conclude,
+            content=meta.content,  # ③ 语义子分（LLM 判定；防御见 meta.py properties）
+            vocab=meta.vocab,
         )
         score_status = "unavailable"
         if score_task is not None:
@@ -339,7 +346,12 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                     flu_score=_dec(score.fluency if score else None),
                     gram_score=_dec(grammar and grammar.get("score")),
                     overall_score=_dec(score.overall if score else None),
-                    details={"word_level": (score.word_level if score else [])},
+                    # 语速辅助指标（docs/07 Q30）+ 流利度时间戳特征（docs/06 §9.3）
+                    wpm=_dec(fluency["wpm"]) if fluency else None,
+                    details={
+                        "word_level": (score.word_level if score else []),
+                        "fluency": fluency,
+                    },
                     error={} if score is not None else {"reason": "score_unavailable"},
                 )
             )
@@ -357,7 +369,9 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                     "coach_note": meta.coach_note,
                     "corpus_hits": hits,
                     "difficulty_delta": meta.difficulty_delta,
-                    "prompt_version": 1,
+                    "content": meta.content,  # ③ 语义子分（报告聚合源，见 service）
+                    "vocab": meta.vocab,
+                    "prompt_version": 2,  # v2=稳定前缀+学习者画像注入（docs/26）
                 },
             )
         )
@@ -369,18 +383,21 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         for h in hits:
             if h["phrase"] not in state.corpus_done:
                 state.corpus_done.append(h["phrase"])
-        low_quality = not transcript or not _grammar_ok(meta, last_errors)
+        low_quality = not transcript or not _meta_executor.grammar_ok(meta, last_errors)
         state.failed_streak = state.failed_streak + 1 if low_quality else 0
         if state.failed_streak >= 2 and action != "retry":
             state.failed_streak = 0  # L2 AI 代说由 LLM 侧换角度完成；此处记账
         db.commit()
 
+        # 摘要双轨（docs/26 §10.3①）：回合落库后异步增量压缩（失败标记 → 下次自动重试）
+        asyncio.create_task(SummarizerService(llm).maybe_summarize(state.session_id))
+
         yield ev.TurnEnd(turn_index=turn_index, score_status=score_status)
 
-        # 9) 收尾判定（meta.conclude 或轮次上限）
+        # 9) 收尾判定（MetaExecutor：meta.conclude 或轮次上限或用户放弃）
         limit = session.assigned_turns or 8
-        if meta.conclude or turn_index >= limit or action == "abandon":
-            summary = await _conclude_summary(llm, state.digest)
+        if _meta_executor.should_conclude(meta, turn_index, limit, action):
+            summary = await _conclude_summary(llm, state.digest, session_id=int(state.session_id))
             report_id = complete_session(state.session_id, llm, summary)
             state.state = "completed"
             await get_state_store().put(state)
@@ -581,6 +598,162 @@ def _coach_for_level(level: str, hits: list[str], key_points: list[str]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# 影子跟读（DoD ④：ISE 主场；start=出句+示范 → normal=跟读评分，逐句推进）
+# ---------------------------------------------------------------------------
+async def _shadow_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
+    """影子跟读回合。score 三维（发音/语速匹配/停顿密度）见 app/practice/shadow.py。
+
+    - start（无音频）：出句 + 示范 TTS（AudioChunk），不推进轮次；
+    - normal（带音频）：ASR + ISE(题卡原文) + 流利度特征 → 三维分 → 落库 → 推进；
+      最后一句系结 → complete_session（报告）。LLM 不参与（规则教练笔记，无 META）。
+    """
+    settings = get_settings()
+    db = _db()
+    try:
+        session = db.get(DbSession, state.session_id)
+        material = db.get(ShadowMaterial, session.shadow_material_id or 0)
+        sentences = split_sentences(material.text_content) if material else []
+        if material is None or material.status != "published" or not sentences:
+            yield ev.StreamError(code="shadow_material_unavailable", recoverable=False)
+            return
+        idx = min(state.current_turn, len(sentences) - 1)
+        sentence = sentences[idx]
+        turn_index = state.current_turn + 1
+
+        if action == "start":
+            yield ev.TurnStart(turn_index=turn_index, reference_text=sentence)
+            demo_url = await _tts_url_from_bytes(
+                tts, sentence, settings.tts_voice, settings.tts_rate
+            )
+            if demo_url:
+                yield ev.AudioChunk(url=demo_url)
+            yield ev.TurnEnd(turn_index=turn_index, score_status="pending")
+            await get_state_store().put(state)
+            return
+
+        if not audio:
+            raise OrchestratorError(status_code=422, detail="audio required for shadow record")
+
+        yield ev.TurnStart(turn_index=turn_index, reference_text=sentence)
+
+        # ASR + 流利度特征（② reuse；失败降级——分数不伪造，落 error 快照）
+        transcript = ""
+        fluency: dict = {}
+        try:
+            res = await asr.transcribe(audio)
+            transcript = res.text.strip()
+            fluency = compute_fluency_features(res.words or [], float(res.duration or 0.0))
+        except Exception as exc:
+            logger.warning("shadow asr failed: %s", exc)
+        score = None
+        if transcript:
+            score = await _safe_score(scorer, audio, sentence)  # ISE（reference=题卡原文）
+
+        sc = shadow_scores(
+            float(score.pronunciation) if score else None,
+            fluency.get("wpm") or None,
+            material.wpm,
+            fluency.get("pause_ratio") or None,
+        )
+        coach = coach_note(sc) or (
+            None if transcript else "Couldn't catch that — try again a bit louder, please."
+        )
+        rhythm = None
+        rhythm_vals = [v for v in (sc.speed_match, sc.pause_score) if v is not None]
+        if rhythm_vals:
+            rhythm = round(sum(rhythm_vals) / len(rhythm_vals), 1)
+
+        conclude = idx + 1 >= len(sentences)
+        yield ev.MetaBlock(
+            grammar=None,
+            coach_note=coach,
+            corpus_hits=[],
+            difficulty_delta=0,
+            conclude=conclude,
+        )
+        score_status = "ok" if sc.overall is not None else "unavailable"
+        if sc.pron is not None:
+            yield ev.ScoreDelta(
+                turn_index=turn_index, pronunciation=round(float(sc.pron), 1), fluency=rhythm
+            )
+
+        # 落库（user 消息 + attempt + coach 消息）
+        seq_user = state.next_seq
+        state.next_seq += 1
+        db.add(
+            ScenarioMessage(
+                session_id=state.session_id,
+                seq=seq_user,
+                role="user",
+                origin="respond",
+                content=transcript or "[shadow]",
+                audio_url=audio_url,
+                meta={
+                    "kind": "shadow",
+                    "sentence_index": idx,
+                    "sentence": sentence,
+                    "wpm": fluency.get("wpm"),
+                    "pause_count": fluency.get("pause_count"),
+                },
+            )
+        )
+        db.add(
+            Attempt(
+                user_id=session.user_id,
+                session_id=state.session_id,
+                scenario_message_id=_find_msg_id(db, state.session_id, seq_user),
+                kind=AttemptKinds.SHADOW_SPEECH,
+                audio_url=audio_url,
+                transcript=transcript or None,
+                pron_score=_dec(sc.pron) if sc.pron is not None else None,
+                flu_score=_dec(rhythm),
+                overall_score=_dec(sc.overall) if sc.overall is not None else None,
+                wpm=_dec(fluency["wpm"]) if fluency else None,
+                details={
+                    "fluency": fluency,
+                    "shadow": sc.as_dict(),
+                    "sentence": sentence,
+                    "word_level": (score.word_level if score else []),
+                },
+                error={}
+                if sc.overall is not None
+                else {"reason": "asr_failed" if not transcript else "score_unavailable"},
+            )
+        )
+        seq_assistant = state.next_seq
+        state.next_seq += 1
+        db.add(
+            ScenarioMessage(
+                session_id=state.session_id,
+                seq=seq_assistant,
+                role="assistant",
+                content=coach or sentence,
+                meta={"kind": "shadow", "coach_note": coach, "prompt_version": 2},
+            )
+        )
+        state.current_turn += 1
+        state.last_action = action
+        db.commit()
+        yield ev.TurnEnd(turn_index=turn_index, score_status=score_status)
+
+        if conclude:
+            summary = f"影子跟读完成，共 {len(sentences)} 句。"
+            report_id = complete_session(state.session_id, llm, summary)
+            state.state = "completed"
+            await get_state_store().put(state)
+            yield ev.SessionEnd(
+                summary=summary,
+                report_id=report_id,
+                metrics={"sentences": len(sentences), "duration_s": None},
+            )
+            return
+        state.state = "awaiting_user"
+        await get_state_store().put(state)
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
 # 工具
 # ---------------------------------------------------------------------------
 async def _safe_score(scorer, audio, reference):
@@ -588,20 +761,6 @@ async def _safe_score(scorer, audio, reference):
         return await scorer.score(audio, reference)
     except Exception:
         return None
-
-
-def _partial_marker_len(s: str) -> int:
-    """chunk 尾部是否为 MARKER 的前缀（跨 chunk 拆分场景）；返回保留长度。"""
-    for k in range(1, len(MARKER)):
-        if s.endswith(MARKER[:k]):
-            return k
-    return 0
-
-
-def _grammar_ok(meta: MetaResult, last_errors: list) -> bool:
-    if meta and meta.grammar:
-        return int(meta.grammar.get("score", 100)) >= 60
-    return True  # 无语法判定时默认"达意"（规则通道已确认说出表达）
 
 
 def _fallback_reply(transcript: str) -> str:
@@ -612,19 +771,30 @@ def _fallback_reply(transcript: str) -> str:
     )
 
 
-async def _conclude_summary(llm: LLMClient, digest: list[str]) -> str:
+async def _conclude_summary(
+    llm: LLMClient, digest: list[str], session_id: int | None = None
+) -> str:
     try:
         content = (
             "Summarize this short speaking practice in one friendly English sentence: "
             f"{' | '.join(digest[-4:])}"
         )
-        return (
-            await llm.chat(
+        fn = getattr(llm, "chat_with_usage", None)
+        if fn is not None:
+            raw, usage = await fn(
                 [{"role": "user", "content": content}],
                 temperature=0.4,
                 max_tokens=80,
             )
-        )[:200]
+            if usage:
+                log_usage("conclude", usage, meta={"session_id": session_id})
+        else:
+            raw = await llm.chat(
+                [{"role": "user", "content": content}],
+                temperature=0.4,
+                max_tokens=80,
+            )
+        return (raw or "")[:200]
     except Exception:
         return "Well done! Keep practicing."
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, ref, watch } from 'vue'
 import { NButton, NLayout, NLayoutContent, NLayoutSider, NMenu, NSelect, NTag } from 'naive-ui'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import type { MenuOption } from 'naive-ui'
 
@@ -13,6 +13,7 @@ import { previewPages } from './registry'
 type PreviewMode = 'gallery' | 'user' | 'admin'
 
 const route = useRoute()
+const router = useRouter()
 
 /**
  * 布局模拟模式（docs/13 §8 盲点修正）：
@@ -70,6 +71,7 @@ function renderMenu(): MenuOption[] {
         class="w-[150px]"
         @update:value="mode = $event"
       />
+      <NButton size="small" quaternary @click="router.push('/demo')">回到 Demo</NButton>
       <NButton size="small" type="primary" secondary @click="mode = 'gallery'">返回画廊</NButton>
     </div>
   </template>
@@ -81,6 +83,11 @@ function renderMenu(): MenuOption[] {
         <span class="inline-block h-3 w-3 rounded-full bg-accent" />
         <span class="font-bold">前端预览画廊</span>
         <NTag size="small" type="warning">DEV ONLY</NTag>
+      </div>
+      <div class="px-2 pb-2">
+        <NButton size="small" quaternary block @click="router.push('/demo')">
+          ← 回到骨架 Demo
+        </NButton>
       </div>
       <n-menu :value="activeKey" :options="renderMenu()" />
       <div class="mt-auto border-t border-[#E5E7EB] px-4 py-3 text-xs leading-relaxed text-[#667085]">

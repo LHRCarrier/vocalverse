@@ -18,6 +18,18 @@ export const previewRoute: RouteRecordRaw | null = import.meta.env.DEV
         { path: '', redirect: '/preview/home' },
         { path: 'home', component: () => import('@/views/preview/HomePreview.vue') },
         {
+          path: 'agent-lab',
+          component: () => import('@/views/preview/AgentLabPreview.vue'),
+        },
+        {
+          path: 'fluency',
+          component: () => import('@/views/preview/FluencyPreview.vue'),
+        },
+        {
+          path: 'shadow',
+          component: () => import('@/views/preview/ShadowPreview.vue'),
+        },
+        {
           path: 'admin-dashboard',
           component: () => import('@/views/preview/AdminDashboardPreview.vue'),
         },

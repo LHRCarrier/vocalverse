@@ -1,4 +1,4 @@
-# VocalVerse · 工作日志
+﻿# VocalVerse · 工作日志
 
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
@@ -168,6 +168,280 @@
 —— 执行人：Faust-sudo
 
 ## 2026-09-09 PR#25 推荐系统落地 · 复审整改与合入（模型同步 / 契约快照 / CI 兜底）
+## 2026-09-04 影子跟读联调台：录音完成 → 试听自己读的 → 确认提交/重录
+
+- 需求（组员复测反馈「方便测试」）：录完先听自己的跟读再提交，避免闭眼提交后才发现录歪；
+- 实现：`ShadowPreview.vue` 录音停止**不再自动提交**——本地 ObjectURL 试听条（原生 audio 控件）+「提交评分 / 重录」按钮；换句/换素材/卸载时 revoke 防泄漏；VoiceRecorder 的 cancel 路径不触发 onStop，仅真实停止才生成试听；
+- 验证：lint（0 warning）/typecheck/vitest 19/build 全绿；dev 模块 transform 200。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-04 评分 DoD ③：META content/vocab 语义子分（LLM 判定 · 进展示不进总分）
+
+打分「链路完成」DoD 剩余三项之③（④ 之后收尾）：
+
+- **契约增量（docs/14 §3.4 + docs/26 同步）**：`[-META-]` 增 `content:{score,note}`（内容相关度/充实度）与 `vocab:{score,note}`（词汇多样性）——**口径 docs/07 Q38 拍板 C 落地**：LLM 判定、进报告展示、**不进量化总分**（S=0.4·发音+0.3·语法+0.3·流利度 不变），避免「语义对错混入口语技能分」；
+- **改动面**：`meta.py`（properties content/vocab + render_meta 扩展，默认 None 不破坏既有调用；**防御：模型输出裸数字/字符串 → None 不伪造**）；`context_builder` system 契约行加字段描述（**system 仍逐字静态**——字段说明属契约正文，docs/26 ⑤ 不变）；`meta_executor` 补偿 prompt（_COMPENSATE_SYSTEM + user 注记）同步；`events.MetaBlock` + SSE 手写类型（sse-types.ts）加 content/vocab；orchestrator（MetaBlock 透出 + assistant 消息 meta 落 content/vocab）；`service.complete_session` 新增 `metrics.semantic`（聚合均分+轮次）；`stubs.FakeLLM` 的 META 带 88/84 子分（全链路可断言）；
+- **前端**：ReportView 评分卡下方加「内容相关度 / 词汇多样性」两卡（标注不含总分；无数据隐藏）；
+- **验证**：pytest **180 passed**（+3：META 解析与防御、补偿 prompt 形状、补偿透传；全链路测试断言 SSE meta_block 带 content/vocab + 报告 semantic={content:88.0/1轮, vocab:84.0/1轮}）+ ruff 全绿；前端 lint/typecheck/vitest 19/build 全绿；
+- **踩坑**：① docs/14 契约行与 system 契约行是我在一天内第三次改「契约文本」——每次都要同时对照 docs/14、docs/26、meta.py 文档字符串与 _STATIC_TEMPLATE 四处，改一处漏一处（本次已四同步）；② 复用了"改 worklog 用标题行做锚点"的老毛病，两次吞掉下一条目标题——本次已逐处核对。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-04 评分 DoD ④：影子跟读/朗读编排分支（ISE 主场 · 三维评分 + 联调测试台）
+
+打分「链路完成」DoD 剩余三项之④（顺序：④→③）：
+
+- **素材基础盘点**：`shadow_materials` 表/迁移 0003/SessionCheck kind=shadow/`AttemptKinds.SHADOW_SPEECH`/推荐链路（type=shadow）**均已存在**，缺的只是生产编排；`seed_recommend` 补了 L2/L3/L4 三条演示素材（text_content/wpm 120/145/165，全仓此前无素材时 recommend_shadow 恒空——本次执行 seed 后验证 count=3）；
+- **评分口径定版（docs/06 §9.3）**：三维 = `0.4·发音(ISE accuracy) + 0.3·语速匹配 + 0.3·停顿密度`；语速匹配（用户 wpm vs 素材原声 wpm）分段 ≤10%→95/≤20%→85/≤35%→70/≤50%→55/其余 40；停顿密度（pause_ratio）≤5%→95/≤10%→85/≤20%→70/≤35%→55/其余 40；素材缺 wpm → 该维缺省按剩余权重归一；**重音落点/连读识别留待 M3 前端韵律引擎（docs/24 ①），登记 P2 不伪造**；
+- **新模块** `app/practice/shadow.py`（分句/分段打分/加权归一/规则教练笔记——LLM 不参与，无 META 泄漏面）；`_shadow_turn` 编排：start（出句+TTS 示范 AudioChunk，不推进）→ normal（ASR 特征 + ISE 题卡参考 → 三维分 → attempt(kind=shadow_speech, details.shadow) → 逐句推进 → 末句 complete_session）；
+- **接入**：`create_session` kind=shadow + `shadow_material_id`（SessionCreate 契约 + 快照刷新，diff 仅该字段）；**顺带修一个潜伏 bug**：`create_session` 的 assembled 引用未初始化 `scenario`（defense 建会话同样踩 UnboundLocalError，只是此前无测试覆盖——本次 shadow 测试立刻抓出）；
+- **联调测试页** `/preview/shadow`（ShadowPreview.vue + registry/router；后端 test-only `shadow_preview.py`：materials/tts（原始字节示范）/analyze，`include_in_schema=False`、默认关闭 `APP_SHADOW_PREVIEW_ENABLED`（本地已开，生产禁止）、删除清单文件尾）；
+- **验证**：pytest **177 passed**（+24：纯函数分段/权重归一/教练档位、start→评分→收尾→报告全链路（fake 数值：wpm=145.83→speed 95、pause 0.3646→40、pron 90→overall 76）、素材 404/缺音频 422、测试台 404+openapi 零路径、analyze Fake 三维）；ruff 全绿；前端 lint/typecheck/vitest 19/build 绿（dist 无 Shadow chunk）；真链路（经 Vite 代理）：materials=3、analyze（ref-3 音频 × 面试题卡句——故意不相配 → pron 7.9/speed 85/pause 70/overall 50，coach "Slow down..."，**口径合理**：错题卡低发音分）；
+- **踩坑**：① PowerShell `$PID` 是保留自动变量，`dev-up.ps1` stop 循环变量撞名 → 服务杀不掉（已改 `$procId`）；② 测试里 SSE JSON 断言别忘了冒号后有空格（`"conclude": false`），与旧代码无空格格式不同。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-04 联调台实测英文歌：链路扛住 + ISE 口语口径守卫（超长降级原因）
+
+- **组员传整曲《阿云嘎 HOY-MIX-Regression.ogg》（3:56 / 236.71s / 9580KB）实测**：试听/转写 179 词/特征全出无崩溃——但数字对唱歌无语义（41.3s「停顿」= 器乐段、2.72s「词」= DTW 拉长，whisper 词级时间戳是口语标定）；ISE 因整篇歌词超长被拒/失败，页面却显示「未评分」，误导；
+- **修复**：`analyze` 增口语口径守卫 —— 音频 >60s（`max_speech_seconds`）→ `audio_too_long`；参考 >300 字符（`MAX_ISE_REF_CHARS`）→ `reference_too_long`；ISE 异常 → `ise_failed`；`score_ref` 保留以表明「已触发评分」；测试台不盲等 ISE；
+- **页面**：ISE 卡黄色提示降级原因；停顿标注对 ≥3s 超长间隙改「可能为器乐段/无词段，非口语停顿」；
+- **口径记录**：唱歌长音频的评分走 M3 音准/节奏链路（sing_attempts/pyin/LRC DTW，docs/singing 22），本测试台只服务口语；这正好实证 docs/19 P0-5「流利度/发音口径不适配唱歌」的一面；
+- **验证**：pytest **153 passed** + ruff 全绿（+2 守卫测试：reference_too_long / 236.7s audio_too_long）；前端 lint/typecheck/vitest 19/build 全绿；真链路：419 字符参考 → `reference_too_long(419 > 300 字符...)`，ref-3 正常路径 overall=90.82 无 error。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-04 联调台加「选中文件即试听」（本地回放，不上传）
+
+- 需求（组员反馈「方便测试」）：选完音频立刻能听，再决定是否分析；
+- 实现：`FluencyPreview.vue` 选择后 `URL.createObjectURL` 生成预览地址 + 原生 `<audio controls>`（显示文件名·大小；更换/卸载时 revoke 防泄漏）——纯浏览器本地回放，不经过后端；
+- 验证：lint/typecheck/vitest 19/build 全绿；dev 模块 transform 200。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-04 测试台 ISE 口径修正（转写对转写开关）+ 开发服务脱离终端起停
+
+- **缘由（组长提问「为什么流利度要有参考文本」）**：区分两种「流利度」——① 时间戳特征（wpm/停顿，纯音频+转写，**无需参考**）；② ISE 流利度分（评测引擎按「音频 vs 给定文本」对齐，**必须有参考**；生产对话口径 = ASR 转写当参考「转写对转写」，朗读/影子跟读才有题卡原文）。
+- **修正**：测试台加「用 ASR 转写作为参考（转写对转写）」勾选**默认开**；后端 `/analyze` 增 `use_transcript_ref` 表单参数（手动 reference 优先），响应增 `score_ref`（manual/transcript/null）供页面标注；不填参考也不再是空评分——实测 ref-3.wav：score_ref=transcript / **overall=90.82 / flu=95.02 / pron=89.39**；未勾选时 score_ref=null（页面提示如何开启）。测试 +2 条（转写对转写、手动参考优先），pytest **151 passed** + ruff 全绿；前端 lint/typecheck/vitest 19/build 全绿。
+- **开发服务起停重构**：uvicorn/mvn/pnpm 作为终端批次任务跑时，关终端弹「Terminate batch job (Y/N)?」且服务随会话死（断网重启后三端全掉）。新增 `scripts/dev-up.ps1`（start/status/stop，**Start-Process 独立进程** + 日志 `local/dev-logs/`；pwsh 7 执行），README 方式 B 增一键起停说明；已验证三端健康（python readyz / java ping / vite 200）。
+- **踩坑**：vite 默认绑 `localhost`（::1），脚本健康探测用 `127.0.0.1` 会 false——已改 localhost（与之前的 5173 访问同坑）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-04 ② 联调发现 BUG：ASR 词级时间戳恒空（生成器二次迭代）已修 + 归档
+
+- **现象**：`/preview/fluency` 上传 ref-2.wav（6.12s）→ 转写文本正确但 words=0、wpm/停顿全零；直接 `WhisperModel.transcribe(word_timestamps=True)` × 同文件却出 11 词——矩阵锁定封装层；
+- **根因**：faster-whisper `transcribe()` 返回**生成器**；`transcribe_sync` 先「拉平文本」（`''.join` 消费殆尽）再「遍历取词」→ 第二次迭代恒空；**旧代码 `ASRResult.segments` 亦恒空**（无消费方、无断言，自 M2 静默存在；直调测试因恰好 `list()` 物化而正常，极具迷惑性）；
+- **修复**：解包后 `segments = list(segments)` 物化一次 + 注释生成器契约（`app/audio/asr.py`）；回归测试 `tests/test_asr_words.py`（假模型返回生成器、断言 word_timestamps 透传+三处消费一致）——**删掉物化行必红（实测 1 failed）→ 恢复绿**；全量 **149 passed** + ruff 全绿；
+- **真链路复验**（重启 :8000）：words=**11** / wpm=**124.06** / pause=**2** / max_pause=**0.96s** / ISE overall=**84.94** flu=89.66 pron=82.01；
+- 归档：`worklog/BUG实测/asr词级时间戳空.md`（复现/根因/修复/验证/踩坑——**faster-whisper 生成器契约：要迭代两次必须先 list()**）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-04 评分 DoD ②：流利度时间戳特征（ASR 词级时间戳 → wpm/停顿 → 落库/报告/联调测试台）
+
+打分「链路完成」DoD 剩余三项之②（2026-09-03 工作日志登记）：
+
+- **特征模块**：`app/audio/fluency.py` 纯函数 `compute_fluency_features`（**恒定键集、坏数据全零兜底、永不抛异常**）——`wpm`（词数/有效说话段分钟，**排除录音首尾静默**）、`articulation_rate`（去停顿纯发音速率）、停顿统计（**相邻词间隙 ≥0.5s 计一次**、≥1.0s 长停顿；仅词间不记首尾静默）、`pause_ratio`；口径 docs/07 Q30（ISE fluency 仍为权威流利度分，本模块只出辅助）；
+- **数据源**：faster-whisper `transcribe(..., word_timestamps=True)` → `ASRResult` 增 `words[{word,start,end,probability}]` + `duration`（契约变更 → `scripts/refresh-openapi.ps1` 刷新 python-openapi.json + `pnpm gen:api` 生成类型，diff 仅 ASRResult 两字段）；`FakeASRClient` 补同构词表（含 1.05s 停顿，测试可断言精确值）；
+- **接入**：对话链路（orchestrator `_dialog_turn`：attempt 写 `wpm` + `details.fluency` + user 消息 meta 带 wpm/pause_count）与入学测试链路（placement `score_item`：同写 + 响应补 wpm）——**修复前 `attempts.wpm` 列恒 NULL**（列自 0001 迁移就存在但从未写入）；
+- **报告**：`service.py` report `metrics.attempts[]` 增 `wpm` + `fluency_features`（前端 `ReportView` 流利度卡下显示「语速 ≈ N 词/分 · 停顿 ≈ M 次/轮」，仅无数据时隐藏）；
+- **联调测试页（新功能固件规范 · 预览机制）**：前端 `views/preview/FluencyPreview.vue`（/preview/fluency，dev-only 生产零体积，已验 dist 无 chunk）+ registry/router 登记；后端 test-only `routes/fluency_preview.py`（POST /api/v1/fluency-preview/analyze：真 ASR→特征→可选真 ISE→与 attempts/report 同构演示载荷），`include_in_schema=False`（契约快照零 diff）、无表无迁移、默认关闭（`APP_FLUENCY_PREVIEW_ENABLED`，本地 .env 已开，生产禁止开启）、删除清单见文件尾注释；页内报告样张按 **lieflat-charts 报告模式 R09 × PORCELAIN** 色值呈现（与 `assets/lieflat/vv-learning-report.html` 同 token）；
+- **验证**：pytest **148 passed**（新增 test_fluency 10 条纯函数 / fluency-preview 3 条（默认 404 + openapi 无该路径）/ asr 契约词表 1 条 / 对话→attempt→complete→report 全链路 1 条：wpm=145.83、pause=1、long=1）+ ruff check/format 全绿；前端 lint/typecheck/vitest 19 passed/build 绿；真链路冒烟（重启 :8000 后 `analyze` + 合成正弦 WAV）code=0 —— 正弦波 whisper 出 0 词级时间戳时特征全零兜底不崩；
+- **踩坑**：① `refresh-openapi.ps1` 被 Windows PowerShell 5.1 以 ANSI 解析报语法错 → 必须用 pwsh 7 执行；② 执行刷新会把 Java 快照重写成压缩单行（live springdoc 未开 pretty-print，契约语义相同但 2343 行噪音 diff）→ 本次 Java 零改动，已 `git checkout` 恢复入库 pretty 版；③ `zip() strict` ruff B905、`import.meta` 等老坑之外，本次 vue-tsc build 门禁抓住 `w.gap` 可能 null（lint/typecheck 不报，build 报——与踩坑③同型「门禁分工」）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-03 ISE 批量对照实证：SpeechOcean762 人工标注 vs ISE（r=0.81，分档单调）
+
+新增 `scripts/poc/ise_validation.py`（gold 对照脚本，本地素材 `local/english-audio/01-speechocean762/` 驱动，gitignored）：按 gold 总分（0-10）抽低/中/高各 30 句（固定种子 42 可复现）→ 逐句真 ISE 评分 → TSV 对比表。
+
+**实测（90/90 成功，0 失败）**：
+- pearson(gold_total → ise_overall) = **0.810**（强相关，发音评测准确性成立）；
+- gold_acc → ise_pron = 0.730；gold_flu → ise_flu = 0.797；
+- 各档 ISE overall 均值：low=**57.17** / mid=**80.39** / high=**88.27** —— 三档完全单调，可作为"水平分档"的实证依据（对应 A2/B1+/C1 近似的语音侧分档）。结论：**ISE 接入可靠性（链路）+ 准确性（对标）双双达标**；打分"链路完成"的 DoD 第①条达成（剩余：流利度时间戳特征、META content/vocab 语义子分、影子跟读编排分支——另排）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-03 讯飞 ISE 真链路接入：旧 HTTP 接口已下线 → 流式版重写（真调用全通）
+
+组长提供 ISE 密钥（APPID/APIKey/APISecret，已写入 gitignored `services/python/.env` 与根 `.env`，不入库）。接入过程（真调用逐级排障）：
+
+- **HTTP 版接口已下线**：`https://ise-api.xfyun.cn/v2/open-ise`（POST form + X-Appid/X-CheckSum MD5 签名）返回 `not found`/403——官方现行文档为**流式版 WebSocket**（`wss://ise-api.xfyun.cn/v2/open-ise`），据此整体重写 `ise.py`；
+- **踩坑链（每级有官方文档依据）**：① WebSocket 握手 401 → url 查询参数通用鉴权（authorization/date/host，HMAC-SHA256，`host:…\ndate:…\nGET /v2/open-ise HTTP/1.1`）；② 每帧 `data.data`（base64）**≤26000 字符**（10163，PCM 每帧 ≤~19KB）；③ **business 必须每帧携带**、common 仅首帧；cmd 按阶段切换：参数帧 `cmd=ssb`（data.status=0）→ 音频帧 `cmd=auw`+`aus=1/2/4`（status=1/1/2，末帧带最后音频块）；每帧全带 business 曾致 `10222 DeadlineExceeded`，仅首帧带则 `30002 cmd needed`；④ 业务参数 `aue` **默认是讯飞定制 speex**，裸 PCM 必须显式 `aue=raw`（40007 SRecWrite）；⑤ 结果帧 `data.data` = **base64(XML)** 而非 JSON；⑥ 文本需 UTF8 BOM 头（`\uFEFF`+text）；⑦ 多维度分需 `rst=entirety`+`ise_unite=1`+`extra_ability=multi_dimension`，真实 XML 里 **sentence 层只有 accuracy_score/fluency_score/standard_score/total_score，integrity_score 只在 read_chapter 层** → 解析器做 chapter 回退；⑧ `score()` 曾漏包 `ScoreResult`（返回 dict）已修。
+- **音频转码**：ISE 只收 16k 单声道 s16le 裸 PCM → `_to_pcm16`（ffmpeg）预处理（编排器传的是原始 WebM 字节）；本机无 ffmpeg → `_ffmpeg_bin` 增加 **imageio-ffmpeg 自带二进制回退**（`uv pip install imageio-ffmpeg`，README 登记的免管理员路径）+ PATH/env 优先。
+- **验证**：① 单测 5 条（转码/分帧/真实 XML 解析/降级），**pytest 132 passed** + ruff 全绿；② 真调用（Windows SAPI 离线 TTS 生成测试音频，规避 edge-tts 偶发 DNS）→ **overall=90.90 / pron=92.59 / flu=87.70 / completeness=100.00 / 词级细评 9 条**；③ 服务端 `/api/v1/score` 走真评分器 → code=0 同分数，全链路通。
+- **边界说明**：当前对话场景以 ASR 转写作为 reference（"转写对转写"，近似发音对齐）；ISE 的真正价值在**有题卡场景**（影子跟读/朗读/M3 唱歌，`category=read_sentence` 已支持，自由题 `category=topic` 可扩展）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-03 预览测试页机制统一修复：Agent Lab 404 根因 + Demo↔预览画廊双向通道
+
+- **BUG1 · Agent Lab 测试台 HTTP 404**（以截图为准，用户口中 401 实为 404）：根因 = `agent_lab_enabled` 默认 False 且本地 `.env` 未设置 → 路由未注册（符合 docs/26 §8 约束：默认关闭、生产禁止开启）；修复 = 本地 gitignored `services/python/.env` 与根 `.env` 追加 `APP_AGENT_LAB_ENABLED=true`（带「生产禁止开启」注释；不提交、不进 CI、生产零暴露不变）。
+- **BUG2 · /preview 画廊不可达且易跳出**：进入预览画廊只能手输路由，测试中误点「真实布局」模式的 TopNav 就回到 demo 应用；修复 = ① `DemoView.vue` 加 DEV-only 面板（`v-if="isDev"`，`isDev = import.meta.env.DEV` 生产折叠不渲染、不进用户导航）：「进入预览画廊」「直达 Agent Lab 测试台」双入口；② `PreviewLayout.vue` 画廊侧栏顶部加「← 回到骨架 Demo」、布局模拟模式浮动条加「回到 Demo」→ Demo 与测试页**双向唯一通道**，任何测试场景下都能一键回画廊/回 Demo。
+- **踩坑**：① 8000 被 uvicorn `--reload` 的**孤儿 worker** 占用——父进程已死，netstat 显示的 PID 31736 是已消失的父进程（taskkill 必失败：找不到进程），真 socket 由子进程 34108（`multiprocessing spawn_main`）持有，杀子进程才释放端口；② 本地 `.env` 开启开关后 **pytest 本地必红**：`test_agent_lab_disabled_returns_404` 经 pydantic-settings 读取 `.env` 导致路由被注册 → 已在 `tests/conftest.py` 钉回 `APP_AGENT_LAB_ENABLED=false`（env 优先级高于 .env；CI 无 .env 行为不变）；③ `import.meta` 不能出现在 SFC 模板表达式（模板按 script 解析 → `vite:vue` 报错）——必须在 `<script setup>` 取常量；该错误 lint/typecheck 均不报，**build 门禁报**（已实测红→绿）。
+- **验证**：① 后端重启（.venv uvicorn 8000，托管后台任务）后 readyz 200 + `POST /api/v1/agent-lab/turn` 真跑 DeepSeek 单轮 → envelope `code 0`（404→200 端到端）；② pytest **124 passed**（含默认关闭断言）+ ruff check / format 全绿（未改后端业务代码，agent-lab 本就 `include_in_schema=False` → 契约快照零 diff）；③ 前端 lint / typecheck / vitest 18 passed / build 绿（生产 dist 无 preview 残留）；④ 已起 dev 环境供复验：后端 8000 + 前端 5173。
+- **BUG3 · 登录页报 `Unexpected end of JSON input`**：Java 服务未启动（8080 无监听，用户停服时只重启了 Python）→ Vite `/manage` 代理返回空体 5xx → `resp.json()` 抛 SyntaxError，页面只显示晦涩的 JSON 解析错误。修复 = ① 重启 Java（`mvn spring-boot:run`，JAVA_HOME 已对齐 Temurin 21；`POST /auth/login` 经代理验证 200/code 0/userId 1）；② `api/client.ts` `request()` 空体/非 JSON 改为抛 `ApiError`（如「Java（登录/管理端）服务不可达（HTTP 500，`/manage/auth/login`）——请确认对应后端已启动」）+ 补单测（修复前该测试必红：抛 SyntaxError），vitest 19 passed。
+- **BUG4 · 单轮结果显示 `[object Object]`、user 卡片空白**：根因 = `/turn` 把 `build_context_for_display()` 的成果 `{system: str, user: str}` **再包了一层** → `data.system` 变成 `{system,user}` 对象（NCode 渲染 [object Object]），`data.user` 根本不存在（卡片空白）。修复 = 展示载荷扁平化 `{**display, "result": ...}`（前端本就按字符串渲染原文，无需改前端）+ 回归单测 `test_display_payload_is_flat_text`（修复前该断言必红）。另记：reply 尾部偶见 `[`（如 `...today? [`）为**模型侧多余输出**（正文末尾多写 `[` 后才写 `[-META-]`），META 抽取不受影响（meta_ok=True / coach_note / grammar / hits 皆正常）——先记录不干预（POC 语义），如需净化可在 splitter 加「marker 前仅剩 `[` 行则丢弃」的小规则。
+- **BUG5 · 冒烟连跑五轮：reply 尾部全带 `[` + 末轮 conclude=false**：① reply 尾 `[` 根因 = `context_builder` 模板 `[{marker}]` 渲染成 `[[-META-]]`——模型逐字照抄：外层 `[` 落进正文（每轮 reply 尾多一个 `[`，你截图 5/5 全中）、外层 `]` 落在 meta 尾段靠兜底正则吞掉（META 仍解析，掩盖了契约偏差）；契约行应为裸 `[-META-]`（meta.py 文档同款）→ 已改 + 回归单测（断言无 `[[-META-]]`，修复前必红）；② 末轮 conclude=false 根因 = `/turns` 全轮共用表单 `concluded_by_turn`（默认 False）→ 冒烟第 5 轮上下文永远「Turn limit reached: False」→ conclude 必 false；已改为 POC 冒烟同款 `_effective_by_turn`（**末轮自动 True**；勾选保持全轮 True）+ 单测 + 页面说明（连跑冒烟末轮自动注入，无需勾选）。**验证**：后端重启后重跑 5 轮冒烟——reply 全部无 `[`、第 5 轮 conclude=**True**、补偿后 META 100%、tokens 1706p/391c；**观察项**：本轮 META 直出 1/5（补偿 4/5，补偿率 80% 偏离 <50% 目标）——docs/26 §9 观察带 40~75%，n=5 样本小且上一轮直出 4/5，先记录、多跑几轮看分布；若持续走高按 §11.4 顺序查契约/补偿 prompt。
+- **BUG6 · 单轮卡片 system `[object Object]`（与 BUG4 同因，page 未刷新）**：5 轮跑完截图里 system/user 卡仍是**修复前的旧结果**（本回合结果 1233ms 与上轮完全相同）——连跑 `/turns` 不更新单轮卡，需重跑「运行单轮」或刷新页面。
+- **改动清单**（10 个跟踪文件）：`apps/web/src/views/DemoView.vue`、`apps/web/src/views/preview/PreviewLayout.vue`、`apps/web/src/views/preview/AgentLabPreview.vue`、`apps/web/src/api/client.ts`、`apps/web/src/api/client.test.ts`、`services/python/app/api/routes/agent_lab.py`、`services/python/app/agent/runtime/context_builder.py`、`services/python/tests/test_agent_lab.py`、`services/python/tests/agent/test_context_builder.py`、`services/python/tests/conftest.py`；`*/.env` 为 gitignored 本地开关，不提交。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-03 PR#26 管理员直推合入 main（组内无人审 PR，组长行政决定）
+
+组长决定：团队成员不参与 PR 评审，**管理员方式直推 main**（`gh pr merge --admin --squash --delete-branch`，合并 commit `ee8e7ae`，PR#26 = feat(agent): LLM 框架 P0 内核（ai4u 对齐分层切片））。
+
+- **合入前核查（AGENTS.md「先查 CI 是否真的跑过」）**：python-ci 曾 1 次红（12s 失败）——根因 `test_orchestrator_compensate.py` 的 lint 修复（F811 重复导入/F841 sc_id）在工作区未提交 + `agent_lab.py` usage 字段漏 add（**又一次路径白名单遗漏**，已补 commit `802c2ad`）；补推后 **python-ci / frontend-ci / secret-scan 全 success** 才执行合并；
+- **合入内容**：LLM 框架 P0 内核 + META 契约 v2.2 + 补偿调用接线 + Agent Lab 测试台 + 摘要双轨/usage_log（迁移 0004）+ 文档群（docs/10 19+2、docs/14 v2.2、docs/24/25/26、worklog 若干）；本地全量 124 passed + ruff 全清（main 上复核通过）；
+- **直推后流程说明**：后续新 PR 仍按规范开（留痕/可追溯），合入由组长按本次模式 admin squash（CI 全绿为前提）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-03 补齐遗漏：orchestrator × META 补偿接线（未提交缺口，红→绿验证）
+
+组长发现工作区有未提交文件：上批提交 `git add` 只圈了 `app/agent`，**漏了 `app/practice/orchestrator.py` 的补偿接线**（import + 调用块）——已提交版本中原生链路「流式未出 META → 补偿调用」从未生效（框架冒烟通过是因为脚本自身调了 compensate，生产 orchestrator 没调）。本次补齐：
+
+- `orchestrator._dialog_turn`：`if not meta.ok → compensate_meta(...)`（docs/26 §9.4 设计原样）；
+- 补接线回归测试 `tests/agent/test_orchestrator_compensate.py`（NoMetaLLM 流 + 合法 JSON chat）：**接线前必红（coach_note=None）、接线后绿**（已实测红→绿）；
+- 全量 pytest **118 passed**。
+
+踩坑：**跨目录批次提交时，`git add` 的路径白名单不是「整个功能」**——`app/agent` 与 `app/practice` 分属两个目录，漏一个目录就是静默功能缺口；下次提交用 `git status` 全量核对而非凭记忆圈路径。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-03 缺口补齐：摘要双轨落库 + usage_log 用量记账（迁移 0004）+ Agent Lab 指标化
+
+按 docs/26 §10.3 两个缺口实施（组长拍板「缺口补上」）：
+
+- **① 会话摘要落库**：`sessions` 加 `summary/summary_updated_at/summary_failed_at` 三列（迁移 0004，对齐 ai4u agent_conversation.summary*）；`app/agent/domains/summarizer.py`（ai4u summarizer 版：近 6 条原文 + 更早 40 条窗口 + 每 4 条增量触发 + 首尾保底 300/100 + 重试 1 次 + 失败标记；回合落库后异步触发、收尾 `complete_session` 覆盖写最终总结）；**注入 ContextBuilder 的 user 尾部 `[context]`**（`Rolling summary` 行——绝不放 system，POC §9 铁证）；
+- **② usage_log 用量表**：迁移 0004 新表 + `app/agent/domains/usage.py log_usage`；`llm.py` 增 `chat_with_usage/stream_rich`（usage 透传）、`stubs.FakeLLMClient.stream_rich` 同型；记账点 = turn（TurnRunner 富流）/ meta_compensate / summary / conclude 四点；
+- **Agent Lab 指标化**：连跑统计加 tokens、页面顶部「指标说明」卡（怎么用/测什么/八项指标口径与阈值）；docs/26 增 §11 测试指南、§10.3 状态更新 + §10.4 摘要口径；docs/10 表清单（19+2）与写方矩阵同步；EXPECTED_TABLES + usage_log；
+- **验证**：pytest **124 passed**（摘要触发/失败标记/用量落库/迁移 offline 渲染（batch 仅 downgrade）/富流用量）；ruff + format 全清；
+- **踩坑**：① `may_be_summarize` 首版用 `len(recent)<=RECENT_N` 判定导致永远早退（recent 被 LIMIT 截断）→ 改总消息数判定；② `op.create_table` 用 `*_pki()` 展开 + 无显式 PK → offline `--sql` 渲染 `getitem` NotImplementedError → 对齐 0003 样式（显式 PrimaryKeyConstraint + `length=` 形参）后通过。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-03 协作流程固化：新功能必须带联调测试页（AGENTS.md 第 3 条）
+
+组长拍板固化为仓库纪律：**凡开发涉及前后端联动的新功能，必须按既有预览机制提供「团队联调测试页（可删无影响）」**（AGENTS.md 工作流程第 3 条，新增「审 PR 检查项」同步）。规范要点：
+
+- **前端**：docs/13 §8 预览工作流（`views/preview/` + `registry.ts` 一行 + `router/preview.ts` 一行；dev-only 子树，生产构建零体积零路由）；
+- **后端**：test-only 接口模板（`include_in_schema=False` 契约快照零 diff、无表无迁移、`*_enabled=False` 默认不注册、生产禁止开启）；
+- **可删无影响**：删除清单写入接口文件尾注释；删除后全量门禁绿 + 契约快照零 diff；
+- **首例模板**：Agent Lab（PR#26）——`AgentLabPreview.vue` + `app/api/routes/agent_lab.py`，后续新页克隆改造。
+- 审 PR 检查项：涉前后端联动功能 PR 缺联调测试页或删除清单 → comment 要求补。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-03 Agent Lab · LLM 框架测试台（团队测试用，整删无影响）
+
+按组长要求「做一个前端测试页，专供团队测试、不影响其它代码、删除无影响」，落地 **Agent Lab**：
+
+- **前端**：`apps/web/src/views/preview/AgentLabPreview.vue`（预览工作流 docs/13 §8：dev-only 子树，生产构建 Rollup 整枝剔除——零体积零路由；注册表 + 路由各 +1 行）。能力：单轮实验（真 LLM）/连跑 5 轮冒烟（META 直出 vs 补偿、命中、收尾、统计）/system-user 原文查看（验证「system 全静态」契约）/学习者画像只读查看；
+- **后端**：`app/api/routes/agent_lab.py`（`include_in_schema=False` → OpenAPI 契约快照零 diff；无表无迁移；`agent_lab_enabled=False` 默认关闭、未开启路由不注册 → 404）；`GET /agent-lab/turn` `POST /agent-lab/turns` `GET /agent-lab/learner`；
+- **验证**：pytest 117 passed（含默认关闭 404 + 契约无 agent-lab 路径 + Fake 流式 META/无 META 补偿两路径）；ruff 全清；前端 lint/typecheck/test:run/build 全绿（后台跑毕确认）；**开启方式**：本地 `APP_AGENT_LAB_ENABLED=true`（生产必须保持关闭）；
+- **删除清单**（已写入 agent_lab.py 文件尾注释）：删 vue 文件 + registry/路由各 1 行 + 后端路由文件 + main.py 2 行 + config 1 行 —— 无迁移/无契约影响。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-03 LLM 框架 P0 · 真 Key POC 实证与 META 契约 v2.2 定案（PR#26）
+
+组长提供 DeepSeek Key 后，框架切片首次真实现跑，60+ 次调用得出**推翻两处原设计的实证结论**（详见 docs/26 §9）：
+
+- **POC-2（流式 META 稳定性）初判 35% < 90% FAIL**（docs/18 预案=回退两调用）→ 四臂探针定位真因：**system 内动态 context 块是 META 契约杀手**（D=0% / D1=50% / E3=0%；A/C 静态无动态=100%，流式无影响）→ 初判推倒，无需回退全两调用；
+- **契约 v2.2 定案**：system 纯静态（角色/规则/conclude 指令/输出契约）；动态全部挂 **user 尾部 `[context]`**（难度/语料[仅英文，剥离 `|中文释义` 污染]/画像/已命中/收尾/摘要）；**META 缺失条件补偿调用**（temperature 0.2）→ 全链路冒烟 **5/5 = 100%**（流式直出 3 + 补偿 2），hits/conclude 全部正确；
+- **缓存 POC：NO-CACHE**（预热→300s 落盘→相同前缀，hit=0）→ ⑤ 收益重定位：「前缀稳定=契约稳定工程」（100% vs 0% 的实证差距），**缓存降费不作依赖、不进答辩主张**；`llm_cache_hit.py` 保留复测；
+- **防御补丁**：模型输出 `grammar:90` 裸数字（META 畸形）→ 旧代码会崩溃（冒烟实测抓出），已加 dict 防御并补测试；
+- 新 POC 脚本 3 份入库（ab 探针/框架冒烟/缓存验证，无 Key skip；llm_meta_ab 四臂矩阵可复跑）；
+- 门禁：pytest 114 passed / ruff 全清 / format 全清；PR#26 已 push 第 2~3 批 commit（代码+测试+docs 分开），POC 结果已回写 PR comment。
+
+**待办**：次日 reviewer 评审合并；`docs/24 §9`（B 系列）随前端重构推进；group 拍板 retry 命中口径（docs/14 §2.1 注释 vs 实现）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-03 LLM 框架对齐 ai4u · 评估与实施计划（docs/26）
+
+组长拍板方向：LLM 部分不做小改，做成组内自研 ai4u 那样的分层框架（ai4u = 组长自研 Electron+Vue3+NestJS 桌面 AI 伴侣，`F:\WorkingL\ai4u`，Agent 运行时自研分层架构）。通读 ai4u 源码与 `docs/agent/` 后输出评估：
+
+- **结论：可以，架构模式迁移而非代码拷贝**（技术栈不同 + ai4u 无 LICENSE/含外部素材，仅借分层思想，代码全部 VocalVerse 自研；不改任何对外契约，M2 DoD 测试全绿为硬门禁）；
+- **映射**：scenes（dialog/defense 门面化）→ runtime（TurnRunner 流式循环+META 泄漏门 / ContextBuilder 单一入口（并入 docs/24 ⑤⑥）/ MetaExecutor 结构化输出权威 / MessageSink 落库门面）→ domains（**学习者记忆域**：mastery/skill/attempts → 易错点检索注入 + 摘要双轨 + Auto-memory 收尾写入）/ persona（双人格模板化）→ hooks（post-session/失效/兜底）→ core（llm + usage 记账，含 prompt_cache_hit_tokens）；
+- **不迁移**：proactive（主动消息）/IM/TRPG/journal/来信/RAG 知识库/多角色——产品定位不匹配；「记忆」= 学习者画像而非情感记忆；
+- **分期**：P0 内核（框架壳+ContextBuilder+MetaExecutor+TurnRunner+hooks+usage ≈2.5~3.5 人日，docs/24 A 系列并入）→ P1 memory 双轨（④摘要+Auto-memory+画像升级）→ P2 persona/场景收敛；
+- **RAG 无自有知识库**：VocalVerse 语料走场景绑定，不迁知识库/RAG。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-03 InternalBeyond 对比调研 · 结果核验与落地计划（docs/24）
+组员在 `local/InternalBeyond对比与借鉴分析.md` 提交对 Sui-IB/InternalBeyond（单文件离线个人网站，V2.6.2 @ 2026-09-01）的对比调研；组长要求核验可行性与制定落地计划：
+
+- **核验**（下载 IB `InternalBeyond.html` 2.4MB 逐行比对 + LICENSE 原文 + DeepSeek 官方缓存文档）：
+  - IB 侧 18 处行号引用**全部精准命中**（仅 1 处笔误：`prompt_cache_key` 实为 11663，非 14663）；
+  - 许可确凿：代码 PolyForm Noncommercial 1.0.0（商用需作者书面授权）、视觉素材/文档 CC BY-NC-SA 4.0、项目标识不作商标授权 → 结论「只借算法思路、不拷代码素材」合规成立；
+  - VocalVerse 侧引用（ise.py/asr.py/tts.py/audio.py/recorder.ts 行号、SSE 协议、8 轮上限、课程项目定位、mastery/skill 模块）**全部属实**；
+  - 修正 3 处：⑤ 的 cache_control/prompt_cache_key 是 IB 多供应商适配，DeepSeek 官方缓存**全自动无需参数**；⑥ 本仓已有遗忘半衰期/句级掌握度，缺的仅是「检索注入」，投入中→低；② `webkitSpeechRecognition` 依赖 Google 服务器国内不可用、whisper RTF 已达标，边际价值低。
+- **产出**：`docs/24-InternalBeyond借鉴落地计划.md`（已登记 README 索引）——范围裁定（⑤前缀缓存+⑥画像注入+①韵律引擎 P0；④摘要可选；②③登记前瞻；⑦报告导出 P2）；落点 = `practice/service.py:356 build_llm_context` 拆条 + 新增 `app/practice/learner.py` + 前端 `apps/web/src/audio/prosody.ts`（拍板确认浏览器端 TS 版）；任务分解合计 ≈3.3~4.3 人日（不占 M3 唱歌/前端重构主线）；PR 拆分 6 条；验收含「两次调用前缀逐字节一致」「合成信号 vitest ≥6 用例，修复前必失败」；风险回退表 + 5 个拍板点（P1 启动窗口 / P2 B3 契约落库 / P3 运行摘要 / P4 注入强度）。
+- **进展（2026-09-03）**：计划升级 **v2 详细实施版**（单人今日执行）→ 三路子代理火力拷问完成 → **v3 修订定稿**（`docs/25-InternalBeyond落地计划拷问报告.md` 落档，README 索引已登记）。三官裁决：全量 A+B 6.5h 不可行 → 今日硬底线 = **A 系列（拆条+画像注入+6 pytest+ POC skip 路径）PR1 就绪待审（今日不合并，自评 comment + 挂 reviewer）**，B 系列降级（引擎骨架 + 全静音/纯音高 2 用例）；P0×6/P1×12 全部落地 v3（conclude 指令保留、P1 锚点改子串断言、VAD 线性域、f0 最小滞后、Python 侧聚合、白名单谓词、回退二选一、dotenv、日期误标更正等）。
+- **组长拍板（2026-09-03 追加）**：LLM 框架优先——今日范围 = **A 系列全量 + 真 Key 验证**（POC-2 流式 META 实跑 + 缓存命中实测，LLM 链路从未真 Key 跑过），**B 系列整体顺延**（随 docs/23 前端重构波次，按 §2 设计定稿实施）。
+- **二次追加（2026-09-03）**：方向升级为**对齐 ai4u 分层框架**（docs/26）——拍板采纳 §4 分期、今日按 §8「P0 内核最小切片」（ContextBuilder+MetaExecutor+TurnRunner 抽取 + learner 域基础版（含 ⑤⑥）+ META 泄漏门 + 最小 hooks；MessageSink/usage 顺延 P1）、usage 仅日志、答辩话术不透露 ai4u 仓库细节；**真 Key 实跑与框架切片同天完成**。docs/24 A 系列实现方式被 docs/26 §8 取代（目标不变）。
+- **待办**：按 docs/24 v3 §3 时间块开工（09:30 起，今日 PR1 就绪待审）；PR 合并等次日 reviewer。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+
+## 2026-09-03 修复：lieflat 学习报表雷达图点击重播后空白（BUG 实测入库）
+
+用户报告 `vv-learning-report.html` 雷达图点击重播后消失、其余图正常。根因是本文件把两条正本
+reveal 路径混用：带 `n.innerHTML=''` 的 obsReveal（basics/lupi 正本，SVG 专用）套到了 ECharts
+雷达上——重播时先把 zrender 挂载的 canvas DOM 拔掉，eReveal 拿回残留实例 `clear+setOption`
+不会重建 DOM → 空白。修复为 glance-porcelain.html 正本路径（obsReveal 不清空 + eReveal 复用实例，
+SVG 图在各自 fn 开头自清空），与看板文件路径一致。
+
+验证：无头 Edge 自动点击重播冒烟——修复前逻辑 canvas 数 0（必红），修复后 1（与缺陷一一对应）；
+前端门禁 lint/typecheck/test:run/build 全绿；`node --check` 抽检通过。详见 `worklog/BUG实测/lieflat雷达重播失效.md`
+（含坑 29：共用 reveal 的清空策略必须匹配图引擎）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-02 唱歌相关文档归档 `docs/singing/`（组长要求整理）
+
+组长要求把唱歌相关文档统一收纳：新建模块目录 `docs/singing/`，迁入 7 份文件（原 `docs/22-*` 6 份 + 原 `docs/audit/英文歌打分-…轴线D…` 1 份；文件名与内容除路径引用外零改动）：
+
+- `docs/singing/22-英文歌打分系统集成拷问报告.md`（主报告）+ `-轴线A/B/C/E/F.md`（轴 A 算法 / B 契约 / C 数据 / E 前端 / F 运维）
+- `docs/singing/英文歌打分-系统集成拷问-轴线D-离线参考旋律提取与Java薄管理端边界.md`（轴 D 离线提取 × Java 边界；原按「音频类 → docs/audit」落位，现随唱歌模块归组）
+
+同步更新交叉引用：主报告/轴文件内互相引用路径、README 文档索引 7 行、docs/23 与 worklog 中的路径提及（已 grep 全仓验证 **0 处残留** `docs/22` / `docs/audit/英文歌` 旧路径）。唱歌文档均属 `docs/singing/` 子模块，编号 22 保留原样以便追溯；docs/23（前端重构调研）留在 `docs/` 根（其余系列文档与其并列，非唱歌模块）。
+
+—— 执行人：LHRCarrier
+
+## 2026-09-02 前端重构 · 市场同类设计调研（docs/23 · M3/M4 前置）
+
+组长提出「重新构建前端」，先做市场调研再动手。产出《前端重构市场设计调研报告》（`docs/23-前端重构市场设计调研报告.md`，已登记 README 文档索引）：
+
+- **现状盘点**：技术栈（Vue3.5+TS strict+Vite6+naive-ui+UnoCSS+Pinia+ECharts/p5/d3 + openapi 双快照生成）与页面表；引用 docs/19-M2 的 9 个 P0 交互问题与 FTUE 账（8 次点击 / 15s 强制等待 ≈ 90~120s 才开口）——**结论：重构主战场是交互层与信息架构，不是换皮**。
+- **商业调研**：① AI 口语类（Speak：目标清单/三级提示/无惩罚重说/轻纠正重复盘/开口量仪表盘——七条行业标配；ELSA：音素级 + CEFR 对齐 93.88% 可信度路线；流利说/Laoora/Praktika/BoldVoice/Duolingo Max Video Call 速览）；② 游戏化类（Duolingo 设计系统：Feather Green 色系/Nunito/路径/streak/任务/联赛，佐证 docs/13 方向；报表可视化 6 手法）；③ K 歌类（全民K歌/唱吧/Smule/Yousician/UltraStar/nightingale：滚动歌词/逐句色卡/音高双轨/分享卡/练唱两段式）。
+- **开源与技术**：LibreLingo（活跃度低，价值有限）；nightingale 与 docs/06 §9.4 口径同构（音高曲线 vs 参考旋律 + 星级 + 榜单）；AI 对话前端 8 条可迁移模式（LobeChat/Open WebUI/chat-ui 系）；管理端模板对照（naive-ui-admin 最省）；音频可视化选型（AnalyserNode 真波形 / wavesurfer.js 回放 / pitchy 实时音高 / D3 自绘音高曲线，勿用图表库）；移动端 8 条硬约束（iOS 手势内 getUserMedia、AudioContext suspended、autoplay 策略等）。
+- **重构建议**：四象限（P0 交互修复 → IA 重排 → 对话页 Speak 化 → 视觉收尾 → M3 页面）；推荐信息架构（新首页免登录试用卡/路径化 hub/激励三件套）；逐页设计参照表（首页/hub/对话/报告/唱歌/报表/管理端）；技术决策表（**保留** Vue3+naive-ui+UnoCSS 全栈，新增 AnalyserNode/wavesurfer/pitchy，SSE 状态机重做）；5 阶段 ≈9~12 人日；答辩口径。
+- **联动**：唱歌页设计依赖 docs/singing/22-英文歌打分系统集成拷问报告 已列 P0 未决项（逐帧 F0 是否落库等），前端 /sing 先静态高保真，等拍板。
+
+—— 执行人：LHRCarrier
+
+## 2026-09-02 英文歌打分模块 · 系统集成拷问（M3 预热）—— 前端架构调研员（AI 代笔）
+
+按组长分工「英文歌打分我们来做，参考 nightingale；Python 端做模块、Java 端只做薄管理端」，对 M3 唱歌模块做了**系统集成拷问**并成文档（供组员参阅）：
+
+- **产出**（均已登记 README 文档索引）：
+  - `docs/singing/22-英文歌打分系统集成拷问报告.md`——**主报告**：六轴（A 算法 / B 契约 / C 数据 / D 离线提取与 Java 边界 / E 前端 / F 运维）汇总 + 未决缺口 P0~P3 决策表 + 建议实施顺序。
+  - `docs/singing/22-…-轴线A/B/C/E/F.md` 与 `docs/singing/…-轴线D….md`——六轴逐问 Q/A 完整原文。
+- **关键结论**：schema（`songs/lrc/song_pitch_refs/sing_attempts`）与评分口径（docs/06 §9.4：`0.5音准+0.2节奏+0.3发音`、pyin、DTW）**已定稿并迁移**，但**实现层全空**（无评分器/无参考旋律提取器/无端点/`create_session` 不认 sing/无 song_id）。
+- **P0 阻塞（需组长拍板）**：① 参考旋律输入轨未定义（`songs.audio_url` 是本地路径、无独立人声/分离产物/无 `vocal_ref_url`）；② 用户逐帧 F0 是否落库（决定 D3 音准图能否画 & 评分器输出契约）；③ `songs.pitch_ref_status` 写归属冲突（songs 属 Java 独占、M-1 角色只授 Python SELECT → Python 物理写不了该列）。另：**逐句 ISE 发音限流配额炸弹**（一首歌 ≈几十句会打穿 60/h 桶）。
+- **踩坑**：`docs/21` 的 `sessions.kind∈practice/defense/placement` 与模型 `SessionKinds(dialog/sing/defense)` 矛盾；`SingAttempt` 已建模（勿再当「未建模」）。
+
+—— 执行人：前端架构调研员（AI 代笔；**正式署名待组长确认**，勿以本条目作为个人署名依据）
+
+## 2026-09-02 PR#25 推荐系统落地 · 复审整改与合入（模型同步 / 契约快照 / CI 兜底）
 
 复审发现并修复 3 个阻断项（评审结论见 PR#25 review，2026-09-02）：
 1. **模型-迁移不同步**：迁移 0003 已扩 `sessions.kind='shadow'`、新增 `sessions.shadow_material_id`、扩 `attempts.kind='shadow_speech'`，但 `models/practice.py` 未同步 → shadow 会话落库 CHECK 违约；`mastery/service.py` 读 `session.shadow_material_id` 抛 AttributeError 被收尾钩子吞掉（动态水平/掌握度静默不更新）。已补模型同步 + 2 条回归测试（`tests/mastery/test_session_model_sync.py`：修复前 2 failed，修复后绿）。

@@ -1434,6 +1434,19 @@
             },
             "type": "array",
             "title": "Segments"
+          },
+          "words": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Words"
+          },
+          "duration": {
+            "type": "number",
+            "title": "Duration",
+            "default": 0.0
           }
         },
         "type": "object",
@@ -1974,6 +1987,17 @@
               }
             ],
             "title": "Turn Limit"
+          },
+          "shadow_material_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shadow Material Id"
           }
         },
         "type": "object",

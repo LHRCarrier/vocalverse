@@ -462,6 +462,15 @@ export interface components {
             segments?: {
                 [key: string]: unknown;
             }[];
+            /** Words */
+            words?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Duration
+             * @default 0
+             */
+            duration: number;
         };
         /** Body_asr_api_v1_asr_post */
         Body_asr_api_v1_asr_post: {
@@ -682,6 +691,8 @@ export interface components {
             difficulty?: number | null;
             /** Turn Limit */
             turn_limit?: number | null;
+            /** Shadow Material Id */
+            shadow_material_id?: number | null;
         };
         /**
          * TTSResult

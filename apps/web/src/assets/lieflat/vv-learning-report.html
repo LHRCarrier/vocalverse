@@ -217,9 +217,12 @@ const alpha=(h,a)=>h[0]==='#'?'rgba('+[0,2,4].map(i=>parseInt(h.slice(1).substr(
 const tipLight={backgroundColor:TXT,borderWidth:0,textStyle:{color:BG,fontFamily:'Inter',fontSize:12},padding:[10,14]};
 
 const timers={};
+/* reveal（glance-porcelain.html 正本路径）：不清空目标 DOM——
+   ECharts 图重播要复用实例（clear+setOption），innerHTML='' 会拔掉
+   zrender 的 DOM 导致重播后空白（踩坑 29）；SVG 图在各自 fn 开头清空。 */
 const obsReveal=(id,fn)=>{
   const n=document.getElementById(id);
-  const go=()=>{(timers[id]||[]).forEach(clearInterval);timers[id]=[];n.innerHTML='';fn(n)};
+  const go=()=>{(timers[id]||[]).forEach(clearInterval);timers[id]=[];fn(n)};
   const io=new IntersectionObserver(es=>{if(es[0].isIntersecting){go();io.disconnect()}},{threshold:.3});
   io.observe(n);n.style.cursor='pointer';n.addEventListener('click',go);
 };
@@ -233,6 +236,7 @@ const eReveal=(id,opt)=>obsReveal(id,elDom=>{
 (()=>{
 const NODE=[['开口',40],['评分',236],['反馈',420],['提升',580]];
 obsReveal('flow',s=>{
+  s.innerHTML='';
   const OY=178;
   el(s,'line',{x1:16,y1:OY,x2:604,y2:OY,stroke:GRID,'stroke-width':.8,class:'fade'});
   const O=NODE[0][1];
@@ -291,6 +295,7 @@ eReveal('radar',{
 const N=30;
 const val=d=>74+8*Math.sin(d/6)+5*Math.sin(d/2.3)+rnd(d+1,5)*8+d*.42;
 obsReveal('dayline',s=>{
+  s.innerHTML='';
   const x=d=>30+d*11.7,base=262,map=v=>base-v*2.15;
   for(let d=0;d<N;d++)
     el(s,'line',{x1:x(d),y1:base,x2:x(d),y2:base-7,stroke:FLOOR,'stroke-width':.6,
@@ -330,6 +335,7 @@ obsReveal('dayline',s=>{
 (()=>{
 const D=[['场景对话',43,CAT4[0]],['唱歌',29,CAT4[1]],['答辩',16,CAT4[2]],['入学复测',12,CAT4[3]]];
 obsReveal('tickdonut',s=>{
+  s.innerHTML='';
   const cx=200,cy=148,R0=64;
   let k0=0;
   D.forEach(([name,v,shade],si)=>{
@@ -371,6 +377,7 @@ obsReveal('tickdonut',s=>{
 (()=>{
 const ASK=[['重音与弱读',46],['时态一致性',41],['语态错误',34],['冠词使用',28]];
 obsReveal('tally',s=>{
+  s.innerHTML='';
   const VS=ASK.map(a=>a[1]),topI=VS.indexOf(Math.max(...VS));
   ASK.forEach(([name,v],i)=>{
     const base=72+i*58;

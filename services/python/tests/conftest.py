@@ -9,6 +9,15 @@ os.environ.setdefault("APP_TESTING", "true")
 os.environ.setdefault("APP_DATABASE_URL", "sqlite+pysqlite:///:memory:")
 os.environ.setdefault("APP_JWT_SECRET", "vocalverse-dev-jwt-secret-0123456789abcdef")
 os.environ.setdefault("APP_AUDIO_DIR", "./data/audio-test")
+# Agent Lab 测试台：即使本地 .env 开启 APP_AGENT_LAB_ENABLED=true，测试环境也钉回默认关闭
+# （test_agent_lab_disabled_returns_404 断言路由 404；env 变量优先级高于 .env）
+os.environ.setdefault("APP_AGENT_LAB_ENABLED", "false")
+# 流利度特征测试台同规格：默认关闭钉回（test_fluency_preview_disabled_returns_404）
+os.environ.setdefault("APP_FLUENCY_PREVIEW_ENABLED", "false")
+# 影子跟读测试台同规格：默认关闭钉回（test_shadow_preview_disabled_returns_404）
+os.environ.setdefault("APP_SHADOW_PREVIEW_ENABLED", "false")
+
+import shutil  # noqa: E402
 
 import pytest  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
@@ -27,6 +36,11 @@ def _fresh_db():
     """
     reset_engine()
     create_all_for_tests()
+    # 音频目录隔离（BUG：见 worklog/BUG实测/音频残留过期410flaky.md）——
+    # save_audio_bytes 对已存在文件不更新 mtime（sha1 去重），data/audio-test 残留的
+    # 过期 mtime 旧文件会在 GET /audio 先判 410 并惰性删除，导致
+    # test_save_audio_and_ownership 全量跑时红、单跑时绿（顺序依赖 flaky）。
+    shutil.rmtree(get_settings().audio_dir, ignore_errors=True)
     yield
 
 

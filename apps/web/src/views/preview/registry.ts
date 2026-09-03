@@ -12,6 +12,19 @@ export interface PreviewPage {
 
 export const previewPages: PreviewPage[] = [
   { path: '/preview/home', label: '学习主页', group: '用户端', layout: 'user' },
+  { path: '/preview/agent-lab', label: 'Agent Lab · LLM 框架测试台', group: '用户端', layout: 'gallery' },
+  {
+    path: '/preview/fluency',
+    label: '流利度特征 · 联调测试台（docs/06 §9.3）',
+    group: '用户端',
+    layout: 'gallery',
+  },
+  {
+    path: '/preview/shadow',
+    label: '影子跟读 · 联调测试台（DoD ④）',
+    group: '用户端',
+    layout: 'gallery',
+  },
   { path: '/preview/admin-dashboard', label: '评价看板（可视化）', group: '管理端', layout: 'admin' },
   { path: '/preview/admin-users', label: '用户管理', group: '管理端', layout: 'admin' },
   { path: '/preview/lieflat', label: 'Lieflat 表盘（高保真）', group: '管理端', layout: 'gallery' },

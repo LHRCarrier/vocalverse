@@ -95,6 +95,15 @@ mvn spring-boot:run
 ```
 
 > ⚠️ 方式 B 与方式 A 端口相同（8000/8080），**不要同时起**；各服务更多细节见 `services/*/README.md`。
+>
+> 💡 **一键起停（推荐，2026-09-04 起）**：三端用**独立进程**启动（日志 `local/dev-logs/`，gitignored），
+> 关终端不会再弹「Terminate batch job」：
+> ```powershell
+> pwsh -File scripts/dev-up.ps1 start    # 启动三端 + 健康等待（电脑重启/断网后重跑一次即可）
+> pwsh -File scripts/dev-up.ps1 status   # 查看监听与健康
+> pwsh -File scripts/dev-up.ps1 stop     # 按端口杀三端
+> ```
+> 注意：Windows PowerShell 5.1 会因 UTF-8 解析报错，必须用 `pwsh`（7）执行。
 
 ### 4. 启动成功判定（验收清单）
 
@@ -164,6 +173,17 @@ worklog/          团队工作日志（VocalVerse工作日志.md，按日追加�
 | `docs/19-*.md` | 六路拷问报告：需求调研里程碑的架构/UX/商业合规拷问 + 竞品深度分析（流利说/Speak） |
 | `docs/20-系统架构设计说明书.md` | **系统设计①**：五层划分/应用内分层/服务边界/写方唯一性矩阵 + 守护机制设计（M-1~M-4）/3 张 Mermaid DFD/P0 目标态排期表 |
 | `docs/21-接口设计说明书.md` | **系统设计②**：OpenAPI 双快照对账（Python 20 ops/Java 6 ops 端点清单）/SSE 契约/内部 REST 契约登记/契约整改项 R-1~R-16/变更流程 |
+| `docs/singing/22-英文歌打分系统集成拷问报告.md` | **M3 唱歌模块·系统集成拷问主报告**：六轴（A 算法/B 契约/C 数据/D 离线提取与 Java 边界/E 前端/F 运维）系统集成拷问汇总、未决缺口 P0~P3 决策表、建议实施顺序 |
+| `docs/singing/22-英文歌打分系统集成拷问报告-轴线A.md` | 轴线 A：评分算法与参考旋律（pyin/DTW/音准·节奏·发音/缺失降权/Fake 接口/逐帧 F0）逐问 Q/A |
+| `docs/singing/22-英文歌打分系统集成拷问报告-轴线B.md` | 轴线 B：Python API 契约与异步（整首跟唱形态/端点/Redis 任务轮询/ISE 配额炸弹/错误码）逐问 Q/A |
+| `docs/singing/22-英文歌打分系统集成拷问报告-轴线C.md` | 轴线 C：数据模型与存储（sing_attempts 建模复核/榜单/大 JSON/级联/24h 清理/迁移）逐问 Q/A |
+| `docs/singing/22-英文歌打分系统集成拷问报告-轴线E.md` | **系统集成拷问·轴线 E**：Web 前端（录音→上传→评分展示→音高/节奏可视化）与移动端/PWA；唱歌交互形态/录音转码/可视化选型/轮询/移动端 8 约束/组件复用 + 未决缺口 B1~B7 |
+| `docs/singing/22-英文歌打分系统集成拷问报告-轴线F.md` | 轴线 F：运维/测试/合规/并发（线程模型/信号量/readyz/24h 清理/基准脚本/战略风险 G9）逐问 Q/A |
+| `docs/singing/英文歌打分-系统集成拷问-轴线D-离线参考旋律提取与Java薄管理端边界.md` | 轴线 D：离线参考旋律提取管线 × Java 薄管理端边界（audio 解耦/触发编排/单写方冲突/薄管理端最小端点/合规） |
+| `docs/23-前端重构市场设计调研报告.md` | **前端重构调研**：现状盘点（技术/页面/设计系统/9 个 P0 体验问题）+ 商业同类设计调研（Speak/ELSA/流利说/Duolingo/全民K歌/Smule/Yousician）+ 开源与前端技术模式（LibreLingo/nightingale/LobeChat 系/管理端模板/音频可视化选型）+ 重构建议（IA/逐页参照表/5 阶段落地/答辩口径） |
+| `docs/24-InternalBeyond借鉴落地计划.md` | **IB 借鉴落地计划 v3（三官拷问修订定稿）**：范围裁定（⑤前缀缓存⑥画像注入①韵律引擎；④/⑦/②③不做或后置）+ 详细设计（`build_llm_context` 静态/动态**重写**（保留 conclude 指令与 `(none)` 兜底）、`learner.py` 画像注入（Python 侧聚合+白名单+TTL 缓存+收尾失效挂钩）、`prosody.ts` 纯函数韵律引擎（线性域 VAD+f0 最小滞后拾取）、`llm_cache_hit.py` POC）+ 测试用例（修复前必失败）+ 单人时间块（A 硬底线+B 骨架）/PR 拆分（今日就绪待审不合并）/风险回退/答辩口径；许可红线（只借思路不拷代码素材） |
+| `docs/25-InternalBeyond落地计划拷问报告.md` | **IB 落地计划三官火力拷问报告**：技术（A 系列 P0×2：删 conclude 指令/锚点自相矛盾）、算法（B 系列 P0×3：VAD 单位域/特征作用域/f0 平局错频）、范围排期（全量 6.5h 不可行裁决：A 硬底线+B 骨架）、P1×12/P2×15 整改全部落地 docs/24 v3 + 事实核查修正（日期误标/.env/章节号） |
+| `docs/26-LLM框架对齐ai4u评估与实施计划.md` | **LLM 框架对齐 ai4u 评估与实施计划**：ai4u（组内自研桌面 AI 伴侣）Agent 运行时解剖（scenes/runtime/domains/hooks/core）+ 映射表（→ `app/agent/` 分层：ContextBuilder/TurnRunner/MetaExecutor/MessageSink/学习者记忆域/persona）+ 不迁移清单（proactive/IM/TRPG/journal/RAG）+ 分期（P0 内核 2.5~3.5 人日 → P1 memory 双轨 → P2 persona）+ 风险回退 + 答辩口径；docs/24 A 系列并入 P0 内核；仅迁移架构模式不拷贝代码（ai4u 无 LICENSE、含外部素材） |
 
 ## 里程碑（详见 docs/04、docs/06）
 
