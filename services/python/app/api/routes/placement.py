@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.audio.base import get_asr_client, get_scorer_client
+from app.audio.fluency import compute_fluency_features
 from app.audio.upload import validate_audio_bytes
 from app.core.auth import get_current_user_id
 from app.core.config import get_settings
@@ -82,7 +83,10 @@ async def score_item(
         if q is None or q.status != "published":
             raise HTTPException(status_code=404, detail="question not found")
         asr = get_asr_client()
-        text = (await asr.transcribe(data)).text
+        asr_res = await asr.transcribe(data)
+        text = asr_res.text
+        # 流利度时间戳特征（docs/06 §9.3 辅助口径；与对话链路同源）
+        fluency = compute_fluency_features(asr_res.words or [], float(asr_res.duration or 0.0))
         scorer = get_scorer_client()
         try:
             score = await scorer.score(data, q.prompt)
@@ -96,6 +100,8 @@ async def score_item(
             flu_score=_dec(score.fluency) if score else None,
             gram_score=_dec(score.grammar) if score else None,
             overall_score=_dec(score.overall) if score else None,
+            wpm=_dec(fluency["wpm"]) if fluency else None,
+            details={"fluency": fluency},
             error={} if score else {"reason": "score_unavailable"},
         )
         db.add(attempt)
@@ -108,6 +114,7 @@ async def score_item(
                 "pron": float(score.pronunciation) if score else None,
                 "flu": float(score.fluency) if score else None,
                 "gram": float(score.grammar) if score else None,
+                "wpm": float(attempt.wpm) if attempt.wpm is not None else None,
             }
         )
     finally:

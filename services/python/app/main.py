@@ -84,4 +84,10 @@ if get_settings().agent_lab_enabled:
     from app.api.routes import agent_lab
 
     app.include_router(agent_lab.router)
+# 流利度特征测试台（test-only 前端联调；默认关闭，开启才注册 → 404；删除无影响，
+# 见 fluency_preview.py 删除清单）
+if get_settings().fluency_preview_enabled:
+    from app.api.routes import fluency_preview
+
+    app.include_router(fluency_preview.router)
 app.add_middleware(RequestIdMiddleware)  # X-Request-Id 透传（docs/06 §11）

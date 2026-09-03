@@ -174,6 +174,9 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
                         "fluency": _f(a.flu_score),
                         "grammar": _f(a.gram_score),
                         "overall": _f(a.overall_score),
+                        "wpm": _f(a.wpm),  # 语速辅助指标（docs/07 Q30）
+                        # 流利度时间戳特征（wpm/停顿/语速构成，docs/06 §9.3；无数据时缺省）
+                        "fluency_features": (a.details or {}).get("fluency"),
                         "details": a.details or {},
                         "error_present": bool(a.error),
                     }

@@ -131,6 +131,9 @@ class Settings(BaseSettings):
     # ---- Agent Lab（test-only 前端测试台，docs/26 §8；默认关闭，生产禁止开启） ----
     agent_lab_enabled: bool = False  # APP_AGENT_LAB_ENABLED=true 时注册 /api/v1/agent-lab/*
 
+    # ---- 流利度特征测试台（test-only 前端联调页，docs/06 §9.3；默认关闭，生产禁止开启） ----
+    fluency_preview_enabled: bool = False  # 开启时注册 /api/v1/fluency-preview/*
+
 
 @lru_cache
 def get_settings() -> Settings:

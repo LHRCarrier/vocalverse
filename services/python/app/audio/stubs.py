@@ -14,7 +14,21 @@ from app.audio.base import ASRClient, ASRResult, LLMClient, ScorerClient, ScoreR
 
 class FakeASRClient(ASRClient):
     async def transcribe(self, audio_bytes: bytes, language: str = "en") -> ASRResult:
-        return ASRResult(text="[stub] hello, I would like a coffee, please.", language=language)
+        # 词级时间戳与转写文本逐词对应（"coffee," 后接 1.05s 停顿 → 停顿特征可测）
+        return ASRResult(
+            text="[stub] hello, I would like a coffee, please.",
+            language=language,
+            words=[
+                {"word": "hello", "start": 0.10, "end": 0.34, "probability": 0.98},
+                {"word": "I", "start": 0.42, "end": 0.50, "probability": 0.97},
+                {"word": "would", "start": 0.58, "end": 0.86, "probability": 0.99},
+                {"word": "like", "start": 0.94, "end": 1.14, "probability": 0.98},
+                {"word": "a", "start": 1.22, "end": 1.30, "probability": 0.95},
+                {"word": "coffee,", "start": 2.35, "end": 2.72, "probability": 0.99},
+                {"word": "please.", "start": 2.80, "end": 2.98, "probability": 0.98},
+            ],
+            duration=3.2,
+        )
 
 
 class FakeTTSClient(TTSClient):

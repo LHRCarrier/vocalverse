@@ -21,6 +21,7 @@ from app.agent.domains.usage import log_usage
 from app.agent.runtime.meta_executor import MetaExecutor, compensate_meta
 from app.agent.runtime.turn_runner import TurnRunner
 from app.audio.base import ASRClient, LLMClient, ScorerClient, TTSClient
+from app.audio.fluency import compute_fluency_features
 from app.core.config import get_settings
 from app.db import get_session_factory
 from app.models import (
@@ -143,11 +144,18 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         # 1) ASR（rescue 轮跳过）
         transcript = ""
         asr_meta: dict = {}
+        fluency: dict = {}
         if action in ("normal", "retry") and audio:
             try:
                 res = await asr.transcribe(audio)
                 transcript = res.text.strip()
-                asr_meta = {"asr_seconds": round(len(audio) / 16000, 1)}
+                # 流利度时间戳特征（docs/06 §9.3 辅助口径：wpm/停顿；数据源 = 词级时间戳）
+                fluency = compute_fluency_features(res.words or [], float(res.duration or 0.0))
+                asr_meta = {
+                    "asr_seconds": round(len(audio) / 16000, 1),
+                    "wpm": fluency["wpm"],
+                    "pause_count": fluency["pause_count"],
+                }
             except Exception as exc:
                 logger.warning("asr failed: %s", exc)
                 yield ev.StreamError(code="asr_failed", recoverable=True)
@@ -331,7 +339,12 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                     flu_score=_dec(score.fluency if score else None),
                     gram_score=_dec(grammar and grammar.get("score")),
                     overall_score=_dec(score.overall if score else None),
-                    details={"word_level": (score.word_level if score else [])},
+                    # 语速辅助指标（docs/07 Q30）+ 流利度时间戳特征（docs/06 §9.3）
+                    wpm=_dec(fluency["wpm"]) if fluency else None,
+                    details={
+                        "word_level": (score.word_level if score else []),
+                        "fluency": fluency,
+                    },
                     error={} if score is not None else {"reason": "score_unavailable"},
                 )
             )

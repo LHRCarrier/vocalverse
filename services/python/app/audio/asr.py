@@ -52,13 +52,29 @@ class FasterWhisperClient(ASRClient):
 
     def transcribe_sync(self, wav_path: str, language: str = "en") -> ASRResult:
         model = self._get_model()
-        segments, info = model.transcribe(wav_path, language=language, beam_size=5)
+        # word_timestamps=True：词级时间戳（流利度时间戳特征数据源，docs/06 §9.3）
+        segments, info = model.transcribe(
+            wav_path, language=language, beam_size=5, word_timestamps=True
+        )
         text = "".join(s.text for s in segments).strip()
+        words: list[dict] = []
+        for s in segments:
+            for w in s.words or []:
+                words.append(
+                    {
+                        "word": w.word,
+                        "start": float(w.start),
+                        "end": float(w.end),
+                        "probability": float(getattr(w, "probability", 0.0) or 0.0),
+                    }
+                )
         return ASRResult(
             text=text,
             language=info.language or language,
             confidence=float(getattr(info, "language_probability", 0.0) or 0.0),
             segments=[{"start": s.start, "end": s.end, "text": s.text} for s in segments],
+            words=words,
+            duration=float(getattr(info, "duration", 0.0) or 0.0),
         )
 
     async def transcribe(self, audio_bytes: bytes, language: str = "en") -> ASRResult:

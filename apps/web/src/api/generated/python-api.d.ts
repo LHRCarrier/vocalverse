@@ -387,6 +387,15 @@ export interface components {
             segments?: {
                 [key: string]: unknown;
             }[];
+            /** Words */
+            words?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Duration
+             * @default 0
+             */
+            duration: number;
         };
         /** Body_asr_api_v1_asr_post */
         Body_asr_api_v1_asr_post: {

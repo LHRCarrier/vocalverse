@@ -16,6 +16,10 @@ class ASRResult:
     language: str = "en"
     confidence: float = 0.0
     segments: list[dict[str, Any]] = field(default_factory=list)
+    # 词级时间戳（faster-whisper word_timestamps=True）：[{word, start, end, probability}]
+    # —— 流利度时间戳特征（wpm/停顿）的数据源（docs/06 §9.3 辅助口径），无时间戳实现返回 []
+    words: list[dict[str, Any]] = field(default_factory=list)
+    duration: float = 0.0  # 音频总时长（秒；whisper info.duration，未知为 0）
 
 
 @dataclass
