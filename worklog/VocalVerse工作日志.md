@@ -3,6 +3,22 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-04 评分 DoD ④：影子跟读/朗读编排分支（ISE 主场 · 三维评分 + 联调测试台）
+
+打分「链路完成」DoD 剩余三项之④（顺序：④→③）：
+
+- **素材基础盘点**：`shadow_materials` 表/迁移 0003/SessionCheck kind=shadow/`AttemptKinds.SHADOW_SPEECH`/推荐链路（type=shadow）**均已存在**，缺的只是生产编排；`seed_recommend` 补了 L2/L3/L4 三条演示素材（text_content/wpm 120/145/165，全仓此前无素材时 recommend_shadow 恒空——本次执行 seed 后验证 count=3）；
+- **评分口径定版（docs/06 §9.3）**：三维 = `0.4·发音(ISE accuracy) + 0.3·语速匹配 + 0.3·停顿密度`；语速匹配（用户 wpm vs 素材原声 wpm）分段 ≤10%→95/≤20%→85/≤35%→70/≤50%→55/其余 40；停顿密度（pause_ratio）≤5%→95/≤10%→85/≤20%→70/≤35%→55/其余 40；素材缺 wpm → 该维缺省按剩余权重归一；**重音落点/连读识别留待 M3 前端韵律引擎（docs/24 ①），登记 P2 不伪造**；
+- **新模块** `app/practice/shadow.py`（分句/分段打分/加权归一/规则教练笔记——LLM 不参与，无 META 泄漏面）；`_shadow_turn` 编排：start（出句+TTS 示范 AudioChunk，不推进）→ normal（ASR 特征 + ISE 题卡参考 → 三维分 → attempt(kind=shadow_speech, details.shadow) → 逐句推进 → 末句 complete_session）；
+- **接入**：`create_session` kind=shadow + `shadow_material_id`（SessionCreate 契约 + 快照刷新，diff 仅该字段）；**顺带修一个潜伏 bug**：`create_session` 的 assembled 引用未初始化 `scenario`（defense 建会话同样踩 UnboundLocalError，只是此前无测试覆盖——本次 shadow 测试立刻抓出）；
+- **联调测试页** `/preview/shadow`（ShadowPreview.vue + registry/router；后端 test-only `shadow_preview.py`：materials/tts（原始字节示范）/analyze，`include_in_schema=False`、默认关闭 `APP_SHADOW_PREVIEW_ENABLED`（本地已开，生产禁止）、删除清单文件尾）；
+- **验证**：pytest **177 passed**（+24：纯函数分段/权重归一/教练档位、start→评分→收尾→报告全链路（fake 数值：wpm=145.83→speed 95、pause 0.3646→40、pron 90→overall 76）、素材 404/缺音频 422、测试台 404+openapi 零路径、analyze Fake 三维）；ruff 全绿；前端 lint/typecheck/vitest 19/build 绿（dist 无 Shadow chunk）；真链路（经 Vite 代理）：materials=3、analyze（ref-3 音频 × 面试题卡句——故意不相配 → pron 7.9/speed 85/pause 70/overall 50，coach "Slow down..."，**口径合理**：错题卡低发音分）；
+- **踩坑**：① PowerShell `$PID` 是保留自动变量，`dev-up.ps1` stop 循环变量撞名 → 服务杀不掉（已改 `$procId`）；② 测试里 SSE JSON 断言别忘了冒号后有空格（`"conclude": false`），与旧代码无空格格式不同。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+
+
 ## 2026-09-04 联调台实测英文歌：链路扛住 + ISE 口语口径守卫（超长降级原因）
 
 - **组员传整曲《阿云嘎 HOY-MIX-Regression.ogg》（3:56 / 236.71s / 9580KB）实测**：试听/转写 179 词/特征全出无崩溃——但数字对唱歌无语义（41.3s「停顿」= 器乐段、2.72s「词」= DTW 拉长，whisper 词级时间戳是口语标定）；ISE 因整篇歌词超长被拒/失败，页面却显示「未评分」，误导；
