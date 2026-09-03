@@ -3,6 +3,24 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-03 本轮总结 · 入学测试 A~E 落地 + 整合 + P0 安全加固（M2）
+
+**一句话**：在 `feat/recommend-landing` 上完成了入学测试从需求澄清(A~E 分阶段)到前后端落地、与 origin/main(38 commits) 整合、按 AGENTS.md rule 3 补联调测试页、遍历完善，以及 M2 六路拷问后的 **P0 安全修复**；全部门禁绿，已推送。
+
+**提交链**（从早到晚）：`c3ae906`(feat 两维/run/复测/回写/前端) → `46c5a60`(test) → `9c86c8e`(docs) → `7be241e`(merge origin/main) → `b345167`(联调测试台) → `1009358`(docs 整合) → `1bc6c93`(fix 遍历) → `ad5206b`(test 联调) → `65a6a39`(docs 遍历) → `7e9058b`(P0 fix) → `23f3784`(P0 test) → `604c1bb`(docs P0)。
+
+**功能要点（入学测试）**：两维 S=0.6·发音+0.4·流利度（对齐推荐系统统一尺度）、LLM 语法仅诊断、run 状态机(40910)、finalize 幂等、复测(40302/42902)、跳过(provisional L2)、回写断点修复(Java /internal/level 幂等 + JwtAuthFilter 跳过 /internal/**)、前端双模式(试音/示范/重录/跳过/QA参考) + errorCopy + 场景按档过滤 + 未定档引导。迁移 `0005_placement_run_state`（对齐 0004 agent_summary）。
+
+**P0 安全加固（六路拷问）**：密钥 production fail-fast(Python config + Java SecretGuard)、nginx 阻断 `/manage/internal/`、三处 IDOR 归属校验(complete/report/turns)、`/asr /score /tts /llm/chat` 加鉴权+限流。
+
+**门禁**：Python 全量 **256 passed**；ruff 全绿；Java 目标测试 **6 passed**；python 契约快照 MATCH；前端 lint/typecheck/test:run/build 全绿；alembic 单头。
+
+**队友工作保留**：`router/index.ts`、`rec/service.py`、`test_mastery.py`、`RecTestView.vue`、推荐文档/测试、`recommend_smoke.py` 等未提交工作保留在工作区（未混入本轮）。
+
+**P1 待修（拷问报告，按优先级）**：`/status.can_retest` 与 C5 口径不一致、`complete_session` 幂等、`finalize` 乐观锁、ISE 全故障 fail-closed 降级、前端 `bootstrapAuth` 补 `fetchMe`、SSE error 复位、`errorCopy` 全覆盖、skill 回写契约断链。
+
+—— 执行人：Faust-sudo
+
 ## 2026-09-03 修复 P0 安全缺陷（M2 六路拷问 · 高优先级）
 
 | P0 | 问题 | 修复 |
