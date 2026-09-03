@@ -3,6 +3,35 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-03 LLM 框架对齐 ai4u · 评估与实施计划（docs/26）
+
+组长拍板方向：LLM 部分不做小改，做成组内自研 ai4u 那样的分层框架（ai4u = 组长自研 Electron+Vue3+NestJS 桌面 AI 伴侣，`F:\WorkingL\ai4u`，Agent 运行时自研分层架构）。通读 ai4u 源码与 `docs/agent/` 后输出评估：
+
+- **结论：可以，架构模式迁移而非代码拷贝**（技术栈不同 + ai4u 无 LICENSE/含外部素材，仅借分层思想，代码全部 VocalVerse 自研；不改任何对外契约，M2 DoD 测试全绿为硬门禁）；
+- **映射**：scenes（dialog/defense 门面化）→ runtime（TurnRunner 流式循环+META 泄漏门 / ContextBuilder 单一入口（并入 docs/24 ⑤⑥）/ MetaExecutor 结构化输出权威 / MessageSink 落库门面）→ domains（**学习者记忆域**：mastery/skill/attempts → 易错点检索注入 + 摘要双轨 + Auto-memory 收尾写入）/ persona（双人格模板化）→ hooks（post-session/失效/兜底）→ core（llm + usage 记账，含 prompt_cache_hit_tokens）；
+- **不迁移**：proactive（主动消息）/IM/TRPG/journal/来信/RAG 知识库/多角色——产品定位不匹配；「记忆」= 学习者画像而非情感记忆；
+- **分期**：P0 内核（框架壳+ContextBuilder+MetaExecutor+TurnRunner+hooks+usage ≈2.5~3.5 人日，docs/24 A 系列并入）→ P1 memory 双轨（④摘要+Auto-memory+画像升级）→ P2 persona/场景收敛；
+- **RAG 无自有知识库**：VocalVerse 语料走场景绑定，不迁知识库/RAG。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-03 InternalBeyond 对比调研 · 结果核验与落地计划（docs/24）
+组员在 `local/InternalBeyond对比与借鉴分析.md` 提交对 Sui-IB/InternalBeyond（单文件离线个人网站，V2.6.2 @ 2026-09-01）的对比调研；组长要求核验可行性与制定落地计划：
+
+- **核验**（下载 IB `InternalBeyond.html` 2.4MB 逐行比对 + LICENSE 原文 + DeepSeek 官方缓存文档）：
+  - IB 侧 18 处行号引用**全部精准命中**（仅 1 处笔误：`prompt_cache_key` 实为 11663，非 14663）；
+  - 许可确凿：代码 PolyForm Noncommercial 1.0.0（商用需作者书面授权）、视觉素材/文档 CC BY-NC-SA 4.0、项目标识不作商标授权 → 结论「只借算法思路、不拷代码素材」合规成立；
+  - VocalVerse 侧引用（ise.py/asr.py/tts.py/audio.py/recorder.ts 行号、SSE 协议、8 轮上限、课程项目定位、mastery/skill 模块）**全部属实**；
+  - 修正 3 处：⑤ 的 cache_control/prompt_cache_key 是 IB 多供应商适配，DeepSeek 官方缓存**全自动无需参数**；⑥ 本仓已有遗忘半衰期/句级掌握度，缺的仅是「检索注入」，投入中→低；② `webkitSpeechRecognition` 依赖 Google 服务器国内不可用、whisper RTF 已达标，边际价值低。
+- **产出**：`docs/24-InternalBeyond借鉴落地计划.md`（已登记 README 索引）——范围裁定（⑤前缀缓存+⑥画像注入+①韵律引擎 P0；④摘要可选；②③登记前瞻；⑦报告导出 P2）；落点 = `practice/service.py:356 build_llm_context` 拆条 + 新增 `app/practice/learner.py` + 前端 `apps/web/src/audio/prosody.ts`（拍板确认浏览器端 TS 版）；任务分解合计 ≈3.3~4.3 人日（不占 M3 唱歌/前端重构主线）；PR 拆分 6 条；验收含「两次调用前缀逐字节一致」「合成信号 vitest ≥6 用例，修复前必失败」；风险回退表 + 5 个拍板点（P1 启动窗口 / P2 B3 契约落库 / P3 运行摘要 / P4 注入强度）。
+- **进展（2026-09-03）**：计划升级 **v2 详细实施版**（单人今日执行）→ 三路子代理火力拷问完成 → **v3 修订定稿**（`docs/25-InternalBeyond落地计划拷问报告.md` 落档，README 索引已登记）。三官裁决：全量 A+B 6.5h 不可行 → 今日硬底线 = **A 系列（拆条+画像注入+6 pytest+ POC skip 路径）PR1 就绪待审（今日不合并，自评 comment + 挂 reviewer）**，B 系列降级（引擎骨架 + 全静音/纯音高 2 用例）；P0×6/P1×12 全部落地 v3（conclude 指令保留、P1 锚点改子串断言、VAD 线性域、f0 最小滞后、Python 侧聚合、白名单谓词、回退二选一、dotenv、日期误标更正等）。
+- **组长拍板（2026-09-03 追加）**：LLM 框架优先——今日范围 = **A 系列全量 + 真 Key 验证**（POC-2 流式 META 实跑 + 缓存命中实测，LLM 链路从未真 Key 跑过），**B 系列整体顺延**（随 docs/23 前端重构波次，按 §2 设计定稿实施）。
+- **二次追加（2026-09-03）**：方向升级为**对齐 ai4u 分层框架**（docs/26）——拍板采纳 §4 分期、今日按 §8「P0 内核最小切片」（ContextBuilder+MetaExecutor+TurnRunner 抽取 + learner 域基础版（含 ⑤⑥）+ META 泄漏门 + 最小 hooks；MessageSink/usage 顺延 P1）、usage 仅日志、答辩话术不透露 ai4u 仓库细节；**真 Key 实跑与框架切片同天完成**。docs/24 A 系列实现方式被 docs/26 §8 取代（目标不变）。
+- **待办**：按 docs/24 v3 §3 时间块开工（09:30 起，今日 PR1 就绪待审）；PR 合并等次日 reviewer。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+
 ## 2026-09-03 修复：lieflat 学习报表雷达图点击重播后空白（BUG 实测入库）
 
 用户报告 `vv-learning-report.html` 雷达图点击重播后消失、其余图正常。根因是本文件把两条正本
@@ -17,7 +46,7 @@ SVG 图在各自 fn 开头自清空），与看板文件路径一致。
 
 —— 执行人：LHRCarrier（AI 代工整理）
 
-## 2026-09-09 唱歌相关文档归档 `docs/singing/`（组长要求整理）
+## 2026-09-02 唱歌相关文档归档 `docs/singing/`（组长要求整理）
 
 组长要求把唱歌相关文档统一收纳：新建模块目录 `docs/singing/`，迁入 7 份文件（原 `docs/22-*` 6 份 + 原 `docs/audit/英文歌打分-…轴线D…` 1 份；文件名与内容除路径引用外零改动）：
 
@@ -28,7 +57,7 @@ SVG 图在各自 fn 开头自清空），与看板文件路径一致。
 
 —— 执行人：LHRCarrier
 
-## 2026-09-09 前端重构 · 市场同类设计调研（docs/23 · M3/M4 前置）
+## 2026-09-02 前端重构 · 市场同类设计调研（docs/23 · M3/M4 前置）
 
 组长提出「重新构建前端」，先做市场调研再动手。产出《前端重构市场设计调研报告》（`docs/23-前端重构市场设计调研报告.md`，已登记 README 文档索引）：
 
@@ -40,7 +69,7 @@ SVG 图在各自 fn 开头自清空），与看板文件路径一致。
 
 —— 执行人：LHRCarrier
 
-## 2026-09-09 英文歌打分模块 · 系统集成拷问（M3 预热）—— 前端架构调研员（AI 代笔）
+## 2026-09-02 英文歌打分模块 · 系统集成拷问（M3 预热）—— 前端架构调研员（AI 代笔）
 
 按组长分工「英文歌打分我们来做，参考 nightingale；Python 端做模块、Java 端只做薄管理端」，对 M3 唱歌模块做了**系统集成拷问**并成文档（供组员参阅）：
 
@@ -53,7 +82,7 @@ SVG 图在各自 fn 开头自清空），与看板文件路径一致。
 
 —— 执行人：前端架构调研员（AI 代笔；**正式署名待组长确认**，勿以本条目作为个人署名依据）
 
-## 2026-09-09 PR#25 推荐系统落地 · 复审整改与合入（模型同步 / 契约快照 / CI 兜底）
+## 2026-09-02 PR#25 推荐系统落地 · 复审整改与合入（模型同步 / 契约快照 / CI 兜底）
 
 复审发现并修复 3 个阻断项（评审结论见 PR#25 review，2026-09-02）：
 1. **模型-迁移不同步**：迁移 0003 已扩 `sessions.kind='shadow'`、新增 `sessions.shadow_material_id`、扩 `attempts.kind='shadow_speech'`，但 `models/practice.py` 未同步 → shadow 会话落库 CHECK 违约；`mastery/service.py` 读 `session.shadow_material_id` 抛 AttributeError 被收尾钩子吞掉（动态水平/掌握度静默不更新）。已补模型同步 + 2 条回归测试（`tests/mastery/test_session_model_sync.py`：修复前 2 failed，修复后绿）。

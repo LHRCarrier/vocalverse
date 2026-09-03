@@ -172,6 +172,9 @@ worklog/          团队工作日志（VocalVerse工作日志.md，按日追加�
 | `docs/singing/22-英文歌打分系统集成拷问报告-轴线F.md` | 轴线 F：运维/测试/合规/并发（线程模型/信号量/readyz/24h 清理/基准脚本/战略风险 G9）逐问 Q/A |
 | `docs/singing/英文歌打分-系统集成拷问-轴线D-离线参考旋律提取与Java薄管理端边界.md` | 轴线 D：离线参考旋律提取管线 × Java 薄管理端边界（audio 解耦/触发编排/单写方冲突/薄管理端最小端点/合规） |
 | `docs/23-前端重构市场设计调研报告.md` | **前端重构调研**：现状盘点（技术/页面/设计系统/9 个 P0 体验问题）+ 商业同类设计调研（Speak/ELSA/流利说/Duolingo/全民K歌/Smule/Yousician）+ 开源与前端技术模式（LibreLingo/nightingale/LobeChat 系/管理端模板/音频可视化选型）+ 重构建议（IA/逐页参照表/5 阶段落地/答辩口径） |
+| `docs/24-InternalBeyond借鉴落地计划.md` | **IB 借鉴落地计划 v3（三官拷问修订定稿）**：范围裁定（⑤前缀缓存⑥画像注入①韵律引擎；④/⑦/②③不做或后置）+ 详细设计（`build_llm_context` 静态/动态**重写**（保留 conclude 指令与 `(none)` 兜底）、`learner.py` 画像注入（Python 侧聚合+白名单+TTL 缓存+收尾失效挂钩）、`prosody.ts` 纯函数韵律引擎（线性域 VAD+f0 最小滞后拾取）、`llm_cache_hit.py` POC）+ 测试用例（修复前必失败）+ 单人时间块（A 硬底线+B 骨架）/PR 拆分（今日就绪待审不合并）/风险回退/答辩口径；许可红线（只借思路不拷代码素材） |
+| `docs/25-InternalBeyond落地计划拷问报告.md` | **IB 落地计划三官火力拷问报告**：技术（A 系列 P0×2：删 conclude 指令/锚点自相矛盾）、算法（B 系列 P0×3：VAD 单位域/特征作用域/f0 平局错频）、范围排期（全量 6.5h 不可行裁决：A 硬底线+B 骨架）、P1×12/P2×15 整改全部落地 docs/24 v3 + 事实核查修正（日期误标/.env/章节号） |
+| `docs/26-LLM框架对齐ai4u评估与实施计划.md` | **LLM 框架对齐 ai4u 评估与实施计划**：ai4u（组内自研桌面 AI 伴侣）Agent 运行时解剖（scenes/runtime/domains/hooks/core）+ 映射表（→ `app/agent/` 分层：ContextBuilder/TurnRunner/MetaExecutor/MessageSink/学习者记忆域/persona）+ 不迁移清单（proactive/IM/TRPG/journal/RAG）+ 分期（P0 内核 2.5~3.5 人日 → P1 memory 双轨 → P2 persona）+ 风险回退 + 答辩口径；docs/24 A 系列并入 P0 内核；仅迁移架构模式不拷贝代码（ai4u 无 LICENSE、含外部素材） |
 
 ## 里程碑（详见 docs/04、docs/06）
 
