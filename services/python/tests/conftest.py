@@ -14,6 +14,8 @@ os.environ.setdefault("APP_AUDIO_DIR", "./data/audio-test")
 os.environ.setdefault("APP_AGENT_LAB_ENABLED", "false")
 # 流利度特征测试台同规格：默认关闭钉回（test_fluency_preview_disabled_returns_404）
 os.environ.setdefault("APP_FLUENCY_PREVIEW_ENABLED", "false")
+# 影子跟读测试台同规格：默认关闭钉回（test_shadow_preview_disabled_returns_404）
+os.environ.setdefault("APP_SHADOW_PREVIEW_ENABLED", "false")
 
 import shutil  # noqa: E402
 
