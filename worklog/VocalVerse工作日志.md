@@ -3,6 +3,20 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-03 修复：lieflat 学习报表雷达图点击重播后空白（BUG 实测入库）
+
+用户报告 `vv-learning-report.html` 雷达图点击重播后消失、其余图正常。根因是本文件把两条正本
+reveal 路径混用：带 `n.innerHTML=''` 的 obsReveal（basics/lupi 正本，SVG 专用）套到了 ECharts
+雷达上——重播时先把 zrender 挂载的 canvas DOM 拔掉，eReveal 拿回残留实例 `clear+setOption`
+不会重建 DOM → 空白。修复为 glance-porcelain.html 正本路径（obsReveal 不清空 + eReveal 复用实例，
+SVG 图在各自 fn 开头自清空），与看板文件路径一致。
+
+验证：无头 Edge 自动点击重播冒烟——修复前逻辑 canvas 数 0（必红），修复后 1（与缺陷一一对应）；
+前端门禁 lint/typecheck/test:run/build 全绿；`node --check` 抽检通过。详见 `worklog/BUG实测/lieflat雷达重播失效.md`
+（含坑 29：共用 reveal 的清空策略必须匹配图引擎）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
 ## 2026-09-09 唱歌相关文档归档 `docs/singing/`（组长要求整理）
 
 组长要求把唱歌相关文档统一收纳：新建模块目录 `docs/singing/`，迁入 7 份文件（原 `docs/22-*` 6 份 + 原 `docs/audit/英文歌打分-…轴线D…` 1 份；文件名与内容除路径引用外零改动）：
