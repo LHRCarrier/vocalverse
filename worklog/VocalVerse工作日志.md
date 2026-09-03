@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-04 联调台实测英文歌：链路扛住 + ISE 口语口径守卫（超长降级原因）
+
+- **组员传整曲《阿云嘎 HOY-MIX-Regression.ogg》（3:56 / 236.71s / 9580KB）实测**：试听/转写 179 词/特征全出无崩溃——但数字对唱歌无语义（41.3s「停顿」= 器乐段、2.72s「词」= DTW 拉长，whisper 词级时间戳是口语标定）；ISE 因整篇歌词超长被拒/失败，页面却显示「未评分」，误导；
+- **修复**：`analyze` 增口语口径守卫 —— 音频 >60s（`max_speech_seconds`）→ `audio_too_long`；参考 >300 字符（`MAX_ISE_REF_CHARS`）→ `reference_too_long`；ISE 异常 → `ise_failed`；`score_ref` 保留以表明「已触发评分」；测试台不盲等 ISE；
+- **页面**：ISE 卡黄色提示降级原因；停顿标注对 ≥3s 超长间隙改「可能为器乐段/无词段，非口语停顿」；
+- **口径记录**：唱歌长音频的评分走 M3 音准/节奏链路（sing_attempts/pyin/LRC DTW，docs/singing 22），本测试台只服务口语；这正好实证 docs/19 P0-5「流利度/发音口径不适配唱歌」的一面；
+- **验证**：pytest **153 passed** + ruff 全绿（+2 守卫测试：reference_too_long / 236.7s audio_too_long）；前端 lint/typecheck/vitest 19/build 全绿；真链路：419 字符参考 → `reference_too_long(419 > 300 字符...)`，ref-3 正常路径 overall=90.82 无 error。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
 ## 2026-09-04 联调台加「选中文件即试听」（本地回放，不上传）
 
 - 需求（组员反馈「方便测试」）：选完音频立刻能听，再决定是否分析；
