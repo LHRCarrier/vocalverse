@@ -39,6 +39,16 @@ logger = logging.getLogger("vocalverse")
 _SAFE_NAME = re.compile(r"^[0-9a-f]{32}\.mp3$")
 
 
+def _require_session_owner(db, session_id: int, user_id: int) -> DbSession:
+    """归属校验：会话必须属于当前用户（IDOR 防护，P0-3/P0-4/P0-5）。"""
+    session = db.get(DbSession, session_id)
+    if session is None:
+        raise BizError(http_status=404, code=40401, message="session not found or expired")
+    if session.user_id != user_id:
+        raise BizError(http_status=403, code=40301, message="not your session")
+    return session
+
+
 class SessionCreate(BaseModel):
     kind: str
     scenario_id: int | None = None
@@ -151,6 +161,12 @@ async def post_turn(
     state = await store.get(session_id)
     if state is None:
         raise BizError(http_status=404, code=40401, message="session not found or expired")
+    # P0-5 IDOR：回合必须属于当前用户（防劫持他人会话/注入音频）
+    db = get_session_factory()()
+    try:
+        _require_session_owner(db, session_id, user_id)
+    finally:
+        db.close()
     if state.state not in ("awaiting_user", "listening", "opening"):
         raise BizError(http_status=409, code=40902, message=f"session state={state.state}")
     if expected_turn is not None and expected_turn != state.current_turn:
@@ -182,6 +198,12 @@ async def complete(
     session_id: int,
     user_id: int = Depends(get_current_user_id),
 ):
+    # P0-3 IDOR：只能收尾自己的会话（防篡改他人会话/触发其报告）
+    db = get_session_factory()()
+    try:
+        _require_session_owner(db, session_id, user_id)
+    finally:
+        db.close()
     llm = get_llm_client()
     summary = await _summary_for(llm, session_id)
     report_id = complete_session(session_id, llm, summary)
@@ -214,6 +236,11 @@ async def get_report(
         report = db.get(Report, report_id)
         if report is None:
             raise BizError(http_status=404, code=40401, message="report not found")
+        # P0-4 IDOR：报告须归属当前用户（session 报告经会话归属校验；含转写 PII）
+        if report.scope == "session":
+            _require_session_owner(db, report.scope_id, user_id)
+        elif report.scope == "user" and report.scope_id != user_id:
+            raise BizError(http_status=403, code=40301, message="not your report")
         return ok(
             {
                 "id": report.id,

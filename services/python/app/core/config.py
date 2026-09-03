@@ -7,6 +7,7 @@
 
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +17,20 @@ class Settings(BaseSettings):
         env_file=(".env", ".env.local"),
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def _reject_default_secrets_in_production(self) -> "Settings":
+        """P0-1：production 下拒绝使用已知默认密钥/短密钥（docs/20:185 fail-fast）。"""
+        if self.app_env != "production":
+            return self
+        if (
+            self.jwt_secret in ("", "vocalverse-dev-jwt-secret-0123456789abcdef")
+            or len(self.jwt_secret) < 32
+        ):
+            raise ValueError("production requires a strong non-default APP_JWT_SECRET")
+        if self.service_token in ("", "change-me-internal-service-token"):
+            raise ValueError("production requires a non-default APP_SERVICE_TOKEN")
+        return self
 
     # 运行模式
     app_env: str = "development"  # development | test | production

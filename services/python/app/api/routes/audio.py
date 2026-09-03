@@ -24,7 +24,9 @@ from app.audio.base import (
     get_tts_client,
 )
 from app.audio.upload import validate_audio_bytes
+from app.core.auth import get_current_user_id
 from app.core.config import Settings, get_settings
+from app.core.ratelimit import bucket_limits, consume
 from app.core.response import Envelope, ok
 
 router = APIRouter(prefix="/api/v1", tags=["audio"])
@@ -41,7 +43,9 @@ async def asr(
     language: str = Form("en"),
     client: ASRClient = Depends(get_asr_client),
     settings: Settings = Depends(get_settings),
+    user_id: int = Depends(get_current_user_id),
 ) -> Envelope[ASRResult]:
+    await consume("asr", bucket_limits()["asr"], user_id)  # P0-6 鉴权+限流（付费 whisper）
     data = await _read_bounded(audio, settings.max_upload_bytes)
     result = await client.transcribe(data, language=language)
     return ok(result)
@@ -53,7 +57,9 @@ async def score(
     reference: str = Form(...),
     client: ScorerClient = Depends(get_scorer_client),
     settings: Settings = Depends(get_settings),
+    user_id: int = Depends(get_current_user_id),
 ) -> Envelope[ScoreResult]:
+    await consume("ise", bucket_limits()["ise"], user_id)  # P0-6 鉴权+限流（付费 ISE）
     data = await _read_bounded(audio, settings.max_upload_bytes)
     result = await client.score(data, reference)
     return ok(result)
@@ -65,7 +71,9 @@ async def tts(
     voice: str = Form("en-US-JennyNeural"),
     rate: str = Form("+0%"),
     client: TTSClient = Depends(get_tts_client),
+    user_id: int = Depends(get_current_user_id),
 ) -> Envelope[TTSResult]:
+    await consume("tts", bucket_limits()["tts"], user_id)  # P0-6 鉴权+限流（付费/TTS）
     audio_bytes = await client.synthesize(text, voice=voice, rate=rate)
     return ok(TTSResult(audio_bytes=audio_bytes.hex(), length=len(audio_bytes)))
 
@@ -74,6 +82,8 @@ async def tts(
 async def llm_chat(
     message: str = Form(...),
     client: LLMClient = Depends(get_llm_client),
+    user_id: int = Depends(get_current_user_id),
 ) -> Envelope[ChatResult]:
+    await consume("llm", bucket_limits()["llm"], user_id)  # P0-6 鉴权+限流（付费 DeepSeek）
     reply = await client.chat([{"role": "user", "content": message}])
     return ok(ChatResult(reply=reply))

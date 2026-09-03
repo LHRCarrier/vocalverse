@@ -20,6 +20,7 @@ logging:
 
 # 服务间契约密钥（docs/06 §11：Python 验签用同值；禁止提交真实值，.env 覆盖）
 vocalverse:
+  app-env: ${APP_ENV:development}  # development | production（production 强制强密钥，见 SecretGuard）
   jwt:
     secret: ${JWT_SECRET:vocalverse-dev-jwt-secret-0123456789abcdef}
     access-ttl-seconds: 3600

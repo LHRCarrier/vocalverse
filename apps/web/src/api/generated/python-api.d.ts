@@ -771,7 +771,10 @@ export interface operations {
     asr_api_v1_asr_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -804,7 +807,10 @@ export interface operations {
     score_api_v1_score_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -837,7 +843,10 @@ export interface operations {
     tts_api_v1_tts_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -870,7 +879,10 @@ export interface operations {
     llm_chat_api_v1_llm_chat_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
