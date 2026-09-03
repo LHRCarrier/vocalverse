@@ -52,10 +52,13 @@ class FasterWhisperClient(ASRClient):
 
     def transcribe_sync(self, wav_path: str, language: str = "en") -> ASRResult:
         model = self._get_model()
-        # word_timestamps=True：词级时间戳（流利度时间戳特征数据源，docs/06 §9.3）
+        # word_timestamps=True：词级时间戳（流利度时间戳特征数据源，docs/06 §9.3）；
+        # 注意 transcribe 返回**生成器**，先 list() 物化一次——重复迭代同一生成器
+        # 第二次永远为空（旧代码 segments 恒空、2026-09-04 联调发现 words 恒空的根因）
         segments, info = model.transcribe(
             wav_path, language=language, beam_size=5, word_timestamps=True
         )
+        segments = list(segments)
         text = "".join(s.text for s in segments).strip()
         words: list[dict] = []
         for s in segments:
