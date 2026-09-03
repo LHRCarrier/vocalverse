@@ -53,10 +53,13 @@ def build_context(
     hits_so_far: Sequence[str],
     concluded_by_turn: bool,
     learner_profile: str = "",
+    rolling_summary: str = "",
 ) -> list[dict[str, str]]:
     """组装 [system, user] 消息（system 纯静态；动态全部进 user 尾部 [context] 段）。
 
     state 仅用于读取滚动摘要（state.digest[-3:]）；其余全部显式传参（可单测、无 db 依赖）。
+    rolling_summary：会话滚动摘要（sessions.summary，docs/26 §10.3①）——与画像行同级
+    会话级稳定段，注入 [context] 尾部（绝不影响 system 静态契约）。
     """
     from app.practice.meta import MARKER
 
@@ -69,6 +72,8 @@ def build_context(
     ]
     if learner_profile:
         ctx_lines.append(learner_profile)
+    if rolling_summary:
+        ctx_lines.append(f"Rolling summary (earlier turns): {rolling_summary}")
     ctx_lines.append(
         "Already used expressions — rephrase instead: "
         f"{', '.join(map(str, hits_so_far)) or '(none)'}"

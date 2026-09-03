@@ -181,6 +181,9 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
                 ],
             },
         )
+        # 摘要双轨落库（docs/26 §10.3①）：收尾最终总结写入 sessions.summary
+        session.summary = summary
+        session.summary_updated_at = now
         db.add(report)
         db.commit()
         _post_session_skills(db, session)
@@ -371,12 +374,13 @@ def build_llm_context(
     hits_so_far: list[str],
     concluded_by_turn: bool,
     learner_profile: str = "",
+    rolling_summary: str = "",
 ) -> list[dict]:
     """对话回合 system/user 消息（docs/14 §3.4）。
 
     兼容薄壳：实现已迁至 Agent 框架层 `app.agent.runtime.context_builder.build_context`
-    （docs/26：静态/动态两级 + ⑤前缀稳定 + ⑥画像注入）；本函数保留签名供既有引用，
-    新代码一律直调框架层。
+    （docs/26：静态 system + user 尾部 [context]（画像/摘要/难度/语料/命中）+ ⑤契约稳定）；
+    本函数保留签名供既有引用，新代码一律直调框架层。
     """
     from app.agent.runtime.context_builder import build_context
 
@@ -390,6 +394,7 @@ def build_llm_context(
         hits_so_far,
         concluded_by_turn,
         learner_profile=learner_profile,
+        rolling_summary=rolling_summary,
     )
 
 

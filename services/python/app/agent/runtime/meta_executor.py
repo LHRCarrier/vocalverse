@@ -93,11 +93,32 @@ async def compensate_meta(
         "state=ok if no fatal grammar error, else fix."
     )
     try:
-        raw = await llm.chat(
-            [{"role": "system", "content": _COMPENSATE_SYSTEM}, {"role": "user", "content": user}],
-            temperature=0.2,
-            max_tokens=300,
-        )
+        fn = getattr(llm, "chat_with_usage", None)
+        if fn is not None:
+            raw, usage = await fn(
+                [
+                    {"role": "system", "content": _COMPENSATE_SYSTEM},
+                    {"role": "user", "content": user},
+                ],
+                temperature=0.2,
+                max_tokens=300,
+            )
+            if usage:
+                try:
+                    from app.agent.domains.usage import log_usage
+
+                    log_usage("meta_compensate", usage, meta=None)
+                except Exception:
+                    pass
+        else:
+            raw = await llm.chat(
+                [
+                    {"role": "system", "content": _COMPENSATE_SYSTEM},
+                    {"role": "user", "content": user},
+                ],
+                temperature=0.2,
+                max_tokens=300,
+            )
     except Exception:
         return MetaResult(reply=reply_text, meta=None, ok=False)
     return _parse_meta_json(raw, reply_text)

@@ -27,6 +27,7 @@ class TurnRunResult:
     reply_text: str  # 完整正文（不含 META；泄漏降级时为纯正文）
     meta: MetaResult
     leaked: bool  # 泄漏门触发（第二个标记被截断）
+    usage: dict | None = None  # {"model","prompt_tokens","completion_tokens"}（docs/26 §10.3②）
 
 
 def _partial_marker_len(s: str) -> int:
@@ -99,10 +100,20 @@ class TurnRunner:
 
     async def run(self, messages: list[dict[str, str]]):
         splitter = MetaStreamSplitter()
+        usage: dict | None = None
+        rich = getattr(self._llm, "stream_rich", None)
         try:
-            async for chunk in self._llm.stream(messages):
-                for delta in splitter.push(chunk):
-                    yield delta
+            if rich is not None:
+                async for kind, payload in rich(messages):
+                    if kind == "usage":
+                        usage = payload if isinstance(payload, dict) else None
+                        continue
+                    for delta in splitter.push(payload):
+                        yield delta
+            else:
+                async for chunk in self._llm.stream(messages):
+                    for delta in splitter.push(chunk):
+                        yield delta
         except Exception:
             raise  # 调用方决定降级（保持旧 orchestrator 双层结构）
         full, meta_buf, pending = splitter.finish()
@@ -116,7 +127,9 @@ class TurnRunner:
         else:
             meta = extract_meta(full)
         reply = meta.reply or full
-        self.result = TurnRunResult(reply_text=reply, meta=meta, leaked=splitter.leak_count > 0)
+        self.result = TurnRunResult(
+            reply_text=reply, meta=meta, leaked=splitter.leak_count > 0, usage=usage
+        )
 
 
 __all__ = ["MetaStreamSplitter", "TurnRunner", "TurnRunResult"]

@@ -33,7 +33,7 @@ const running = ref(false)
 
 // ---------- 结果 ----------
 const last = ref<{ system: string; user: string; result: Record<string, unknown> } | null>(null)
-const runStats = ref<{ turns: number; meta_ok: number; meta_rate: number; compensated: number; concluded: boolean } | null>(null)
+const runStats = ref<{ turns: number; meta_ok: number; meta_rate: number; compensated: number; concluded: boolean; tokens?: { prompt: number; completion: number } } | null>(null)
 const runTable = ref<Array<Record<string, unknown>>>([])
 const learner = ref<{ enabled: boolean; rendered: string; weak_phrases: string[]; weak_words: string[]; est_level: string | null } | null>(null)
 const errorMsg = ref('')
@@ -119,6 +119,23 @@ function tagType(v: unknown) {
 
     <NTabs type="line" class="mb-4">
       <NTabPane name="turn" tab="回合实验">
+        <NAlert type="info" class="mb-4" :show-icon="true" title="怎么用 / 测什么 / 指标口径">
+          <ol class="list-decimal pl-4 text-sm leading-6">
+            <li><b>怎么用</b>：① 本页走真实 DeepSeek（Key 见后端 .env）；② 点「运行单轮」看单回合，点「连跑 5 轮冒烟」看会话级统计；③ <b>验证 system 契约</b>——每次运行的 system 应逐字相同（POC 铁证：动态进 system 会让 META 遵守率从 100% 跌到 0%）。</li>
+            <li><b>测什么</b>：META 契约（流式直出/补偿后）、MetaExecutor（命中/收尾）、学习者画像注入、滚动摘要注入（连跑第 7 条消息后可在 user 原文看到 "Rolling summary" 行）、用量记账（tokens）。</li>
+            <li>
+              <b>指标口径与阈值</b>：<br>
+              · META 直出率 = 流式自带可解析 META 的轮次/总轮次 —— 观察值 ~60%（全上下文），<b>不设硬门槛</b>（补偿是兜底）；
+              · 补偿后 META 率 = (直出 + 补偿成功)/总轮次 —— <b>目标 100%</b>（低于 80% → 检查补偿 prompt/两调用回退预案）；
+              · 补偿率 = 补偿轮次/总轮次 —— <b>&lt; 50% 良好</b>（过高说明主契约在退步）；
+              · coach_note 有效 = MetaBlock.coach_note 非空占比 —— 目标 100%；
+              · 覆盖度命中 = hits 非空的轮次（规则通道，与 META 无关，2/5 起步即正常）；
+              · conclude 正确 = 第 5 轮（冒烟脚本末轮）为 true；
+              · 往返耗时 ms（回合总时长，均值参考 ~1-2s/轮）；
+              · tokens：prompt/completion 累计（同时验证 usage_log 落库——后端 usage_log 表应逐轮新增行）。
+            </li>
+          </ol>
+        </NAlert>
         <NCard class="mb-4">
           <h2 class="mb-2 font-bold">参数</h2>
           <NForm label-placement="left" label-width="130">
@@ -181,9 +198,12 @@ function tagType(v: unknown) {
           <NCard class="mt-4" title="连跑统计" size="small">
             <div class="flex flex-wrap gap-3">
               <NTag size="small" type="info">轮次 {{ runStats.turns }}</NTag>
-              <NTag size="small" :type="runStats.meta_rate >= 80 ? 'success' : 'error'">META {{ runStats.meta_rate }}%</NTag>
+              <NTag size="small" :type="runStats.meta_rate >= 80 ? 'success' : 'error'">补偿后 META {{ runStats.meta_rate }}%</NTag>
               <NTag size="small" type="warning">补偿 {{ runStats.compensated }}</NTag>
               <NTag size="small" :type="runStats.concluded ? 'success' : 'default'">收尾 {{ runStats.concluded }}</NTag>
+              <NTag v-if="runStats.tokens" size="small" type="info">
+                tokens {{ runStats.tokens.prompt }}p / {{ runStats.tokens.completion }}c
+              </NTag>
             </div>
           </NCard>
           <NCard class="mt-4" title="逐轮结果" size="small">

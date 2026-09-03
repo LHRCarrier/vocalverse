@@ -16,6 +16,8 @@ import hashlib
 import logging
 
 from app.agent.domains.learner import get_rendered
+from app.agent.domains.summarizer import SummarizerService, get_session_summary
+from app.agent.domains.usage import log_usage
 from app.agent.runtime.meta_executor import MetaExecutor, compensate_meta
 from app.agent.runtime.turn_runner import TurnRunner
 from app.audio.base import ASRClient, LLMClient, ScorerClient, TTSClient
@@ -215,6 +217,7 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             state.corpus_done,
             concluded_by_turn=(state.current_turn + 1 >= (session.assigned_turns or 8)),
             learner_profile=get_rendered(int(session.user_id)),
+            rolling_summary=get_session_summary(state.session_id) or "",
         )
         # LLM 流式：交 TurnRunner（docs/26 runtime/turn-runner：边界拆分 + META 泄漏门）；
         # 失败降级不重试（流式不可回放；POC-2 判定 <90% 成功率时切换「两调用」方案，docs/18 §6）
@@ -237,6 +240,12 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             meta = res.meta
             if res.leaked:
                 logger.warning("META leak degraded: reply without meta (user=%s)", session.user_id)
+            if res.usage:
+                log_usage(
+                    "turn",
+                    res.usage,
+                    meta={"session_id": int(state.session_id), "turn": turn_index},
+                )
         if meta is None:
             meta = MetaResult(reply=full_text, meta=None, ok=False)
         if not meta.ok:
@@ -358,12 +367,15 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             state.failed_streak = 0  # L2 AI 代说由 LLM 侧换角度完成；此处记账
         db.commit()
 
+        # 摘要双轨（docs/26 §10.3①）：回合落库后异步增量压缩（失败标记 → 下次自动重试）
+        asyncio.create_task(SummarizerService(llm).maybe_summarize(state.session_id))
+
         yield ev.TurnEnd(turn_index=turn_index, score_status=score_status)
 
         # 9) 收尾判定（MetaExecutor：meta.conclude 或轮次上限或用户放弃）
         limit = session.assigned_turns or 8
         if _meta_executor.should_conclude(meta, turn_index, limit, action):
-            summary = await _conclude_summary(llm, state.digest)
+            summary = await _conclude_summary(llm, state.digest, session_id=int(state.session_id))
             report_id = complete_session(state.session_id, llm, summary)
             state.state = "completed"
             await get_state_store().put(state)
@@ -581,19 +593,30 @@ def _fallback_reply(transcript: str) -> str:
     )
 
 
-async def _conclude_summary(llm: LLMClient, digest: list[str]) -> str:
+async def _conclude_summary(
+    llm: LLMClient, digest: list[str], session_id: int | None = None
+) -> str:
     try:
         content = (
             "Summarize this short speaking practice in one friendly English sentence: "
             f"{' | '.join(digest[-4:])}"
         )
-        return (
-            await llm.chat(
+        fn = getattr(llm, "chat_with_usage", None)
+        if fn is not None:
+            raw, usage = await fn(
                 [{"role": "user", "content": content}],
                 temperature=0.4,
                 max_tokens=80,
             )
-        )[:200]
+            if usage:
+                log_usage("conclude", usage, meta={"session_id": session_id})
+        else:
+            raw = await llm.chat(
+                [{"role": "user", "content": content}],
+                temperature=0.4,
+                max_tokens=80,
+            )
+        return (raw or "")[:200]
     except Exception:
         return "Well done! Keep practicing."
 
