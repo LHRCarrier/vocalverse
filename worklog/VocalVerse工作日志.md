@@ -3,6 +3,20 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-04 评分 DoD ②：流利度时间戳特征（ASR 词级时间戳 → wpm/停顿 → 落库/报告/联调测试台）
+
+打分「链路完成」DoD 剩余三项之②（2026-09-03 工作日志登记）：
+
+- **特征模块**：`app/audio/fluency.py` 纯函数 `compute_fluency_features`（**恒定键集、坏数据全零兜底、永不抛异常**）——`wpm`（词数/有效说话段分钟，**排除录音首尾静默**）、`articulation_rate`（去停顿纯发音速率）、停顿统计（**相邻词间隙 ≥0.5s 计一次**、≥1.0s 长停顿；仅词间不记首尾静默）、`pause_ratio`；口径 docs/07 Q30（ISE fluency 仍为权威流利度分，本模块只出辅助）；
+- **数据源**：faster-whisper `transcribe(..., word_timestamps=True)` → `ASRResult` 增 `words[{word,start,end,probability}]` + `duration`（契约变更 → `scripts/refresh-openapi.ps1` 刷新 python-openapi.json + `pnpm gen:api` 生成类型，diff 仅 ASRResult 两字段）；`FakeASRClient` 补同构词表（含 1.05s 停顿，测试可断言精确值）；
+- **接入**：对话链路（orchestrator `_dialog_turn`：attempt 写 `wpm` + `details.fluency` + user 消息 meta 带 wpm/pause_count）与入学测试链路（placement `score_item`：同写 + 响应补 wpm）——**修复前 `attempts.wpm` 列恒 NULL**（列自 0001 迁移就存在但从未写入）；
+- **报告**：`service.py` report `metrics.attempts[]` 增 `wpm` + `fluency_features`（前端 `ReportView` 流利度卡下显示「语速 ≈ N 词/分 · 停顿 ≈ M 次/轮」，仅无数据时隐藏）；
+- **联调测试页（新功能固件规范 · 预览机制）**：前端 `views/preview/FluencyPreview.vue`（/preview/fluency，dev-only 生产零体积，已验 dist 无 chunk）+ registry/router 登记；后端 test-only `routes/fluency_preview.py`（POST /api/v1/fluency-preview/analyze：真 ASR→特征→可选真 ISE→与 attempts/report 同构演示载荷），`include_in_schema=False`（契约快照零 diff）、无表无迁移、默认关闭（`APP_FLUENCY_PREVIEW_ENABLED`，本地 .env 已开，生产禁止开启）、删除清单见文件尾注释；页内报告样张按 **lieflat-charts 报告模式 R09 × PORCELAIN** 色值呈现（与 `assets/lieflat/vv-learning-report.html` 同 token）；
+- **验证**：pytest **148 passed**（新增 test_fluency 10 条纯函数 / fluency-preview 3 条（默认 404 + openapi 无该路径）/ asr 契约词表 1 条 / 对话→attempt→complete→report 全链路 1 条：wpm=145.83、pause=1、long=1）+ ruff check/format 全绿；前端 lint/typecheck/vitest 19 passed/build 绿；真链路冒烟（重启 :8000 后 `analyze` + 合成正弦 WAV）code=0 —— 正弦波 whisper 出 0 词级时间戳时特征全零兜底不崩；
+- **踩坑**：① `refresh-openapi.ps1` 被 Windows PowerShell 5.1 以 ANSI 解析报语法错 → 必须用 pwsh 7 执行；② 执行刷新会把 Java 快照重写成压缩单行（live springdoc 未开 pretty-print，契约语义相同但 2343 行噪音 diff）→ 本次 Java 零改动，已 `git checkout` 恢复入库 pretty 版；③ `zip() strict` ruff B905、`import.meta` 等老坑之外，本次 vue-tsc build 门禁抓住 `w.gap` 可能 null（lint/typecheck 不报，build 报——与踩坑③同型「门禁分工」）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
 ## 2026-09-03 ISE 批量对照实证：SpeechOcean762 人工标注 vs ISE（r=0.81，分档单调）
 
 新增 `scripts/poc/ise_validation.py`（gold 对照脚本，本地素材 `local/english-audio/01-speechocean762/` 驱动，gitignored）：按 gold 总分（0-10）抽低/中/高各 30 句（固定种子 42 可复现）→ 逐句真 ISE 评分 → TSV 对比表。
