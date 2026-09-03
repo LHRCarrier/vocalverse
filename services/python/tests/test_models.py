@@ -42,6 +42,7 @@ EXPECTED_TABLES = {
     "listening_materials",
     "post_likes",
     "defense_profiles",
+    "usage_log",
 }
 
 

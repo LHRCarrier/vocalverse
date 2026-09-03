@@ -43,10 +43,11 @@ async def test_run_turn_meta_via_fake_stream(monkeypatch) -> None:
 
 
 class _NoMetaLLM(FakeLLMClient):
-    """流式不带 META → 触发补偿（chat 返回无 JSON → 补偿失败但流程不崩）。"""
+    """流式不带 META（覆盖 stream_rich；True实现 TurnRunner 走富流）→ 触发补偿。"""
 
-    async def stream(self, messages, temperature=0.6, max_tokens=512):
-        yield "That'll be three dollars, please."
+    async def stream_rich(self, messages, temperature=0.6, max_tokens=512):
+        yield ("delta", "That'll be three dollars, please.")
+        yield ("usage", {"model": "fake", "prompt_tokens": 10, "completion_tokens": 5})
 
 
 @pytest.mark.anyio
