@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     level_threshold_l2: float = 55.0  # 55~69→L2；<55→L1
     placement_min_read_items: int = 1  # C5：可跳过 + 2 题迷你版（1 朗读 + 1 QA）
     placement_retest_cooldown_days: int = 1  # C3t：复测冷却（距上次 completed 定档；42902）
+    placement_lab_enabled: bool = False  # Placement Lab 联调测试台（test-only；生产禁止开启）
 
     # =========================================================================
     # 推荐系统（local/31 §4.4 配置汇总 + local/32 六维拷问修订；依据 local/26~32）
