@@ -3,6 +3,21 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-03 LLM 框架 P0 · 真 Key POC 实证与 META 契约 v2.2 定案（PR#26）
+
+组长提供 DeepSeek Key 后，框架切片首次真实现跑，60+ 次调用得出**推翻两处原设计的实证结论**（详见 docs/26 §9）：
+
+- **POC-2（流式 META 稳定性）初判 35% < 90% FAIL**（docs/18 预案=回退两调用）→ 四臂探针定位真因：**system 内动态 context 块是 META 契约杀手**（D=0% / D1=50% / E3=0%；A/C 静态无动态=100%，流式无影响）→ 初判推倒，无需回退全两调用；
+- **契约 v2.2 定案**：system 纯静态（角色/规则/conclude 指令/输出契约）；动态全部挂 **user 尾部 `[context]`**（难度/语料[仅英文，剥离 `|中文释义` 污染]/画像/已命中/收尾/摘要）；**META 缺失条件补偿调用**（temperature 0.2）→ 全链路冒烟 **5/5 = 100%**（流式直出 3 + 补偿 2），hits/conclude 全部正确；
+- **缓存 POC：NO-CACHE**（预热→300s 落盘→相同前缀，hit=0）→ ⑤ 收益重定位：「前缀稳定=契约稳定工程」（100% vs 0% 的实证差距），**缓存降费不作依赖、不进答辩主张**；`llm_cache_hit.py` 保留复测；
+- **防御补丁**：模型输出 `grammar:90` 裸数字（META 畸形）→ 旧代码会崩溃（冒烟实测抓出），已加 dict 防御并补测试；
+- 新 POC 脚本 3 份入库（ab 探针/框架冒烟/缓存验证，无 Key skip；llm_meta_ab 四臂矩阵可复跑）；
+- 门禁：pytest 114 passed / ruff 全清 / format 全清；PR#26 已 push 第 2~3 批 commit（代码+测试+docs 分开），POC 结果已回写 PR comment。
+
+**待办**：次日 reviewer 评审合并；`docs/24 §9`（B 系列）随前端重构推进；group 拍板 retry 命中口径（docs/14 §2.1 注释 vs 实现）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
 ## 2026-09-03 LLM 框架对齐 ai4u · 评估与实施计划（docs/26）
 
 组长拍板方向：LLM 部分不做小改，做成组内自研 ai4u 那样的分层框架（ai4u = 组长自研 Electron+Vue3+NestJS 桌面 AI 伴侣，`F:\WorkingL\ai4u`，Agent 运行时自研分层架构）。通读 ai4u 源码与 `docs/agent/` 后输出评估：
