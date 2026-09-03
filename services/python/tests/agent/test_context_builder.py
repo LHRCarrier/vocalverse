@@ -1,14 +1,15 @@
-"""ContextBuilder 单测（docs/26 P0 · docs/24 §1-B3 P1/P2 修正版）。
+"""ContextBuilder 单测（docs/26 P0 · docs/14 §3.4 v2.2 实证契约）。
 
-P1（A 官 F02 修正）：两次调用用**不同 state**（不同 digest/hits/concluded）→ 断言
-`messages[0]` 中 `DYNAMIC_MARKER` 之前的**子串**逐字节一致（整条不要求一致）——旧实现
-（单条 system 混装）不含该标记，本用例必失败（先红后绿的核心回归锚点）。
-P2：动态字段全部位于标记之后；F01 保真项：`set conclude=true` 指令与 `(none)` 兜底存在。
+P1（A 官 F02 修正 + POC 实证升级）：两次调用用**不同 state**（不同 digest/hits/concluded）→
+断言 **system 完全一致**（POC 铁证：system 必须 100% 静态，动态块进 system 直接摧毁
+META 契约遵守率——0% vs 100%，docs/26 §POC 复盘）。
+P2：动态字段（难度/语料/画像/hits/收尾/摘要）全部在 user 消息内；**中文释义不出现在任何消息**。
+F01 保真：conclude 指令与 (none) 兜底存在。
 """
 
 from __future__ import annotations
 
-from app.agent.runtime.context_builder import DYNAMIC_MARKER, build_context
+from app.agent.runtime.context_builder import build_context
 from app.practice.meta import MARKER
 from app.practice.state import SessionState
 
@@ -34,64 +35,56 @@ def _build(state: SessionState, learner: str = "", user_text: str = "hello there
     )
 
 
-def _prefix(system: str) -> str:
-    return system.split(DYNAMIC_MARKER)[0]
-
-
-def test_prefix_static_across_different_states() -> None:
-    """P1（修正版）：不同 state（不同 digest/hits/concluded）→ 标记前子串逐字节一致。"""
+def test_system_static_identical_across_different_states() -> None:
+    """P1：不同 state（不同 digest/hits/concluded）→ system 消息逐字节一致（全静态）。"""
     m1 = _build(_state(digest=["U: a | A: b"], hits=["x"]), user_text="one")
     m2 = _build(_state(digest=["U: c | A: d", "U: e | A: f"], hits=["y", "z"]), user_text="two")
     assert len(m1) == 2 and m1[0]["role"] == "system" and m1[1]["role"] == "user"
-    assert _prefix(m1[0]["content"]) == _prefix(m2[0]["content"])
-    # 整条 system 不必一致（动态段不同）——断言锚点本身
-    assert m1[0]["content"] != m2[0]["content"]
+    assert m1[0]["content"] == m2[0]["content"]  # system 逐字节一致（前缀缓存全量命中）
+    assert m1[1]["content"] != m2[1]["content"]  # 动态在 user 尾部
 
 
-def test_prefix_preserves_behavior_instructions() -> None:
-    """F01 保真：conclude 行为指令与输出契约必须保留在静态前缀。"""
+def test_system_preserves_behavior_instructions() -> None:
+    """F01 保真：conclude 行为指令与输出契约必须保留在（静态）system。"""
     system = _build(_state())[0]["content"]
-    pre = _prefix(system)
-    assert "set conclude=true" in pre
-    assert MARKER in pre
-    assert "META JSON fields" in pre
+    assert "set conclude=true" in system
+    assert MARKER in system
+    assert "META JSON fields" in system
 
 
-def test_dynamic_fields_after_marker() -> None:
-    """P2：难度/语料/画像/hits/收尾/摘要全部位于标记之后；前缀不含动态值。"""
+def test_dynamic_fields_all_in_user_message() -> None:
+    """P2：难度/语料/画像/hits/收尾/摘要全部位于 user 消息；system 不含动态值。"""
     learner = (
         "Learner profile (internal): weak phrases: How much is it?. "
         "Gently address these, do not overcorrect."
     )
     state = _state(digest=["U: hi | A: hello"], hits=["already-hit"])
-    system = _build(state, learner=learner)[0]["content"]
-    pre, post = system.split(DYNAMIC_MARKER, 1)
-    assert "difficulty 2" in post
-    assert "I'd like a coffee." in post
-    assert "already-hit" in post
-    assert "Turn limit reached: True" in post
-    assert "U: hi | A: hello" in post
-    assert "Learner profile" in post
+    msgs = _build(state, learner=learner)
+    system, user = msgs[0]["content"], msgs[1]["content"]
+    assert "difficulty 2" in user
+    assert "I'd like a coffee." in user  # 英文短语
     assert (
-        "difficulty 2" not in pre
-    )  # 动态值不出现在前缀（META 字段名 difficulty_delta 属契约，例外）
-    assert "Target language level" not in pre
-    assert "already-hit" not in pre
-    assert "U: hi" not in pre
-    assert "Learner profile" not in pre
+        "请给我来杯咖啡" not in system and "请给我来杯咖啡" not in user
+    )  # 中文释义不出现在 LLM 上下文
+    assert "already-hit" in user
+    assert "Turn limit reached: True" in user
+    assert "U: hi | A: hello" in user
+    assert "Learner profile" in user
+    for needle in ("difficulty 2", "already-hit", "U: hi", "Learner profile"):
+        assert needle not in system
 
 
 def test_learner_line_omitted_when_empty() -> None:
-    system = _build(_state())[0]["content"]
-    assert "Learner profile" not in system
+    user = _build(_state())[1]["content"]
+    assert "Learner profile" not in user
     # 空值兜底（F01）：corpus/hits 为空时保留 (none)
-    system2 = build_context(_state(), "p", "", 2, "u", "normal", [], False, learner_profile="")[0][
-        "content"
-    ]
-    assert "(none)" in system2
+    state = _state()
+    msgs = build_context(state, "p", "", 2, "u", "normal", [], False, learner_profile="")
+    assert "(none)" in msgs[1]["content"]
 
 
-def test_user_msg_keeps_dynamic_at_tail() -> None:
+def test_user_msg_head_kept() -> None:
     state = _state()
     msgs = _build(state, user_text="maybe wrong word")
     assert msgs[1]["content"].startswith("user said (ASR): maybe wrong word")
+    assert "[context]" in msgs[1]["content"]

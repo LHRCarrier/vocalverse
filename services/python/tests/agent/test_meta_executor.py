@@ -7,7 +7,8 @@
 
 from __future__ import annotations
 
-from app.agent.runtime.meta_executor import MetaExecutor
+import pytest
+from app.agent.runtime.meta_executor import MetaExecutor, _parse_meta_json, compensate_meta
 from app.practice.corpus import parse_corpus
 from app.practice.meta import MetaResult
 
@@ -80,3 +81,58 @@ def test_should_conclude_rules() -> None:
     assert ex.should_conclude(_meta(conclude=False), 8, 8, "normal") is True  # 轮次上限兜底
     assert ex.should_conclude(MetaResult(reply="x", meta=None, ok=False), 2, 8, "abandon") is True
     assert ex.should_conclude(_meta(conclude=False), 2, 8, "normal") is False
+
+
+# ---------------------------------------------------------------------------
+# 补偿调用（docs/26 §9.4：META 缺失后置提取）
+# ---------------------------------------------------------------------------
+class _JsonLLM:
+    def __init__(self, raw: str) -> None:
+        self.raw = raw
+        self.calls = 0
+
+    async def chat(self, messages, temperature=0.7, max_tokens=512) -> str:
+        self.calls += 1
+        return self.raw
+
+
+@pytest.mark.anyio
+async def test_compensate_meta_parses_json() -> None:
+    llm = _JsonLLM(
+        '{"grammar":{"score":91,"errors":[]},"coach_note":"Nice!","corpus_hits":'
+        '[{"phrase":"How much is it?","state":"ok"}],"difficulty_delta":0,"conclude":false}'
+    )
+    m = await compensate_meta(
+        llm,
+        reply_text="That'll be three dollars.",
+        transcript="How much is it?",
+        action="normal",
+        concluded_by_turn=False,
+    )
+    assert m.ok and m.coach_note == "Nice!" and len(m.corpus_hits) == 1
+    assert llm.calls == 1
+
+
+@pytest.mark.anyio
+async def test_compensate_meta_tolerates_prose_fence() -> None:
+    llm = _JsonLLM('Here you go:\n```json\n{"conclude":false}\n```')
+    m = await compensate_meta(
+        llm, reply_text="x", transcript="", action="normal", concluded_by_turn=False
+    )
+    assert m.ok and m.meta == {"conclude": False}
+
+
+@pytest.mark.anyio
+async def test_compensate_meta_failure_degrades() -> None:
+    llm = _JsonLLM("sorry, no json today")
+    m = await compensate_meta(
+        llm, reply_text="x", transcript="", action="normal", concluded_by_turn=False
+    )
+    assert m.ok is False and m.meta is None
+
+
+def test_parse_meta_json_malformed_grammar_guarded() -> None:
+    # 防御：grammar 裸数字（冒烟实测）→ ok=True 但不崩溃（grammar_ok 判 dict）
+    m = _parse_meta_json('{"grammar":90,"coach_note":"ok"}', "reply")
+    assert m.ok is True
+    assert ex.grammar_ok(m, []) is True  # 非 dict → 默认达意（不崩）

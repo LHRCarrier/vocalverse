@@ -12,16 +12,13 @@
 
 from __future__ import annotations
 
-import json
 import os
-import sys
 from pathlib import Path
 
 import httpx
 
 BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
-RUNS = 5
 
 # 静态块（模拟 ContextBuilder 的 DYNAMIC_MARKER 之前部分）
 SYSTEM_STATIC = (
@@ -31,15 +28,6 @@ SYSTEM_STATIC = (
     "Output contract: reply as plain English text ONLY, then finish with a single line: "
     "[-META-]{}"
 )
-
-# 每轮变化的 user 消息（模拟动态尾：hit/miss 分界）
-USER_TURNS = [
-    "hi, I would like a latte, please.",
-    "and a croissant, thanks",
-    "what's the price?",
-    "thanks, how long will it take?",
-    "ok, can I pay by card?",
-]
 
 
 def load_key() -> str:
@@ -66,52 +54,80 @@ async def main() -> None:
         print("未设置 DEEPSEEK_API_KEY —— 跳过实跑（真 Key 就绪后运行本脚本并回写结果）")
         return
 
-    hit_tokens: list[int] = []
-    miss_tokens: list[int] = []
-    for i in range(RUNS):
-        messages = [
-            {"role": "system", "content": SYSTEM_STATIC + "\n── DYNAMIC BEGIN ── (poc placeholder)"},
-            {"role": "user", "content": USER_TURNS[i % len(USER_TURNS)]},
-        ]
+    # 判据（官方 kv_cache 指南）：缓存按「完整匹配缓存前缀单元」命中；落盘为异步过程，
+    # 连续快速请求（<落盘延迟）之间不命中属预期 → 采用「预热 → 等待落盘 → 相同前缀验证」。
+    warm = {
+        "role": "user",
+        "content": "warm-up: hi, I'd like a latte, please.",
+    }
+    verify_same = {
+        "role": "user",
+        "content": "warm-up: hi, I'd like a latte, please.",  # 与预热完全一致（例一：A+B 完整匹配）
+    }
+    verify_variant = {"role": "user", "content": "turn 2: and a croissant, thanks"}
+
+    async def call(messages, tag: str) -> tuple[int | None, int | None]:
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
                 f"{BASE_URL}/chat/completions",
-                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                json={"model": MODEL, "temperature": 0.6, "max_tokens": 32, "messages": messages},
+                headers={
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": MODEL,
+                    "temperature": 0.6,
+                    "max_tokens": 32,
+                    "messages": messages,
+                },
             )
         if resp.status_code != 200:
-            print(f"  run[{i}] HTTP {resp.status_code}: {resp.text[:200]}")
-            continue
-        data = resp.json()
-        usage = data.get("usage") or {}
+            print(f"  [{tag}] HTTP {resp.status_code}: {resp.text[:200]}")
+            return None, None
+        usage = (resp.json().get("usage") or {})
         hit = usage.get("prompt_cache_hit_tokens")
         miss = usage.get("prompt_cache_miss_tokens")
         if hit is None or miss is None:
             print(
-                f"  run[{i}] usage 字段缺失（hit/miss 为 None）：{json.dumps(usage, ensure_ascii=False)[:200]}"
-                " —— 请确认模型/端点支持缓存字段"
+                f"  [{tag}] usage 字段缺失: {usage} —— 请确认模型/端点支持缓存字段"
             )
-            continue
-        hit_tokens.append(int(hit))
-        miss_tokens.append(int(miss))
-        print(f"  run[{i}] hit={hit} miss={miss}（{'MISS' if i == 0 else 'HIT' if hit else 'NO-CACHE'}）")
+            return None, None
+        print(f"  [{tag}] hit={hit} miss={miss}")
+        return int(hit), int(miss)
 
-    if not hit_tokens:
-        print("无有效采样 —— 检查 key/网络/缓存字段")
-        sys.exit(1)
-    total_hit = sum(hit_tokens)
-    total = sum(hit_tokens) + sum(miss_tokens)
-    ratio = total_hit / total * 100 if total else 0.0
-    print(
-        f"\n-- 统计({len(hit_tokens)} 次): hit 总 {total_hit} / miss 总 {sum(miss_tokens)}"
-        f" / 命中占比 {ratio:.1f}%\n"
-        f"   第 2 次起命中: {[h for h in hit_tokens[1:]]}"
+    system_static = (
+        SYSTEM_STATIC
+        + "\n── DYNAMIC BEGIN ── (poc placeholder)"
     )
+
+    print("[1] 预热请求（落盘 A+B 单元）")
+    await call([{"role": "system", "content": system_static}, warm], "warm-up")
+
+    print("[2] 等待缓存落盘（300s……后台执行，勿中断）")
+    import time
+
+    time.sleep(300)
+
+    print("[3] 相同前缀验证（A+B 完全一致 → 应命中）")
+    h_same, m_same = await call(
+        [{"role": "system", "content": system_static}, verify_same], "verify-same"
+    )
+
+    print("[4] 动态尾验证（A+B 共享前缀 + 新尾；公共前缀 A+B 已落盘 → 应命中 A+B 段）")
+    h_var, m_var = await call(
+        [{"role": "system", "content": system_static}, verify_variant], "verify-variant"
+    )
+
     print("== 判定 ==")
-    if any(h > 0 for h in hit_tokens[1:]):
-        print("PASS → 前缀缓存机制成立（静态块逐字稳定策略有效）")
+    if (h_same or 0) > 0:
+        print("PASS → 前缀缓存机制成立（相同前缀落盘后可命中）")
+    elif (h_var or 0) > 0:
+        print("PARTIAL → 完整前缀尚未命中但共享前缀命中（公共前缀检测生效）")
     else:
-        print("NO-CACHE → 前缀未命中：核查静态块是否真的逐字稳定 / 模型与端点是否支持缓存")
+        print(
+            "NO-CACHE → 前/前缀均未命中：核查静态块是否真的逐字稳定 / 模型与端点是否支持缓存 / "
+            "是否受 5 分钟落盘延迟之外的因素影响"
+        )
 
 
 if __name__ == "__main__":
