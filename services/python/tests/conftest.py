@@ -12,6 +12,8 @@ os.environ.setdefault("APP_AUDIO_DIR", "./data/audio-test")
 # Agent Lab 测试台：即使本地 .env 开启 APP_AGENT_LAB_ENABLED=true，测试环境也钉回默认关闭
 # （test_agent_lab_disabled_returns_404 断言路由 404；env 变量优先级高于 .env）
 os.environ.setdefault("APP_AGENT_LAB_ENABLED", "false")
+# 流利度特征测试台同规格：默认关闭钉回（test_fluency_preview_disabled_returns_404）
+os.environ.setdefault("APP_FLUENCY_PREVIEW_ENABLED", "false")
 
 import shutil  # noqa: E402
 

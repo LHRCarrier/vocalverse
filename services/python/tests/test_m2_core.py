@@ -236,6 +236,68 @@ def test_turn_stale_expected_turn_rejected(client, auth_headers):
     assert resp.status_code == 409
 
 
+def test_fluency_features_flow_into_attempt_and_report(client, auth_headers):
+    """集成：对话回合（Fake ASR 词级时间戳）→ attempts.wpm/details.fluency → 报告透出。
+
+    修复前 wpm 列从未写入（attempts.wpm 恒 NULL），流利度时间戳特征无处呈现。
+    Fake 词表含 1.05s 停顿：wpm=145.83 / pause_count=1 / long_pause_count=1。
+    """
+    from app.db import get_session_factory
+    from app.models import Attempt, Scenario
+    from sqlalchemy import select
+
+    db = get_session_factory()()
+    scenario = Scenario(
+        title="流利度特征测试",
+        scene_type="cafe",
+        difficulty=1,
+        system_prompt="You are Bella, a friendly barista.",
+        opening_line="Hi there!",
+        target_corpus="I'd like a coffee, please.|请给我来杯咖啡",
+        interest_tags=[],
+        status="published",
+    )
+    db.add(scenario)
+    db.commit()
+    sid = scenario.id
+    db.close()
+
+    resp = client.post(
+        "/api/v1/sessions", json={"kind": "dialog", "scenario_id": sid}, headers=auth_headers
+    )
+    session_id = resp.json()["data"]["id"]
+    resp = client.post(
+        f"/api/v1/sessions/{session_id}/turns",
+        data={"action": "normal"},
+        files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+
+    db = get_session_factory()()
+    try:
+        attempt = db.execute(select(Attempt).where(Attempt.session_id == session_id)).scalar_one()
+        assert attempt.wpm is not None
+        assert float(attempt.wpm) == 145.83
+        features = (attempt.details or {}).get("fluency")
+        assert features["word_count"] == 7
+        assert features["pause_count"] == 1
+        assert features["long_pause_count"] == 1
+        assert features["max_pause_s"] == 1.05
+    finally:
+        db.close()
+
+    resp = client.post(f"/api/v1/sessions/{session_id}/complete", headers=auth_headers)
+    assert resp.status_code == 200
+    report_id = resp.json()["data"]["report_id"]
+    resp = client.get(f"/api/v1/reports/{report_id}", headers=auth_headers)
+    assert resp.status_code == 200
+    attempts = resp.json()["data"]["metrics"]["attempts"]
+    assert attempts[0]["wpm"] == 145.83
+    assert attempts[0]["fluency_features"]["pause_count"] == 1
+    assert attempts[0]["fluency_features"]["wpm"] == 145.83
+
+
 def test_defense_profile_lifecycle(client, auth_headers):
     resp = client.post(
         "/api/v1/defense/profiles",
