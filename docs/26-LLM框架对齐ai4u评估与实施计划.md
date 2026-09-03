@@ -170,4 +170,43 @@ docs/14 §3.4 已按 v2.2 回写；tests/agent/test_context_builder.py 断言已
 
 ---
 
+## 10. 数据设计：现有表承载 + 两处该补的缺口（对比 ai4u schema）
+
+> 结论先行：**P0 零新表是正确设计**（框架层不落库、全部聚合派生）；对 ai4u 30+ 张表逐表比对后，
+> 真正「该落库没落库」的只有 **① 会话摘要 ② 用量记账**，其余均为「有语义对应、形态不同」。
+
+### 10.1 VocalVerse 现状（LLM 框架读写面，全部既有表，零迁移）
+
+| 数据 | 表/载体 | 说明 |
+|---|---|---|
+| 场景人设/语料 | `scenarios`（system_prompt/target_corpus 行制式 `phrase\|释义`/difficulty/prompt_version） | 场景即角色（单入口产品，无需 ai4u character 表） |
+| 会话 | `sessions`（kind/scenario_id/assigned_turns/turn_count/duration_s） | **无 summary 列** |
+| 消息/每轮 META | `scenario_messages`（role/seq/content/audio_url + **meta JSONB**：grammar/coach_note/corpus_hits/difficulty_delta/prompt_version/basis/is_question） | 相当于 ai4u agent_message 的 meta 位（缺 tokenUsage） |
+| 词级错误 | `attempts.details.word_level`（error_type/score） | learner 画像词级源 |
+| 句级/场景级掌握度 | `user_corpus_mastery` / `user_mastery`（status=not_mastered/in_progress/mastered、mastery_score、attempt/pass 计数） | **学习者记忆的结构化形态**（评分驱动，非对话内容记忆） |
+| 动态水平 | `user_skill_state`（est_score/est_level/confidence/60 天半衰期/滞回/低谷保护） | ai4u memory 的「衰减」语义对等物 |
+| 画像缓存 | **进程内 dict（TTL 900s）**，不落表 | 聚合派生 + 收尾失效，无需表 |
+| 滚动摘要 | **进程内 state.digest（30min TTL）**，不落表 | ⚠️ 见 §10.3 缺口① |
+
+### 10.2 ai4u → VocalVerse 对照（与 LLM/记忆相关表）
+
+| ai4u 表（关键字段） | VocalVerse 对应 | 判定 |
+|---|---|---|
+| `agent_conversation`（**summary/summaryUpdatedAt/summaryFailedAt**、messageCount、isPinned、lastMessageAt；scene/characterId/campaignId） | `sessions` 部分对应 | **摘要三列缺失 → 缺口①**；其余字段无对应需求 |
+| `agent_message`（role/content/**tokenUsage（JSON）**/meta/refs/kind/payload；source=chat\|proactive） | `scenario_messages`（meta 已有） | **tokenUsage 缺失 → 缺口②**；proactive/IM 字段不迁移 |
+| `memory`（content/valence/arousal/importance/**activationCount/lastActivatedAt/pinned/visibility**/source=manual\|auto\|chat-tool\|letter\|proactive\|summary/quote） | ✅ 语义对应 = `user_corpus_mastery`+`user_skill_state`+`attempts`（**结构化学习者记忆**） | **不建对等表**：学习者记忆是评分派生数据，半衰期/复习席（rec `review_gap_days` 最弱优先）已覆盖「衰减/激活/探索」语义；valence/arousal/quote 是陪伴产品要素，不迁移 |
+| `character`（persona/backstory/toneDescription/toneFeatures/generationConfig/**firstChatAt/lastAutoMemoryAt/proactiveEnabled/status/personalSignatures**） | `scenarios`（system_prompt+difficulty 档位=persona 轻量化；教练双人格 docs/14 §2.2 在 prompt 内） | 不建表（无多角色需求） |
+| `character_corpus`（dialogue/lore + chunks） | `target_corpus`（行制式） | 无（few-shot 语料 = target_corpus 本身） |
+| `qa_scenario`（profileId/persona/toneRules/citationRules/domainRules/**params JSON**）/ `prompt_template`（scene/template/variables/isSystem） | prompt 模板**硬编码**于 `context_builder._STATIC_TEMPLATE` | P2 可选：如需可管理模板再建 `prompt_templates` 表（ai4u prompt-admin 先例） |
+| `usage_log`（source/model/**promptTokens/completionTokens**/meta） | **无**（P3 拍板：仅日志不建表） | **缺口②**：M3 报表时按此模板加表（P3 已登记「M3 报表再定」） |
+| TRPG 六表/journal/letter/character_event/scheduled_message/media/conversation_participant/knowledge_base 系/Settings 单例 | —— | 不迁移（产品定位差异，§3 不迁移清单） |
+
+### 10.3 缺口与 P1 建议（待组长拍板）
+
+1. **① 会话摘要落库**（ai4u 双轨精华）：`sessions` 加 `summary TEXT` + `summary_updated_at TIMESTAMP`（+可选 `summary_failed_at`）——摘要从进程内 digest 落库后：长会话不失忆、跨会话续聊有基础（M2「刷新恢复 P2 延期」卡的就是此缺口）、失败可自动重试（ai4u summaryFailedAt 系统信号）。**随 P1 摘要双轨实施**（docs/26 §4-P1），预估 1 人日内。
+2. **③ 学习者画像维持派生不建表**：mastery/skill/attempts 聚合 + 进程内 TTL 缓存已闭环；如 P1 做 **Auto-memory**（每会话收尾把新易错点沉淀为画像更新），可在 `user_corpus_mastery`/衍生表上自然生长，不新增记忆表——ai4u memory 的情感坐标/quote 是陪伴产品要素，与口语训练产品不符。
+3. **② usage_log**：P3 拍板已定（暂仅日志）；M3 报表时按 ai4u `usage_log` 模板建表（source/model/prompt_tokens/completion_tokens/meta + 时间索引）。
+
+---
+
 *状态：拍板完成（§7）。docs/24 A 系列实现方式被本 P0 取代（并入 §8③）但目标不变；docs/24 的 B 系列顺延、许可红线、禁止项继续有效。*
