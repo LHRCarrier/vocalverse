@@ -3,6 +3,17 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-03 Agent Lab · LLM 框架测试台（团队测试用，整删无影响）
+
+按组长要求「做一个前端测试页，专供团队测试、不影响其它代码、删除无影响」，落地 **Agent Lab**：
+
+- **前端**：`apps/web/src/views/preview/AgentLabPreview.vue`（预览工作流 docs/13 §8：dev-only 子树，生产构建 Rollup 整枝剔除——零体积零路由；注册表 + 路由各 +1 行）。能力：单轮实验（真 LLM）/连跑 5 轮冒烟（META 直出 vs 补偿、命中、收尾、统计）/system-user 原文查看（验证「system 全静态」契约）/学习者画像只读查看；
+- **后端**：`app/api/routes/agent_lab.py`（`include_in_schema=False` → OpenAPI 契约快照零 diff；无表无迁移；`agent_lab_enabled=False` 默认关闭、未开启路由不注册 → 404）；`GET /agent-lab/turn` `POST /agent-lab/turns` `GET /agent-lab/learner`；
+- **验证**：pytest 117 passed（含默认关闭 404 + 契约无 agent-lab 路径 + Fake 流式 META/无 META 补偿两路径）；ruff 全清；前端 lint/typecheck/test:run/build 全绿（后台跑毕确认）；**开启方式**：本地 `APP_AGENT_LAB_ENABLED=true`（生产必须保持关闭）；
+- **删除清单**（已写入 agent_lab.py 文件尾注释）：删 vue 文件 + registry/路由各 1 行 + 后端路由文件 + main.py 2 行 + config 1 行 —— 无迁移/无契约影响。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
 ## 2026-09-03 LLM 框架 P0 · 真 Key POC 实证与 META 契约 v2.2 定案（PR#26）
 
 组长提供 DeepSeek Key 后，框架切片首次真实现跑，60+ 次调用得出**推翻两处原设计的实证结论**（详见 docs/26 §9）：
