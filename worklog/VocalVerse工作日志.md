@@ -3,6 +3,29 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-03 ISE 批量对照实证：SpeechOcean762 人工标注 vs ISE（r=0.81，分档单调）
+
+新增 `scripts/poc/ise_validation.py`（gold 对照脚本，本地素材 `local/english-audio/01-speechocean762/` 驱动，gitignored）：按 gold 总分（0-10）抽低/中/高各 30 句（固定种子 42 可复现）→ 逐句真 ISE 评分 → TSV 对比表。
+
+**实测（90/90 成功，0 失败）**：
+- pearson(gold_total → ise_overall) = **0.810**（强相关，发音评测准确性成立）；
+- gold_acc → ise_pron = 0.730；gold_flu → ise_flu = 0.797；
+- 各档 ISE overall 均值：low=**57.17** / mid=**80.39** / high=**88.27** —— 三档完全单调，可作为"水平分档"的实证依据（对应 A2/B1+/C1 近似的语音侧分档）。结论：**ISE 接入可靠性（链路）+ 准确性（对标）双双达标**；打分"链路完成"的 DoD 第①条达成（剩余：流利度时间戳特征、META content/vocab 语义子分、影子跟读编排分支——另排）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-03 讯飞 ISE 真链路接入：旧 HTTP 接口已下线 → 流式版重写（真调用全通）
+
+组长提供 ISE 密钥（APPID/APIKey/APISecret，已写入 gitignored `services/python/.env` 与根 `.env`，不入库）。接入过程（真调用逐级排障）：
+
+- **HTTP 版接口已下线**：`https://ise-api.xfyun.cn/v2/open-ise`（POST form + X-Appid/X-CheckSum MD5 签名）返回 `not found`/403——官方现行文档为**流式版 WebSocket**（`wss://ise-api.xfyun.cn/v2/open-ise`），据此整体重写 `ise.py`；
+- **踩坑链（每级有官方文档依据）**：① WebSocket 握手 401 → url 查询参数通用鉴权（authorization/date/host，HMAC-SHA256，`host:…\ndate:…\nGET /v2/open-ise HTTP/1.1`）；② 每帧 `data.data`（base64）**≤26000 字符**（10163，PCM 每帧 ≤~19KB）；③ **business 必须每帧携带**、common 仅首帧；cmd 按阶段切换：参数帧 `cmd=ssb`（data.status=0）→ 音频帧 `cmd=auw`+`aus=1/2/4`（status=1/1/2，末帧带最后音频块）；每帧全带 business 曾致 `10222 DeadlineExceeded`，仅首帧带则 `30002 cmd needed`；④ 业务参数 `aue` **默认是讯飞定制 speex**，裸 PCM 必须显式 `aue=raw`（40007 SRecWrite）；⑤ 结果帧 `data.data` = **base64(XML)** 而非 JSON；⑥ 文本需 UTF8 BOM 头（`\uFEFF`+text）；⑦ 多维度分需 `rst=entirety`+`ise_unite=1`+`extra_ability=multi_dimension`，真实 XML 里 **sentence 层只有 accuracy_score/fluency_score/standard_score/total_score，integrity_score 只在 read_chapter 层** → 解析器做 chapter 回退；⑧ `score()` 曾漏包 `ScoreResult`（返回 dict）已修。
+- **音频转码**：ISE 只收 16k 单声道 s16le 裸 PCM → `_to_pcm16`（ffmpeg）预处理（编排器传的是原始 WebM 字节）；本机无 ffmpeg → `_ffmpeg_bin` 增加 **imageio-ffmpeg 自带二进制回退**（`uv pip install imageio-ffmpeg`，README 登记的免管理员路径）+ PATH/env 优先。
+- **验证**：① 单测 5 条（转码/分帧/真实 XML 解析/降级），**pytest 132 passed** + ruff 全绿；② 真调用（Windows SAPI 离线 TTS 生成测试音频，规避 edge-tts 偶发 DNS）→ **overall=90.90 / pron=92.59 / flu=87.70 / completeness=100.00 / 词级细评 9 条**；③ 服务端 `/api/v1/score` 走真评分器 → code=0 同分数，全链路通。
+- **边界说明**：当前对话场景以 ASR 转写作为 reference（"转写对转写"，近似发音对齐）；ISE 的真正价值在**有题卡场景**（影子跟读/朗读/M3 唱歌，`category=read_sentence` 已支持，自由题 `category=topic` 可扩展）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
 ## 2026-09-03 预览测试页机制统一修复：Agent Lab 404 根因 + Demo↔预览画廊双向通道
 
 - **BUG1 · Agent Lab 测试台 HTTP 404**（以截图为准，用户口中 401 实为 404）：根因 = `agent_lab_enabled` 默认 False 且本地 `.env` 未设置 → 路由未注册（符合 docs/26 §8 约束：默认关闭、生产禁止开启）；修复 = 本地 gitignored `services/python/.env` 与根 `.env` 追加 `APP_AGENT_LAB_ENABLED=true`（带「生产禁止开启」注释；不提交、不进 CI、生产零暴露不变）。
