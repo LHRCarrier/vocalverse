@@ -181,7 +181,7 @@ docs/14 §3.4 已按 v2.2 回写；tests/agent/test_context_builder.py 断言已
 |---|---|---|
 | 场景人设/语料 | `scenarios`（system_prompt/target_corpus 行制式 `phrase\|释义`/difficulty/prompt_version） | 场景即角色（单入口产品，无需 ai4u character 表） |
 | 会话 | `sessions`（kind/scenario_id/assigned_turns/turn_count/duration_s） | **无 summary 列** |
-| 消息/每轮 META | `scenario_messages`（role/seq/content/audio_url + **meta JSONB**：grammar/coach_note/corpus_hits/difficulty_delta/prompt_version/basis/is_question） | 相当于 ai4u agent_message 的 meta 位（缺 tokenUsage） |
+| 消息/每轮 META | `scenario_messages`（role/seq/content/audio_url + **meta JSONB**：grammar/coach_note/corpus_hits/difficulty_delta/content/vocab（③ 语义子分，2026-09-04）/prompt_version/basis/is_question） | 相当于 ai4u agent_message 的 meta 位（缺 tokenUsage） |
 | 词级错误 | `attempts.details.word_level`（error_type/score） | learner 画像词级源 |
 | 句级/场景级掌握度 | `user_corpus_mastery` / `user_mastery`（status=not_mastered/in_progress/mastered、mastery_score、attempt/pass 计数） | **学习者记忆的结构化形态**（评分驱动，非对话内容记忆） |
 | 动态水平 | `user_skill_state`（est_score/est_level/confidence/60 天半衰期/滞回/低谷保护） | ai4u memory 的「衰减」语义对等物 |

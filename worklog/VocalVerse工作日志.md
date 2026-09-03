@@ -3,6 +3,18 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-04 评分 DoD ③：META content/vocab 语义子分（LLM 判定 · 进展示不进总分）
+
+打分「链路完成」DoD 剩余三项之③（④ 之后收尾）：
+
+- **契约增量（docs/14 §3.4 + docs/26 同步）**：`[-META-]` 增 `content:{score,note}`（内容相关度/充实度）与 `vocab:{score,note}`（词汇多样性）——**口径 docs/07 Q38 拍板 C 落地**：LLM 判定、进报告展示、**不进量化总分**（S=0.4·发音+0.3·语法+0.3·流利度 不变），避免「语义对错混入口语技能分」；
+- **改动面**：`meta.py`（properties content/vocab + render_meta 扩展，默认 None 不破坏既有调用；**防御：模型输出裸数字/字符串 → None 不伪造**）；`context_builder` system 契约行加字段描述（**system 仍逐字静态**——字段说明属契约正文，docs/26 ⑤ 不变）；`meta_executor` 补偿 prompt（_COMPENSATE_SYSTEM + user 注记）同步；`events.MetaBlock` + SSE 手写类型（sse-types.ts）加 content/vocab；orchestrator（MetaBlock 透出 + assistant 消息 meta 落 content/vocab）；`service.complete_session` 新增 `metrics.semantic`（聚合均分+轮次）；`stubs.FakeLLM` 的 META 带 88/84 子分（全链路可断言）；
+- **前端**：ReportView 评分卡下方加「内容相关度 / 词汇多样性」两卡（标注不含总分；无数据隐藏）；
+- **验证**：pytest **180 passed**（+3：META 解析与防御、补偿 prompt 形状、补偿透传；全链路测试断言 SSE meta_block 带 content/vocab + 报告 semantic={content:88.0/1轮, vocab:84.0/1轮}）+ ruff 全绿；前端 lint/typecheck/vitest 19/build 全绿；
+- **踩坑**：① docs/14 契约行与 system 契约行是我在一天内第三次改「契约文本」——每次都要同时对照 docs/14、docs/26、meta.py 文档字符串与 _STATIC_TEMPLATE 四处，改一处漏一处（本次已四同步）；② 复用了"改 worklog 用标题行做锚点"的老毛病，两次吞掉下一条目标题——本次已逐处核对。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
 ## 2026-09-04 评分 DoD ④：影子跟读/朗读编排分支（ISE 主场 · 三维评分 + 联调测试台）
 
 打分「链路完成」DoD 剩余三项之④（顺序：④→③）：
@@ -16,8 +28,6 @@
 - **踩坑**：① PowerShell `$PID` 是保留自动变量，`dev-up.ps1` stop 循环变量撞名 → 服务杀不掉（已改 `$procId`）；② 测试里 SSE JSON 断言别忘了冒号后有空格（`"conclude": false`），与旧代码无空格格式不同。
 
 —— 执行人：LHRCarrier（AI 代工整理）
-
-
 
 ## 2026-09-04 联调台实测英文歌：链路扛住 + ISE 口语口径守卫（超长降级原因）
 
