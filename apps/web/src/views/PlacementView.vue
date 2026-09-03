@@ -8,7 +8,7 @@
  * 每题：🔊 示范（TTS 读 prompt / QA reference_answer）+ 录音 + 重录一次 + 下一题；
  * 结束 finalize → 两维综合分 S → L1~L4。
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { NButton, NCard, NTag } from 'naive-ui'
 
@@ -85,6 +85,13 @@ onMounted(async () => {
   } catch (e) {
     error.value = errorCopy(e)
   }
+})
+
+onUnmounted(() => {
+  // 卸载时释放 demo/试音 blob URL（避免内存/媒体资源泄漏）
+  if (demoUrl.value) URL.revokeObjectURL(demoUrl.value)
+  if (testUrl.value) URL.revokeObjectURL(testUrl.value)
+  if (recorder.state === 'recording') recorder.stop()
 })
 
 async function beginTest() {
@@ -280,7 +287,7 @@ function format(v?: number | null) {
           <span>语法 <b>{{ format(currentResult.gram) }}</b></span>
         </div>
         <div class="flex justify-center gap-3">
-          <NButton round secondary :disabled="uploading" @click="recorder.start(15_000).catch(() => undefined)">
+          <NButton round secondary :disabled="uploading" @click="startRecord">
             🔁 重录一次
           </NButton>
           <NButton v-if="!done" round type="primary" @click="nextQuestion">下一题 →</NButton>

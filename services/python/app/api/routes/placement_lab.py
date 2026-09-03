@@ -115,6 +115,10 @@ async def run(user_id: int = Query(default=1)) -> Envelope[dict]:
                 }
             )
 
+        # 语法仅诊断（C1，不进 S）：过滤 None 后取均值，无则 None
+        gram_non = [g for g in gram_vals if g is not None]
+        gram_mean = sum(gram_non) / len(gram_non) if gram_non else None
+
         a = compute_accuracy(pron_vals) if pron_vals else None
         f = compute_fluency(flu_vals, comp_vals, cfg) if flu_vals else None
         s = compute_s(a, f, cfg) if (a is not None and f is not None) else 0.0
@@ -131,7 +135,7 @@ async def run(user_id: int = Query(default=1)) -> Envelope[dict]:
             overall_score=_dec(s),
             pron_score=_dec(a) if a is not None else None,
             flu_score=_dec(f) if f is not None else None,
-            gram_score=_dec(sum(gram_vals) / len(gram_vals)) if gram_vals else None,
+            gram_score=_dec(gram_mean) if gram_mean is not None else None,
             details={"schema_version": "2d", "source": "placement-lab", "items": items},
         )
         db.add(placement)
@@ -144,7 +148,7 @@ async def run(user_id: int = Query(default=1)) -> Envelope[dict]:
                 "total_score": round(s, 2),
                 "pron": round(a, 2) if a is not None else None,
                 "flu": round(f, 2) if f is not None else None,
-                "gram": round(sum(gram_vals) / len(gram_vals), 2) if gram_vals else None,
+                "gram": round(gram_mean, 2) if gram_mean is not None else None,
                 "exam_revision": revision,
                 "items": items,
             }
