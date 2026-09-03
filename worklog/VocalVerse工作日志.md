@@ -3,6 +3,22 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-03 修复 P0 安全缺陷（M2 六路拷问 · 高优先级）
+
+| P0 | 问题 | 修复 |
+|---|---|---|
+| P0-1 | 密钥默认值入库无 fail-fast | Python `config.py`：`app_env=='production'` 且默认/短密钥 → `ValueError`；Java 增 `SecretGuard`（`app-env==production` 校验）+ `application.yml` 加 `app-env` |
+| P0-2 | `/internal/level` 经网关可达 | `nginx.conf` 增 `location /manage/internal/ { return 404 }`（docs/20 §3.3 目标态；直连 8080 属部署 ops 项） |
+| P0-3 | IDOR `POST /sessions/{id}/complete` 可收尾他人会话 | `practice.py` 增 `_require_session_owner` 归属校验 |
+| P0-4 | IDOR `GET /reports/{report_id}` 读他人报告(PII) | `get_report` 按 `scope` 归属校验(session/user) |
+| P0-5 | IDOR `POST /sessions/{id}/turns` 可注入他人会话 | `post_turn` 归属校验 |
+| P0-6 | `/asr /score /tts /llm/chat` 无鉴权无限流(付费裸接口) | `audio.py` 加 `get_current_user_id` + 对应桶限流(asr/ise/tts/llm) |
+
+**回归测试（修前必失败）**：`test_pipeline_endpoints_require_auth`（无 token 401）、`test_idor_cross_user_session_ops`（跨用户 turns/complete/report 403）、`test_production_config_rejects_default_secrets`、`test_audio_stub` 五个用例补 auth_headers。
+**门禁**：Python 全量 `pytest -q` **256 passed**；`ruff` 全绿；Java `InternalLevelControllerTest+AuthFlowTest` **6 passed**；Python 契约快照 **MATCH**（audio 端点新增头参数后重生成）；前端 `typecheck`/`lint` 全绿。
+
+—— 执行人：Faust-sudo
+
 ## 2026-09-03 遍历完善 · 入学测试域巡检修复
 
 **巡检点**：旧三维公式(0.4/0.3/0.3)/`_level_for`/`QA_REF` 残留、`compute_s` None 兜底、前端交互状态、`placement_lab` 语法均值。
