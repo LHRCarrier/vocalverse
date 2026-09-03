@@ -65,6 +65,9 @@ const recorder = new VoiceRecorder()
 recorder.onStateChange = (s) => {
   recording.value = s === 'recording'
 }
+/** 本次录音（试听 + 提交用；本地 ObjectURL 不回传） */
+const recordedBlob = ref<Blob | null>(null)
+const recordedUrl = ref<string | null>(null)
 
 async function loadMaterials() {
   loading.value = true
@@ -87,6 +90,7 @@ function pickSentence() {
   sentenceIndex.value = 0
   result.value = null
   stopDemo()
+  clearRecorded()
 }
 
 async function playDemo() {
@@ -132,10 +136,24 @@ function stopRecord() {
   recorder.stop()
 }
 
-function recordAndSubmit() {
+/** 录音停止 → 生成试听地址（本地回放，不上传）；此时不自动提交，等用户试听后决定。 */
+function onRecorded(blob: Blob) {
+  if (recordedUrl.value) URL.revokeObjectURL(recordedUrl.value)
+  recordedBlob.value = blob
+  recordedUrl.value = URL.createObjectURL(blob)
+  error.value = null
+}
+
+function clearRecorded() {
+  if (recordedUrl.value) URL.revokeObjectURL(recordedUrl.value)
+  recordedBlob.value = null
+  recordedUrl.value = null
+}
+
+function record() {
   recorder.onStop = (blob: Blob) => {
     recorder.onStop = null
-    void analyze(blob)
+    onRecorded(blob)  // VoiceRecorder 的 cancel() 路径不触发 onStop，此处仅真实停止
   }
   void startRecord()
 }
@@ -164,12 +182,14 @@ function nextSentence() {
   if (sentenceIndex.value + 1 < sentences.value.length) {
     sentenceIndex.value += 1
     result.value = null
+    clearRecorded()
   }
 }
 
 onUnmounted(() => {
   stopDemo()
   recorder.cancel()
+  clearRecorded()
 })
 
 // ── PORCELAIN token（与 lieflat vv-learning-report.html 一致）──
@@ -237,13 +257,29 @@ function fmt(v: number | null | undefined, digits = 1): string {
           <div class="mt-1 text-lg font-bold">{{ currentSentence }}</div>
           <div class="mt-3 flex flex-wrap items-center gap-2">
             <NButton size="small" type="primary" :loading="loading" @click="playDemo">🔊 听示范</NButton>
-            <NButton size="small" :type="recording ? 'error' : 'default'" @click="recording ? stopRecord() : recordAndSubmit()">
-              {{ recording ? '■ 停止并提交评分' : '🎙 录音跟读（提交评分）' }}
+            <NButton
+              size="small"
+              :type="recording ? 'error' : 'default'"
+              :disabled="!!recordedUrl"
+              @click="recording ? stopRecord() : record()"
+            >
+              {{ recording ? '■ 停止' : '🎙 开始录音' }}
             </NButton>
             <NButton size="small" secondary :disabled="sentenceIndex + 1 >= sentences.length" @click="nextSentence">
               下一句 →
             </NButton>
           </div>
+          <!-- 录音完成 → 试听自己读的（本地回放，不上传）→ 确认提交 / 重录 -->
+          <div v-if="recordedUrl" class="mt-3 flex flex-wrap items-center gap-3 rounded-[10px] p-3" :style="{ background: C.panel }">
+            <span class="text-[10px] font-bold tracking-widest" :style="{ color: C.mut }">👂 试听自己读的</span>
+            <audio :src="recordedUrl" controls preload="auto" class="h-9 max-w-[320px]" />
+            <NButton size="small" type="primary" :loading="loading" @click="recordedBlob && analyze(recordedBlob)">
+              提交评分
+            </NButton>
+            <NButton size="small" secondary @click="clearRecorded">重录</NButton>
+            <span class="text-[11px]" :style="{ color: C.mut }">本地浏览器回放，不上传</span>
+          </div>
+          <div v-else class="mt-1 text-[11px]" :style="{ color: C.mut }">录音停止后先试听自己的跟读，确认没问题再提交评分。</div>
         </div>
         <p v-if="error" class="mt-2 text-xs text-[#B91C1C]">{{ error }}</p>
       </template>
