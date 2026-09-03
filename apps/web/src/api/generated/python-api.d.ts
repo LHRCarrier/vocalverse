@@ -616,6 +616,8 @@ export interface components {
             difficulty?: number | null;
             /** Turn Limit */
             turn_limit?: number | null;
+            /** Shadow Material Id */
+            shadow_material_id?: number | null;
         };
         /**
          * TTSResult

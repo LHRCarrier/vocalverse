@@ -90,4 +90,10 @@ if get_settings().fluency_preview_enabled:
     from app.api.routes import fluency_preview
 
     app.include_router(fluency_preview.router)
+# 影子跟读测试台（test-only 前端联调；默认关闭，开启才注册 → 404；删除无影响，
+# 见 shadow_preview.py 删除清单）
+if get_settings().shadow_preview_enabled:
+    from app.api.routes import shadow_preview
+
+    app.include_router(shadow_preview.router)
 app.add_middleware(RequestIdMiddleware)  # X-Request-Id 透传（docs/06 §11）

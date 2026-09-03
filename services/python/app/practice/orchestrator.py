@@ -28,6 +28,7 @@ from app.models import (
     Attempt,
     Scenario,
     ScenarioMessage,
+    ShadowMaterial,
 )
 from app.models import (
     Session as DbSession,
@@ -41,6 +42,7 @@ from app.practice.service import (
     complete_session,
     tts_sentences,
 )
+from app.practice.shadow import coach_note, shadow_scores, split_sentences
 from app.practice.state import SessionState, get_state_store
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -116,6 +118,9 @@ async def run_turn(
             async for event in _defense_turn(
                 state, action, audio, audio_url, asr, scorer, llm, tts
             ):
+                yield event
+        elif state.kind == SessionKinds.SHADOW:
+            async for event in _shadow_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                 yield event
         else:
             async for event in _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
@@ -586,6 +591,162 @@ def _coach_for_level(level: str, hits: list[str], key_points: list[str]) -> str:
     if level == "yellow":
         return "Good direction. Try to include one more key point first."
     return "Tip: lead with your conclusion, then support it."
+
+
+# ---------------------------------------------------------------------------
+# 影子跟读（DoD ④：ISE 主场；start=出句+示范 → normal=跟读评分，逐句推进）
+# ---------------------------------------------------------------------------
+async def _shadow_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
+    """影子跟读回合。score 三维（发音/语速匹配/停顿密度）见 app/practice/shadow.py。
+
+    - start（无音频）：出句 + 示范 TTS（AudioChunk），不推进轮次；
+    - normal（带音频）：ASR + ISE(题卡原文) + 流利度特征 → 三维分 → 落库 → 推进；
+      最后一句系结 → complete_session（报告）。LLM 不参与（规则教练笔记，无 META）。
+    """
+    settings = get_settings()
+    db = _db()
+    try:
+        session = db.get(DbSession, state.session_id)
+        material = db.get(ShadowMaterial, session.shadow_material_id or 0)
+        sentences = split_sentences(material.text_content) if material else []
+        if material is None or material.status != "published" or not sentences:
+            yield ev.StreamError(code="shadow_material_unavailable", recoverable=False)
+            return
+        idx = min(state.current_turn, len(sentences) - 1)
+        sentence = sentences[idx]
+        turn_index = state.current_turn + 1
+
+        if action == "start":
+            yield ev.TurnStart(turn_index=turn_index, reference_text=sentence)
+            demo_url = await _tts_url_from_bytes(
+                tts, sentence, settings.tts_voice, settings.tts_rate
+            )
+            if demo_url:
+                yield ev.AudioChunk(url=demo_url)
+            yield ev.TurnEnd(turn_index=turn_index, score_status="pending")
+            await get_state_store().put(state)
+            return
+
+        if not audio:
+            raise OrchestratorError(status_code=422, detail="audio required for shadow record")
+
+        yield ev.TurnStart(turn_index=turn_index, reference_text=sentence)
+
+        # ASR + 流利度特征（② reuse；失败降级——分数不伪造，落 error 快照）
+        transcript = ""
+        fluency: dict = {}
+        try:
+            res = await asr.transcribe(audio)
+            transcript = res.text.strip()
+            fluency = compute_fluency_features(res.words or [], float(res.duration or 0.0))
+        except Exception as exc:
+            logger.warning("shadow asr failed: %s", exc)
+        score = None
+        if transcript:
+            score = await _safe_score(scorer, audio, sentence)  # ISE（reference=题卡原文）
+
+        sc = shadow_scores(
+            float(score.pronunciation) if score else None,
+            fluency.get("wpm") or None,
+            material.wpm,
+            fluency.get("pause_ratio") or None,
+        )
+        coach = coach_note(sc) or (
+            None if transcript else "Couldn't catch that — try again a bit louder, please."
+        )
+        rhythm = None
+        rhythm_vals = [v for v in (sc.speed_match, sc.pause_score) if v is not None]
+        if rhythm_vals:
+            rhythm = round(sum(rhythm_vals) / len(rhythm_vals), 1)
+
+        conclude = idx + 1 >= len(sentences)
+        yield ev.MetaBlock(
+            grammar=None,
+            coach_note=coach,
+            corpus_hits=[],
+            difficulty_delta=0,
+            conclude=conclude,
+        )
+        score_status = "ok" if sc.overall is not None else "unavailable"
+        if sc.pron is not None:
+            yield ev.ScoreDelta(
+                turn_index=turn_index, pronunciation=round(float(sc.pron), 1), fluency=rhythm
+            )
+
+        # 落库（user 消息 + attempt + coach 消息）
+        seq_user = state.next_seq
+        state.next_seq += 1
+        db.add(
+            ScenarioMessage(
+                session_id=state.session_id,
+                seq=seq_user,
+                role="user",
+                origin="respond",
+                content=transcript or "[shadow]",
+                audio_url=audio_url,
+                meta={
+                    "kind": "shadow",
+                    "sentence_index": idx,
+                    "sentence": sentence,
+                    "wpm": fluency.get("wpm"),
+                    "pause_count": fluency.get("pause_count"),
+                },
+            )
+        )
+        db.add(
+            Attempt(
+                user_id=session.user_id,
+                session_id=state.session_id,
+                scenario_message_id=_find_msg_id(db, state.session_id, seq_user),
+                kind=AttemptKinds.SHADOW_SPEECH,
+                audio_url=audio_url,
+                transcript=transcript or None,
+                pron_score=_dec(sc.pron) if sc.pron is not None else None,
+                flu_score=_dec(rhythm),
+                overall_score=_dec(sc.overall) if sc.overall is not None else None,
+                wpm=_dec(fluency["wpm"]) if fluency else None,
+                details={
+                    "fluency": fluency,
+                    "shadow": sc.as_dict(),
+                    "sentence": sentence,
+                    "word_level": (score.word_level if score else []),
+                },
+                error={}
+                if sc.overall is not None
+                else {"reason": "asr_failed" if not transcript else "score_unavailable"},
+            )
+        )
+        seq_assistant = state.next_seq
+        state.next_seq += 1
+        db.add(
+            ScenarioMessage(
+                session_id=state.session_id,
+                seq=seq_assistant,
+                role="assistant",
+                content=coach or sentence,
+                meta={"kind": "shadow", "coach_note": coach, "prompt_version": 2},
+            )
+        )
+        state.current_turn += 1
+        state.last_action = action
+        db.commit()
+        yield ev.TurnEnd(turn_index=turn_index, score_status=score_status)
+
+        if conclude:
+            summary = f"影子跟读完成，共 {len(sentences)} 句。"
+            report_id = complete_session(state.session_id, llm, summary)
+            state.state = "completed"
+            await get_state_store().put(state)
+            yield ev.SessionEnd(
+                summary=summary,
+                report_id=report_id,
+                metrics={"sentences": len(sentences), "duration_s": None},
+            )
+            return
+        state.state = "awaiting_user"
+        await get_state_store().put(state)
+    finally:
+        db.close()
 
 
 # ---------------------------------------------------------------------------

@@ -45,6 +45,7 @@ class SessionCreate(BaseModel):
     profile_id: int | None = None
     difficulty: int | None = None
     turn_limit: int | None = None
+    shadow_material_id: int | None = None  # kind=shadow（DoD ④，2026-09-04）
 
 
 @router.get("/scenarios")
@@ -93,6 +94,7 @@ async def post_session(
         profile_id=body.profile_id,
         difficulty=body.difficulty,
         turn_limit=body.turn_limit,
+        shadow_material_id=body.shadow_material_id,
     )
     return ok(
         {
@@ -100,6 +102,7 @@ async def post_session(
             "kind": session.kind,
             "scenario_id": session.scenario_id,
             "profile_id": session.profile_id,
+            "shadow_material_id": session.shadow_material_id,
             "assigned_turns": session.assigned_turns,
         }
     )

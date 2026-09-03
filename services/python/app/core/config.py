@@ -134,6 +134,9 @@ class Settings(BaseSettings):
     # ---- 流利度特征测试台（test-only 前端联调页，docs/06 §9.3；默认关闭，生产禁止开启） ----
     fluency_preview_enabled: bool = False  # 开启时注册 /api/v1/fluency-preview/*
 
+    # ---- 影子跟读测试台（test-only 前端联调页，DoD ④；默认关闭，生产禁止开启） ----
+    shadow_preview_enabled: bool = False  # 开启时注册 /api/v1/shadow-preview/*
+
 
 @lru_cache
 def get_settings() -> Settings:

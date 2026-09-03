@@ -18,12 +18,14 @@ from app.models import (
     DefenseProfile,
     Scenario,
     ScenarioMessage,
+    ShadowMaterial,
 )
 from app.models import (
     Session as DbSession,
 )
 from app.models.base import SessionKinds, SessionStatus
 from app.practice.corpus import parse_corpus
+from app.practice.shadow import split_sentences
 from app.practice.state import SessionState, get_state_store
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -47,8 +49,12 @@ async def create_session(
     profile_id: int | None,
     difficulty: int | None,
     turn_limit: int | None,
+    shadow_material_id: int | None = None,
 ) -> DbSession:
     db = get_session_factory()()
+    scenario = None  # dialog 分支赋值；defense/shadow 为 None（2026-09-04 修复未曾覆盖的
+    # UnboundLocalError——此前 defense 建会话同样会踩中，只是无测试覆盖）
+    material = None
     try:
         if kind == SessionKinds.DIALOG:
             scenario = db.get(Scenario, scenario_id) if scenario_id else None
@@ -62,6 +68,14 @@ async def create_session(
             if not profile.knowledge_bank.get("questions"):
                 raise HTTPException(status_code=409, detail="knowledge bank not ready")
             assigned = turn_limit or profile.question_count
+        elif kind == SessionKinds.SHADOW:
+            material = db.get(ShadowMaterial, shadow_material_id) if shadow_material_id else None
+            if material is None or material.status != "published":
+                raise HTTPException(status_code=404, detail="shadow material not found")
+            sentences = split_sentences(material.text_content)
+            if not sentences:
+                raise HTTPException(status_code=409, detail="shadow material has no sentences")
+            assigned = turn_limit or len(sentences)
         else:
             raise HTTPException(status_code=400, detail="unsupported kind")
 
@@ -70,6 +84,7 @@ async def create_session(
             kind=kind,
             scenario_id=scenario_id,
             profile_id=profile_id,
+            shadow_material_id=shadow_material_id,
             status=SessionStatus.ACTIVE,
             assigned_turns=assigned,  # defense：设定题数快照（docs/18 实现决策）
             channel="web",
@@ -84,12 +99,16 @@ async def create_session(
             assembled={
                 "scenario_id": scenario_id,
                 "difficulty": difficulty,
-                "opening_text": (scenario.opening_line if scenario else None),
+                "opening_text": (getattr(scenario, "opening_line", None) if scenario else None),
                 "corpus": [
                     {"phrase": it.phrase, "gloss": it.gloss}
                     for it in parse_corpus(scenario.target_corpus)
                 ]
                 if scenario
+                else [],
+                "shadow_material_id": shadow_material_id,
+                "shadow_sentences": split_sentences(material.text_content)
+                if kind == SessionKinds.SHADOW
                 else [],
             },
         )

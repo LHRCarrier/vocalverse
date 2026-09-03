@@ -61,9 +61,9 @@ switch ($Action) {
     }
     "stop" {
         foreach ($p in 8000, 8080, 5173) {
-            foreach ($pid in (Get-PortPid $p)) {
-                Write-Host "  killing $pid (port $p)..."
-                taskkill /PID $pid /T /F | Out-Null
+            foreach ($procId in (Get-PortPid $p)) {
+                Write-Host "  killing $procId (port $p)..."
+                taskkill /PID $procId /T /F | Out-Null
             }
         }
         Write-Host "  done。日志保留在 local/dev-logs/"

@@ -26,6 +26,10 @@ export const previewRoute: RouteRecordRaw | null = import.meta.env.DEV
           component: () => import('@/views/preview/FluencyPreview.vue'),
         },
         {
+          path: 'shadow',
+          component: () => import('@/views/preview/ShadowPreview.vue'),
+        },
+        {
           path: 'admin-dashboard',
           component: () => import('@/views/preview/AdminDashboardPreview.vue'),
         },

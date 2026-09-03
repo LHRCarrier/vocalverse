@@ -19,6 +19,12 @@ export const previewPages: PreviewPage[] = [
     group: '用户端',
     layout: 'gallery',
   },
+  {
+    path: '/preview/shadow',
+    label: '影子跟读 · 联调测试台（DoD ④）',
+    group: '用户端',
+    layout: 'gallery',
+  },
   { path: '/preview/admin-dashboard', label: '评价看板（可视化）', group: '管理端', layout: 'admin' },
   { path: '/preview/admin-users', label: '用户管理', group: '管理端', layout: 'admin' },
   { path: '/preview/lieflat', label: 'Lieflat 表盘（高保真）', group: '管理端', layout: 'gallery' },
