@@ -11,6 +11,9 @@
   `[context]` 段内（ai4u 同款姿势 + IB ⑤「动态内容挂最后一条消息尾部」）；
 - 画像注入（docs/24 ⑥）：learner_profile 行放 [context] 段（会话级稳定、用户专属）；
 - 语义保真（docs/25 拷问 F01）：`set conclude=true` 指令、`(none)` 兜底全部保留。
+  契约行 = `{marker}`（即 `[-META-]`，**不能再包方括号**——2026-09-03 冒烟实测：
+  `[{marker}]` 让模型逐字输出 `[[-META-]]`，外层 `[` 被拆进正文（每轮 reply 尾多一个 `[`），
+  外层 `]` 落在 meta 尾段靠兜底正则吞掉——契约与 meta.py 文档「一行 `[-META-]{…}`」不符）。
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ _STATIC_TEMPLATE = (
     "Keep sentences short (≤3 sentences), simple words, natural and encouraging.\n"
     "If the conversation reached the limit or user ends, set conclude=true.\n"
     "Output contract: reply as plain English text ONLY, then finish with a single line:\n"
-    "[{marker}]\n"
+    "{marker}\n"
     "META JSON fields: grammar:{{score:0-100,errors:[{{word,fix}}]}}, coach_note(≤15 words), "
     "corpus_hits:[{{phrase,state:'ok'|'fix'}}], difficulty_delta:-1|0|1, conclude(bool)."
 )

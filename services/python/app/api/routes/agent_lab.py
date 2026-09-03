@@ -81,18 +81,31 @@ class _TurnOutcome:
     usage: dict | None = None  # 回合流用量（prompt/completion tokens，docs/26 §10.3②）
 
 
+def _effective_by_turn(flag: bool, i: int, n: int) -> bool:
+    """连跑时末轮自动视为「回合上限已到」（POC 冒烟同款：concluded_by_turn=(i>=n)）。
+
+    2026-09-03 修复：此前 /turns 全轮共用表单的 concluded_by_turn（默认 False）→
+    第 5 轮（冒烟末轮）上下文永远「Turn limit reached: False」→ conclude 必为 false。
+    flag=True（勾选）则保持全轮 True（原语义：模拟整段会话最后一轮）。
+    """
+    return flag or i >= n
+
+
 async def _run_turn(
     req: AgentTurnRequest,
     state: SessionState,
     user_text: str,
     turn_index: int,
     llm,
+    *,
+    concluded_by_turn: bool | None = None,
 ) -> _TurnOutcome:
     """一回合：build_context → TurnRunner →（缺 META 时）补偿 → MetaExecutor 命中。"""
     from app.agent.runtime.context_builder import build_context
     from app.agent.runtime.meta_executor import MetaExecutor, compensate_meta
     from app.agent.runtime.turn_runner import TurnRunner
 
+    by_turn = req.concluded_by_turn if concluded_by_turn is None else concluded_by_turn
     messages = build_context(
         state,
         req.scenario_prompt,
@@ -101,7 +114,7 @@ async def _run_turn(
         user_text,
         req.action,
         state.corpus_done,
-        req.concluded_by_turn,
+        by_turn,
         learner_profile=req.learner_profile,
     )
     t0 = time.perf_counter()
@@ -118,7 +131,7 @@ async def _run_turn(
             reply_text=res.reply_text,
             transcript=user_text,
             action=req.action,
-            concluded_by_turn=req.concluded_by_turn,
+            concluded_by_turn=by_turn,
         )
         compensated = True
     hits = MetaExecutor().apply_hits(user_text, parse_corpus(req.corpus_text), meta, req.action, [])
@@ -142,16 +155,16 @@ async def _run_turn(
 
 @router.post("/turn")
 async def turn(req: AgentTurnRequest) -> Envelope[dict]:
-    """单轮实验（真 LLM；Key 缺失时 DeepSeek 客户端照常抛错→由前端显示）。"""
+    """单轮实验（真 LLM；Key 缺失时 DeepSeek 客户端照常抛错→由前端显示）。
+
+    展示载荷扁平化：{system: str, user: str, result: {...}}——前端 last.system /
+    last.user 直接展示原文（2026-09-03 修复：曾把 display dict 再包一层，
+    data.system 变成 {system,user} 对象 → 前端渲染 [object Object]）。
+    """
     state = SessionState(session_id=0, kind="dialog")
     state.digest = list(req.history)
     out = await _run_turn(req, state, req.user_text, 1, _make_llm())
-    return ok(
-        {
-            "system": build_context_for_display(req, state),
-            "result": out.__dict__,
-        }
-    )
+    return ok({**build_context_for_display(req, state), "result": out.__dict__})
 
 
 @router.post("/turns")
@@ -160,9 +173,17 @@ async def turns(req: AgentTurnsRequest) -> Envelope[dict]:
     state = SessionState(session_id=0, kind="dialog")
     state.digest = list(req.history)
     llm = _make_llm()
+    turns = req.turns or [req.user_text]
     results: list[dict] = []
-    for i, user_text in enumerate(req.turns or [req.user_text], start=1):
-        out = await _run_turn(req, state, user_text, i, llm)
+    for i, user_text in enumerate(turns, start=1):
+        out = await _run_turn(
+            req,
+            state,
+            user_text,
+            i,
+            llm,
+            concluded_by_turn=_effective_by_turn(req.concluded_by_turn, i, len(turns)),
+        )
         results.append(out.__dict__)
         state.digest.append(f"U: {user_text[:60]} | A: {out.reply[:60]}")
         for h in out.corpus_hits:
