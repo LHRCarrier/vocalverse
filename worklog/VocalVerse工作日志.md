@@ -3,6 +3,14 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-04 影子跟读联调台：录音完成 → 试听自己读的 → 确认提交/重录
+
+- 需求（组员复测反馈「方便测试」）：录完先听自己的跟读再提交，避免闭眼提交后才发现录歪；
+- 实现：`ShadowPreview.vue` 录音停止**不再自动提交**——本地 ObjectURL 试听条（原生 audio 控件）+「提交评分 / 重录」按钮；换句/换素材/卸载时 revoke 防泄漏；VoiceRecorder 的 cancel 路径不触发 onStop，仅真实停止才生成试听；
+- 验证：lint（0 warning）/typecheck/vitest 19/build 全绿；dev 模块 transform 200。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
 ## 2026-09-04 评分 DoD ③：META content/vocab 语义子分（LLM 判定 · 进展示不进总分）
 
 打分「链路完成」DoD 剩余三项之③（④ 之后收尾）：
