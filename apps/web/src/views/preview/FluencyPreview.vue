@@ -15,7 +15,7 @@
  *    + `config.py` 的 `fluency_preview_enabled` 一行；
  * 3. 收尾：pytest 全量 / pnpm typecheck / lint / build；契约快照零 diff。
  */
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { NAlert, NButton, NCheckbox, NInput, NTag } from 'naive-ui'
 
 interface FluencyFeatures {
@@ -62,6 +62,18 @@ const useTranscriptRef = ref(true)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const result = ref<AnalyzeResult | null>(null)
+/** 试听：选中后浏览器本地回放（ObjectURL，不上传；更换/卸载时 revoke 防泄漏）。 */
+const previewUrl = ref<string | null>(null)
+
+const fileLabel = computed(() => {
+  if (!file.value) return null
+  const kb = Math.round(file.value.size / 1024)
+  return `${file.value.name} · ${kb} KB`
+})
+
+onUnmounted(() => {
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+})
 
 const PAUSE_THRESHOLD_S = 0.5
 
@@ -88,6 +100,8 @@ const pauseIntervals = computed(() => timeline.value.filter((w) => w.paused))
 function onPick(e: Event) {
   const f = (e.target as HTMLInputElement).files?.[0] ?? null
   file.value = f
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  previewUrl.value = f ? URL.createObjectURL(f) : null
   error.value = null
 }
 
@@ -218,6 +232,11 @@ const C = {
         </NCheckbox>
         <NButton type="primary" :loading="loading" @click="analyze">分析</NButton>
         <NButton secondary @click="fillDemo">演示数据（离线看版式）</NButton>
+      </div>
+      <div v-if="previewUrl" class="mt-3 flex flex-wrap items-center gap-3">
+        <span class="text-xs text-[#667085]">{{ fileLabel }}</span>
+        <audio :src="previewUrl" controls preload="none" class="h-9 max-w-[320px]" />
+        <span class="text-[11px] text-[#98A2B3]">本地试听（浏览器回放，不上传）</span>
       </div>
       <p v-if="error" class="mt-2 text-xs text-[#B91C1C]">{{ error }}</p>
     </div>
