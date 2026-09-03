@@ -27,6 +27,9 @@ router = APIRouter(
     prefix="/api/v1/fluency-preview", tags=["fluency-preview"], include_in_schema=False
 )  # include_in_schema=False：不进 OpenAPI 契约快照（同 agent-lab 测试台约束）
 
+# ISE 句子级评测的参考文本长度上限（口语单句/短段；整篇歌词会触发降级而非盲等）
+MAX_ISE_REF_CHARS = 300
+
 
 @router.post("/analyze")
 async def analyze(
@@ -38,34 +41,52 @@ async def analyze(
 
     参考文本优先级：手动 `reference` → `use_transcript_ref=true` 时用 ASR 转写
     （「转写对转写」，与生产对话链路同口径，orchestrator._dialog_turn）→ 无参考不评分。
-    返回 `score_ref`（manual/transcript/None）供页面标注参考来源。
+    返回 `score_ref`（manual/transcript/None）与 `score_error`（降级原因）供页面标注。
+
+    口语口径守卫（docs/06 §9.3）：ISE 是句子级口语评测——音频 >60s（说话句上限）或
+    参考 >MAX_ISE_REF_CHARS 字符时**不再盲等 ISE**，直接降级并给出原因；
+    唱歌长音频（如整曲 3-4 分钟）走 M3 音准/节奏链路（sing_attempts），本台不适用。
 
     无状态测试端点：只守上界（min_bytes=0 与 /asr 同口径）；不扣限流、不落库。
     测试环境（APP_TESTING=true）走 FakeASR/FakeScorer，CI 零真实 Key。
     """
+    settings = get_settings()
     data = validate_audio_bytes(
-        await audio.read(), min_bytes=0, max_bytes=get_settings().max_upload_bytes
+        await audio.read(), min_bytes=0, max_bytes=settings.max_upload_bytes
     )
     asr_res = await get_asr_client().transcribe(data)
     features = compute_fluency_features(asr_res.words or [], float(asr_res.duration or 0.0))
 
     score = None
     score_ref: str | None = None
+    score_error: str | None = None
     ref_text = (
         reference.strip() if reference.strip() else (asr_res.text if use_transcript_ref else "")
     )
     if ref_text:
-        try:
-            s = await get_scorer_client().score(data, ref_text)
-            score = {
-                "overall": float(s.overall),
-                "pronunciation": float(s.pronunciation),
-                "fluency": float(s.fluency),
-                "grammar": float(s.grammar) if s.grammar is not None else None,
-            }
-            score_ref = "manual" if reference.strip() else "transcript"
-        except Exception:  # 评分失败不强求（测试台以特征为主）
-            score = None
+        score_ref = "manual" if reference.strip() else "transcript"
+        duration = float(asr_res.duration or 0.0)
+        if duration > settings.max_speech_seconds:
+            score_error = (
+                f"audio_too_long({round(duration)}s > 口语上限 {settings.max_speech_seconds}s；"
+                "唱歌走 M3 音准/节奏链路)"
+            )
+        elif len(ref_text) > MAX_ISE_REF_CHARS:
+            score_error = (
+                f"reference_too_long({len(ref_text)} > {MAX_ISE_REF_CHARS} 字符；"
+                "整篇歌词不适合句子级评测)"
+            )
+        else:
+            try:
+                s = await get_scorer_client().score(data, ref_text)
+                score = {
+                    "overall": float(s.overall),
+                    "pronunciation": float(s.pronunciation),
+                    "fluency": float(s.fluency),
+                    "grammar": float(s.grammar) if s.grammar is not None else None,
+                }
+            except Exception as exc:  # 评分失败不强求（测试台以特征为主）
+                score_error = f"ise_failed({type(exc).__name__})"
 
     return ok(
         {
@@ -76,6 +97,7 @@ async def analyze(
             "features": features,
             "score": score,
             "score_ref": score_ref,
+            "score_error": score_error,
             # 与完整对话回合落进 attempts/report 的同构演示载荷（口径 docs/06 §9.3）
             "attempt_demo": {
                 "transcript": asr_res.text,

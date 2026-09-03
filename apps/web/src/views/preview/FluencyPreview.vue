@@ -53,6 +53,8 @@ interface AnalyzeResult {
   } | null
   /** ISE 评分参考来源：manual=题卡原文 / transcript=ASR 转写（转写对转写）/ null=未评分 */
   score_ref: 'manual' | 'transcript' | null
+  /** ISE 降级原因（null=正常出分或未触发）；如 audio_too_long / reference_too_long */
+  score_error: string | null
 }
 
 const file = ref<File | null>(null)
@@ -163,6 +165,7 @@ function fillDemo() {
     },
     score: { overall: 90.9, pronunciation: 92.59, fluency: 87.7, grammar: null },
     score_ref: 'transcript',
+    score_error: null,
   }
   error.value = null
 }
@@ -304,7 +307,14 @@ const C = {
             :style="{ color: C.txt }"
           >
             <div v-for="(w, i) in pauseIntervals" :key="i">
-              <b>停顿 {{ i + 1 }}</b>：{{ fmt(w.gap ?? 0) }}s（{{ w.word }} 前）—— {{ (w.gap ?? 0) >= 1 ? '长停顿：明显的卡壳/忘词信号' : '普通停顿：换气/组织语言' }}
+              <b>停顿 {{ i + 1 }}</b>：{{ fmt(w.gap ?? 0) }}s（{{ w.word }} 前）——
+              {{
+                (w.gap ?? 0) >= 3
+                  ? '超长间隙（≥3s）：可能是器乐段/无词段，非口语停顿'
+                  : (w.gap ?? 0) >= 1
+                    ? '长停顿：明显的卡壳/忘词信号'
+                    : '普通停顿：换气/组织语言'
+              }}
             </div>
           </div>
           <div v-else class="mt-3 text-xs" :style="{ color: C.mut }">无 ≥0.5s 跨词停顿。</div>
@@ -400,6 +410,12 @@ const C = {
               </div>
             </div>
           </template>
+          <p
+            v-else-if="result.score_ref"
+            class="mt-1 rounded-[8px] bg-[#FEF3C7] px-2 py-1.5 text-xs text-[#B45309]"
+          >
+            ISE 降级未出分：{{ result.score_error }}
+          </p>
           <p v-else class="text-xs text-[#667085]">无参考文本（评分降级）→ 不展示 ISE 分。</p>
           <div class="mt-4 mb-2 text-xs font-semibold text-[#667085]">口径说明</div>
           <ul class="list-inside list-disc space-y-1 text-xs text-[#667085]">
