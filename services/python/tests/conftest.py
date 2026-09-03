@@ -10,6 +10,8 @@ os.environ.setdefault("APP_DATABASE_URL", "sqlite+pysqlite:///:memory:")
 os.environ.setdefault("APP_JWT_SECRET", "vocalverse-dev-jwt-secret-0123456789abcdef")
 os.environ.setdefault("APP_AUDIO_DIR", "./data/audio-test")
 
+import shutil  # noqa: E402
+
 import pytest  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
 from app.db import create_all_for_tests, reset_engine  # noqa: E402
@@ -27,6 +29,11 @@ def _fresh_db():
     """
     reset_engine()
     create_all_for_tests()
+    # 音频目录隔离（BUG：见 worklog/BUG实测/音频残留过期410flaky.md）——
+    # save_audio_bytes 对已存在文件不更新 mtime（sha1 去重），data/audio-test 残留的
+    # 过期 mtime 旧文件会在 GET /audio 先判 410 并惰性删除，导致
+    # test_save_audio_and_ownership 全量跑时红、单跑时绿（顺序依赖 flaky）。
+    shutil.rmtree(get_settings().audio_dir, ignore_errors=True)
     yield
 
 
