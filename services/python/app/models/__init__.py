@@ -25,6 +25,7 @@ from .mastery import UserCorpusMastery, UserMastery
 from .practice import Attempt, PostLike, Score, Session, SingAttempt
 from .skill import UserSkillState
 from .tickets import Ticket
+from .usage import UsageLog
 from .user import Placement, RefreshToken, User, UserProfile
 
 __all__ = [
@@ -57,6 +58,8 @@ __all__ = [
     "MaterialDifficulty",
     "UserMastery",
     "UserCorpusMastery",
+    # LLM 框架域（docs/26 §10.3，迁移 0004）
+    "UsageLog",
     # 分析/支持域
     "Event",
     "Report",

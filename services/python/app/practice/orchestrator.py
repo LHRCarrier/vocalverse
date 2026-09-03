@@ -15,6 +15,11 @@ import asyncio
 import hashlib
 import logging
 
+from app.agent.domains.learner import get_rendered
+from app.agent.domains.summarizer import SummarizerService, get_session_summary
+from app.agent.domains.usage import log_usage
+from app.agent.runtime.meta_executor import MetaExecutor, compensate_meta
+from app.agent.runtime.turn_runner import TurnRunner
 from app.audio.base import ASRClient, LLMClient, ScorerClient, TTSClient
 from app.core.config import get_settings
 from app.db import get_session_factory
@@ -28,8 +33,8 @@ from app.models import (
 )
 from app.models.base import AttemptKinds, SessionKinds
 from app.practice import events as ev
-from app.practice.corpus import match_rule, parse_corpus
-from app.practice.meta import MARKER, MetaResult, extract_meta
+from app.practice.corpus import parse_corpus
+from app.practice.meta import MetaResult
 from app.practice.service import (
     build_llm_context,
     complete_session,
@@ -40,6 +45,8 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 logger = logging.getLogger("vocalverse")
+
+_meta_executor = MetaExecutor()
 
 
 class OrchestratorError(HTTPException):
@@ -209,69 +216,54 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             action,
             state.corpus_done,
             concluded_by_turn=(state.current_turn + 1 >= (session.assigned_turns or 8)),
+            learner_profile=get_rendered(int(session.user_id)),
+            rolling_summary=get_session_summary(state.session_id) or "",
         )
-        # LLM 流式：边收边转发 text_delta；尾部 [-META-] 拆出解析（失败降级，不重试——
-        # 流式不可回放；POC-2 判定 <90% 成功率时切换「两调用」方案，见 docs/18 §6）
-        full_buf: list[str] = []
-        meta_buf = ""
-        held = ""
-        meta_done = False
+        # LLM 流式：交 TurnRunner（docs/26 runtime/turn-runner：边界拆分 + META 泄漏门）；
+        # 失败降级不重试（流式不可回放；POC-2 判定 <90% 成功率时切换「两调用」方案，docs/18 §6）
+        runner = TurnRunner(llm)
+        caught = False
         try:
-            async for chunk in llm.stream(messages):
-                if meta_done:
-                    meta_buf += chunk
-                    continue
-                payload = held + chunk
-                idx = payload.find(MARKER)
-                if idx >= 0:
-                    pre, post = payload[:idx], payload[idx:]
-                    full_buf.append(pre)
-                    meta_buf = post
-                    if pre.strip():
-                        yield ev.TextDelta(text=pre)
-                    meta_done = True
-                    continue
-                keep = _partial_marker_len(payload)
-                emit = payload[:-keep] if keep else payload
-                full_buf.append(emit)
-                if emit:
-                    yield ev.TextDelta(text=emit)
-                held = payload[-keep:] if keep else ""
-            if not meta_done and held:
-                full_buf.append(held)
-                yield ev.TextDelta(text=held)
-            full_text = "".join(full_buf)
-            meta = (
-                extract_meta(full_text + MARKER + meta_buf)
-                if meta_done
-                else extract_meta(full_text)
-            )
+            async for delta in runner.run(messages):
+                yield ev.TextDelta(text=delta)
         except Exception as exc:
+            caught = True
             logger.warning("llm failed: %s", exc)
             yield ev.StreamError(code="llm_failed", recoverable=True)
-            full_text, meta = (
-                _fallback_reply(transcript),
-                MetaResult(reply=_fallback_reply(transcript), meta=None, ok=False),
-            )
+        if caught:
+            full_text = _fallback_reply(transcript)
+            meta = MetaResult(reply=full_text, meta=None, ok=False)
+        else:
+            res = runner.result
+            assert res is not None
+            full_text = res.reply_text
+            meta = res.meta
+            if res.leaked:
+                logger.warning("META leak degraded: reply without meta (user=%s)", session.user_id)
+            if res.usage:
+                log_usage(
+                    "turn",
+                    res.usage,
+                    meta={"session_id": int(state.session_id), "turn": turn_index},
+                )
         if meta is None:
             meta = MetaResult(reply=full_text, meta=None, ok=False)
+        if not meta.ok:
+            # META 缺失补偿（docs/26 §9.4）：流式未守契约 → 后置一次低温度提取调用；
+            # 仍失败 → 既有降级（rule conclude 兜底，不伪造元数据）
+            meta = await compensate_meta(
+                llm,
+                reply_text=full_text,
+                transcript=transcript,
+                action=action,
+                concluded_by_turn=(state.current_turn + 1 >= (session.assigned_turns or 8)),
+            )
         reply = meta.reply or full_text
         if not reply:
             reply = _fallback_reply(transcript)
 
-        # 4) 命中（规则权威 + LLM 兜底；retry/hint/demo 作废）
-        hits: list[dict] = []
-        if action in ("normal", "retry"):
-            rule_hits = match_rule(transcript, corpus)
-            grammar_ok = _grammar_ok(meta, last_errors)
-            hits = [{"phrase": p, "state": "ok" if grammar_ok else "fix"} for p in rule_hits]
-            seen = set(rule_hits)
-            for h in meta.corpus_hits or []:
-                phrase = h.get("phrase") if isinstance(h, dict) else h
-                if phrase and phrase not in seen:
-                    state_hit = h.get("state", "ok") if isinstance(h, dict) else "ok"
-                    hits.append({"phrase": str(phrase), "state": state_hit})
-                    seen.add(str(phrase))
+        # 4) 命中（MetaExecutor：规则权威 + LLM 兜底；retry/hint/demo 作废——docs/26 §⑤）
+        hits = _meta_executor.apply_hits(transcript, corpus, meta, action, last_errors)
 
         # 5) 逐句 TTS（并发；失败静默降级字幕）
         audio_urls: list[str] = []
@@ -282,7 +274,7 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                 yield ev.AudioChunk(url=url)
 
         # 6) 后置元数据 + 迟到的评分徽章
-        grammar = meta.grammar or (last_errors and {"score": 60, "errors": last_errors} or None)
+        grammar = _meta_executor.effective_grammar(meta, last_errors)
         yield ev.MetaBlock(
             grammar=grammar,
             coach_note=(meta.coach_note or None),
@@ -357,7 +349,7 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                     "coach_note": meta.coach_note,
                     "corpus_hits": hits,
                     "difficulty_delta": meta.difficulty_delta,
-                    "prompt_version": 1,
+                    "prompt_version": 2,  # v2=稳定前缀+学习者画像注入（docs/26）
                 },
             )
         )
@@ -369,18 +361,21 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         for h in hits:
             if h["phrase"] not in state.corpus_done:
                 state.corpus_done.append(h["phrase"])
-        low_quality = not transcript or not _grammar_ok(meta, last_errors)
+        low_quality = not transcript or not _meta_executor.grammar_ok(meta, last_errors)
         state.failed_streak = state.failed_streak + 1 if low_quality else 0
         if state.failed_streak >= 2 and action != "retry":
             state.failed_streak = 0  # L2 AI 代说由 LLM 侧换角度完成；此处记账
         db.commit()
 
+        # 摘要双轨（docs/26 §10.3①）：回合落库后异步增量压缩（失败标记 → 下次自动重试）
+        asyncio.create_task(SummarizerService(llm).maybe_summarize(state.session_id))
+
         yield ev.TurnEnd(turn_index=turn_index, score_status=score_status)
 
-        # 9) 收尾判定（meta.conclude 或轮次上限）
+        # 9) 收尾判定（MetaExecutor：meta.conclude 或轮次上限或用户放弃）
         limit = session.assigned_turns or 8
-        if meta.conclude or turn_index >= limit or action == "abandon":
-            summary = await _conclude_summary(llm, state.digest)
+        if _meta_executor.should_conclude(meta, turn_index, limit, action):
+            summary = await _conclude_summary(llm, state.digest, session_id=int(state.session_id))
             report_id = complete_session(state.session_id, llm, summary)
             state.state = "completed"
             await get_state_store().put(state)
@@ -590,20 +585,6 @@ async def _safe_score(scorer, audio, reference):
         return None
 
 
-def _partial_marker_len(s: str) -> int:
-    """chunk 尾部是否为 MARKER 的前缀（跨 chunk 拆分场景）；返回保留长度。"""
-    for k in range(1, len(MARKER)):
-        if s.endswith(MARKER[:k]):
-            return k
-    return 0
-
-
-def _grammar_ok(meta: MetaResult, last_errors: list) -> bool:
-    if meta and meta.grammar:
-        return int(meta.grammar.get("score", 100)) >= 60
-    return True  # 无语法判定时默认"达意"（规则通道已确认说出表达）
-
-
 def _fallback_reply(transcript: str) -> str:
     return (
         "I see! Could you tell me more?"
@@ -612,19 +593,30 @@ def _fallback_reply(transcript: str) -> str:
     )
 
 
-async def _conclude_summary(llm: LLMClient, digest: list[str]) -> str:
+async def _conclude_summary(
+    llm: LLMClient, digest: list[str], session_id: int | None = None
+) -> str:
     try:
         content = (
             "Summarize this short speaking practice in one friendly English sentence: "
             f"{' | '.join(digest[-4:])}"
         )
-        return (
-            await llm.chat(
+        fn = getattr(llm, "chat_with_usage", None)
+        if fn is not None:
+            raw, usage = await fn(
                 [{"role": "user", "content": content}],
                 temperature=0.4,
                 max_tokens=80,
             )
-        )[:200]
+            if usage:
+                log_usage("conclude", usage, meta={"session_id": session_id})
+        else:
+            raw = await llm.chat(
+                [{"role": "user", "content": content}],
+                temperature=0.4,
+                max_tokens=80,
+            )
+        return (raw or "")[:200]
     except Exception:
         return "Well done! Keep practicing."
 

@@ -181,6 +181,9 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
                 ],
             },
         )
+        # 摘要双轨落库（docs/26 §10.3①）：收尾最终总结写入 sessions.summary
+        session.summary = summary
+        session.summary_updated_at = now
         db.add(report)
         db.commit()
         _post_session_skills(db, session)
@@ -206,6 +209,14 @@ def _post_session_skills(db, session) -> None:
             "post-session skills skipped session=%s (self-heal next practice)", session.id
         )
         db.rollback()
+    # 学习者画像缓存失效（docs/26 ⑥）：会话完结后掌握度/水平已重算，下次注入须读到新画像。
+    # 独立于 skills 更新成败（数据已可能变化，按"保守失效"处理）；异常吞掉不阻塞收尾。
+    try:
+        from app.agent.domains.learner import invalidate as _learner_invalidate
+
+        _learner_invalidate(int(session.user_id))
+    except Exception:
+        pass
 
 
 def _f(v: Decimal | None) -> float | None:
@@ -362,34 +373,29 @@ def build_llm_context(
     action: str,
     hits_so_far: list[str],
     concluded_by_turn: bool,
+    learner_profile: str = "",
+    rolling_summary: str = "",
 ) -> list[dict]:
-    """对话回合 system/user 消息（docs/14 §3.4：3 轮滚动摘要 + 输出契约 + 语料提示）。"""
-    from app.practice.meta import MARKER
+    """对话回合 system/user 消息（docs/14 §3.4）。
 
-    system = (
-        f"{scenario_prompt}\n"
-        "You are role-playing in an English speaking practice app. "
-        f"Target language level: difficulty {difficulty} — keep sentences short (≤3 sentences), "
-        f"simple words, natural and encouraging. Naturally steer the topic toward these target "
-        f"expressions WITHOUT reading them aloud: {corpus_text or '(none)'}\n"
-        f"Already used expressions — rephrase instead: {', '.join(hits_so_far) or '(none)'}\n"
-        "Output contract: reply as plain English text ONLY, then finish with a single line:\n"
-        f"{MARKER}{{}}\n"
-        "META JSON fields: grammar:{score:0-100,errors:[{word,fix}]}, coach_note(≤15 words), "
-        "corpus_hits:[{phrase,state:'ok'|'fix'}], difficulty_delta:-1|0|1, conclude(bool).\n"
-        f"If the conversation reached the limit or user ends, set conclude=true.\n"
-        f"Turn limit reached: {concluded_by_turn}\n"
-        f"Recent turns:\n{chr(10).join(state.digest[-3:]) or '(conversation start)'}"
+    兼容薄壳：实现已迁至 Agent 框架层 `app.agent.runtime.context_builder.build_context`
+    （docs/26：静态 system + user 尾部 [context]（画像/摘要/难度/语料/命中）+ ⑤契约稳定）；
+    本函数保留签名供既有引用，新代码一律直调框架层。
+    """
+    from app.agent.runtime.context_builder import build_context
+
+    return build_context(
+        state,
+        scenario_prompt,
+        corpus_text,
+        difficulty,
+        user_text,
+        action,
+        hits_so_far,
+        concluded_by_turn,
+        learner_profile=learner_profile,
+        rolling_summary=rolling_summary,
     )
-    user_msg = (
-        f"user said (ASR): {user_text or '(no speech)'}\n"
-        f"action: {action} (retry/hint = learner needs help; be kind and short)\n"
-        "word_errors: " + str(_count_errors(state.assembled.get("last_errors", [])))
-    )
-    return [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user_msg},
-    ]
 
 
 def _count_errors(errors: list) -> int:

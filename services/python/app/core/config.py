@@ -119,6 +119,18 @@ class Settings(BaseSettings):
     review_ratio: float = 0.33  # 复习席占比（limit 的 1/3）
     review_mastery_threshold: float = 0.8  # 复习席触发：mastered 占比 ≥ 此值（local/32 A-4.4）
 
+    # =========================================================================
+    # LLM 框架层（docs/26：对齐 ai4u 分层；⑤前缀稳定 + ⑥学习者画像注入，docs/24）
+    # 注意：env 前缀 APP_（APP_LEARNER_INJECTION_ENABLED 等）
+    # =========================================================================
+    learner_injection_enabled: bool = True  # ⑥ 画像注入总开关（默认开，可一键关闭回退）
+    learner_max_items: int = 3  # 画像注入条数上限（≤3 防过度纠正，docs/24 拍板 P4）
+    learner_cache_ttl_s: int = 900  # 画像进程内缓存 TTL（15min；会话收尾主动失效兜底）
+    learner_word_error_window: int = 20  # 词级错误聚合窗口（最近 N 条 dialog attempt）
+
+    # ---- Agent Lab（test-only 前端测试台，docs/26 §8；默认关闭，生产禁止开启） ----
+    agent_lab_enabled: bool = False  # APP_AGENT_LAB_ENABLED=true 时注册 /api/v1/agent-lab/*
+
 
 @lru_cache
 def get_settings() -> Settings:
