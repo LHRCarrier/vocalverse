@@ -1,7 +1,42 @@
-﻿# VocalVerse · 工作日志
+# VocalVerse · 工作日志
 
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
+
+## 2026-09-03 入学测试联调测试页（AGENTS.md rule 3 前后端联动强制项）
+
+**背景**：AGENTS.md 2026-09-03 新增「前后端联动新功能须提供联调测试页」强制项；入学测试属此类，补做。
+
+| 落点 | 说明 |
+|---|---|
+| 后端 `app/api/routes/placement_lab.py` | test-only：`include_in_schema=False`、无表/无迁移、不碰既有路由；`placement_lab_enabled=False` 默认不注册 → 404；`POST /run`（Fake 客户端跑完整入学测试复现两维公式+落库）+ `GET /status`（档位/复测冷却）；文件尾**删除清单** |
+| 配置 | `config.py` 新增 `placement_lab_enabled: bool = False`（生产禁止开启） |
+| 注册 | `main.py` 条件注册（`placement_lab_enabled` 为真才 include_router） |
+| 前端 | `views/preview/PlacementPreview.vue` + `registry.ts` 一行 + `router/preview.ts` 一行（dev-only，生产构建零体积） |
+
+**验证**：Python 契约快照 **MATCH**（`include_in_schema=False` → 零 schema 变化）；全量 `pytest -q` **251 passed / 1 skipped**；`ruff check`+`format --check` 全绿；前端 `lint`/`typecheck`/`build` 全绿。
+
+—— 执行人：Faust-sudo
+
+## 2026-09-03 整合 origin/main(38 commits) + 提交入学测试改动（A~E 落地）
+
+**背景**：本地在 `feat/recommend-landing` 上完成了入学测试改（A~E），`git fetch` 发现 `origin/main` 前进 38 commits，与我的改动重叠且未提交。
+
+**动作**：
+1. **先提交**：把「入学测试」改动拆成 3 条 commit（code `c3ae906` / test `46c5a60` / docs `9c86c8e`），与队友未提交的推荐工作（rec/service.py、test_mastery.py、RecTestView.vue、推荐文档/测试等）隔离。
+2. **合并** origin/main：`git merge`。核心代码（config/models/practice/agent 等）自动合并；**手动解决 4 个冲突**：
+   - `placement.py`：保留两维评分/run状态机/grammar诊断，并**并入 origin/main 的 wpm/流利度时间戳特征**（`compute_fluency_features` + `asr_res.words/duration` + `attempts.wpm`/`details.fluency`）；
+   - `test_m2_core.py`：保留双方测试（我的 40303 + origin/main 的 wpm 透出，并给后者补定档 seed 以过 40303 门禁）；
+   - `worklog`：保留双方置顶记录；
+   - `python-openapi.json`：从合并代码重生成。
+3. **迁移重编号**：我方 `0004_placement_run_state` 与 origin/main 的 `0004_agent_summary_usage` 撞 revision id → 改为 `0005_placement_run_state`（down=0004），alembic 单头恢复。
+4. **保留队友工作**：`rec/service.py`、`test_mastery.py`、`router/index.ts`、推荐文档/测试等**未提交工作不动**（不入合并提交）。
+
+**验证**：Python 全量 `pytest -q` **251 passed / 1 skipped**；`ruff check`+`format --check` 全绿；python 契约快照 MATCH；前端 `lint`/`typecheck`/`test:run`/`build` 全绿。合并提交 `7be241e`。
+
+**⚠️ 合规（AGENTS.md 2026-09-03 新增「前后端联动新功能须提供联调测试页」强制项）**：入学测试是前后端联动新功能，按 rule 3 需补 `AgentLab` 式 **联调测试页**（`views/preview/PlacementPreview.vue` + `registry.ts` 一行 + `router/preview.ts` 一行 + 后端 test-only 接口 `include_in_schema=False` + 删除清单）——待补，否则 PR 评审会被 comment 要求补。
+
+—— 执行人：Faust-sudo
 
 ## 2026-09-03 整合完善 · 修复 alembic 漂移 + C4/C6 建档→场景难度过滤
 
