@@ -3,6 +3,15 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-04 测试台 ISE 口径修正（转写对转写开关）+ 开发服务脱离终端起停
+
+- **缘由（组长提问「为什么流利度要有参考文本」）**：区分两种「流利度」——① 时间戳特征（wpm/停顿，纯音频+转写，**无需参考**）；② ISE 流利度分（评测引擎按「音频 vs 给定文本」对齐，**必须有参考**；生产对话口径 = ASR 转写当参考「转写对转写」，朗读/影子跟读才有题卡原文）。
+- **修正**：测试台加「用 ASR 转写作为参考（转写对转写）」勾选**默认开**；后端 `/analyze` 增 `use_transcript_ref` 表单参数（手动 reference 优先），响应增 `score_ref`（manual/transcript/null）供页面标注；不填参考也不再是空评分——实测 ref-3.wav：score_ref=transcript / **overall=90.82 / flu=95.02 / pron=89.39**；未勾选时 score_ref=null（页面提示如何开启）。测试 +2 条（转写对转写、手动参考优先），pytest **151 passed** + ruff 全绿；前端 lint/typecheck/vitest 19/build 全绿。
+- **开发服务起停重构**：uvicorn/mvn/pnpm 作为终端批次任务跑时，关终端弹「Terminate batch job (Y/N)?」且服务随会话死（断网重启后三端全掉）。新增 `scripts/dev-up.ps1`（start/status/stop，**Start-Process 独立进程** + 日志 `local/dev-logs/`；pwsh 7 执行），README 方式 B 增一键起停说明；已验证三端健康（python readyz / java ping / vite 200）。
+- **踩坑**：vite 默认绑 `localhost`（::1），脚本健康探测用 `127.0.0.1` 会 false——已改 localhost（与之前的 5173 访问同坑）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
 ## 2026-09-04 ② 联调发现 BUG：ASR 词级时间戳恒空（生成器二次迭代）已修 + 归档
 
 - **现象**：`/preview/fluency` 上传 ref-2.wav（6.12s）→ 转写文本正确但 words=0、wpm/停顿全零；直接 `WhisperModel.transcribe(word_timestamps=True)` × 同文件却出 11 词——矩阵锁定封装层；
