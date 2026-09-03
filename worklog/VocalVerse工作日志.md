@@ -3,6 +3,19 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-03 遍历完善 · 入学测试域巡检修复
+
+**巡检点**：旧三维公式(0.4/0.3/0.3)/`_level_for`/`QA_REF` 残留、`compute_s` None 兜底、前端交互状态、`placement_lab` 语法均值。
+**结论**：无旧公式/`_level_for`/`QA_REF` 残留（`_level_for` 在 difficulty/skill 属推荐域）；`compute_s` 的 `(a or 0.0)` 已被 finalize/lab 的 None 守卫覆盖。
+**修复**：
+1. `PlacementView.vue`：「🔁 重录一次」由直调 `recorder.start` 改为调用 `startRecord()`（修录音态/停止键/埋点失效）；补 `onUnmounted` 释放 `demoUrl`/`testUrl`/记停止。
+2. `placement_lab.py`：`gram_score`/返回 `gram` 改为**过滤 None 后取均值**（原 `sum(gram_vals)` 在 Fake LLM 语法恒 None 时报 `int+NoneType`）。
+3. 新增 `tests/test_placement_lab.py`（/run 两维档位 + /status 档位/冷却）——校验联调测试台按 AGENTS.md rule 3 可用且可删无影响。
+
+**门禁**：`pytest tests/placement/ + tests/test_placement_lab.py` 34 passed；整仓 `ruff check`+`format --check` 全绿；前端 `lint`/`typecheck`/`test:run`/`build` 全绿。
+
+—— 执行人：Faust-sudo
+
 ## 2026-09-03 入学测试联调测试页（AGENTS.md rule 3 前后端联动强制项）
 
 **背景**：AGENTS.md 2026-09-03 新增「前后端联动新功能须提供联调测试页」强制项；入学测试属此类，补做。
