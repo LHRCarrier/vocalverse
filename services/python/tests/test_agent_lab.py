@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import pytest
-from app.api.routes.agent_lab import AgentTurnRequest, _run_turn
+from app.api.routes.agent_lab import AgentTurnRequest, _run_turn, build_context_for_display
 from app.audio.stubs import FakeLLMClient
 from app.practice.state import SessionState
 
@@ -28,6 +28,32 @@ def test_agent_lab_disabled_returns_404(client) -> None:
     assert r.status_code == 404
     schemas = client.get("/openapi.json").json()
     assert "/api/v1/agent-lab" not in schemas["paths"]  # include_in_schema=False：契约快照零 diff
+
+
+def test_effective_by_turn_last_round_auto() -> None:
+    """回归：连跑末轮自动视为「回合上限已到」（POC 冒烟同款 concluded_by_turn=(i>=n)）。
+
+    修复前 /turns 全轮共用表单开关（默认 False）→ 冒烟第 5 轮上下文永远是
+    "Turn limit reached: False" → conclude 必为 false（2026-09-03 实测 5/5 false）。
+    """
+    from app.api.routes.agent_lab import _effective_by_turn
+
+    assert _effective_by_turn(False, 4, 5) is False  # 非末轮不注入
+    assert _effective_by_turn(False, 5, 5) is True  # 末轮自动注入
+    assert _effective_by_turn(True, 2, 5) is True  # 勾选 → 全轮 True（保留原语义）
+
+
+def test_display_payload_is_flat_text() -> None:
+    """回归：/turn 展示载荷 system/user 必须是**字符串**（前端 NCode 直显原文）。
+
+    修复前 /turn 把 build_context_for_display 的 {system,user} 再包一层 →
+    data.system 变成对象 → 前端渲染 [object Object]、user 卡片空白（2026-09-03 实测）。
+    """
+    state = SessionState(session_id=0, kind="dialog")
+    disp = build_context_for_display(_req(), state)
+    assert set(disp) == {"system", "user"}
+    assert isinstance(disp["system"], str) and disp["system"].startswith("You are Maya")
+    assert isinstance(disp["user"], str) and "[context]" in disp["user"]
 
 
 @pytest.mark.anyio

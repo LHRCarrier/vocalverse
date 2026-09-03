@@ -52,6 +52,18 @@ def test_system_preserves_behavior_instructions() -> None:
     assert "META JSON fields" in system
 
 
+def test_system_contract_marker_has_no_extra_brackets() -> None:
+    """回归：契约行必须是裸 `[-META-]`（单行、无外层方括号）。
+
+    2026-09-03 冒烟实测：模板曾写 `[{marker}]` → 渲染成 `[[-META-]]`，模型逐字输出
+    外层括号 → 每轮 reply 尾部多一个 `[`（splitter 在第一个 `[` 处分界），外层 `]`
+    落进 meta 尾段靠兜底正则吞掉——与 meta.py「一行 `[-META-]{…}`」契约不符。
+    """
+    system = _build(_state())[0]["content"]
+    assert f"\n{MARKER}\n" in system
+    assert f"[{MARKER}]" not in system
+
+
 def test_dynamic_fields_all_in_user_message() -> None:
     """P2：难度/语料/画像/hits/收尾/摘要全部位于 user 消息；system 不含动态值。"""
     learner = (
