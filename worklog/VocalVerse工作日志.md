@@ -3,6 +3,18 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-03 补齐遗漏：orchestrator × META 补偿接线（未提交缺口，红→绿验证）
+
+组长发现工作区有未提交文件：上批提交 `git add` 只圈了 `app/agent`，**漏了 `app/practice/orchestrator.py` 的补偿接线**（import + 调用块）——已提交版本中原生链路「流式未出 META → 补偿调用」从未生效（框架冒烟通过是因为脚本自身调了 compensate，生产 orchestrator 没调）。本次补齐：
+
+- `orchestrator._dialog_turn`：`if not meta.ok → compensate_meta(...)`（docs/26 §9.4 设计原样）；
+- 补接线回归测试 `tests/agent/test_orchestrator_compensate.py`（NoMetaLLM 流 + 合法 JSON chat）：**接线前必红（coach_note=None）、接线后绿**（已实测红→绿）；
+- 全量 pytest **118 passed**。
+
+踩坑：**跨目录批次提交时，`git add` 的路径白名单不是「整个功能」**——`app/agent` 与 `app/practice` 分属两个目录，漏一个目录就是静默功能缺口；下次提交用 `git status` 全量核对而非凭记忆圈路径。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
 ## 2026-09-03 协作流程固化：新功能必须带联调测试页（AGENTS.md 第 3 条）
 
 组长拍板固化为仓库纪律：**凡开发涉及前后端联动的新功能，必须按既有预览机制提供「团队联调测试页（可删无影响）」**（AGENTS.md 工作流程第 3 条，新增「审 PR 检查项」同步）。规范要点：
