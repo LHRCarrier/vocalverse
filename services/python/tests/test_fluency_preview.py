@@ -90,3 +90,43 @@ def test_manual_reference_takes_priority_over_transcript_flag() -> None:
     )
     assert r.status_code == 200
     assert r.json()["data"]["score_ref"] == "manual"
+
+
+def test_analyze_downgrades_reference_too_long(monkeypatch) -> None:
+    """整篇歌词（>300 字符）→ 不盲等 ISE，降级并给原因（2026-09-04 传歌实测暴露）。"""
+    c = _mounted_client()
+    long_ref = "Too much of the past for one to memorize. " * 10  # 约 540 字符
+    assert len(long_ref) > 300
+    r = c.post(
+        "/api/v1/fluency-preview/analyze",
+        files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
+        data={"reference": long_ref},
+    )
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert data["score"] is None
+    assert data["score_ref"] == "manual"
+    assert data["score_error"].startswith("reference_too_long")
+
+
+def test_analyze_downgrades_audio_too_long(monkeypatch) -> None:
+    """音频 >60s（口语上限）→ 降级 audio_too_long；唱歌长音频走 M3 链路。"""
+    import app.api.routes.fluency_preview as fp
+    from app.audio.base import ASRResult
+
+    class _LongAsr:
+        async def transcribe(self, audio_bytes: bytes, language: str = "en") -> ASRResult:
+            return ASRResult(text="hello world", words=[], duration=236.7)
+
+    monkeypatch.setattr(fp, "get_asr_client", lambda: _LongAsr())
+    c = _mounted_client()
+    r = c.post(
+        "/api/v1/fluency-preview/analyze",
+        files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
+        data={"use_transcript_ref": "true"},
+    )
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert data["score"] is None
+    assert data["score_ref"] == "transcript"
+    assert data["score_error"].startswith("audio_too_long")
