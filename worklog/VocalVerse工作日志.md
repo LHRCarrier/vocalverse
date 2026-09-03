@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-04 ② 联调发现 BUG：ASR 词级时间戳恒空（生成器二次迭代）已修 + 归档
+
+- **现象**：`/preview/fluency` 上传 ref-2.wav（6.12s）→ 转写文本正确但 words=0、wpm/停顿全零；直接 `WhisperModel.transcribe(word_timestamps=True)` × 同文件却出 11 词——矩阵锁定封装层；
+- **根因**：faster-whisper `transcribe()` 返回**生成器**；`transcribe_sync` 先「拉平文本」（`''.join` 消费殆尽）再「遍历取词」→ 第二次迭代恒空；**旧代码 `ASRResult.segments` 亦恒空**（无消费方、无断言，自 M2 静默存在；直调测试因恰好 `list()` 物化而正常，极具迷惑性）；
+- **修复**：解包后 `segments = list(segments)` 物化一次 + 注释生成器契约（`app/audio/asr.py`）；回归测试 `tests/test_asr_words.py`（假模型返回生成器、断言 word_timestamps 透传+三处消费一致）——**删掉物化行必红（实测 1 failed）→ 恢复绿**；全量 **149 passed** + ruff 全绿；
+- **真链路复验**（重启 :8000）：words=**11** / wpm=**124.06** / pause=**2** / max_pause=**0.96s** / ISE overall=**84.94** flu=89.66 pron=82.01；
+- 归档：`worklog/BUG实测/asr词级时间戳空.md`（复现/根因/修复/验证/踩坑——**faster-whisper 生成器契约：要迭代两次必须先 list()**）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
 ## 2026-09-04 评分 DoD ②：流利度时间戳特征（ASR 词级时间戳 → wpm/停顿 → 落库/报告/联调测试台）
 
 打分「链路完成」DoD 剩余三项之②（2026-09-03 工作日志登记）：
