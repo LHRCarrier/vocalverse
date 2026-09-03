@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-03 PR#26 管理员直推合入 main（组内无人审 PR，组长行政决定）
+
+组长决定：团队成员不参与 PR 评审，**管理员方式直推 main**（`gh pr merge --admin --squash --delete-branch`，合并 commit `ee8e7ae`，PR#26 = feat(agent): LLM 框架 P0 内核（ai4u 对齐分层切片））。
+
+- **合入前核查（AGENTS.md「先查 CI 是否真的跑过」）**：python-ci 曾 1 次红（12s 失败）——根因 `test_orchestrator_compensate.py` 的 lint 修复（F811 重复导入/F841 sc_id）在工作区未提交 + `agent_lab.py` usage 字段漏 add（**又一次路径白名单遗漏**，已补 commit `802c2ad`）；补推后 **python-ci / frontend-ci / secret-scan 全 success** 才执行合并；
+- **合入内容**：LLM 框架 P0 内核 + META 契约 v2.2 + 补偿调用接线 + Agent Lab 测试台 + 摘要双轨/usage_log（迁移 0004）+ 文档群（docs/10 19+2、docs/14 v2.2、docs/24/25/26、worklog 若干）；本地全量 124 passed + ruff 全清（main 上复核通过）；
+- **直推后流程说明**：后续新 PR 仍按规范开（留痕/可追溯），合入由组长按本次模式 admin squash（CI 全绿为前提）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
 ## 2026-09-03 补齐遗漏：orchestrator × META 补偿接线（未提交缺口，红→绿验证）
 
 组长发现工作区有未提交文件：上批提交 `git add` 只圈了 `app/agent`，**漏了 `app/practice/orchestrator.py` 的补偿接线**（import + 调用块）——已提交版本中原生链路「流式未出 META → 补偿调用」从未生效（框架冒烟通过是因为脚本自身调了 compensate，生产 orchestrator 没调）。本次补齐：
