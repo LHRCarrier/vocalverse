@@ -29,6 +29,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
+    // /internal/** 由 ServiceTokenFilter 校验（Authorization: Bearer <service-token>，非 JWT）。
+    // 不进 JWT 解析，否则会把 service-token 当 JWT 解析失败 → clearContext() 清掉 ROLE_SERVICE → 403。
+    if (request.getRequestURI().startsWith("/internal/")) {
+      filterChain.doFilter(request, response);
+      return;
+    }
     String header = request.getHeader("Authorization");
     if (header != null && header.startsWith("Bearer ")) {
       try {

@@ -12,10 +12,12 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from app.audio.base import LLMClient
+from app.core.response import BizError
 from app.db import get_session_factory
 from app.models import (
     Attempt,
     DefenseProfile,
+    Placement,
     Scenario,
     ScenarioMessage,
 )
@@ -50,6 +52,22 @@ async def create_session(
 ) -> DbSession:
     db = get_session_factory()()
     try:
+        # D1：练习（对话）需先完成入学测试（有 level 定档）。C5 跳过路径会创建 provisional
+        # completed placement，故凡有 completed 档位即可；无则 40303（未定档引导见 stage E-4）。
+        if kind == SessionKinds.DIALOG:
+            has_placement = (
+                db.execute(
+                    select(Placement.id)
+                    .where(Placement.user_id == user_id, Placement.status == "completed")
+                    .limit(1)
+                ).scalar_one_or_none()
+                is not None
+            )
+            if not has_placement:
+                raise BizError(
+                    http_status=403, code=40303, message="placement required before practice"
+                )
+
         if kind == SessionKinds.DIALOG:
             scenario = db.get(Scenario, scenario_id) if scenario_id else None
             if scenario is None:
@@ -196,11 +214,15 @@ def _post_session_skills(db, session) -> None:
     """
     try:
         from app.mastery.service import update_session_mastery
+        from app.rec.service import invalidate_recommendation_cache
         from app.skill.service import update_user_level
 
         update_session_mastery(db, int(session.id))
         update_user_level(int(session.user_id), db)
         db.commit()
+        # 推荐输入已变（user_mastery/skill_state/cefr_level）→ 主动失效缓存（local/32 A-2.4）；
+        # 未配 Redis 时 invalidate 内部 suppress 不抛、幂等。
+        invalidate_recommendation_cache(int(session.user_id))
     except Exception:
         logger.warning(
             "post-session skills skipped session=%s (self-heal next practice)", session.id

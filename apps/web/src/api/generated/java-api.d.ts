@@ -566,6 +566,9 @@ export interface components {
             /** Format: int64 */
             userId: number;
             level: string;
+            source?: string;
+            /** Format: date-time */
+            levelAt?: string;
         };
         EnvelopeLong: {
             /** Format: int32 */

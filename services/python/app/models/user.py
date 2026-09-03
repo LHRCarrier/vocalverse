@@ -162,9 +162,10 @@ class Placement(TimestampMixin, Base):
     """入学测试记录（Python 评分管线写；1 用户可多次，取最新 completed 判档）。
 
     - exam_revision：固定朗读题版本（docs/06 §9.2 可复现要求；题库版本变更时递增）；
-    - 综合分 S = 0.4·发音 + 0.3·语法 + 0.3·流利度（docs/06 §9.2，阈值写配置）；
+    - 综合分 S = 0.6·发音 + 0.4·流利度（C1 两维，对齐推荐系统统一尺度 local/26 §2；阈值写配置）；
+      F = 0.7·mean(flu) + 0.3·mean(completeness)；语法（LLM）仅诊断、不进 S；
     - level 为按 S 折算的快照（写配置可调档位映射）；
-    - details 存每题明细 [{item_index, transcript, pron/gram/flu, errors}]。
+    - details 存每题明细 [{item_index, transcript, gram/grammar, kind}]。
     """
 
     __tablename__ = "placements"
@@ -197,4 +198,12 @@ class Placement(TimestampMixin, Base):
             name="level",
         ),
         Index("ix_placements_user_started", "user_id", "started_at"),
+        # B1 并发 40910 守卫：一个用户同时最多一个 in_progress 的考试 run
+        Index(
+            "uq_placements_user_inprogress",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status = 'in_progress'"),
+            sqlite_where=text("status = 'in_progress'"),
+        ),
     )

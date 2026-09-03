@@ -1641,6 +1641,13 @@
           },
           "level" : {
             "type" : "string"
+          },
+          "source" : {
+            "type" : "string"
+          },
+          "levelAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
