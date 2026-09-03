@@ -4,6 +4,9 @@ import { onMounted, ref } from 'vue'
 import { asr, pingJava, readyz } from '@/api/client'
 import { VoiceRecorder } from '@/audio/recorder'
 
+// DEV-only 预览画廊通道：生产构建常量折叠为 false → 面板不渲染（不进用户导航）
+const isDev = import.meta.env.DEV
+
 const pythonStatus = ref('检查中…')
 const javaStatus = ref('检查中…')
 const recordState = ref('idle')
@@ -60,6 +63,27 @@ onMounted(checkServices)
     <p class="mb-6 text-sm text-[#667085]">
       M1 脚手架：三服务连通性 + 录音组件验证（docs/06 第 16 章）
     </p>
+
+    <!-- 团队预览画廊通道（DEV Only）：生产构建常量折叠 → v-if 恒 false，不渲染、不进导航 -->
+    <section
+      v-if="isDev"
+      class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[12px] border border-dashed border-[#A7F3D0] bg-[#ECFDF5] p-4"
+    >
+      <b class="text-sm text-brand-deep">团队预览画廊（DEV Only）</b>
+      <RouterLink
+        to="/preview"
+        class="rounded-full bg-brand px-4 py-1.5 text-sm text-white transition-colors hover:bg-brand-deep"
+      >
+        进入预览画廊 →
+      </RouterLink>
+      <RouterLink
+        to="/preview/agent-lab"
+        class="rounded-full border border-brand px-4 py-1.5 text-sm text-brand transition-colors hover:bg-white"
+      >
+        直达 Agent Lab 测试台 →
+      </RouterLink>
+      <span class="text-xs text-[#667085]">可反向往返：画廊侧栏「回到骨架 Demo」</span>
+    </section>
 
     <section class="mb-4 rounded-[12px] border border-[#E5E7EB] bg-white p-6">
       <h2 class="mb-3 font-semibold">服务连通</h2>

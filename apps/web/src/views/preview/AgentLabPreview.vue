@@ -130,7 +130,7 @@ function tagType(v: unknown) {
               · 补偿率 = 补偿轮次/总轮次 —— <b>&lt; 50% 良好</b>（过高说明主契约在退步）；
               · coach_note 有效 = MetaBlock.coach_note 非空占比 —— 目标 100%；
               · 覆盖度命中 = hits 非空的轮次（规则通道，与 META 无关，2/5 起步即正常）；
-              · conclude 正确 = 第 5 轮（冒烟脚本末轮）为 true；
+              · conclude 正确 = 第 5 轮（冒烟脚本末轮）为 true（连跑冒烟<b>末轮自动</b>注入「回合上限已到」，无需勾选；单轮勾选「收尾标记」= 模拟最后一轮）；
               · 往返耗时 ms（回合总时长，均值参考 ~1-2s/轮）；
               · tokens：prompt/completion 累计（同时验证 usage_log 落库——后端 usage_log 表应逐轮新增行）。
             </li>
@@ -162,7 +162,9 @@ function tagType(v: unknown) {
               <NInput v-model:value="form.learner_profile" type="textarea" :rows="2" :placeholder="`留空=不注入；示例：${learnerExample}`" />
             </NFormItem>
             <NFormItem label="收尾标记">
-              <NCheckbox v-model:checked="form.concluded_by_turn">concluded_by_turn = True（模拟最后一轮）</NCheckbox>
+              <NCheckbox v-model:checked="form.concluded_by_turn">
+                concluded_by_turn = True（模拟最后一轮；连跑时全轮生效，冒烟末轮则自动为 True）
+              </NCheckbox>
             </NFormItem>
           </NForm>
           <div class="flex gap-2">
