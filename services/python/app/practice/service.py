@@ -166,6 +166,7 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
             db.execute(select(Attempt).where(Attempt.session_id == session_id)).scalars()
         )
         coverage = _coverage_summary(msgs, attempts)
+        semantic = _semantic_summary(msgs)  # ③ 语义子分聚合（不进量化总分，docs/07 Q38）
         summary = summary_text or f"会话完成：{len(user_msgs)} 轮口头交流。"
 
         from app.models import Report
@@ -179,6 +180,7 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
             metrics={
                 "summary": summary,
                 "coverage": coverage,
+                "semantic": semantic,  # ③ 语义子分（content/vocab；不进总分，展示口径）
                 "kind": session.kind,
                 "assigned_turns": session.assigned_turns,
                 "user_turn_count": len(user_msgs),
@@ -266,6 +268,31 @@ def _coverage_summary(msgs: list[ScenarioMessage], attempts: list[Attempt]) -> d
         "needs_fix": sorted(set(fix)),
         "to_practice": [],
         "coverage_count": len(seen),
+    }
+
+
+def _semantic_summary(msgs: list[ScenarioMessage]) -> dict:
+    """③ 语义子分聚合（docs/07 Q38：LLM 判定、进展示**不进量化总分**）。
+
+    取 assistant 消息 meta 的 content/vocab（META 契约增量字段）；无数据 → score=None。
+    返回：{"content": {"score": avg|None, "turns": n}, "vocab": {...}}
+    """
+
+    def _avg(key: str) -> tuple[float | None, int]:
+        vals: list[float] = []
+        for m in msgs:
+            if m.role != "assistant":
+                continue
+            v = (m.meta or {}).get(key)
+            if isinstance(v, dict) and isinstance(v.get("score"), (int, float)):
+                vals.append(float(v["score"]))
+        return (round(sum(vals) / len(vals), 1) if vals else None), len(vals)
+
+    content_avg, content_n = _avg("content")
+    vocab_avg, vocab_n = _avg("vocab")
+    return {
+        "content": {"score": content_avg, "turns": content_n},
+        "vocab": {"score": vocab_avg, "turns": vocab_n},
     }
 
 

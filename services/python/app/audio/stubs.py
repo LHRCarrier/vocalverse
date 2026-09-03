@@ -88,5 +88,7 @@ class FakeLLMClient(LLMClient):
                 corpus_hits=[{"phrase": "I would like a coffee, please", "state": "ok"}],
                 difficulty_delta=0,
                 conclude=False,
+                content={"score": 88, "note": "On-topic and helpful."},  # ③ 语义子分
+                vocab={"score": 84, "note": "Good variety for this level."},
             ),
         )

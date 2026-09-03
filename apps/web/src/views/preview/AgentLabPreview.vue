@@ -193,6 +193,8 @@ function tagType(v: unknown) {
             <p class="mt-1"><b>grammar：</b>{{ JSON.stringify(last.result.grammar) }}</p>
             <p class="mt-1"><b>hits：</b>{{ JSON.stringify(last.result.corpus_hits) }}</p>
             <p class="mt-1"><b>difficulty_delta / conclude：</b>{{ last.result.difficulty_delta }} / {{ last.result.conclude }}</p>
+            <!-- ③ 语义子分（2026-09-04；LLM 判定、不进总分） -->
+            <p class="mt-1"><b>content / vocab：</b>{{ JSON.stringify(last.result.content) }} / {{ JSON.stringify(last.result.vocab) }}</p>
           </NCard>
         </template>
 

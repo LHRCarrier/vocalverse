@@ -78,6 +78,8 @@ class _TurnOutcome:
     difficulty_delta: int
     conclude: bool
     ms: int
+    content: dict | None = None  # ③ 语义子分（默认字段置尾；dataclass 顺序约束）
+    vocab: dict | None = None  # ③ 语义子分
     usage: dict | None = None  # 回合流用量（prompt/completion tokens，docs/26 §10.3②）
 
 
@@ -148,6 +150,8 @@ async def _run_turn(
         corpus_hits=hits,
         difficulty_delta=meta.difficulty_delta,
         conclude=meta.conclude,
+        content=meta.content,  # ③ 语义子分（契约观测窗，2026-09-04）
+        vocab=meta.vocab,
         ms=ms,
         usage=res.usage,
     )

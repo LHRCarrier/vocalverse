@@ -16,6 +16,8 @@ const overall = ref<{ pron: number; flu: number; gram: number } | null>(null)
  *  attempt 条目：{wpm, fluency_features:{pause_count,...}}，无数据时为 null/缺省。 */
 const wpmAvg = ref<number | null>(null)
 const pauseAvg = ref<number | null>(null)
+/** ③ 语义子分（LLM 判定；进展示不进量化总分，docs/07 Q38） */
+const semantic = ref<{ content: number | null; vocab: number | null; turns: number } | null>(null)
 
 onMounted(async () => {
   try {
@@ -39,6 +41,17 @@ onMounted(async () => {
         .filter((v) => v > 0)
       if (pauseVals.length) {
         pauseAvg.value = Math.round((pauseVals.reduce((s, v) => s + v, 0) / pauseVals.length) * 10) / 10
+      }
+      // ③ 语义子分：metrics.semantic = {content:{score,turns}, vocab:{score,turns}}
+      const sem = report.value.metrics.semantic as
+        | { content?: { score?: number; turns?: number }; vocab?: { score?: number } }
+        | null
+      if (sem && (sem.content?.score != null || sem.vocab?.score != null)) {
+        semantic.value = {
+          content: sem.content?.score ?? null,
+          vocab: sem.vocab?.score ?? null,
+          turns: sem.content?.turns ?? 0,
+        }
       }
     }
   } catch (e) {
@@ -79,6 +92,22 @@ onMounted(async () => {
         <div class="text-center">
           <div class="text-2xl font-bold text-[#0EA5E9]">{{ overall.gram }}</div>
           <div class="mt-1 text-xs text-[#667085]">语法</div>
+        </div>
+      </NCard>
+    </section>
+
+    <!-- ③ 语义子分（LLM 判定 · 展示口径，不进量化总分 · docs/07 Q38） -->
+    <section v-if="semantic" class="mb-4 grid grid-cols-2 gap-4">
+      <NCard size="small">
+        <div class="text-center">
+          <div class="text-2xl font-bold text-[#334EAC]">{{ semantic.content ?? '—' }}</div>
+          <div class="mt-1 text-xs text-[#667085]">内容相关度（{{ semantic.turns }} 轮）</div>
+        </div>
+      </NCard>
+      <NCard size="small">
+        <div class="text-center">
+          <div class="text-2xl font-bold text-[#7096D1]">{{ semantic.vocab ?? '—' }}</div>
+          <div class="mt-1 text-xs text-[#667085]">词汇多样性 · 均分</div>
         </div>
       </NCard>
     </section>

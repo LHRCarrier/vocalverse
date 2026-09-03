@@ -36,6 +36,8 @@ class MetaBlock(pydantic.BaseModel):
     corpus_hits: list[dict[str, Any]] = pydantic.Field(default_factory=list)
     difficulty_delta: int = 0
     conclude: bool = False
+    content: dict | None = None  # ③ 语义子分：内容相关度 {score,note}（LLM 判定，不进总分）
+    vocab: dict | None = None  # ③ 语义子分：词汇多样性 {score,note}（LLM 判定，不进总分）
     level: str | None = None  # defense：作答等级 green/yellow/red
     hits: dict | None = None  # defense：要点命中 {hits: [...], total: n}
 

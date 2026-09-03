@@ -294,6 +294,8 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             corpus_hits=hits,
             difficulty_delta=meta.difficulty_delta,
             conclude=meta.conclude,
+            content=meta.content,  # ③ 语义子分（LLM 判定；防御见 meta.py properties）
+            vocab=meta.vocab,
         )
         score_status = "unavailable"
         if score_task is not None:
@@ -367,6 +369,8 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                     "coach_note": meta.coach_note,
                     "corpus_hits": hits,
                     "difficulty_delta": meta.difficulty_delta,
+                    "content": meta.content,  # ③ 语义子分（报告聚合源，见 service）
+                    "vocab": meta.vocab,
                     "prompt_version": 2,  # v2=稳定前缀+学习者画像注入（docs/26）
                 },
             )

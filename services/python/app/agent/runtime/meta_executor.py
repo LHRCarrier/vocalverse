@@ -65,7 +65,9 @@ _COMPENSATE_SYSTEM = (
     "Reply with ONLY a JSON object of exactly this shape (no prose, no code fence):\n"
     '{"grammar":{"score":0-100,"errors":[{"word":"...","fix":"..."}]},'
     '"coach_note":"<=15 words","corpus_hits":[{"phrase":"...","state":"ok|fix"}],'
-    '"difficulty_delta":-1|0|1,"conclude":false}'
+    '"difficulty_delta":-1|0|1,"conclude":false,'
+    '"content":{"score":0-100,"note":"<=20 words"},'
+    '"vocab":{"score":0-100,"note":"<=20 words"}}'
 )
 
 
@@ -90,7 +92,9 @@ async def compensate_meta(
         "Note: conclude=true only if the conversation reached the turn limit or the user ended "
         f"(turn limit reached: {concluded_by_turn}).\n"
         "corpus_hits: phrases from the reply that the learner actually expressed (empty if none); "
-        "state=ok if no fatal grammar error, else fix."
+        "state=ok if no fatal grammar error, else fix.\n"
+        "content.score = relevance & fullness of this turn to the current topic (0-100); "
+        "vocab.score = vocabulary variety & word choice (0-100); notes are short, actionable."
     )
     try:
         fn = getattr(llm, "chat_with_usage", None)

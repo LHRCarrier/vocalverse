@@ -28,7 +28,8 @@ _STATIC_TEMPLATE = (
     "Output contract: reply as plain English text ONLY, then finish with a single line:\n"
     "{marker}\n"
     "META JSON fields: grammar:{{score:0-100,errors:[{{word,fix}}]}}, coach_note(≤15 words), "
-    "corpus_hits:[{{phrase,state:'ok'|'fix'}}], difficulty_delta:-1|0|1, conclude(bool)."
+    "corpus_hits:[{{phrase,state:'ok'|'fix'}}], difficulty_delta:-1|0|1, conclude(bool), "
+    "content:{{score:0-100,note}}, vocab:{{score:0-100,note}}."
 )
 
 
