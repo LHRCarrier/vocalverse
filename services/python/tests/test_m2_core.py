@@ -148,7 +148,32 @@ def test_bank_validation_requires_three_tiers():
 # ---------------------------------------------------------------------------
 # 全链路（Fake clients，经由 API）
 # ---------------------------------------------------------------------------
+def _seed_completed_placement(user_id: int) -> None:
+    """D1：给测试用户补一条 completed 定档（否则 /sessions 40303 拦截）。"""
+    from datetime import UTC, datetime
+
+    from app.db import get_session_factory
+    from app.models import Placement
+
+    db = get_session_factory()()
+    try:
+        db.add(
+            Placement(
+                user_id=user_id,
+                status="completed",
+                completed_at=datetime.now(UTC),
+                level="L2",
+                exam_revision=1,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+
 def test_full_dialog_turn_sse_flow(client, auth_headers):
+    # D1：先完成一次定档，否则 /sessions 40303 拦截（见 _seed_completed_placement）
+    _seed_completed_placement(1)
     # 预置场景（直接走 DB 建一条 Published 场景）
     from app.db import get_session_factory
     from app.models import Scenario
@@ -205,6 +230,7 @@ def test_full_dialog_turn_sse_flow(client, auth_headers):
 
 
 def test_turn_stale_expected_turn_rejected(client, auth_headers):
+    _seed_completed_placement(1)  # D1
     from app.db import get_session_factory
     from app.models import Scenario
 
@@ -234,6 +260,33 @@ def test_turn_stale_expected_turn_rejected(client, auth_headers):
         headers=auth_headers,
     )
     assert resp.status_code == 409
+
+
+def test_dialog_session_requires_placement(client, auth_headers):
+    """D1：未完成定档（无 completed placement）→ POST /sessions 403 + 40303。"""
+    from app.db import get_session_factory
+    from app.models import Scenario
+
+    db = get_session_factory()()
+    scenario = Scenario(
+        title="T-no-placement",
+        scene_type="cafe",
+        difficulty=1,
+        system_prompt="x",
+        opening_line="hi",
+        target_corpus="a|A",
+        interest_tags=[],
+        status="published",
+    )
+    db.add(scenario)
+    db.commit()
+    sid = scenario.id
+    db.close()
+    resp = client.post(
+        "/api/v1/sessions", json={"kind": "dialog", "scenario_id": sid}, headers=auth_headers
+    )
+    assert resp.status_code == 403, resp.text
+    assert resp.json()["code"] == 40303
 
 
 def test_defense_profile_lifecycle(client, auth_headers):
