@@ -16,7 +16,7 @@
  * 3. 收尾：pytest 全量 / pnpm typecheck / lint / build；契约快照零 diff。
  */
 import { computed, ref } from 'vue'
-import { NAlert, NButton, NInput, NTag } from 'naive-ui'
+import { NAlert, NButton, NCheckbox, NInput, NTag } from 'naive-ui'
 
 interface FluencyFeatures {
   word_count: number
@@ -51,10 +51,14 @@ interface AnalyzeResult {
     fluency: number
     grammar: number | null
   } | null
+  /** ISE 评分参考来源：manual=题卡原文 / transcript=ASR 转写（转写对转写）/ null=未评分 */
+  score_ref: 'manual' | 'transcript' | null
 }
 
 const file = ref<File | null>(null)
 const reference = ref('')
+/** 填了参考文本 → 题卡原文优先；否则勾选时用 ASR 转写喂 ISE（生产对话同款转写对转写）。 */
+const useTranscriptRef = ref(true)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const result = ref<AnalyzeResult | null>(null)
@@ -97,7 +101,11 @@ async function analyze() {
   try {
     const form = new FormData()
     form.append('audio', file.value)
-    if (reference.value.trim()) form.append('reference', reference.value.trim())
+    if (reference.value.trim()) {
+      form.append('reference', reference.value.trim())
+    } else if (useTranscriptRef.value) {
+      form.append('use_transcript_ref', 'true')
+    }
     const resp = await fetch('/api/v1/fluency-preview/analyze', { method: 'POST', body: form })
     const body = (await resp.json()) as { code: number; message: string; data?: AnalyzeResult }
     if (!resp.ok || body.code !== 0 || !body.data) {
@@ -140,6 +148,7 @@ function fillDemo() {
       pause_ratio: 0.3646,
     },
     score: { overall: 90.9, pronunciation: 92.59, fluency: 87.7, grammar: null },
+    score_ref: 'transcript',
   }
   error.value = null
 }
@@ -202,8 +211,11 @@ const C = {
         <NInput
           v-model:value="reference"
           class="w-72"
-          placeholder="参考文本（可选，用于 ISE 发音评分）"
+          placeholder="参考文本（留空 = 用转写对转写）"
         />
+        <NCheckbox v-model:checked="useTranscriptRef" :disabled="!!reference.trim()">
+          用 ASR 转写作为参考（转写对转写，与生产对话一致）
+        </NCheckbox>
         <NButton type="primary" :loading="loading" @click="analyze">分析</NButton>
         <NButton secondary @click="fillDemo">演示数据（离线看版式）</NButton>
       </div>
@@ -343,7 +355,16 @@ const C = {
           </table>
         </div>
         <div class="rounded-[16px] border border-[#E5E7EB] bg-white p-4 text-sm">
-          <div class="mb-2 text-xs font-semibold text-[#667085]">ISE 发音评分（参考文本非空时）</div>
+          <div class="mb-2 text-xs font-semibold text-[#667085]">
+            ISE 发音评分 ·
+            {{
+              result.score_ref === 'manual'
+                ? '参考：题卡原文（手动填写）'
+                : result.score_ref === 'transcript'
+                  ? '参考：ASR 转写（转写对转写）'
+                  : '未评分（填参考文本或勾选转写对转写）'
+            }}
+          </div>
           <template v-if="result.score">
             <div class="grid grid-cols-3 gap-3">
               <div>
@@ -355,16 +376,17 @@ const C = {
                 <div class="text-xl font-bold">{{ fmt(result.score.pronunciation) }}</div>
               </div>
               <div>
-                <div class="text-xs text-[#667085]">语法</div>
-                <div class="text-xl font-bold">{{ result.score.grammar === null ? '未启用' : fmt(result.score.grammar) }}</div>
+                <div class="text-xs text-[#667085]">流利度</div>
+                <div class="text-xl font-bold">{{ fmt(result.score.fluency) }}</div>
               </div>
             </div>
           </template>
-          <p v-else class="text-xs text-[#667085]">未提供参考文本（或评分降级）→ 不展示。</p>
+          <p v-else class="text-xs text-[#667085]">无参考文本（评分降级）→ 不展示 ISE 分。</p>
           <div class="mt-4 mb-2 text-xs font-semibold text-[#667085]">口径说明</div>
           <ul class="list-inside list-disc space-y-1 text-xs text-[#667085]">
             <li>语速/停顿是 <b>辅助指标</b>；流利度权威分仍为 ISE fluency（docs/07 Q30）。</li>
             <li>首词前/末词后静默不计停顿（录音边沿噪声）。</li>
+            <li>测试台默认「转写对转写」（与生产对话链路一致）；填了参考文本则题卡原文优先。</li>
             <li>
               数据落 <code>attempts.wpm</code> + <code>attempts.details.fluency</code>，报告经
               <code>metrics.attempts[].wpm / fluency_features</code> 透出。

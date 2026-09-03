@@ -32,8 +32,13 @@ router = APIRouter(
 async def analyze(
     audio: UploadFile = File(...),
     reference: str = Form(default=""),
+    use_transcript_ref: bool = Form(default=False),
 ) -> Envelope[dict]:
-    """音频 → 词级时间戳 → 流利度特征 →（参考文本非空时）发音评分。
+    """音频 → 词级时间戳 → 流利度特征 →（有参考时）发音评分。
+
+    参考文本优先级：手动 `reference` → `use_transcript_ref=true` 时用 ASR 转写
+    （「转写对转写」，与生产对话链路同口径，orchestrator._dialog_turn）→ 无参考不评分。
+    返回 `score_ref`（manual/transcript/None）供页面标注参考来源。
 
     无状态测试端点：只守上界（min_bytes=0 与 /asr 同口径）；不扣限流、不落库。
     测试环境（APP_TESTING=true）走 FakeASR/FakeScorer，CI 零真实 Key。
@@ -45,15 +50,20 @@ async def analyze(
     features = compute_fluency_features(asr_res.words or [], float(asr_res.duration or 0.0))
 
     score = None
-    if reference.strip():
+    score_ref: str | None = None
+    ref_text = (
+        reference.strip() if reference.strip() else (asr_res.text if use_transcript_ref else "")
+    )
+    if ref_text:
         try:
-            s = await get_scorer_client().score(data, reference)
+            s = await get_scorer_client().score(data, ref_text)
             score = {
                 "overall": float(s.overall),
                 "pronunciation": float(s.pronunciation),
                 "fluency": float(s.fluency),
                 "grammar": float(s.grammar) if s.grammar is not None else None,
             }
+            score_ref = "manual" if reference.strip() else "transcript"
         except Exception:  # 评分失败不强求（测试台以特征为主）
             score = None
 
@@ -65,6 +75,7 @@ async def analyze(
             "duration_s": float(asr_res.duration or 0.0),
             "features": features,
             "score": score,
+            "score_ref": score_ref,
             # 与完整对话回合落进 attempts/report 的同构演示载荷（口径 docs/06 §9.3）
             "attempt_demo": {
                 "transcript": asr_res.text,
