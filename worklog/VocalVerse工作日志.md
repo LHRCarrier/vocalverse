@@ -15,6 +15,18 @@
 
 —— 执行人：LHRCarrier（AI 代工整理）
 
+## 2026-09-03 缺口补齐：摘要双轨落库 + usage_log 用量记账（迁移 0004）+ Agent Lab 指标化
+
+按 docs/26 §10.3 两个缺口实施（组长拍板「缺口补上」）：
+
+- **① 会话摘要落库**：`sessions` 加 `summary/summary_updated_at/summary_failed_at` 三列（迁移 0004，对齐 ai4u agent_conversation.summary*）；`app/agent/domains/summarizer.py`（ai4u summarizer 版：近 6 条原文 + 更早 40 条窗口 + 每 4 条增量触发 + 首尾保底 300/100 + 重试 1 次 + 失败标记；回合落库后异步触发、收尾 `complete_session` 覆盖写最终总结）；**注入 ContextBuilder 的 user 尾部 `[context]`**（`Rolling summary` 行——绝不放 system，POC §9 铁证）；
+- **② usage_log 用量表**：迁移 0004 新表 + `app/agent/domains/usage.py log_usage`；`llm.py` 增 `chat_with_usage/stream_rich`（usage 透传）、`stubs.FakeLLMClient.stream_rich` 同型；记账点 = turn（TurnRunner 富流）/ meta_compensate / summary / conclude 四点；
+- **Agent Lab 指标化**：连跑统计加 tokens、页面顶部「指标说明」卡（怎么用/测什么/八项指标口径与阈值）；docs/26 增 §11 测试指南、§10.3 状态更新 + §10.4 摘要口径；docs/10 表清单（19+2）与写方矩阵同步；EXPECTED_TABLES + usage_log；
+- **验证**：pytest **124 passed**（摘要触发/失败标记/用量落库/迁移 offline 渲染（batch 仅 downgrade）/富流用量）；ruff + format 全清；
+- **踩坑**：① `may_be_summarize` 首版用 `len(recent)<=RECENT_N` 判定导致永远早退（recent 被 LIMIT 截断）→ 改总消息数判定；② `op.create_table` 用 `*_pki()` 展开 + 无显式 PK → offline `--sql` 渲染 `getitem` NotImplementedError → 对齐 0003 样式（显式 PrimaryKeyConstraint + `length=` 形参）后通过。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
 ## 2026-09-03 协作流程固化：新功能必须带联调测试页（AGENTS.md 第 3 条）
 
 组长拍板固化为仓库纪律：**凡开发涉及前后端联动的新功能，必须按既有预览机制提供「团队联调测试页（可删无影响）」**（AGENTS.md 工作流程第 3 条，新增「审 PR 检查项」同步）。规范要点：

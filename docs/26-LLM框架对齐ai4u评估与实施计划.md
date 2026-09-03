@@ -203,9 +203,62 @@ docs/14 §3.4 已按 v2.2 回写；tests/agent/test_context_builder.py 断言已
 
 ### 10.3 缺口与 P1 建议（待组长拍板）
 
-1. **① 会话摘要落库**（ai4u 双轨精华）：`sessions` 加 `summary TEXT` + `summary_updated_at TIMESTAMP`（+可选 `summary_failed_at`）——摘要从进程内 digest 落库后：长会话不失忆、跨会话续聊有基础（M2「刷新恢复 P2 延期」卡的就是此缺口）、失败可自动重试（ai4u summaryFailedAt 系统信号）。**随 P1 摘要双轨实施**（docs/26 §4-P1），预估 1 人日内。
+> **状态（2026-09-03 已实施，迁移 0004）**：① 摘要三列已落库（`sessions.summary/summary_updated_at/summary_failed_at` +
+> `SummarizerService` 增量压缩：近 6 条原文 + 更早 40 条窗口/首尾保底/重试 1 次/失败标记，
+> 收尾最终总结覆盖写入；**注入 user 尾部 [context]「Rolling summary」**——绝不进 system，
+> 见 §9.2 铁证）；② `usage_log` 表 + `log_usage`（source=turn/meta_compensate/summary/conclude）
+> + `llm.py stream_rich/chat_with_usage` 用量透传，回合/补偿/收尾/摘要四点记账。
+
+1. **① 会话摘要落库**（ai4u 双轨精华）：`sessions` 加 `summary TEXT` + `summary_updated_at TIMESTAMP`（+可选 `summary_failed_at`）——摘要从进程内 digest 落库后：长会话不失忆、跨会话续聊有基础（M2「刷新恢复 P2 延期」卡的就是此缺口）、失败可自动重试（ai4u summaryFailedAt 系统信号）。**✅ 已完成（迁移 0004 + SummarizerService）**；
 2. **③ 学习者画像维持派生不建表**：mastery/skill/attempts 聚合 + 进程内 TTL 缓存已闭环；如 P1 做 **Auto-memory**（每会话收尾把新易错点沉淀为画像更新），可在 `user_corpus_mastery`/衍生表上自然生长，不新增记忆表——ai4u memory 的情感坐标/quote 是陪伴产品要素，与口语训练产品不符。
-3. **② usage_log**：P3 拍板已定（暂仅日志）；M3 报表时按 ai4u `usage_log` 模板建表（source/model/prompt_tokens/completion_tokens/meta + 时间索引）。
+3. **② usage_log**：**✅ 已完成（迁移 0004 + log_usage）**；M3 报表按本表聚合成本。
+
+### 10.4 P1 摘要双轨只读口径（已实现，供拍板参考）
+
+- 字与轮数：`RECENT_N=6` 原文窗口、`TRIGGER_MESSAGES=4` 增量触发、`SOURCE_LIMIT=40` 压缩窗口、首尾保底 300/100、失败重试 1 次（1.5s 退避）——魔数均标 ai4u 溯源，调整前重估；
+- 注入：`[context]` 段 `Rolling summary (earlier turns): …`（会话级稳定段，与画像行同级）；
+- 收尾：`complete_session` 以最终总结覆盖 `sessions.summary`（报告快照与摘要列同源）。
+
+---
+
+## 11. Agent Lab 测试指南（怎么用 / 测什么 / 指标口径）
+
+> 入口：`/preview/agent-lab`（前端预览画廊，dev-only）；后端 `APP_AGENT_LAB_ENABLED=true`。
+> 本页所有调用走真实 DeepSeek（`.env` 的 `APP_DEEPSEEK_API_KEY`），每次点击消耗配额。
+
+### 11.1 怎么用（三步）
+
+1. `services/python/.env` 加 `APP_AGENT_LAB_ENABLED=true`（Key 已有则直用），重启后端（uvicorn 8000）+ `pnpm dev`（5173）；
+2. 打开 `http://localhost:5173/preview/agent-lab` → 画廊点「Agent Lab · LLM 框架测试台」；
+3. 默认参数即「Maya 咖啡馆」场景 → 点 **运行单轮**（看单回合样例）或 **连跑 5 轮冒烟**（看会话统计）。
+
+### 11.2 测什么（五类验证）
+
+| # | 验证点 | 怎么看 |
+|---|---|---|
+| 1 | **system 静态契约** | 任意两次「运行单轮」的 system 原文应**逐字相同**；若不同 → 契约被破坏（POC 铁证：动态进 system = META 0%） |
+| 2 | **META 契约与补偿** | 每轮 result 卡：`META OK`（流式直出）或 `META OK(补偿)`；`MISS` = 补偿也失败（检查 Key/网络/补偿 prompt） |
+| 3 | **MetaExecutor 命中/收尾** | hits 列表（规则通道应命中目标语料短语）；连跑末轮 conclude=true |
+| 4 | **画像/摘要注入** | 第 2 轮起 user 原文应含 `Learner profile` 行；消息 ≥7 条后应含 `Rolling summary` 行（图片行 0~3 条、摘要 ≤300 字） |
+| 5 | **用量记账** | 连跑统计 tokens；对照后端 `usage_log` 表逐轮新增（turn/summary/conclude 源） |
+
+### 11.3 指标口径与阈值（页面顶卡同款）
+
+| 指标 | 口径 | 阈值/参考 |
+|---|---|---|
+| META 直出率 | 流式自带可解析 META 的轮次/总轮次 | 观察值 ≈60%（全上下文）；**不设硬门槛**（补偿是兜底） |
+| 补偿后 META 率 | (直出+补偿成功)/总轮次 | **目标 100%**；<80% → 检查补偿 prompt / docs/18 §6 两调用回退预案 |
+| 补偿率 | 补偿轮次/总轮次 | **<50% 良好**；持续走高说明主契约退步（对比 docs/26 §9 四臂矩阵） |
+| coach_note 有效 | MetaBlock.coach_note 非空占比 | 目标 100%（用户在对话页看到每轮点评） |
+| 覆盖度命中 | hits 非空轮次（规则通道，独立于 LLM） | 冒烟场景 2/5 起步即正常；与语料相关性相关 |
+| conclude 正确 | 第 5 轮（冒烟末轮）为 true | =true（规则兜底保证，META 只是加速） |
+| 往返耗时 ms | 回合总时长（含补偿） | 参考 1~2s/轮（POC-2 first_token 0.41s） |
+| tokens | prompt/completion 累计 | 对照 usage_log 表一致（记账验证） |
+
+### 11.4 结论判定
+
+- **PASS**：补偿后 META 率 ≥80% 且 system 逐字一致且补偿率 <50% 且 tokens>0；
+- **FAIL 自检顺序**：① META 0% → 看 system 是否被意外改动（契约）；② 补偿率 100% → 检查 prompt 静态块是否含动态值；③ tokens=0 → 后端未启用新代码 / 用旧进程。
 
 ---
 
