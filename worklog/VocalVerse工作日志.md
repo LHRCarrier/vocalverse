@@ -3,6 +3,18 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-03 协作流程固化：新功能必须带联调测试页（AGENTS.md 第 3 条）
+
+组长拍板固化为仓库纪律：**凡开发涉及前后端联动的新功能，必须按既有预览机制提供「团队联调测试页（可删无影响）」**（AGENTS.md 工作流程第 3 条，新增「审 PR 检查项」同步）。规范要点：
+
+- **前端**：docs/13 §8 预览工作流（`views/preview/` + `registry.ts` 一行 + `router/preview.ts` 一行；dev-only 子树，生产构建零体积零路由）；
+- **后端**：test-only 接口模板（`include_in_schema=False` 契约快照零 diff、无表无迁移、`*_enabled=False` 默认不注册、生产禁止开启）；
+- **可删无影响**：删除清单写入接口文件尾注释；删除后全量门禁绿 + 契约快照零 diff；
+- **首例模板**：Agent Lab（PR#26）——`AgentLabPreview.vue` + `app/api/routes/agent_lab.py`，后续新页克隆改造。
+- 审 PR 检查项：涉前后端联动功能 PR 缺联调测试页或删除清单 → comment 要求补。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
 ## 2026-09-03 Agent Lab · LLM 框架测试台（团队测试用，整删无影响）
 
 按组长要求「做一个前端测试页，专供团队测试、不影响其它代码、删除无影响」，落地 **Agent Lab**：
