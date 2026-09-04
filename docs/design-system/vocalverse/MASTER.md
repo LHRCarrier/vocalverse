@@ -13,8 +13,11 @@ v3.1 硬性修正：**单一字体**、**≤6 档字级**、**间距分组（16 
 
 ## 设计风格
 
-- **主体**：Soft UI Evolution——柔和双投影、大圆角、克制用色；白卡带 1px 淡描边（浅蓝底上边界清晰）
-- **元素层**：Voice-First Multimodal——声波可视化（焦点卡/登录大图形用 Phosphor duotone/fill）、聆听/说话态
+- **主体（v3.3 soft-brutalism）**：语言源自 uiverse.io/@0xnihilism 15 元素提炼（**只借模式，代码全自研**）——
+  硬偏移阴影（4px 4px 0 实色）、厚描边（2.5-3px 深墨）、扫光（主按钮 hover 高光掠过）、
+  按压下沉（active translate 2-3px + 阴影收缩）、微旋转（焦点卡 hover -0.6°，reduced-motion 关闭）；
+  整体保持圆润（20px 圆角）与大众友好（不放大面积黑块，深墨只做"边界/阴影"角色）
+- **元素层**：Voice-First Multimodal——声波线稿插画（ArtWave/ArtCalendar，自绘）、聆听/说话态
 - **动效层**：Micro-interactions——60ms 按压、120-150ms 微动、spring 主交互；只动 transform/opacity
 
 ## 色彩 Token（浅色模式；深色模式后续版本另行验证）
@@ -44,8 +47,9 @@ v3.1 硬性修正：**单一字体**、**≤6 档字级**、**间距分组（16 
 ## 圆角 / 阴影 / 间距
 
 - 圆角：card `20px` · inner `14px` · chip `10px` · pill `999px`
-- 阴影（仅两档）：`--s-shadow-card: 0 2px 10px rgba(15,42,69,.06), 0 8px 28px rgba(15,42,69,.08)`；
-  `--s-shadow-float: 0 12px 32px rgba(15,42,69,.14)`（Tab 栏/浮层/白 pill）
+- 阴影（hard-offset 两档）：`--s-shadow-card: 4px 4px 0 #C7DEF7`（浅卡）；
+  `--s-shadow-hard: 4px 4px 0 #172554`（强元素：主按钮/主演）；焦点卡 `6px 6px 0 rgba(23,37,84,.28)` + **白色 3px 厚边**
+- **厚描边**：卡片/按钮/输入/徽章/Tab 栏一律 2.5-3px 深墨 `#172554`（边界即设计语言）
 - 间距 **4 档：8 / 16 / 24 / 32**：卡内标题-描述 8、卡内边距 16、卡片之间 24、大区块 32（删除 28/40）
 - 12 列网格只作内部对齐参考：图标列 / 标题列 / 数值列锁定列位，文本不得"不对齐任何一列"
 

@@ -4,6 +4,10 @@
 > 依据：文档 `docs/13`（前端设计系统总纲）的 app 端落地方案；设计智能出自 ui-ux-pro-max skill
 > （`search.py --design-system` 推理 + 项目拍板修正），机器副本见 `docs/design-system/vocalverse/`。
 > **本文件是 app 端设计的唯一真相源**；页面级规则以 `docs/design-system/vocalverse/pages/*.md` 为准。
+> **v3.3 修订（组长指向 uiverse.io/@0xnihilism 后定稿）**：视觉语言升级为 **soft-brutalism**——硬偏移阴影
+> 4px 4px 0 实色、厚描边 2.5-3px 深墨、主按钮扫光、按压下沉、焦点卡白色厚边 + 6px 硬阴影 + hover 微旋转；
+> 来源 uiverse @0xnihilism 15 元素（只借模式，代码自研；源码存 `local/uiverse/*.md`）；底层规则（单字体/
+> 6 档字级/8-16-24-32 间距/语义色/焦点卡/灰轨白 pill/触控）全部保留。
 > **v3.1 修订（对抗评审 + B 站视频稿参考 + 组长注释图定稿）**：单字体 Plus Jakarta Sans（不再双族）；
 > 字级 6 档 12/14/16/20/24/32（每屏 ≤4）；间距 4 档 8/16/24/32；负字距/紧行高仅限拉丁大字（中文 0 字距/1.25）；
 > 深蓝渐变焦点卡（#1D4ED8→#172554）+ 白色 CTA；灰轨 + 白浮起 pill 选中（材质派）+ 加粗双信号；
