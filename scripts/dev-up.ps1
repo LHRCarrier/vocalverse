@@ -24,6 +24,15 @@ $Root = Split-Path -Parent $PSScriptRoot
 $LogDir = Join-Path $Root "local\dev-logs"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
+# HF 缓存约定（docs/06 §8 · 方式 B 本地，2026-09-04 修复；与容器 hf-cache 卷约定为两套口径，
+# 容器侧由 compose/镜像承载——当前未注入属 K03 未闭合项，另立整改）：
+# huggingface 被墙 → 一律走仓库 data/models 本地缓存（宿主预下载 faster-whisper-small）。
+# 不设则首次 ASR 尝试联网下载 → 连接/SSL 失败 → /placement/items/*/audio 500。
+# 仅在用户未显式设置时注入（与 main.py setdefault 同语义，尊重显式覆盖）。
+if (-not $env:HF_HOME) { $env:HF_HOME = Join-Path $Root "data\models" }
+if (-not $env:HF_HUB_OFFLINE) { $env:HF_HUB_OFFLINE = "1" }
+if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
+
 function Get-PortPid([int]$Port) {
     $c = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
     if ($c) { [int[]]$c.OwningProcess | Select-Object -Unique } else { @() }
