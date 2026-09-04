@@ -4,6 +4,10 @@
 > 依据：文档 `docs/13`（前端设计系统总纲）的 app 端落地方案；设计智能出自 ui-ux-pro-max skill
 > （`search.py --design-system` 推理 + 项目拍板修正），机器副本见 `docs/design-system/vocalverse/`。
 > **本文件是 app 端设计的唯一真相源**；页面级规则以 `docs/design-system/vocalverse/pages/*.md` 为准。
+> **v4.0 修订（配色审美定稿）**：色板全面转向 **0xnihilism 暖色基因**（取自其 15 元素色板统计：黑/白基底最强，
+> 强调 = 三文鱼 #FF7A50、金黄 #E9B50B、深绿 #1A5C46）——背景改**奶油纸感 #FBF6EC**、描边/阴影改**纯黑**、
+> 主色改三文鱼（配深墨字）、打卡金 #E9B50B、成绩深绿；焦点卡改**墨黑贴纸卡**（白 3px 边 + 黑硬阴影 + 三文鱼徽章 + 白 CTA）；
+> 插画同改暖色（ArtWave 三文鱼+金黄星芒）。
 > **v3.3 修订（组长指向 uiverse.io/@0xnihilism 后定稿）**：视觉语言升级为 **soft-brutalism**——硬偏移阴影
 > 4px 4px 0 实色、厚描边 2.5-3px 深墨、主按钮扫光、按压下沉、焦点卡白色厚边 + 6px 硬阴影 + hover 微旋转；
 > 来源 uiverse @0xnihilism 15 元素（只借模式，代码自研；源码存 `local/uiverse/*.md`）；底层规则（单字体/
