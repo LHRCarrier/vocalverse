@@ -25,6 +25,16 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/mobile/MobileReportView.vue'),
     meta: { title: '评分报告', requiresAuth: true },
   },
+  {
+    path: '/m/sing',
+    component: () => import('@/views/mobile/MobileSingView.vue'),
+    meta: { title: '唱吧', requiresAuth: true },
+  },
+  {
+    path: '/m/me',
+    component: () => import('@/views/mobile/MobileMeView.vue'),
+    meta: { title: '我的', requiresAuth: true },
+  },
 
   {
     path: '/',

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 /**
- * 移动端场景对话页（真形态 · 原型 app-speaking）：
- * 逻辑 = PracticeView 核心（docs/14 §3）——创建会话 → 开场 TTS → 录音 ≤15s → SSE 流
- * （字幕/音频队列/教练笔记/覆盖度）→ 收尾 → 报告；模板按原型「气泡 + 语言点 chip + 录音大按钮」。
- * audio 为时间轴权威、文本降级字幕（docs/06 §8）；救援：8s 无录音提示卡（docs/14 §2.3 L1）。
+ * 移动端 · 场景对话（口语陪练）——ui-concept-design skill 重制版
+ * 逻辑 = 原 PracticeView 核心（docs/14 §3）：创建会话 → 开场 TTS → 录音 ≤15s → SSE 流
+ * （字幕/音频队列/教练笔记/覆盖度）→ 收尾 → 报告（跳 /m/report?reportId=）。
+ * 视觉（参考帧 ref-card-light-timeline + examples/app/speaking.html）：
+ * AI 气泡 = track 灰底圆角 + 实色声波头像块；用户气泡 = 炭黑；语言点 = accent chip；
+ * 得分 = 绿色 chip；救援 = 暖色卡；底部 = ink 实心圆形录音按钮（外圈波纹 + 忙碌旋转弧）。
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -13,6 +15,9 @@ import { createSession, fetchScenarios, streamTurn, tts, type ScenarioItem } fro
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 import { useTurnTimers } from '@/composables/useTurnTimers'
+
+import MobileArt from '@/components/mobile/MobileArt.vue'
+import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import '@/styles/mobile-uic.css'
 
 interface Bubble {
@@ -37,6 +42,7 @@ const corpusDone = ref<string[]>([])
 const hitCount = computed(() => corpusDone.value.length)
 const hintText = ref<string | null>(null)
 const errorMsg = ref<string | null>(null)
+const reportId = ref<number | null>(null)
 
 const recorder = new VoiceRecorder()
 const audioQueue: HTMLAudioElement[] = []
@@ -61,7 +67,7 @@ async function boot() {
     const sceneId = Number(route.params.sceneId)
     scenario.value = scenes.find((s) => s.id === sceneId) ?? scenes[0] ?? null
     if (!scenario.value) {
-      errorMsg.value = '没有可用场景，请先执行 seed'
+      errorMsg.value = '暂无可用场景，请先执行 seed 初始化演示数据。'
       phase.value = 'done'
       return
     }
@@ -142,6 +148,12 @@ async function startRecording() {
   }
 }
 
+function bootAgain() {
+  errorMsg.value = null
+  phase.value = 'loading'
+  void boot().catch(() => undefined)
+}
+
 recorder.onStateChange = (state) => {
   if (state !== 'recording') recording.value = false
 }
@@ -212,10 +224,13 @@ function onSseEvent(e: SseStreamEvent) {
     case 'session_end':
       phase.value = 'done'
       hintText.value = e.summary ?? '完成！'
+      reportId.value = e.report_id ?? null
       void track('practice_complete', { sceneId: scenario.value?.id, payload: { report_id: e.report_id } })
-      setTimeout(() => {
-        if (e.report_id) router.push(`/m/report?reportId=${e.report_id}`)
-      }, 1200)
+      if (e.report_id) {
+        setTimeout(() => {
+          router.push(`/m/report?reportId=${e.report_id}`)
+        }, 1600)
+      }
       break
     case 'error':
       errorMsg.value = `管线提示：${e.code}`
@@ -227,70 +242,111 @@ function onSseEvent(e: SseStreamEvent) {
 <template>
   <div class="u-phone">
     <div class="u-content">
-      <!-- 头部：返回 + 场景 -->
+      <!-- 头部：返回 + 场景关键词 -->
       <header class="u-head" style="margin-bottom: 6px">
         <button class="u-back" type="button" title="返回" @click="router.back()">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-            <path d="M15 5l-7 7 7 7" />
-          </svg>
+          <MobileIcon name="back" />
         </button>
-        <div style="flex: 1">
-          <h1 style="font-size: 22px; font-weight: 700">{{ scenario?.title ?? '加载中…' }}</h1>
-          <div style="font-size: 13px; color: var(--u-weak); margin-top: 3px">
-            {{ DIFFICULTY_LABEL[scenario?.difficulty ?? 1] }} · 目标 ~{{ assignedTurns }} 轮 · 覆盖度 {{ hitCount }}
-          </div>
+        <div style="flex: 1; min-width: 0">
+          <h1 style="font-size: 22px; font-weight: 700">{{ scenario?.title ?? '场景对话' }}</h1>
+          <p class="u-head__sub">
+            {{ DIFFICULTY_LABEL[scenario?.difficulty ?? 1] }} · 目标约
+            {{ assignedTurns }} 轮 · 覆盖度 {{ hitCount }}
+          </p>
         </div>
+        <span class="u-chip u-chip--accent" style="flex: none">
+          <MobileIcon name="clock" />
+          {{ currentTurn }}/{{ assignedTurns }}
+        </span>
       </header>
 
-      <!-- 回合指示 -->
-      <div class="u-chip" style="margin: 18px 0 16px">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-          <circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" />
-        </svg>
-        Round {{ currentTurn }} / {{ assignedTurns }}
+      <!-- 加载态：声波线稿锚点 -->
+      <div v-if="!bubbles.length && phase === 'loading'" class="u-empty">
+        <div class="u-empty__art"><MobileArt name="wave" :size="104" /></div>
+        <div class="u-empty__title">正在进入场景…</div>
+        <div class="u-empty__sub">数字人正在准备开场白，稍等片刻。</div>
       </div>
 
-      <!-- 对话流 -->
-      <div v-if="!bubbles.length && phase === 'loading'" class="u-empty">加载中…</div>
+      <!-- 对话流：AI track 气泡 + 用户炭黑气泡 -->
       <template v-for="(m, i) in bubbles" :key="i">
-        <div class="u-chat" :class="{ user: m.role === 'user' }">
+        <div class="u-chat" :class="{ 'u-chat--user': m.role === 'user' }">
           <span v-if="m.role === 'assistant'" class="u-ava" style="background: #16303a">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-              <path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 12h2" />
-            </svg>
+            <MobileIcon name="wave" :size="16" />
           </span>
-          <div class="u-bubble" :class="m.role === 'user' ? 'user' : 'ai'">{{ m.text || '…' }}</div>
+          <div class="u-bubble" :class="m.role === 'user' ? 'u-bubble--user' : 'u-bubble--ai'">
+            {{ m.text || '…' }}
+          </div>
         </div>
         <div v-if="m.chips?.length" class="u-tips">
-          <span v-for="(c, j) in m.chips" :key="j" class="u-chip">{{ '「' + c.phrase + '」已使用' }}</span>
+          <span v-for="(c, j) in m.chips" :key="j" class="u-chip u-chip--accent">
+            「{{ c.phrase }}」已使用
+          </span>
         </div>
       </template>
 
+      <!-- 最近得分（发音/流利绿色 chip；语法有值时显示） -->
+      <div v-if="lastScore && scoreStatus === 'ok'" class="u-tips">
+        <span class="u-chip u-chip--green">发音 {{ lastScore.pron ?? '—' }}</span>
+        <span class="u-chip u-chip--green">流利 {{ lastScore.flu ?? '—' }}</span>
+        <span v-if="lastScore.gram != null" class="u-chip u-chip--green">语法 {{ lastScore.gram }}</span>
+      </div>
+
       <!-- 救援提示卡（8s 无录音） -->
-      <div v-if="hintText" class="u-hint">
+      <div v-if="hintText && phase !== 'done'" class="u-hint">
         💡 {{ hintText }} —— 点击下方按钮，大声说出这句话。
       </div>
 
-      <!-- 最近得分 -->
-      <div v-if="lastScore && scoreStatus === 'ok'" class="u-tips">
-        <span class="u-chip green">发音 {{ lastScore.pron ?? '—' }}</span>
-        <span class="u-chip green">流利 {{ lastScore.flu ?? '—' }}</span>
-        <span v-if="lastScore.gram != null" class="u-chip">语法 {{ lastScore.gram }}</span>
-      </div>
+      <!-- 错误空态（未能进入场景：服务不可达 / 无数据） -->
+      <section v-if="errorMsg && !bubbles.length && phase === 'done'" class="u-empty">
+        <div class="u-empty__art"><MobileArt name="mic" :size="96" /></div>
+        <div class="u-empty__title">无法进入场景</div>
+        <div class="u-empty__sub">{{ errorMsg }}</div>
+        <div class="u-done__actions" style="width: 100%; max-width: 280px">
+          <button class="u-btn u-btn--primary u-btn--block" type="button" @click="bootAgain">
+            重试
+          </button>
+          <RouterLink to="/m/home" class="u-btn u-btn--secondary u-btn--block">回到首页</RouterLink>
+        </div>
+      </section>
 
-      <div v-if="errorMsg" class="u-error">{{ errorMsg }}</div>
+      <!-- 会话中途错误（保留对话，红字提示） -->
+      <div v-else-if="errorMsg" class="u-error">{{ errorMsg }}</div>
+
+      <!-- 会话结束：完成卡 + 查看报告 -->
+      <section v-if="phase === 'done' && !errorMsg" class="u-done">
+        <div class="u-done__art"><MobileArt name="done" :size="88" /></div>
+        <div class="u-done__title">今日练习完成</div>
+        <div class="u-done__sub">
+          {{ hintText ?? `共 ${bubbles.length} 轮对话 · 覆盖 ${hitCount} 个表达` }}
+        </div>
+        <div class="u-done__actions">
+          <button v-if="reportId" class="u-btn u-btn--primary u-btn--block" type="button" @click="router.push(`/m/report?reportId=${reportId}`)">
+            <MobileIcon name="chart" :size="18" />
+            查看评分报告
+          </button>
+          <RouterLink to="/m/home" class="u-btn u-btn--secondary u-btn--block">
+            回到首页
+          </RouterLink>
+        </div>
+      </section>
     </div>
 
-    <!-- 录音大按钮 -->
-    <div class="u-rec-label">{{ recording ? '录音中，点击 ■ 停止并提交' : '点击录音（≤15s）' }}</div>
-    <button class="u-rec" :class="{ recording }" type="button" title="录音" @click="startRecording">
-      <span v-if="recording" class="ring" />
-      <svg v-if="!recording" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-        <rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-      </svg>
-      <svg v-else viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <path d="M7 7h10v10H7z" />
-      </svg>
+    <!-- 录音大按钮（ink 圆形 + 波纹 / 忙碌旋转弧） -->
+    <div v-if="phase !== 'done'" class="u-rec-label">
+      {{ recording ? '录音中，点击 ■ 停止并提交' : phase === 'busy' ? '评分中，请稍候…' : '点击录音（≤15s）' }}
+    </div>
+    <button
+      class="u-rec"
+      :class="{ 'u-rec--recording': recording, 'u-rec--busy': phase === 'busy' }"
+      :disabled="phase !== 'ready' && !recording"
+      type="button"
+      :title="recording ? '停止录音' : '开始录音'"
+      @click="startRecording"
+    >
+      <span v-if="phase !== 'busy'" class="ring" />
+      <span v-if="phase === 'busy'" class="arc" />
+      <MobileIcon v-else-if="recording" name="stop" :size="26" />
+      <MobileIcon v-else name="mic" :size="30" />
     </button>
   </div>
 </template>
