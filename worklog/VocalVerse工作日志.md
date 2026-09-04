@@ -46,6 +46,19 @@
 
 —— 执行人：LHRCarrier
 
+## 2026-09-04 方式 A `migrate` 一次性服务修复（uv run 前缀 + seed 容器路径/挂载）
+
+**背景**：PR#27 方式 A 容器实测时发现 `docker compose up -d migrate` 从基线起就不可用（此前被「容器能起」掩盖）：① 命令裸 `alembic`（镜像内依赖在 `.venv/bin`，缺 `uv run` 前缀）→ `alembic: not found`；② 补前缀后 `seed.py:25` `parents[4]` 在容器布局（`/app/app/db/seed.py` 仅 4 级父目录）越界 → `IndexError: 4`（**与 PR#27 复审 P0 的 `main.py parents[3]` 同类容器路径假设**）；③ 种子数据 `data/seed/scenarios.json` 在仓库根，镜像构建上下文仅 `services/python`，容器内无该文件。
+
+**修复**（2026-09-04 · LHRCarrier）：
+1. `docker-compose.yml` migrate：`alembic upgrade head && python -m app.db.seed` → `uv run alembic upgrade head && uv run python -m app.db.seed`；
+2. migrate 挂载 `./data/seed:/app/data/seed`（与 `./data/audio` 同约定，种子数据入库文件进容器）；
+3. `app/db/seed.py`：`try/except IndexError` 布局感知——本地 `parents[4]`=仓库根；容器回退 `Path("/app")`。
+
+**验证**：`docker compose config --quiet` ✓；`docker compose build migrate` ✓；`docker compose up -d migrate` → `Context impl PostgresqlImpl` + `[seed]…（跳过已存在）`，退出码 0，幂等 ✓；`ruff` / `pytest（test_seed + test_seed_recommend 6 passed）` ✓。完整复现/根因/踩坑见 `worklog/BUG实测/方式A-migrate一次性服务无法执行.md`（踩坑 3 条：migrate 失败不阻塞 compose、容器路径假设第三次踩坑、compose 命令需与镜像运行时同前缀）。
+
+—— 执行人：LHRCarrier
+
 ## 2026-09-04 PR#27 复审整改：容器布局 `parents[3]` 越界 P0 + 「compose 注入 HF 三件套」失实表述更正
 
 **背景**：PR#27（方式 B 三连排障）复审（LHRCarrier，`gh pr review --request-changes`）发现三点阻断：① `Path(__file__).resolve().parents[3]` 在容器布局（Dockerfile `WORKDIR /app` + `COPY . .` → `/app/app/main.py`，parents 仅 3 级）越界 → `IndexError` → 容器导入即崩，方式 A 全栈不可用（现有 CI 结构上测不出：python-ci 在 runner 上路径成立、docker-build 只 build 不 run）；② 代码注释/README/归档所述「容器由 compose 注入 HF 三件套（挂载 ./data/models）」与仓库事实不符——`docker-compose.yml` 无任何 `HF_*` 变量、仅挂载 `./data/audio`，docs/06 §8 模型缓存约定为 `hf-cache:/root/.cache/huggingface` 命名卷（默认缓存路径），审计 `docs/audit/语音链路现状与风险清单-V2.0.md` K03 明言 xet 变量未进 compose/Dockerfile；③ 与 main 冲突（worklog），且 PR 带入一个**无正文的游离标题**「## 2026-09-09 PR#25 推荐系统落地…」（main 本就有该记录，正文在 09-02 组）。
