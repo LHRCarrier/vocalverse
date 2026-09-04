@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * 移动端底部悬浮 Tab 栏（v3.1）：首页 / 口语 / 中央主按钮(+ 新建会话) / 唱吧 / 我的。
- * 视觉：悬浮白胶囊 + safe-area；激活 primary-soft 底 + 图标 spring 弹起；60ms 按压反馈。
+ * 移动端底部悬浮 Tab 栏（v6 clean）：首页 / 口语 / 中央主按钮(+ 新建会话) / 唱吧 / 我的。
+ * 视觉：白浮卡 + 1.5px 细边；激活 = 蓝字 + 浅蓝底；主按钮 = 炭黑（与 Sign In 同款）。
  * 图标：Tabler（unplugin-icons 编译期内联，docs/32）。
  */
 import { useRoute } from 'vue-router'

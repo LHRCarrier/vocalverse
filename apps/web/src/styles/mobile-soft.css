@@ -1,51 +1,46 @@
 /* ============================================================
- * VocalVerse app 端 UI 设计系统 v5.0 —— Clean Charcoal & Blue
- * 配色/公式基准：uiverse @JohnnyCSilva/bad-cheetah-74（组长指定登录框，MIT，保留版权声明）
- *   白卡 + 炭黑 #151717（提交/墨色）+ 蓝 #2D79F3（焦点/链接/激活）+ 细灰边 #ECEDEC + 浅灰底
- * 权威文档：docs/31 + docs/design-system/vocalverse/MASTER.md
- *
- * 设计纪律（承接历次定稿，全部保留）：
- *  - 单字体 Plus Jakarta Sans；字级 6 档 12/14/16/20/24/32（每屏 ≤4）
- *  - 间距 4 档 8/16/24/32（组内贴 8-16、区块分 24-32）；12 列对齐（图标列/标题列/数值列锁定）
- *  - 层次：1 记忆点（炭黑焦点卡）→ 次级白卡 → 静默灰；彩色仅语义（蓝=交互/进行、金=激励、
- *    绿=成绩、红=错误）；强调色配深墨字
- *  - 反馈：三态 + 60ms 按压 + 按钮扫光（仅 transform/opacity）+ reduced-motion 降级
- *  - 触控 ≥48dp、safe-area、48px 行目标；焦点 focus-within 1.5px 蓝描边
+ * VocalVerse app 端 UI 设计系统 v6.0 —— Clean (bad-cheetah-74 同源语言)
+ * 基准：组长已验收的登录页（uiverse @JohnnyCSilva/bad-cheetah-74）
+ *   · 底 #F0F0F0 / 白卡 / 1.5px #ECEDEC 细边 / 圆角 20-10 / 无硬阴影
+ *   · 炭黑 #151717 = 主操作（按钮与 Sign In 同款）/ 蓝 #2D79F3 = 交互·链接·选中
+ *   · 语义色收敛：绿=成绩、金=激励 glyph、红=错误
+ * 保留硬规则：单字体 PJS、6 档字级(12/14/16/20/24/32 每屏≤4)、间距 8/16/24/32、
+ * 触控 ≥48dp、safe-area、reduced-motion 降级、只动 transform/opacity/color。
  * ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  /* ---- 色彩（JohnnyCSilva 方案） ---- */
-  --s-accent: #2d79f3; /* 蓝：焦点/链接/选中/进行中（唯一交互色） */
-  --s-accent-soft: #eaf2fe; /* 浅蓝底：选中底/对话框 */
-  --s-ink: #151717; /* 炭黑：主按钮/标题/文字/焦点卡 */
+  --s-accent: #2d79f3; /* 蓝：交互/链接/选中/进行中 */
+  --s-accent-deep: #1e5fd0;
+  --s-accent-soft: #eaf2fe; /* 浅蓝底 */
+  --s-ink: #151717; /* 炭黑：主按钮/标题 */
   --s-ink-hover: #2b2b2b;
-  --s-bg: #f4f4f6; /* 浅灰底（uiverse 演示页同款） */
-  --s-bg-2: #ececee; /* 轨道/分区底 */
+  --s-ink-pressed: #000;
+  --s-bg: #f0f0f0; /* 浅灰底（登录页同款） */
+  --s-bg-2: #f4f4f5; /* 图标块/轨道底 */
   --s-card: #ffffff;
-  --s-card-border: #ecedec; /* 1.5px 细灰边（JohnnyCSilva 输入框同款） */
+  --s-card-border: #ecedec; /* 细边（bad-cheetah-74 同款） */
   --s-text: #151717;
   --s-text-2: #6b7280;
   --s-text-3: #9ca3af;
-  --s-gold: #e9b50b; /* 金黄：激励/打卡（配深字 #7a5400） */
-  --s-gold-ink: #7a5400;
-  --s-gold-soft: #f9e6a8;
+  --s-gold: #e9b50b;
+  --s-gold-ink: #8a6100;
+  --s-gold-soft: #fff4d6;
   --s-success: #22c55e;
   --s-success-deep: #15803d;
-  --s-success-soft: #dcfce7;
+  --s-success-soft: #e8f7ee;
   --s-error: #ef4444;
   --s-error-deep: #dc2626;
   --s-danger-soft: #fee2e2;
 
   --s-r-card: 20px;
-  --s-r-btn: 12px;
+  --s-r-btn: 10px;
   --s-r-field: 10px;
   --s-r-pill: 999px;
 
-  /* 软阴影两档（干净方案：无硬边阴影，柔和分层） */
-  --s-shadow-card: 0 1px 2px rgba(21, 23, 23, 0.04), 0 8px 24px rgba(21, 23, 23, 0.07);
-  --s-shadow-float: 0 4px 12px rgba(21, 23, 23, 0.1), 0 16px 40px rgba(21, 23, 23, 0.14);
+  --s-shadow-card: 0 1px 2px rgba(21, 23, 23, 0.03), 0 4px 16px rgba(21, 23, 23, 0.05);
+  --s-shadow-float: 0 4px 12px rgba(21, 23, 23, 0.08), 0 12px 32px rgba(21, 23, 23, 0.1);
 
   --s-font: 'Plus Jakarta Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 
@@ -80,7 +75,7 @@
 }
 
 .s-page {
-  padding: 24px 20px calc(140px + env(safe-area-inset-bottom));
+  padding: 20px 16px calc(120px + env(safe-area-inset-bottom));
 }
 
 .s-page--free {
@@ -88,7 +83,7 @@
 }
 
 /* ============================================================
- * 字级（6 档 12/14/16/20/24/32；每屏 ≤4）
+ * 字级（6 档 12/14/16/20/24/32；每屏 ≤4；16=正文基准）
  * ============================================================ */
 .s-display {
   font-size: 32px;
@@ -99,13 +94,13 @@
 
 .s-h1 {
   font-size: 24px;
-  line-height: 1.25;
+  line-height: 1.3;
   font-weight: 700;
 }
 
 .s-h2 {
   font-size: 20px;
-  line-height: 1.25;
+  line-height: 1.3;
   font-weight: 700;
 }
 
@@ -142,7 +137,7 @@
 }
 
 /* ============================================================
- * 按钮（炭黑主按钮 + 扫光 + 60ms 按压；圆角 12）
+ * 按钮（主=炭黑 与登录 Sign In 同款 · 次=白底细边 hover 蓝边）
  * ============================================================ */
 .s-btn {
   display: inline-flex;
@@ -157,35 +152,14 @@
   cursor: pointer;
   text-decoration: none;
   user-select: none;
-  position: relative;
-  overflow: hidden;
   transition:
     transform var(--s-t-press) var(--s-ease-out),
     background-color var(--s-t-micro) var(--s-ease-out),
     color var(--s-t-micro) var(--s-ease-out),
     border-color var(--s-t-micro) var(--s-ease-out),
-    box-shadow var(--s-t-micro) var(--s-ease-out),
     opacity var(--s-t-micro) var(--s-ease-out);
 }
 
-.s-btn::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -80%;
-  width: 60%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
-  transform: translateX(0);
-  transition: transform var(--s-t-standard) var(--s-ease-out);
-  pointer-events: none;
-}
-
-.s-btn:hover::after {
-  transform: translateX(260%);
-}
-
-/* 主按钮：炭黑（bad-cheetah-74 submit 同款） */
 .s-btn--primary {
   background: var(--s-ink);
   color: #fff;
@@ -198,10 +172,9 @@
 
 .s-btn--primary:active {
   transform: scale(0.97);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  background: var(--s-ink-pressed);
 }
 
-/* 次级：白底灰边，hover 蓝边（bad-cheetah-74 .btn 同款） */
 .s-btn--soft {
   background: var(--s-card);
   color: var(--s-text);
@@ -210,6 +183,7 @@
 
 .s-btn--soft:hover {
   border-color: var(--s-accent);
+  color: var(--s-accent);
 }
 
 .s-btn--soft:active {
@@ -217,19 +191,6 @@
   background: var(--s-bg-2);
 }
 
-/* 深色卡 CTA：白色实心 */
-.s-btn--white {
-  background: #fff;
-  color: var(--s-ink);
-  border-color: #fff;
-}
-
-.s-btn--white:active {
-  transform: scale(0.97);
-  background: #f3f4f6;
-}
-
-/* 危险 */
 .s-btn--danger-soft {
   background: var(--s-danger-soft);
   color: var(--s-error-deep);
@@ -250,7 +211,6 @@
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
-  box-shadow: none;
 }
 
 .s-spinner {
@@ -274,43 +234,7 @@
 }
 
 /* ============================================================
- * 芯片
- * ============================================================ */
-.s-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--s-card-border);
-  border-radius: var(--s-r-pill);
-  background: var(--s-card);
-  color: var(--s-text);
-  font: 600 13px var(--s-font);
-  cursor: pointer;
-  transition:
-    transform var(--s-t-micro) var(--s-ease-out),
-    border-color var(--s-t-micro) var(--s-ease-out),
-    background-color var(--s-t-micro) var(--s-ease-out);
-}
-
-.s-chip:hover {
-  border-color: var(--s-accent);
-  color: var(--s-accent);
-}
-
-.s-chip:active {
-  transform: scale(0.94);
-}
-
-.s-chip.is-active {
-  background: var(--s-accent);
-  border-color: var(--s-accent);
-  color: #fff;
-}
-
-/* ============================================================
- * 卡片（白 + 1.5px 细灰边 + 软阴影）
+ * 卡片（白 + 1.5px 细边 + 极轻阴影）
  * ============================================================ */
 .s-card {
   background: var(--s-card);
@@ -320,22 +244,22 @@
 }
 
 /* ============================================================
- * 底部 Tab 栏（白浮卡 + 蓝激活）
+ * 底部 Tab 栏（白浮卡 · 主钮=炭黑）
  * ============================================================ */
 .s-tabbar {
   position: fixed;
   left: 50%;
-  bottom: calc(16px + env(safe-area-inset-bottom));
+  bottom: calc(12px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   z-index: 50;
   display: flex;
   align-items: center;
-  gap: 2px;
-  width: min(calc(100vw - 32px), 448px);
+  gap: 4px;
+  width: min(calc(100vw - 24px), 448px);
   padding: 8px;
   background: rgba(255, 255, 255, 0.98);
   border: 1.5px solid var(--s-card-border);
-  border-radius: 24px;
+  border-radius: 20px;
   box-shadow: var(--s-shadow-float);
 }
 
@@ -346,8 +270,8 @@
   align-items: center;
   justify-content: center;
   gap: 3px;
-  min-height: 56px;
-  border-radius: 16px;
+  min-height: 52px;
+  border-radius: 12px;
   color: var(--s-text-3);
   font: 600 11px var(--s-font);
   text-decoration: none;
@@ -366,7 +290,7 @@
 }
 
 .s-tab.active svg {
-  transform: scale(1.15);
+  transform: scale(1.12);
 }
 
 .s-tab:active {
@@ -374,20 +298,17 @@
 }
 
 .s-tab--main {
-  flex: 0 0 56px;
-  width: 56px;
-  height: 56px;
-  margin: 0 4px;
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  margin: 0 2px;
   border-radius: 50%;
-  background: var(--s-accent);
+  background: var(--s-ink);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 14px rgba(45, 121, 243, 0.35);
-  transition:
-    transform var(--s-t-standard) var(--s-ease-spring),
-    box-shadow var(--s-t-standard) var(--s-ease-out);
+  transition: transform var(--s-t-standard) var(--s-ease-spring);
 }
 
 .s-tab--main:active {
@@ -395,77 +316,80 @@
 }
 
 /* ============================================================
- * 首页组件
+ * 首页组件（v6 clean）
  * ============================================================ */
 .s-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .s-avatar {
-  flex: 0 0 48px;
-  width: 48px;
-  height: 48px;
-  border-radius: 16px;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   background: var(--s-accent-soft);
   color: var(--s-accent);
-  border: 1.5px solid var(--s-card-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 800 18px var(--s-font);
+  font: 800 16px var(--s-font);
 }
 
+/* 激励 chip（白底细边 + 金色 glyph，不占大块） */
 .s-streak {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  border-radius: var(--s-r-pill);
-  background: var(--s-gold);
-  color: var(--s-gold-ink);
-  font: 700 13px var(--s-font);
+  border-radius: var(--s-r-btn);
+  background: var(--s-card);
+  border: 1.5px solid var(--s-card-border);
+  font: 600 12px var(--s-font);
+  color: var(--s-text-2);
   margin-bottom: 16px;
 }
 
-/* ---- 炭黑焦点卡（记忆点 · 白 CTA · 蓝徽章 · 插画装饰） ---- */
+.s-streak svg {
+  color: #c08a00;
+}
+
+/* ---- 今日任务卡（焦点 = 白卡 + 炭黑主按钮，与 Sign In 同款） ---- */
 .s-plan {
-  position: relative;
   padding: 24px;
-  margin-bottom: 24px;
-  border-radius: var(--s-r-card);
-  background: var(--s-ink);
-  color: #fff;
-  box-shadow: var(--s-shadow-float);
-  overflow: hidden;
+  margin-bottom: 16px;
 }
 
 .s-plan__badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 12px;
-  border-radius: var(--s-r-pill);
-  background: var(--s-accent);
-  color: #fff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--s-accent-soft);
+  color: var(--s-accent);
   font: 700 12px var(--s-font);
 }
 
 .s-plan__title {
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: 24px;
-  line-height: 1.25;
+  line-height: 1.3;
   font-weight: 700;
+}
+
+.s-plan__sub {
+  margin-top: 4px;
 }
 
 .s-plan__steps {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin: 12px 0 20px;
+  margin: 14px 0 20px;
 }
 
 .s-plan__step {
@@ -474,11 +398,11 @@
   gap: 8px;
   font-size: 14px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--s-text);
 }
 
 .s-plan__step.is-done {
-  color: rgba(255, 255, 255, 0.42);
+  color: var(--s-text-3);
   text-decoration: line-through;
 }
 
@@ -487,19 +411,11 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.35);
+  background: var(--s-card-border);
 }
 
 .s-plan__dot.is-done {
   background: var(--s-success);
-}
-
-.s-plan__art {
-  position: absolute;
-  top: -8px;
-  right: -6px;
-  opacity: 0.35;
-  pointer-events: none;
 }
 
 /* ---- 统计卡 ---- */
@@ -507,8 +423,8 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  padding: 16px;
-  margin-bottom: 24px;
+  padding: 18px 16px;
+  margin-bottom: 16px;
   text-align: center;
 }
 
@@ -536,64 +452,59 @@
 }
 
 .s-stat-value--star {
-  color: #9a6b00;
+  color: #c08a00;
 }
 
-/* ---- 分段控件：灰轨 + 白浮起 pill（选中 = 蓝边 + 蓝字加粗） ---- */
+/* ---- 筛选：白色 pill 按钮组（选中 = 蓝边蓝字，复用表单 .btn hover 语言） ---- */
 .s-segment {
-  position: relative;
   display: flex;
-  height: 56px;
-  padding: 5px;
-  border-radius: var(--s-r-pill);
-  background: var(--s-bg-2);
-  border: 1.5px solid var(--s-card-border);
-  margin-bottom: 24px;
-}
-
-.s-segment__thumb {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: calc((100% - 8px) / 3);
-  height: calc(100% - 8px);
-  border-radius: var(--s-r-pill);
-  background: var(--s-card);
-  border: 1.5px solid var(--s-accent);
-  box-shadow: 0 2px 6px rgba(45, 121, 243, 0.18);
-  transition: transform var(--s-t-standard) var(--s-ease-out);
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 .s-segment__btn {
-  position: relative;
-  z-index: 1;
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border: none;
-  background: transparent;
+  height: 44px;
+  border: 1px solid #ededef;
+  border-radius: var(--s-r-btn);
+  background: var(--s-card);
   color: var(--s-text-2);
   font: 500 14px var(--s-font);
   cursor: pointer;
-  border-radius: var(--s-r-pill);
-  transition: color var(--s-t-micro) var(--s-ease-out);
+  transition:
+    border-color var(--s-t-micro) var(--s-ease-out),
+    color var(--s-t-micro) var(--s-ease-out),
+    background-color var(--s-t-micro) var(--s-ease-out),
+    transform var(--s-t-press) var(--s-ease-out);
+}
+
+.s-segment__btn:hover {
+  border-color: var(--s-accent);
 }
 
 .s-segment__btn.active {
+  border-color: var(--s-accent);
   color: var(--s-accent);
+  background: var(--s-accent-soft);
   font-weight: 700;
 }
 
-/* ---- 列表行（白卡细边 + 类别色图标块） ---- */
+.s-segment__btn:active {
+  transform: scale(0.97);
+}
+
+/* ---- 列表行 ---- */
 .s-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 76px;
+  min-height: 72px;
   padding: 12px 14px;
-  border-radius: var(--s-r-btn);
+  border-radius: 12px;
   background: var(--s-card);
   border: 1.5px solid var(--s-card-border);
   box-shadow: var(--s-shadow-card);
@@ -620,10 +531,10 @@
 }
 
 .s-row__icon {
-  flex: 0 0 48px;
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -638,7 +549,7 @@
 
 .s-row__icon--singing {
   background: var(--s-gold-soft);
-  color: #9a6b00;
+  color: #b07c00;
 }
 
 .s-row__main {
@@ -648,7 +559,7 @@
 
 .s-row__title {
   display: block;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.4;
   font-weight: 600;
   color: var(--s-text);
@@ -721,13 +632,12 @@
 }
 
 .s-empty__icon {
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   margin: 0 auto 16px;
-  border-radius: 24px;
+  border-radius: 20px;
   background: var(--s-accent-soft);
   color: var(--s-accent);
-  border: 1.5px solid var(--s-card-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -746,169 +656,6 @@
 }
 
 /* ============================================================
- * 登录页 v5（bad-cheetah-74 表单：白卡 / 标签+图标输入 / 蓝焦点 / 炭黑提交）
- * ============================================================ */
-.s-login {
-  min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 16px;
-  background: var(--s-bg);
-}
-
-.s-login__card {
-  width: min(100%, 400px);
-  background: var(--s-card);
-  padding: 28px;
-  border-radius: var(--s-r-card);
-}
-
-.s-login__brand {
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.s-login__name {
-  font-family: var(--s-font);
-  font-size: 24px;
-  line-height: 1.2;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  color: var(--s-text);
-}
-
-.s-login__tag {
-  margin-top: 4px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--s-text-2);
-}
-
-/* 字段：label(600 深墨) + 图标输入行（focus-within 蓝边，bad-cheetah-74 同款） */
-.s-login__form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.s-field__label {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--s-text);
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.s-inputForm {
-  display: flex;
-  align-items: center;
-  height: 52px;
-  padding-left: 12px;
-  border: 1.5px solid #ecedec;
-  border-radius: var(--s-r-field);
-  background: #fff;
-  transition: border-color 0.2s ease-in-out;
-}
-
-.s-inputForm:focus-within {
-  border-color: var(--s-accent);
-}
-
-.s-inputForm__icon {
-  flex: 0 0 auto;
-  color: var(--s-text);
-  display: flex;
-  align-items: center;
-}
-
-.s-input {
-  margin-left: 10px;
-  border: none;
-  width: 100%;
-  height: 100%;
-  background: transparent;
-  font: 500 15px var(--s-font);
-  color: var(--s-text);
-}
-
-.s-input:focus {
-  outline: none;
-}
-
-.s-input::placeholder {
-  color: var(--s-text-3);
-}
-
-/* 行内选项：记住我 + 演示账号（蓝色链接样） */
-.s-login__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 2px;
-}
-
-.s-check {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  color: var(--s-text);
-  cursor: pointer;
-  user-select: none;
-}
-
-.s-check input {
-  accent-color: var(--s-accent);
-  width: 16px;
-  height: 16px;
-}
-
-.s-link {
-  border: none;
-  background: none;
-  padding: 4px 0;
-  font-size: 14px;
-  color: var(--s-accent);
-  font-weight: 500;
-  cursor: pointer;
-  min-height: 32px;
-}
-
-.s-link:active {
-  transform: scale(0.96);
-}
-
-/* 提交按钮（炭黑 #151717 · 高 50 · 圆角 10，同款比例） */
-.s-login__submit {
-  margin-top: 18px;
-  height: 50px;
-  width: 100%;
-  border-radius: var(--s-r-field);
-}
-
-.s-login__hint {
-  text-align: center;
-  color: var(--s-text);
-  font-size: 14px;
-  margin: 10px 0 0;
-}
-
-.s-error {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 10px 0 0;
-  color: var(--s-error-deep);
-  font: 600 13px var(--s-font);
-}
-
-.s-error svg {
-  flex: 0 0 auto;
-}
-
-/* ============================================================
  * 图标尺寸 / 全局反馈 / 无障碍
  * ============================================================ */
 .s-tab svg {
@@ -917,8 +664,8 @@
 }
 
 .s-tab--main svg {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
 }
 
 .s-segment__btn svg {
@@ -927,34 +674,27 @@
 }
 
 .s-streak svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .s-row__icon svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
 
 .s-empty__icon svg {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
 }
 
 .s-btn:focus-visible,
-.s-chip:focus-visible,
 .s-tab:focus-visible,
 .s-tab--main:focus-visible,
 .s-segment__btn:focus-visible,
-.s-row:focus-visible,
-.s-link:focus-visible {
+.s-row:focus-visible {
   outline: 2px solid var(--s-accent);
   outline-offset: 2px;
-}
-
-.input:focus-visible,
-.s-input:focus-visible {
-  outline: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
