@@ -52,6 +52,15 @@ function sceneSub(s: ScenarioItem): string {
     s.description?.split(/[。．.!?]/)[0] ?? ''
   }`
 }
+
+/** 场景 → 深色块 + 具象白图标（对齐设计页 app-home：咖啡=深紫 / 面试=藏青 / 学习=深青） */
+function sceneVisual(s: ScenarioItem): { color: string; icon: 'coffee' | 'briefcase' | 'book' | 'mic' } {
+  const key = `${s.title}${s.description ?? ''}`
+  if (/咖啡|点单|餐厅|民宿|酒店/.test(key)) return { color: '#3A2440', icon: 'coffee' }
+  if (/面试|职场|机场|航班|出差|旅行/.test(key)) return { color: '#232044', icon: 'briefcase' }
+  if (/图书|学习|校园|课堂/.test(key)) return { color: '#16303A', icon: 'book' }
+  return { color: '#1E2B26', icon: 'mic' }
+}
 </script>
 
 <template>
@@ -95,8 +104,17 @@ function sceneSub(s: ScenarioItem): string {
       <div v-else-if="!filtered.length" class="u-empty">暂无会话。请到「Speaking」开始第一轮练习。</div>
       <template v-for="(s, i) in filtered" :key="s.id">
         <RouterLink :to="`/m/chat/${s.id}`" class="u-task" style="text-decoration: none">
-          <span class="u-icon-block" :style="{ background: ['#3A2440', '#232044', '#16303A'][i % 3] }">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <span class="u-icon-block" :style="{ background: sceneVisual(s).color }">
+            <svg v-if="sceneVisual(s).icon === 'coffee'" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M5 9h11v5a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5z" /><path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16" />
+            </svg>
+            <svg v-else-if="sceneVisual(s).icon === 'briefcase'" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <rect x="4" y="8" width="16" height="12" rx="3" /><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+            </svg>
+            <svg v-else-if="sceneVisual(s).icon === 'book'" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M4 6a2 2 0 0 1 2-2h14v16H6a2 2 0 0 1-2-2z" /><path d="M4 6v0M20 4v16" />
+            </svg>
+            <svg v-else viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
               <path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 12h2" />
             </svg>
           </span>
@@ -104,7 +122,7 @@ function sceneSub(s: ScenarioItem): string {
             <span class="u-task-title">{{ s.title }}</span>
             <span class="u-task-sub">{{ sceneSub(s) }}</span>
           </span>
-          <span class="u-task-value">→</span>
+          <span class="u-task-value">›</span>
         </RouterLink>
         <div v-if="i < filtered.length - 1" class="u-dotline">
           <span class="dot" /><span class="line" />

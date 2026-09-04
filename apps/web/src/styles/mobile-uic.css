@@ -159,7 +159,7 @@
   color: var(--u-weak);
 }
 .u-stat-value {
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 700;
   margin-top: 2px;
   font-variant-numeric: tabular-nums;
@@ -173,7 +173,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 52px;
+  height: 56px;
   padding: 4px;
   background: var(--u-track);
   border-radius: var(--u-r-pill);
@@ -213,6 +213,8 @@
   border-radius: var(--u-r-card);
   box-shadow: var(--u-shadow-card);
   cursor: pointer;
+  color: var(--u-ink);
+  text-decoration: none;
   transition:
     transform 150ms ease-out,
     box-shadow 150ms ease-out;
@@ -238,11 +240,18 @@
 .u-task-title {
   font-size: 15px;
   font-weight: 700;
+  color: var(--u-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .u-task-sub {
   font-size: 12px;
   color: var(--u-weak);
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .u-task-value {
   font-size: 20px;
