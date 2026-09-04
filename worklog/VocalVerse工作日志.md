@@ -3,6 +3,31 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 UI Concept Design skill 返工 v2：诊断规则漏洞 + 原型页对照参考帧重做
+
+- 触发：组长反馈 v1 原型"效果一般"。对照 skill 自带的 7 张原版设计帧逐项诊断，问题一半在 skill 规则、一半在 v1 执行：
+- **skill 规则漏洞（已修）**：① 参考帧最核心的**大幅手绘线稿插画**（气球/日历/星星母题）完全没写进 SKILL.md——这是"像原版"和"像普通后台"的分界线；② 图标块规格写错：帧里是**品牌色实底 + 白图标**（Burrito Bowl 深棕块），v1 做成了浅 tint 底彩图标；③ 次级按钮漏了纸面变体（白底+1.5px ink 描边，ref-landing-hero "View Leaderboard"）与白卡变体（track 灰底）的区分；④ 深色卡 badge 应为 **12px 圆角 chip** 不是胶囊；⑤ 尺度偏小：Display/Stat/分段控件/留白全往大气调（Display 48-56px / Stat 32px+ / 分段高 56px / 页边距 40-56 / 卡内边距 32）；⑥ 新增 tokens：pop-green `#A8E05F` 插画填涂色（仅限插画）、信任条与点线时间轴规则；
+- **skill 遗留问题**：`templates/winforms/` 原缺失，已补 `Theme.cs`（色板/字体圆角令牌，dotnet 8 可编译）；`ThemeControls.cs` 未写——组长确认 Web 项目不需要 WinForms 模板，硬约束 ③ 改为"仅 WinForms 项目用模板，Web 跳过"；
+- **原型页 v2（对照参考帧重做）**：三页全部加插画锚点（新增 `UicArt.vue` 手绘线稿组件：热气球/日历/星星/音符，2.5px ink 圆头线 + pop-green 填涂，悬停 200ms 微飘）；首页 = 双侧对称插画 hero + 信任条 + 点线时间轴列表；口语页 = 56px 分段控件 + 实色图标块 + 深藏青推荐卡（光晕 + chip）；唱歌页 = 深紫卡（光晕 + 大幅音符插画 + 总分 64px）+ 逐句点线时间轴；
+- 验证：`pnpm lint`（0/0）/ `pnpm typecheck` / `pnpm build` 全绿；dev server 4 模块 transform 200；生产构建确认 uic 零残留；
+- 入口不变：`/preview/uic-home`、`/preview/uic-speaking`、`/preview/uic-singing`（v2 已热更新，Ctrl+F5 强制刷新查看）。
+
+—— 执行人：LHRCarrier
+
+## 2026-09-07 UI Concept Design skill 原型验证 · 3 个概念页（dev-only 预览画廊）
+
+- 背景：组内 `.trae/skills/ui-concept-design` skill（模板驱动现代桌面 UI：以视频原版设计帧为视觉正本 + 精确 design tokens + 组件决策树），用本仓库做效果测试首发；
+- 产出：`apps/web/src/views/preview/uic/` 下 3 个概念页 + 共享 tokens 样式，走 docs/13 §8 预览工作流（registry.ts 3 行 + router/preview.ts 3 条路由）：
+  1. `UicHome.vue` 学习主页 —— hero 双胶囊按钮（ref-landing-hero-light）+ 统计行（ref-profile-card-stats）+ 分段控件（ref-segmented-pill）+ 时间线列表卡（ref-card-light-timeline）；
+  2. `UicSpeaking.vue` 口语陪练 —— 场景分类分段控件 + 场景卡网格 + 深藏青推荐卡（ref-dark-colored-cards，每屏 1 张深色卡约束）；
+  3. `UicSinging.vue` 唱歌评分报告 —— 深紫总分卡（同色系 badge + 幽灵按钮）+ 四指标统计行 + 逐句评分卡；
+- 价值观全部取自 skill 的 `tokens/design-tokens.md`（paper `#F5F4F1` / 白卡 r-24 / 炭黑胶囊主按钮 / accent `#2F6BFF` 唯一点缀 / shadow 仅一档 `0 8 24 rgba(28,28,26,.06)`），共享文件 `uic.css` + 线性图标组件 `UicIcon.vue`（1.5px 描边）；
+- 验证：`pnpm lint`（0 warning 0 error）/ `pnpm typecheck` / `pnpm build` 全绿；生产构建产物确认不含 uic 任何 chunk（预览子树整枝剔除，零残留）；
+- 与现有 docs/13 设计系统（多邻国活力绿）的关系：**概念页独立成体系**，仅供对比验收，未接入真实 view；验收后按各文件尾注释删除清单移除（删 4 处，门禁复绿）；
+- 注：skill 的 `templates/winforms/` 模板目录在 skill 包内缺失（只有 references/ + tokens/），本次按 Web 端转译为 CSS 组件类，WinForms 侧使用时需补模板或按 tokens 重建。
+
+—— 执行人：LHRCarrier
+
 ## 2026-09-04 影子跟读联调台：录音完成 → 试听自己读的 → 确认提交/重录
 
 - 需求（组员复测反馈「方便测试」）：录完先听自己的跟读再提交，避免闭眼提交后才发现录歪；
