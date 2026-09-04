@@ -14,6 +14,7 @@ import { computed, ref } from 'vue'
 
 import { useAuthStore } from '@/stores/auth'
 
+import ArtCalendar from '@/components/mobile/ArtCalendar.vue'
 import IconBriefcase from '~icons/tabler/briefcase'
 import IconChartBar from '~icons/tabler/chart-bar'
 import IconCheck from '~icons/tabler/check'
@@ -23,7 +24,6 @@ import IconHeadphones from '~icons/tabler/headphones'
 import IconMicrophone from '~icons/tabler/microphone'
 import IconMusic from '~icons/tabler/music'
 import IconStarFilled from '~icons/tabler/star-filled'
-import IconWave from '~icons/ph/wave-sine-fill'
 import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
 import '@/styles/mobile-soft.css'
 
@@ -154,7 +154,7 @@ const planSteps = [
           <IconMicrophone style="width: 18px; height: 18px" />
           开始今日练习
         </RouterLink>
-        <IconWave class="s-plan__wave" aria-hidden="true" />
+        <ArtCalendar class="s-plan__art" aria-hidden="true" />
       </section>
 
       <!-- 次级数据：统计白卡（12 灰标签 / 24 粗数字；绿=成绩、黄星=激励） -->
@@ -204,7 +204,10 @@ const planSteps = [
           class="s-row"
           :aria-label="`查看 ${s.sub}`"
         >
-          <span class="s-row__icon">
+          <span
+            class="s-row__icon"
+            :class="s.kind === 'speaking' ? 's-row__icon--speaking' : 's-row__icon--singing'"
+          >
             <component :is="s.icon" aria-hidden="true" />
           </span>
           <span class="s-row__main">

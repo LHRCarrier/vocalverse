@@ -1,17 +1,17 @@
 <script setup lang="ts">
 /**
- * 登录页 v3.1（移动优先 · 极简 + 设计语言焦点，docs/31 §5.1 + pages/login.md）
+ * 登录页 v3.2（移动优先 · 极简 + 线稿插画焦点，docs/31 + pages/login.md v3.2）
  *
- * 焦点 = 大尺寸声波图形（Phosphor duotone，唯一高饱和元素）——设计语言表达"声语"，不是靠文字；
- * 字标 24px（拉丁 -0.03em收紧）退为次级 + 一行 14px 弱化副标题；表单组（16px 内距）→ 蓝按钮（32px）；
- * 底部单行「演示账号登录」。无卡片、无装饰动画、少文字（全屏 ≤15 词）。
- * 无障碍：placeholder + aria-label + autocomplete（密码管理器/粘贴兼容）；回车提交；错误 aria-live。
+ * 升级点（参考图语言：线稿插画 + 大字标题 + 单点彩色）：
+ *  - 自绘线稿声波插画（ArtWave：2.5px 圆头线稿 + 单色填涂 + 星芒）替代单色图标 = 品牌记忆点/设计语言
+ *  - 字标升 32px（-0.03em 拉丁收紧，仍在本方案 6 档内）
+ *  - 表单组 16 内距 → 蓝按钮；底部单行「演示账号登录」；无卡片、少文字（<15 词）
  */
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import ArtWave from '@/components/mobile/ArtWave.vue'
 import IconMicrophone from '~icons/tabler/microphone'
-import IconWaveDuotone from '~icons/ph/wave-sine-duotone'
 import { useAuthStore } from '@/stores/auth'
 import '@/styles/mobile-soft.css'
 
@@ -32,7 +32,6 @@ async function submit() {
     await auth.login(username.value.trim(), password.value)
     loading.value = false
     success.value = true
-    // 丝滑反馈：绿勾 200ms 后跳转
     setTimeout(() => {
       router.push((router.currentRoute.value.query.redirect as string) ?? '/m/home')
     }, 200)
@@ -42,7 +41,6 @@ async function submit() {
   }
 }
 
-/* 演示账号：一键填充并登录（团队联调用，单行入口不占视觉） */
 function demoLogin() {
   if (loading.value) return
   username.value = 'demoadult'
@@ -53,16 +51,13 @@ function demoLogin() {
 
 <template>
   <div class="s-login">
-    <!-- 品牌焦点：声波大图形（设计语言 = 记忆点） -->
+    <!-- 品牌焦点：自绘线稿声波插画（设计语言 = 记忆点） -->
     <div class="s-login__hero">
-      <span class="s-login__wave">
-        <IconWaveDuotone aria-hidden="true" />
-      </span>
+      <ArtWave :size="216" />
       <h1 class="s-login__name">VocalVerse</h1>
       <p class="s-login__tag">说得好，唱得准</p>
     </div>
 
-    <!-- 表单组：药丸输入 ×2（16 内距）→ 蓝按钮 -->
     <form class="s-login__form" @submit.prevent="submit">
       <input
         v-model="username"

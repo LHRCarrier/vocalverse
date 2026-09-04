@@ -410,10 +410,10 @@
   margin-bottom: 16px;
 }
 
-/* ---- 深蓝渐变焦点卡（唯一记忆点；白 CTA；装饰声波） ---- */
+/* ---- 深蓝渐变焦点卡（唯一记忆点；白 CTA；线稿插画装饰） ---- */
 .s-plan {
   position: relative;
-  padding: 20px;
+  padding: 24px;
   margin-bottom: 24px;
   border-radius: var(--s-r-card);
   background: linear-gradient(180deg, var(--s-dark-1) 0%, var(--s-dark-2) 100%);
@@ -472,12 +472,12 @@
   background: var(--s-success);
 }
 
-/* 装饰性声波（右下沉底，弱存在，不抢文字） */
-.s-plan__wave {
+/* 装饰性线稿插画（右上，弱存在，不抢文字） */
+.s-plan__art {
   position: absolute;
-  right: -12px;
-  bottom: -16px;
-  color: rgba(255, 255, 255, 0.14);
+  top: -8px;
+  right: -6px;
+  opacity: 0.5;
   pointer-events: none;
 }
 
@@ -595,15 +595,26 @@
 }
 
 .s-row__icon {
-  flex: 0 0 44px;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--s-r-inner);
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--s-bg-2);
   color: var(--s-text-2);
+}
+
+/* 类别色（仅 2 色低饱和 tint：蓝=口语 / 紫=唱歌；行内唯一色彩） */
+.s-row__icon--speaking {
+  background: #d6effc;
+  color: #0284c7;
+}
+
+.s-row__icon--singing {
+  background: #ece6f8;
+  color: #6d28d9;
 }
 
 .s-row__main {
@@ -613,7 +624,7 @@
 
 .s-row__title {
   display: block;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.4;
   font-weight: 600;
   color: var(--s-text);
@@ -746,9 +757,9 @@
 }
 
 .s-login__name {
-  margin-top: 12px;
+  margin-top: 16px;
   font-family: var(--s-font);
-  font-size: 24px;
+  font-size: 32px;
   line-height: 1.2;
   font-weight: 800;
   letter-spacing: -0.03em;
