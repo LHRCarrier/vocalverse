@@ -1,28 +1,31 @@
-# Login Page Overrides（登录 · /login · v3.2 线稿插画版）
+# Login Page Overrides（登录 · /login · v5.2 复刻定稿版）
 
 > **PROJECT:** VocalVerse — 本文件覆盖 MASTER.md 的页面级规则。
-> **设计意图（组长 v2→v3 反馈定稿）**：登录页要极简、少文字、有设计感、有记忆点——焦点必须是**设计语言**
-> （图形/尺寸/位置传达），不是文字；团队联调入口收为一键演示登录单行。无卡片、无装饰动画。
-> **v3.2 升级**：用**自绘线稿插画**（ArtWave：2.5px 圆头声波线稿 + 单色填涂 + 星芒，参考 BREAKOUT 插画语言）
-> 替代单色图标——"画"才是参考图里出质感的元素；字标升 **32px**（拉丁 -0.03em，6 档字级内）。
+> **设计意图（组长最终拍板）**：登录页 = **uiverse @JohnnyCSilva/bad-cheetah-74 精准复刻**（MIT，保留版权声明；
+> `local/uiverse/bad-cheetah-74.*` 存原版代码）。结构/样式/图标/配色 1:1 照搬，仅产品接线不同。
 
-## 布局（移动优先；桌面居中）
+## 复刻规格（改值 = 偏离原版，禁止）
 
-- 全屏浅蓝静态渐变（radial×2 + linear，无动画）；
-- **品牌焦点（唯一高饱和元素 + 记忆点）**：`ArtWave.vue` 216px（柔和蓝椭圆 + 三层声波线稿蓝 `#0284C7` +
-  黄/蓝星芒 + 点缀圆点）——Voice-First 记忆点；
-- 字标 `VocalVerse` **32px / 800 / 行高 1.2 / letter-spacing -0.03em** → 一行副标题「说得好，唱得准」14px 中灰
-  （全屏文字只有：2 占位词 + 1 按钮词 + 1 行副题 + 1 行演示入口 ≈ <15 词）;
-- **表单组**（宽 min(100%,340px)，无卡片无字段标签）：药丸输入 ×2（54px / 圆角 18 / 白 94% 底 /
-  占位居中 16px / focus 蓝描边 + 4px 光圈）16px 内距 → **登录按钮**（52px 蓝实心胶囊）32px 距;
-- 单行「演示账号登录」（13px 中灰 / 44px 触控高 / 点击 = 填充 demoadult + 自动提交）;
-- 错误：内联红字 + 图标（aria-live），不打断输入。
+- 背景 `#f0f0f0`；白卡 `.form`（padding 30 · 圆角 20 · 宽 min(450px,100%) · 系统字体栈
+  `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif`）
+- 字段行 `.inputForm`：**1.5px #ECEDEC 边 · 圆角 10 · 高 50 · 左 padding 10**；focus-within → **1.5px #2D79F3**（0.2s）
+- 图标：用户名 = **用户图标（Tabler user，20px，#151717）**；密码 = 原版锁图标（512 viewBox 原样）；
+  标签：原版无字段 label（图标+占位已传达信息）
+- 占位/文案（**全部英文**）："Enter your Username" / "Enter your Password" · "Remember me"（radio 原版）·
+  "Forgot password?"（蓝 #2D79F3 500）· "Sign In"（**炭黑 #151717** · 高 50 · 圆角 10 · margin 20/10）·
+  "Don't have an account? Sign Up" · "Or With" · Google/Apple 原版图标 + `.btn`（白底 1px #EDEDEF，hover 蓝边）
+- 输入框 `.input`：flex:1 边框无 · `appearance:none` · focus 无 outline（框线由 `.inputForm:focus-within` 表达）
+
+## 产品接线（视觉零影响）
+
+- Sign In → 真实登录（aauth store；成功 200ms 绿勾后跳转 `/m/home`）
+- **Sign Up → 一键演示账号**（demoadult/demo123456 自动填充并登录 —— 团队联调入口）
+- Forgot password? / Google / Apple → 英文占位提示（2.4s 自动消失）
 
 ## 无障碍
 
-- input：placeholder + aria-label + autocomplete="username"/"current-password"；允许粘贴；回车提交；
-- 按钮三态（loading spinner / 成功绿勾 200ms / 禁用降透明）；focus-visible 蓝描边；
-- 字标 24px 拉丁（-0.03em）为唯一 display 使用（32 档本轮保留给后续引导页 hero）。
+- 输入 aria-label（Username/Password）+ autocomplete（username / current-password）；label 关联 id（vv-email/vv-password）；
+- 错误 `.error-line` 内联红字 role=alert aria-live；Sign In disabled 态降透明。
 
 ## 后续（入门流程，样板阶段不实现）
 

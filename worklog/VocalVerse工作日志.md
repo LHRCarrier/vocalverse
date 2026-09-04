@@ -3,6 +3,15 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 app 端 UI v5.x（登录页拍板 = uiverse bad-cheetah-74 精准复刻）
+
+- 触发：组长指定 `uiverse.io/JohnnyCSilva/bad-cheetah-74` 为登录框标准（"照搬着来"+配色同源），并逐步指示：去字段 label（图标+占位已传达信息）、全文案英文、修 focus 框线、@ 图标换用户图标；
+- **v5.1→v5.2 落地**：结构/样式/图标/配色 1:1 复刻（`.form` 白卡 450/30/20 · `.inputForm` 1.5px #ECEDEC 圆角 10 高 50 · focus-within 1.5px #2D79F3 0.2s · `.button-submit` 炭黑 #151717 高 50 圆角 10 · radio 记住我 · 蓝链接 · Google/Apple 原版图标与 `.btn` hover 蓝边）；去 `.flex-column` label；全英文文案；username 图标 = Tabler user（20px）；全局配色收敛 v5.0（灰底/白卡/炭黑+蓝 #2D79F3+细灰边）；
+- **产品接线**（视觉零影响）：Sign In=真实登录；Sign Up=一键演示账号；Forgot/第三方=英文占位提示；
+- 验证：门禁 lint/typecheck/vitest 19/build 全绿；Playwright 截图 + **focus 态截图验证蓝框线**（`local/ui-check/soft-login*.png`）；文档 pages/login.md 复刻规格定稿。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
 ## 2026-09-08 app 端 UI v4.0（配色审美定稿 · 0xnihilism 暖色基因）
 
 - 触发：组长 v3.3 仍判「差远了！尤其是配色审美」，要求继续从 uiverse @0xnihilism 提取；对其 15 个元素做**色板普查**（黑 #000 x10 / 白 #FFF x9 为基底，强调系 = 三文鱼 #FFA07A、金黄 #E9B50B、深绿 #356854/#063525、暖棕，阴影 = 纯黑硬偏移 10px10px0，描边 3px #000，注意 #4A90E2 蓝仅个例、非其语言）；
