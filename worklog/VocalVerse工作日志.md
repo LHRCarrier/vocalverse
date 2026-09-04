@@ -3,105 +3,21 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
-## 2026-09-08 对话页细节修正（组长反馈：删头部文字 / 气泡从图标右下角展开 / 修对齐）
+## 2026-09-08 UI 相关记录迁移说明
 
-- 组长看上旧版对话页（u- 风格，认可），要求细节修正：① **顶部文字全部去掉**——标题/L1/目标轮数/覆盖度/1-6 徽章删除，只保留左上角悬浮返回按钮（`u-back--float`）；② **AI 气泡从图标右下角展开**——消息行改 align-items:flex-start，图标 44px 置顶，气泡右上右圆角 16/左下 4px + `::before` 旋转方块尾巴指向图标右下角（聊天附连感）；③ **修对齐**——气泡改 flex:1（去掉 max-width 272），用户气泡右对齐限宽 76%，chips/救援卡缩进统一 56px（图标列+间距），图标底部与气泡基线一致；
-- 验证：本地三端（postgres/redis 容器 + python 8000 + java 8080 + vite 5173）真实链路登录 demo → `/m/chat` 截图（`local/ui-check/soft-chat-real.png`）；门禁 lint/typecheck/vitest 19/build 全绿。
-
-—— 执行人：组长 LHRCarrier（AI 代工整理）
-
-## 2026-09-08 app 端 UI v6.0（首页重设计 · 与登录页同源 clean 语言）
-
-- 触发：组长「首页不行，重新设计」（登录页已验收为 bad-cheetah-74 语言，首页沿用其视觉基因）；
-- **v6 变更**：删除深色焦点卡/硬阴影/黄色大块/插画装饰 → 灰底 `#F0F0F0` + 白卡 1.5px `#ECEDEC` 细边 +
-  炭黑主按钮（与 Sign In 同款）+ 蓝 `#2D79F3` 交互/选中/数值；激励改白 chip 金 glyph；分段改白色 pill
-  按钮组（选中蓝边蓝字）；Tab 栏中央钮改炭黑；列表图标块二色 tint（口语蓝/唱歌金）；修复 ArtCalendar/
-  ArtWave 已不再被引用（随旧样式统一收尾时删除）；
-- 验证：门禁 lint/typecheck/vitest 19/build 全绿；Playwright 截图 `local/ui-check/soft-home.png`；
-  pages/home.md v6 规格定稿。
-
-—— 执行人：组长 LHRCarrier（AI 代工整理）
-
-## 2026-09-08 app 端 UI v5.x（登录页拍板 = uiverse bad-cheetah-74 精准复刻）
-
-- 触发：组长指定 `uiverse.io/JohnnyCSilva/bad-cheetah-74` 为登录框标准（"照搬着来"+配色同源），并逐步指示：去字段 label（图标+占位已传达信息）、全文案英文、修 focus 框线、@ 图标换用户图标；
-- **v5.1→v5.2 落地**：结构/样式/图标/配色 1:1 复刻（`.form` 白卡 450/30/20 · `.inputForm` 1.5px #ECEDEC 圆角 10 高 50 · focus-within 1.5px #2D79F3 0.2s · `.button-submit` 炭黑 #151717 高 50 圆角 10 · radio 记住我 · 蓝链接 · Google/Apple 原版图标与 `.btn` hover 蓝边）；去 `.flex-column` label；全英文文案；username 图标 = Tabler user（20px）；全局配色收敛 v5.0（灰底/白卡/炭黑+蓝 #2D79F3+细灰边）；
-- **产品接线**（视觉零影响）：Sign In=真实登录；Sign Up=一键演示账号；Forgot/第三方=英文占位提示；
-- 验证：门禁 lint/typecheck/vitest 19/build 全绿；Playwright 截图 + **focus 态截图验证蓝框线**（`local/ui-check/soft-login*.png`）；文档 pages/login.md 复刻规格定稿。
-
-—— 执行人：组长 LHRCarrier（AI 代工整理）
-
-## 2026-09-08 app 端 UI v4.0（配色审美定稿 · 0xnihilism 暖色基因）
-
-- 触发：组长 v3.3 仍判「差远了！尤其是配色审美」，要求继续从 uiverse @0xnihilism 提取；对其 15 个元素做**色板普查**（黑 #000 x10 / 白 #FFF x9 为基底，强调系 = 三文鱼 #FFA07A、金黄 #E9B50B、深绿 #356854/#063525、暖棕，阴影 = 纯黑硬偏移 10px10px0，描边 3px #000，注意 #4A90E2 蓝仅个例、非其语言）；
-- **v4.0 warm brutalism**：底改**奶油纸感 #FBF6EC**；描边/墨/硬阴影全**纯黑 #12100E**；主色改**三文鱼 #FF7A50**（配深墨字，废弃蓝+白字组合）；激励金黄 #E9B50B、成绩深绿 #1A5C46、错误 #EE2020；焦点卡改**墨黑贴纸卡**（白 3px 边 + 6px 黑硬阴影 + 三文鱼徽章 + 白 CTA）；插画 ArtWave 转三文鱼/金黄；列表类别色（口语=三文鱼 tint/唱歌=金黄 tint）；分段/输入/按钮/Tab 栏全套纯黑描边 + 硬阴影；
-- 验证：门禁 lint/typecheck/vitest 19/build 全绿；截图 `local/ui-check/soft-{login,home}.png` 两页；MASTER 色板表 + docs/31 v4.0 同步。
-
-—— 执行人：组长 LHRCarrier（AI 代工整理）
-
-## 2026-09-08 app 端 UI v3.3（uiverse @0xnihilism 语言 · soft-brutalism）
-
-- 触发：组长连续两版判「low」，指出参考 uiverse.io/0xnihilism（全部效果开源）；Playwright 真浏览器抓取（Cloudflare 403 → 有头模式过验证）得该作者 15 个元素（卡片×7/按钮×4/输入×3/加载×1，源码存 `local/uiverse/*.md`）；
-- 风格画像：**硬偏移阴影（4px 4px 0 实色）+ 厚描边（3px）+ 扫光 + 按压下沉 + 微旋转**——此前 v3.1/v3.2 的柔和蓝系被批"太安全/模板化"的根因；
-- **v3.3 落地（soft-brutalism = 0xnihilism 腔调 + 大众友好度）**：白卡/统计/列表/分段/Tab 栏全部厚深墨描边 + 硬偏移阴影；主按钮 hover 扫光（::after translateX，只动 transform）+ active 下沉 3px；焦点卡白色 3px 厚边 + 6px 硬阴影 + hover -0.6° 微旋转；输入 3px 厚边 + 3px 硬阴影；徽章/头像/打卡黄 pill 同步硬边化；插画（ArtWave/ArtCalendar）保留；底层规则（单字体 PJS/6 档字级/8-16-24-32 间距/语义色/灰轨白 pill/触控 48dp/reduced-motion 降级）不变；
-- 验证：门禁 lint/typecheck/vitest 19/build 全绿；Playwright 390×844 截图两张（`local/ui-check/soft-{login,home}.png`）；文档 MASTER/pages/docs31 同步 v3.3（仅借模式不拷代码，元素许可以 uiverse 页面为准，入库代码为自研）。
-
-—— 执行人：组长 LHRCarrier（AI 代工整理）
-
-## 2026-09-08 app 端 UI v3.1（对抗评审定稿版：首页 + 登录样板重做）
-
-- 触发：组长对 v1/v2 连续否决（花哨/文字多/无记忆点/留白垃圾/排版乱），给出 5 条硬要求 + 参考（B 站《10分钟讲解所有UI/UX概念》文字稿 + 13 张带注释参考图 `实训项目作业/project/.trae/skills/ui-concept-design/references/`）；并派子代理对我 v3 方案做美学攻击（10 条质疑全部采纳）；
-- **v3.1 关键修正**：① 单字体 Plus Jakarta Sans（删 Varela Round/Nunito 双族）；② 字级 6 档 12/14/16/20/24/32（每屏 ≤4，32 仅 display 档，统计数字封顶 24）；③ 间距 4 档 8/16/24/32（组内 8-16 / 区块 24-32，删 28/40——"垃圾留白"根源）；④ 负字距 -0.02~-0.03em + 行高 115% **仅限拉丁大字**（中文 0 字距/1.25，避免方块字挤压）；⑤ 深蓝渐变焦点卡 `#1D4ED8→#172554` + tint 徽章 + **白色实心 CTA**（不蓝叠蓝）+ 120px 声波装饰 = 每屏唯一记忆点；⑥ 分段改**灰轨 + 白色浮起 pill**（材质派，选中加粗双信号）；⑦ 列表图标块中性化 + 数值列文字级蓝 `#0284C7`（颜色是特权）；⑧ 语义色收敛一蓝+红+绿+一颗黄星（删橙）；⑨ 白卡 1px 描边（底 `#EDF5FE` 不丢边界）；⑩ 文字级对比度（文本蓝用 #0284C7、灰 ≥#5B6B7E）；
-- **图标/基座接入**（docs/32 选型落地）：`unplugin-icons` 编译期内联（vite 插件 + `~icons/tabler/*` 主 / `~icons/ph/*` 深色卡大图形）+ vite-env 类型引用；`mobile-soft.css` 重写为 v3.1 规范（含图标尺寸规则）；
-- 页面：登录 = Phosphor 声波 duotone 160px 焦点（设计语言）+ 字标 24（-0.03em）+ 药丸输入 ×2 + 蓝按钮 + 单行演示登录（全屏 <15 词）；首页 = 深蓝焦点卡 + 统计白卡（12/24 字级对）+ 灰轨白 pill + 中性列表 + 浮动 Tab；
-- 验证：门禁 lint/typecheck/vitest 19/build 全绿；Playwright 390×844 截图两张（`local/ui-check/soft-{login,home}.png`）；文档 MASTER/pages/home/login 同步 v3.1。
-
-—— 执行人：组长 LHRCarrier（AI 代工整理）
-
-## 2026-09-08 图标库 / UI 库全网调研与选型（docs/32 + 素材库）
-
-- 触发：组长要求"全网搜集图标库和 UI 库，符合我们设计的存到文件夹里"；参考依据 = B 站视频（Kole Jain《Every UI/UX Concept Explained in Under 10 Minutes》）+ 13 张带注释参考图（`实训项目作业/project/.trae/skills/ui-concept-design/references/`）；
-- **图标库结论**（17 家对照，报告见 `docs/32`）：主选 **Tabler Icons**（MIT，5,900+，统一 2px 圆头圆角，line↔filled 同库切换）；特殊场景 **Phosphor** fill/duotone（深蓝渐变焦点卡/大图形，⚠️ 官方 `@phosphor-icons/vue` 已停更 → 走 `unplugin-icons` + `@iconify-json/ph`，注意**不存在** `@iconify-json/phosphor` 包）；对比基准 Lucide（**ISC 非 MIT**）；接入 = **unplugin-icons 编译期按需内联 SVG**（离线/换肤/体积最优，`currentColor`），自绘品牌件走 assets；
-- **UI 库/基座结论**：组件 = **reka-ui（Radix Vue 继任，unstyled）+ cva + 自研三层 token**（只抄 shadcn-vue 模式不抄 Tailwind 堆栈；不纯自研无障碍）；**Naive 只留 Web 管理端**（受限 themeOverrides 沾品牌，不搬进移动端）；移动端 5 壳件自研；排除 Vant/NutUI/EP/AntD/panda-css；动效 = VueUse（基座）+ Motion for Vue（增强），排除 GSAP；
-- **素材**：`docs/assets/ui-lib-reference/`（48 个样本 SVG：tabler 25/ph 12/lucide 11 + MANIFEST.json 出处清单 + 4 份许可原文 + 3 份 iconify 数据集）；
-- 验证：许可元数据取自 2026-09 npm registry 实测；素材抽取脚本产物与 MANIFEST 对账 48/48。
-
-—— 执行人：组长 LHRCarrier（AI 代工整理）
-
-## 2026-09-08 app 端 UI 重设计（Soft UI Evolution · 样板阶段：首页 + 登录）
-
-- 触发：组长反馈现 app 端 UI（v2 纸面米白+手绘线稿）不行，要求重做；选定 ui-ux-pro-max skill（DSH 已装 `~/.agents/skills/`，`search.py` 本机验证可跑）作为设计智能；
-- **方向拍板**：排除夜店深色（Dark OLED）/程序员极简（Minimalism+Inter）/少儿低幼（Baloo 2/Comic Neue）→ **Soft UI Evolution + Voice-First 元素层 + Micro-interactions 动效层**；组长四条硬要求（UI 即信息 / 排版呼吸感 / 交互必有反馈 / app 丝滑）落为 docs/31 规则；范围：app 端五页 + 登录/入门流程（先样板后铺开）；
-- **产出**（样板 v1）：
-  - 设计系统：`docs/31-移动端UI重设计（Soft UI Evolution）.md`（app 端唯一真相源）+ `docs/design-system/vocalverse/`（MASTER.md + pages/home.md + pages/login.md 分层检索副本）+ README 文档索引登记 2 行；
-  - 代码：`styles/mobile-soft.css`（s-* 前缀完整组件系统：token 变量/字级/按钮三态/卡片/56px 分段滑块/Tab 栏 safe-area/焦点/reduced-motion/触控 48dp）；重制 `MobileTabBar.vue`（悬浮白胶囊 + 激活 pill + spring 主钮）、`MobileHomeView.vue`（问候→打卡黄徽章→primary-soft 任务焦点卡→统计卡（绿=成绩/黄=激励）→56px 分段→列表行）、`LoginView.vue`（去 Naive 依赖、原生表单 autocomplete 兼容、波形装饰、按钮三态 loading/success/错误 aria-live）；
-  - 旧样式 `mobile-uic.css`（u-*）暂保留给未重制页；旧 WIP 先提交留底（4bbfd29/70d4429，可回滚对照）；
-- 验证：门禁 lint（0 errors）/ typecheck / vitest 19 全过 / build 全绿；dev server + Playwright（390×844）截图自检两页（`local/ui-check/soft-{login,home}.png`），首轮发现任务卡底色缺失与列表行内联文字问题并修复；页面数据口径沿用演示帧（M3 接入后替换）；
-- 组长反馈修正（当日）：登录页 v2 极简化——去掉白卡片/演示账号文案堆砌/波形装饰，改为「居中 72px 波形标 + 字标 + 一行 7 字标语 → 两个药丸输入框 → 主按钮 + 单行「演示账号登录」一键入口」；`pages/login.md` 同步 v2。
+> 组长指正：**App 端 UI/设计相关的记录归属 `worklog/安卓开发日志.md`**（本日志只留 Web/后端/全局事项）。
+> 今日以下 UI 记录已全部迁往安卓开发日志：对话页细节修正 · v6.0 首页重设计 · v5.x 登录页复刻 ·
+> v4.0 配色定稿 · v3.3 soft-brutalism · v3.1 对抗评审 · 图标库/UI 库调研 · Soft UI 样板阶段 ·
+> app 端 UI 重制（5 页替换真实路由）。以后 UI 修改按 `docs/33-UI修改SOP.md` §5 落日志。
 
 —— 执行人：组长 LHRCarrier（AI 代工整理）
 
 ## 2026-09-08 fix(apps/web): 整页刷新/App 冷启后会话不恢复（bootstrapAuth 时序 bug · 实测命中）
-
 - 现象（app 端电脑测试验证时暴露）：登录后一切正常，但 **F5/重启 WebView 后所有 `/api/v1` 请求 401「missing bearer token」**（token 明明还在 localStorage，手动带头上请求 = 200）；
 - 根因：`main.ts` 里 `void bootstrapAuth()` 写在 `createApp(App).use(createPinia())` **之前**——`useAuthStore()` 此刻无 active pinia 直接抛错，被 `.catch(() => undefined)` 静默吞掉 → `setAuthToken` 从未执行，client.ts 全局 token 恒 null。SPA 内跳转不受影响（登录时 persist 已设置），所以此前 W1-W6 联调没暴露；
 - 修复：`createPinia()` 先安装、`bootstrapAuth()` 在 mount 前调用（同步段先于页面 onMounted，首个请求即带 token）；注释写明时序硬约束；
 - 验证：dev(5173) 代理到 compose 真后端——登录 → **reload** → `/m/chat`：`POST /manage/auth/refresh 200` → `GET /api/v1/scenarios 200` → `POST /api/v1/sessions` → `POST /api/v1/tts` 全通，页面渲染真实开场白（机场值机）与目标轮数；lint/typecheck/build 全绿；
 - 影响面：APK 冷启动（WebView 每次加载都是整页刷新）同样受益——之前每次冷启都必须重新登录，修复后自动恢复会话。
-
-—— 执行人：组长 LHRCarrier（AI 代工整理）
-
-## 2026-09-08 app 端 UI 重制（依据 ui-concept-design skill · 5 页替换真实路由）
-
-- 触发：按组长要求用 `LHRCarrier/ui-concept-design` skill（download 至 `local/skills/`）重做 app 端 UI——不参考现有实现，按功能点重新设计；范围拍板：**重做 3 页 + 新增唱吧/我的 = 5 页，替换 `views/mobile/*` 真实路由**；
-- **设计重制要点**（对照 skill 参考帧/tokens，中文文案取代原型英文拷贝）：
-  - 新增 `MobileArt.vue` 手绘线稿锚点（2.5px ink 圆头线 + pop-green 单色填涂：日历/音符/热气球/星星/麦克风声波/完成对勾）+ `MobileIcon.vue` 线性图标（统一 1.5px 圆头，Lucide 风）；
-  - `mobile-uic.css` 全量重写为完整组件系统：胶囊按钮五态（primary 炭黑/次级 track/纸面白底描边/深卡幽灵/危险白底红字，高 48，120-150ms）、56px 分段控件、Stat 32px+、实色图标块 + 点线时间轴（左缩进对齐图标中心）、深色展示卡（每屏 ≤1）、chips/badge 变色体系、toast、focus-visible、disabled/loading 态；
-  - **M2 真功能保留接线**：对话页（建会话/开启 TTS/录音 15s/SSE 流/救援 8s/报告跳转）与报告页（?reportId= 真实 metrics：逐轮 attempts/覆盖度/语义子分/建议）；新增：忙碌旋转弧、错误空态（插图+重试）、会话完成卡（查看报告 CTA）；
-  - **新页**：`/m/sing` 唱吧（M3 UI 先行：深青精选卡 + 56px 分段 + 点线歌单，选歌 toast 提示 M3 开放）；`/m/me` 我的（档案卡/学习目标 chips/统计行/设置列表/退出登录危险按钮——修复底部 Tab「我的」死链）；Tab 栏 5 项路由全部可达（原「口语」Tab 指向不存在的 `/m/speaking` 已修正）；
-- **页面层次**：首页 = 问候+打卡徽章+今日任务卡（线稿日历锚点+步骤点线+主 CTA 真跳 /m/chat）+统计卡+56px 分段+最近练习点线时间轴（口语/唱歌卡分别真跳）；报告默认 = 跟唱演示帧（Total 92.4），真实分支 = 综合分（attempts 均值）+ 发音/语法/流利/覆盖四维 + 语义子分卡（注明不计入总分）+ 逐轮明细；
-- **验证**：`pnpm lint`（0/0）/`typecheck`/`vitest 19`/`build` 全绿；dev server + Playwright（390×844，stub 后端）逐页截图对照参考帧自检：6 页构图/圆角/留白/插画锚点均达标，修了报告演示帧 Total 显示 em dash 的偏差；`local/ui-check/` 留截图与脚本（gitignore，不入库）；
-- 注：本机环境 Java 签发 token 被 Python `/api/v1` 拒（401 · jwt_secret 不一致迹象）为既有环境问题，非本次改动引入（旧页同样命中）；真机演示前请核对双端 JWT secret 对齐。
 
 —— 执行人：组长 LHRCarrier（AI 代工整理）
 
