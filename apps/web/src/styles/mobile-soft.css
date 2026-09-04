@@ -1,0 +1,713 @@
+/* ============================================================
+ * VocalVerse app 端 UI 设计系统 v6.0 —— Clean (bad-cheetah-74 同源语言)
+ * 基准：组长已验收的登录页（uiverse @JohnnyCSilva/bad-cheetah-74）
+ *   · 底 #F0F0F0 / 白卡 / 1.5px #ECEDEC 细边 / 圆角 20-10 / 无硬阴影
+ *   · 炭黑 #151717 = 主操作（按钮与 Sign In 同款）/ 蓝 #2D79F3 = 交互·链接·选中
+ *   · 语义色收敛：绿=成绩、金=激励 glyph、红=错误
+ * 保留硬规则：单字体 PJS、6 档字级(12/14/16/20/24/32 每屏≤4)、间距 8/16/24/32、
+ * 触控 ≥48dp、safe-area、reduced-motion 降级、只动 transform/opacity/color。
+ * ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --s-accent: #2d79f3; /* 蓝：交互/链接/选中/进行中 */
+  --s-accent-deep: #1e5fd0;
+  --s-accent-soft: #eaf2fe; /* 浅蓝底 */
+  --s-ink: #151717; /* 炭黑：主按钮/标题 */
+  --s-ink-hover: #2b2b2b;
+  --s-ink-pressed: #000;
+  --s-bg: #f0f0f0; /* 浅灰底（登录页同款） */
+  --s-bg-2: #f4f4f5; /* 图标块/轨道底 */
+  --s-card: #ffffff;
+  --s-card-border: #ecedec; /* 细边（bad-cheetah-74 同款） */
+  --s-text: #151717;
+  --s-text-2: #6b7280;
+  --s-text-3: #9ca3af;
+  --s-gold: #e9b50b;
+  --s-gold-ink: #8a6100;
+  --s-gold-soft: #fff4d6;
+  --s-success: #22c55e;
+  --s-success-deep: #15803d;
+  --s-success-soft: #e8f7ee;
+  --s-error: #ef4444;
+  --s-error-deep: #dc2626;
+  --s-danger-soft: #fee2e2;
+
+  --s-r-card: 20px;
+  --s-r-btn: 10px;
+  --s-r-field: 10px;
+  --s-r-pill: 999px;
+
+  --s-shadow-card: 0 1px 2px rgba(21, 23, 23, 0.03), 0 4px 16px rgba(21, 23, 23, 0.05);
+  --s-shadow-float: 0 4px 12px rgba(21, 23, 23, 0.08), 0 12px 32px rgba(21, 23, 23, 0.1);
+
+  --s-font: 'Plus Jakarta Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+
+  --s-t-press: 60ms;
+  --s-t-micro: 150ms;
+  --s-t-standard: 220ms;
+  --s-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --s-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.s-lat {
+  letter-spacing: -0.02em;
+}
+
+.s-lat--tight {
+  letter-spacing: -0.03em;
+}
+
+/* ============================================================
+ * 容器 / 骨架
+ * ============================================================ */
+.s-phone {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  background: var(--s-bg);
+  font-family: var(--s-font);
+  color: var(--s-text);
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.s-page {
+  padding: 20px 16px calc(120px + env(safe-area-inset-bottom));
+}
+
+.s-page--free {
+  padding-bottom: 48px;
+}
+
+/* ============================================================
+ * 字级（6 档 12/14/16/20/24/32；每屏 ≤4；16=正文基准）
+ * ============================================================ */
+.s-display {
+  font-size: 32px;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.s-h1 {
+  font-size: 24px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.s-h2 {
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.s-h3 {
+  font-size: 16px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.s-body {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.s-caption {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--s-text-2);
+  font-weight: 500;
+}
+
+.s-note {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--s-text-3);
+  max-width: 34ch;
+}
+
+.s-metric {
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+ * 按钮（主=炭黑 与登录 Sign In 同款 · 次=白底细边 hover 蓝边）
+ * ============================================================ */
+.s-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 0 24px;
+  border: 1.5px solid transparent;
+  border-radius: var(--s-r-btn);
+  font: 600 15px var(--s-font);
+  cursor: pointer;
+  text-decoration: none;
+  user-select: none;
+  transition:
+    transform var(--s-t-press) var(--s-ease-out),
+    background-color var(--s-t-micro) var(--s-ease-out),
+    color var(--s-t-micro) var(--s-ease-out),
+    border-color var(--s-t-micro) var(--s-ease-out),
+    opacity var(--s-t-micro) var(--s-ease-out);
+}
+
+.s-btn--primary {
+  background: var(--s-ink);
+  color: #fff;
+  border-color: var(--s-ink);
+}
+
+.s-btn--primary:hover {
+  background: var(--s-ink-hover);
+}
+
+.s-btn--primary:active {
+  transform: scale(0.97);
+  background: var(--s-ink-pressed);
+}
+
+.s-btn--soft {
+  background: var(--s-card);
+  color: var(--s-text);
+  border: 1px solid #ededef;
+}
+
+.s-btn--soft:hover {
+  border-color: var(--s-accent);
+  color: var(--s-accent);
+}
+
+.s-btn--soft:active {
+  transform: scale(0.97);
+  background: var(--s-bg-2);
+}
+
+.s-btn--danger-soft {
+  background: var(--s-danger-soft);
+  color: var(--s-error-deep);
+  border: 1px solid #fecaca;
+}
+
+.s-btn--danger-soft:active {
+  transform: scale(0.97);
+  background: #fecaca;
+}
+
+.s-btn--block {
+  width: 100%;
+}
+
+.s-btn:disabled,
+.s-btn.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.s-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: s-spin 0.7s linear infinite;
+}
+
+@keyframes s-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.s-btn--ok {
+  background: var(--s-success-deep);
+  border-color: var(--s-success-deep);
+}
+
+/* ============================================================
+ * 卡片（白 + 1.5px 细边 + 极轻阴影）
+ * ============================================================ */
+.s-card {
+  background: var(--s-card);
+  border: 1.5px solid var(--s-card-border);
+  border-radius: var(--s-r-card);
+  box-shadow: var(--s-shadow-card);
+}
+
+/* ============================================================
+ * 底部 Tab 栏（白浮卡 · 主钮=炭黑）
+ * ============================================================ */
+.s-tabbar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: min(calc(100vw - 24px), 448px);
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1.5px solid var(--s-card-border);
+  border-radius: 20px;
+  box-shadow: var(--s-shadow-float);
+}
+
+.s-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 52px;
+  border-radius: 12px;
+  color: var(--s-text-3);
+  font: 600 11px var(--s-font);
+  text-decoration: none;
+  transition:
+    background-color var(--s-t-micro) var(--s-ease-out),
+    color var(--s-t-micro) var(--s-ease-out);
+}
+
+.s-tab svg {
+  transition: transform var(--s-t-micro) var(--s-ease-spring);
+}
+
+.s-tab.active {
+  color: var(--s-accent);
+  background: var(--s-accent-soft);
+}
+
+.s-tab.active svg {
+  transform: scale(1.12);
+}
+
+.s-tab:active {
+  transform: scale(0.95);
+}
+
+.s-tab--main {
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  margin: 0 2px;
+  border-radius: 50%;
+  background: var(--s-ink);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--s-t-standard) var(--s-ease-spring);
+}
+
+.s-tab--main:active {
+  transform: scale(0.9);
+}
+
+/* ============================================================
+ * 首页组件（v6 clean）
+ * ============================================================ */
+.s-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.s-avatar {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--s-accent-soft);
+  color: var(--s-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 800 16px var(--s-font);
+}
+
+/* 激励 chip（白底细边 + 金色 glyph，不占大块） */
+.s-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--s-r-btn);
+  background: var(--s-card);
+  border: 1.5px solid var(--s-card-border);
+  font: 600 12px var(--s-font);
+  color: var(--s-text-2);
+  margin-bottom: 16px;
+}
+
+.s-streak svg {
+  color: #c08a00;
+}
+
+/* ---- 今日任务卡（焦点 = 白卡 + 炭黑主按钮，与 Sign In 同款） ---- */
+.s-plan {
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+.s-plan__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--s-accent-soft);
+  color: var(--s-accent);
+  font: 700 12px var(--s-font);
+}
+
+.s-plan__title {
+  margin-top: 10px;
+  font-size: 24px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.s-plan__sub {
+  margin-top: 4px;
+}
+
+.s-plan__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 20px;
+}
+
+.s-plan__step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--s-text);
+}
+
+.s-plan__step.is-done {
+  color: var(--s-text-3);
+  text-decoration: line-through;
+}
+
+.s-plan__dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--s-card-border);
+}
+
+.s-plan__dot.is-done {
+  background: var(--s-success);
+}
+
+/* ---- 统计卡 ---- */
+.s-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 18px 16px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.s-stat-label {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--s-text-2);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.s-stat-value {
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--s-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.s-stat-value--score {
+  color: var(--s-success-deep);
+}
+
+.s-stat-value--star {
+  color: #c08a00;
+}
+
+/* ---- 筛选：白色 pill 按钮组（选中 = 蓝边蓝字，复用表单 .btn hover 语言） ---- */
+.s-segment {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.s-segment__btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 44px;
+  border: 1px solid #ededef;
+  border-radius: var(--s-r-btn);
+  background: var(--s-card);
+  color: var(--s-text-2);
+  font: 500 14px var(--s-font);
+  cursor: pointer;
+  transition:
+    border-color var(--s-t-micro) var(--s-ease-out),
+    color var(--s-t-micro) var(--s-ease-out),
+    background-color var(--s-t-micro) var(--s-ease-out),
+    transform var(--s-t-press) var(--s-ease-out);
+}
+
+.s-segment__btn:hover {
+  border-color: var(--s-accent);
+}
+
+.s-segment__btn.active {
+  border-color: var(--s-accent);
+  color: var(--s-accent);
+  background: var(--s-accent-soft);
+  font-weight: 700;
+}
+
+.s-segment__btn:active {
+  transform: scale(0.97);
+}
+
+/* ---- 列表行 ---- */
+.s-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--s-card);
+  border: 1.5px solid var(--s-card-border);
+  box-shadow: var(--s-shadow-card);
+  text-decoration: none;
+  color: var(--s-text);
+  cursor: pointer;
+  transition:
+    transform var(--s-t-press) var(--s-ease-out),
+    background-color var(--s-t-press) var(--s-ease-out),
+    border-color var(--s-t-press) var(--s-ease-out);
+}
+
+.s-row:hover {
+  border-color: var(--s-accent);
+}
+
+.s-row:active {
+  transform: scale(0.985);
+  background: var(--s-bg-2);
+}
+
+.s-row + .s-row {
+  margin-top: 10px;
+}
+
+.s-row__icon {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--s-bg-2);
+  color: var(--s-text-2);
+}
+
+.s-row__icon--speaking {
+  background: var(--s-accent-soft);
+  color: var(--s-accent);
+}
+
+.s-row__icon--singing {
+  background: var(--s-gold-soft);
+  color: #b07c00;
+}
+
+.s-row__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.s-row__title {
+  display: block;
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--s-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.s-row__sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--s-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.s-row__right {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.s-row__value {
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--s-accent);
+}
+
+.s-row__value--ink {
+  color: var(--s-text);
+}
+
+.s-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: var(--s-r-pill);
+  font: 700 11px var(--s-font);
+}
+
+.s-badge--success {
+  background: var(--s-success-soft);
+  color: var(--s-success-deep);
+}
+
+.s-badge--star {
+  background: var(--s-gold-soft);
+  color: var(--s-gold-ink);
+}
+
+.s-badge--neutral {
+  background: var(--s-bg-2);
+  color: var(--s-text-2);
+}
+
+.s-section {
+  margin: 4px 0 8px;
+}
+
+.s-empty {
+  text-align: center;
+  padding: 36px 24px;
+}
+
+.s-empty__icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 20px;
+  background: var(--s-accent-soft);
+  color: var(--s-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.s-empty__title {
+  font: 700 16px var(--s-font);
+  color: var(--s-text);
+  margin-bottom: 6px;
+}
+
+.s-empty__sub {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--s-text-3);
+}
+
+/* ============================================================
+ * 图标尺寸 / 全局反馈 / 无障碍
+ * ============================================================ */
+.s-tab svg {
+  width: 22px;
+  height: 22px;
+}
+
+.s-tab--main svg {
+  width: 24px;
+  height: 24px;
+}
+
+.s-segment__btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.s-streak svg {
+  width: 14px;
+  height: 14px;
+}
+
+.s-row__icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.s-empty__icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.s-btn:focus-visible,
+.s-tab:focus-visible,
+.s-tab--main:focus-visible,
+.s-segment__btn:focus-visible,
+.s-row:focus-visible {
+  outline: 2px solid var(--s-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .s-tab--main,
+  .s-tab--main:active {
+    transform: none;
+  }
+}

@@ -19,6 +19,14 @@ class TurnStart(pydantic.BaseModel):
     question: str | None = None  # defense：本轮到 AI 提问
 
 
+class UserTranscript(pydantic.BaseModel):
+    """用户 ASR 转写回显（2026-09-08 新增：前端把用户说的话作为聊天气泡展示）。"""
+
+    type: Literal["user_transcript"] = "user_transcript"
+    turn_index: int
+    text: str
+
+
 class TextDelta(pydantic.BaseModel):
     type: Literal["text_delta"] = "text_delta"
     text: str
@@ -70,7 +78,15 @@ class SessionEnd(pydantic.BaseModel):
 
 
 StreamEvent = (
-    TurnStart | TextDelta | AudioChunk | MetaBlock | ScoreDelta | StreamError | TurnEnd | SessionEnd
+    TurnStart
+    | UserTranscript
+    | TextDelta
+    | AudioChunk
+    | MetaBlock
+    | ScoreDelta
+    | StreamError
+    | TurnEnd
+    | SessionEnd
 )
 
 

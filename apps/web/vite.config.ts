@@ -2,11 +2,17 @@ import { fileURLToPath, URL } from 'node:url'
 
 import vue from '@vitejs/plugin-vue'
 import UnoCSS from 'unocss/vite'
+import Icons from 'unplugin-icons/vite'
 import { defineConfig } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue(), UnoCSS()],
+  plugins: [
+    vue(),
+    UnoCSS(),
+    // 图标：unplugin-icons 编译期按需内联 SVG（docs/32 §1.2）——tabler 主 / ph 深色卡大图形
+    Icons({ compiler: 'vue3', autoInstall: false }),
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

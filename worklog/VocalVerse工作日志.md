@@ -3,6 +3,24 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 UI 相关记录迁移说明
+
+> 组长指正：**App 端 UI/设计相关的记录归属 `worklog/安卓开发日志.md`**（本日志只留 Web/后端/全局事项）。
+> 今日以下 UI 记录已全部迁往安卓开发日志：对话页细节修正 · v6.0 首页重设计 · v5.x 登录页复刻 ·
+> v4.0 配色定稿 · v3.3 soft-brutalism · v3.1 对抗评审 · 图标库/UI 库调研 · Soft UI 样板阶段 ·
+> app 端 UI 重制（5 页替换真实路由）。以后 UI 修改按 `docs/33-UI修改SOP.md` §5 落日志。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
+## 2026-09-08 fix(apps/web): 整页刷新/App 冷启后会话不恢复（bootstrapAuth 时序 bug · 实测命中）
+- 现象（app 端电脑测试验证时暴露）：登录后一切正常，但 **F5/重启 WebView 后所有 `/api/v1` 请求 401「missing bearer token」**（token 明明还在 localStorage，手动带头上请求 = 200）；
+- 根因：`main.ts` 里 `void bootstrapAuth()` 写在 `createApp(App).use(createPinia())` **之前**——`useAuthStore()` 此刻无 active pinia 直接抛错，被 `.catch(() => undefined)` 静默吞掉 → `setAuthToken` 从未执行，client.ts 全局 token 恒 null。SPA 内跳转不受影响（登录时 persist 已设置），所以此前 W1-W6 联调没暴露；
+- 修复：`createPinia()` 先安装、`bootstrapAuth()` 在 mount 前调用（同步段先于页面 onMounted，首个请求即带 token）；注释写明时序硬约束；
+- 验证：dev(5173) 代理到 compose 真后端——登录 → **reload** → `/m/chat`：`POST /manage/auth/refresh 200` → `GET /api/v1/scenarios 200` → `POST /api/v1/sessions` → `POST /api/v1/tts` 全通，页面渲染真实开场白（机场值机）与目标轮数；lint/typecheck/build 全绿；
+- 影响面：APK 冷启动（WebView 每次加载都是整页刷新）同样受益——之前每次冷启都必须重新登录，修复后自动恢复会话。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
 ## 2026-09-07 UI Concept Design skill 返工 v2：诊断规则漏洞 + 原型页对照参考帧重做
 
 - 触发：组长反馈 v1 原型"效果一般"。对照 skill 自带的 7 张原版设计帧逐项诊断，问题一半在 skill 规则、一半在 v1 执行：

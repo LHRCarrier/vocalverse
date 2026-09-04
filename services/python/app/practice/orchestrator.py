@@ -168,6 +168,10 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         if not transcript:
             action = "retry" if transcript == "" and action == "normal" else action
 
+        # 1.5) 用户转写回显（2026-09-08：前端聊天化，用户语音→文字气泡，先于 AI 提问发出）
+        if transcript:
+            yield ev.UserTranscript(turn_index=turn_index, text=transcript)
+
         # 2) rescue 参考句（提示/代说用）
         reference = None
         if not transcript and action in ("retry", "hint"):
