@@ -691,75 +691,113 @@
 }
 
 /* ============================================================
- * 登录页（移动优先；桌面居中收窄）
+ * 登录页（移动优先 · 极简：无卡片、少文字、无装饰动画）
  * ============================================================ */
 .s-login {
   position: relative;
   min-height: 100dvh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px 20px 48px;
-  background: linear-gradient(170deg, var(--s-bg) 0%, var(--s-bg-2) 55%, #dceffb 100%);
+  gap: 0;
+  padding: 40px 24px 64px;
+  background:
+    radial-gradient(120% 70% at 18% 0%, #e0f2fe 0%, transparent 60%),
+    radial-gradient(110% 80% at 85% 100%, #dceffb 0%, transparent 55%),
+    linear-gradient(170deg, var(--s-bg) 0%, var(--s-bg-2) 60%, #dceffb 100%);
   overflow: hidden;
 }
 
-.s-login__wave {
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 180px;
-  pointer-events: none;
-  opacity: 0.35;
-  will-change: transform;
+/* 品牌区：居中波形标 + 字标 + 一行短标语 */
+.s-login__hero {
+  text-align: center;
+  margin-bottom: 36px;
 }
 
-.s-login__card {
-  position: relative;
-  z-index: 1;
-  width: min(100%, 400px);
-  padding: 28px;
-  background: var(--s-card);
-  border-radius: var(--s-r-card);
-  box-shadow: var(--s-shadow-float);
-  margin: auto;
+.s-login__name {
+  font-family: var(--s-font-display);
+  font-size: 30px;
+  line-height: 1.2;
+  color: var(--s-text);
+  margin: 14px 0 0;
 }
 
-.s-login__brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
+.s-login__tag {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--s-text-2);
 }
 
 .s-login__logo {
-  flex: 0 0 44px;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto;
+  border-radius: 24px;
   background: var(--s-primary);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 12px 28px rgba(14, 165, 233, 0.35);
 }
 
-.s-login__tag {
-  margin: 4px 0 24px;
+/* 表单：药丸输入框 + 主按钮（无卡片、无字段标签） */
+.s-login__form {
+  width: min(100%, 340px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.s-input.s-input--pill {
+  height: 54px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  border-color: transparent;
+  box-shadow: 0 2px 10px rgba(12, 74, 110, 0.06);
+  text-align: center;
+}
+
+.s-input--pill:focus {
+  border-color: var(--s-primary);
+}
+
+.s-login__submit {
+  margin-top: 8px;
+}
+
+/* 演示账号：单行次级入口（团队联调用，不占视觉） */
+.s-login__demo {
+  margin-top: 20px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  background: none;
+  color: var(--s-text-2);
+  font: 600 13px var(--s-font);
+  cursor: pointer;
+  border-radius: var(--s-r-pill);
+  transition: color var(--s-t-micro) var(--s-ease-out);
+}
+
+.s-login__demo:hover {
+  color: var(--s-primary-deep);
+}
+
+.s-login__demo:active {
+  transform: scale(0.97);
+}
+
+/* 错误提示（aria-live）：内联，不打断输入 */
+.s-error {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-/* 表单字段：52px 输入行 + focus ring（非仅颜色） */
-.s-field {
-  margin-bottom: 16px;
-}
-
-.s-field__label {
-  display: block;
-  margin-bottom: 6px;
-  font: 700 14px var(--s-font);
-  color: var(--s-text);
+  margin: 14px 0 0;
+  color: var(--s-error-deep);
+  font: 600 13px var(--s-font);
 }
 
 .s-input {
@@ -784,30 +822,6 @@
   outline: none;
   border-color: var(--s-primary);
   box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.15);
-}
-
-/* 演示账号 chips */
-.s-demo {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  margin-top: 16px;
-}
-
-.s-demo__hint {
-  text-align: center;
-  margin-bottom: 8px;
-}
-
-/* 错误提示（aria-live）：200ms 内出现，不打断焦点 */
-.s-error {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 12px 0 0;
-  color: var(--s-error-deep);
-  font: 600 13px var(--s-font);
 }
 
 /* ============================================================
