@@ -1,49 +1,51 @@
 /* ============================================================
- * VocalVerse app 端 UI 设计系统 v4.0 —— Warm Brutalism
- * （uiverse @0xnihilism 配色基因：奶油白底 + 纯黑描边/硬阴影 + 三文鱼/金黄/深绿暖强调）
+ * VocalVerse app 端 UI 设计系统 v5.0 —— Clean Charcoal & Blue
+ * 配色/公式基准：uiverse @JohnnyCSilva/bad-cheetah-74（组长指定登录框，MIT，保留版权声明）
+ *   白卡 + 炭黑 #151717（提交/墨色）+ 蓝 #2D79F3（焦点/链接/激活）+ 细灰边 #ECEDEC + 浅灰底
  * 权威文档：docs/31 + docs/design-system/vocalverse/MASTER.md
  *
- * 配色基因（取自 0xnihilism 元素色板统计：黑/白 x10-9 为基底，暖浅鱼 #FFA07A、金黄 #E9B50B、
- * 深绿 #356854/#063525 为强调系，阴影=纯黑硬偏移 10px10px0，描边 3px #000）：
- *  - 底 #FBF6EC 奶油纸感 / 墨 #12100E 近黑 / 卡片白
- *  - 主色（行动）三文鱼 #FF7A50：配深墨字（brutalist：强调色不配白字）
- *  - 激励金 #E9B50B / 成绩绿 #1A5C46 / 错误红 #EE2020（仅语义）
- *  - 硬偏移阴影两档：浅卡 4px4px0 #E3D4BC / 强元素 4px4px0 纯黑
- *  - 2.5-3px 纯黑厚描边（边界=设计语言）；按钮按压下沉 + 扫光；焦点卡黑色贴纸化
- * 底层规则不变：单字体 PJS、6 档字级、8/16/24/32 间距、触控 ≥48dp、reduced-motion 降级。
+ * 设计纪律（承接历次定稿，全部保留）：
+ *  - 单字体 Plus Jakarta Sans；字级 6 档 12/14/16/20/24/32（每屏 ≤4）
+ *  - 间距 4 档 8/16/24/32（组内贴 8-16、区块分 24-32）；12 列对齐（图标列/标题列/数值列锁定）
+ *  - 层次：1 记忆点（炭黑焦点卡）→ 次级白卡 → 静默灰；彩色仅语义（蓝=交互/进行、金=激励、
+ *    绿=成绩、红=错误）；强调色配深墨字
+ *  - 反馈：三态 + 60ms 按压 + 按钮扫光（仅 transform/opacity）+ reduced-motion 降级
+ *  - 触控 ≥48dp、safe-area、48px 行目标；焦点 focus-within 1.5px 蓝描边
  * ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  /* ---- 色彩（温暖 brutal 基因） ---- */
-  --s-primary: #ff7a50; /* 三文鱼（行动/进行中） */
-  --s-primary-deep: #e8501f; /* hover/深一度 */
-  --s-primary-ink: #12100e; /* 强调色上的文字 = 深墨（不是白） */
-  --s-primary-soft: #ffe0d2; /* 浅底/选中底 */
-  --s-accent: #e9b50b; /* 金黄（激励/打卡 glyph） */
-  --s-accent-ink: #5c4000;
-  --s-success: #22c55e;
-  --s-success-deep: #1a5c46; /* 文字级深绿（AA） */
-  --s-success-soft: #d9ebe1;
-  --s-error: #ee2020;
-  --s-error-deep: #c81e1e;
-  --s-dark-card: #12100e; /* 深色焦点卡（墨黑） */
-  --s-bg: #fbf6ec; /* 奶油纸感底 */
-  --s-bg-2: #f1ead9; /* 轨道/分区底 */
+  /* ---- 色彩（JohnnyCSilva 方案） ---- */
+  --s-accent: #2d79f3; /* 蓝：焦点/链接/选中/进行中（唯一交互色） */
+  --s-accent-soft: #eaf2fe; /* 浅蓝底：选中底/对话框 */
+  --s-ink: #151717; /* 炭黑：主按钮/标题/文字/焦点卡 */
+  --s-ink-hover: #2b2b2b;
+  --s-bg: #f4f4f6; /* 浅灰底（uiverse 演示页同款） */
+  --s-bg-2: #ececee; /* 轨道/分区底 */
   --s-card: #ffffff;
-  --s-edge: #12100e; /* 纯黑厚描边 */
-  --s-text: #12100e; /* 主墨 */
-  --s-text-2: #5c554a; /* 次级（≥4.5:1） */
-  --s-text-3: #99917f; /* 弱化（仅注释） */
-  /* 硬偏移阴影（暖沙 / 纯黑两档） */
-  --s-hard-soft: 4px 4px 0 #e3d4bc;
-  --s-hard-black: 4px 4px 0 #12100e;
+  --s-card-border: #ecedec; /* 1.5px 细灰边（JohnnyCSilva 输入框同款） */
+  --s-text: #151717;
+  --s-text-2: #6b7280;
+  --s-text-3: #9ca3af;
+  --s-gold: #e9b50b; /* 金黄：激励/打卡（配深字 #7a5400） */
+  --s-gold-ink: #7a5400;
+  --s-gold-soft: #f9e6a8;
+  --s-success: #22c55e;
+  --s-success-deep: #15803d;
+  --s-success-soft: #dcfce7;
+  --s-error: #ef4444;
+  --s-error-deep: #dc2626;
+  --s-danger-soft: #fee2e2;
 
   --s-r-card: 20px;
-  --s-r-inner: 14px;
-  --s-r-chip: 10px;
+  --s-r-btn: 12px;
+  --s-r-field: 10px;
   --s-r-pill: 999px;
+
+  /* 软阴影两档（干净方案：无硬边阴影，柔和分层） */
+  --s-shadow-card: 0 1px 2px rgba(21, 23, 23, 0.04), 0 8px 24px rgba(21, 23, 23, 0.07);
+  --s-shadow-float: 0 4px 12px rgba(21, 23, 23, 0.1), 0 16px 40px rgba(21, 23, 23, 0.14);
 
   --s-font: 'Plus Jakarta Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 
@@ -140,18 +142,18 @@
 }
 
 /* ============================================================
- * 按钮（纯黑厚描边 + 纯黑硬阴影 + 扫光 + 按压下沉）
+ * 按钮（炭黑主按钮 + 扫光 + 60ms 按压；圆角 12）
  * ============================================================ */
 .s-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 52px;
-  padding: 0 26px;
-  border: 3px solid var(--s-edge);
-  border-radius: var(--s-r-pill);
-  font: 800 16px var(--s-font);
+  min-height: 50px;
+  padding: 0 24px;
+  border: 1.5px solid transparent;
+  border-radius: var(--s-r-btn);
+  font: 600 15px var(--s-font);
   cursor: pointer;
   text-decoration: none;
   user-select: none;
@@ -161,6 +163,7 @@
     transform var(--s-t-press) var(--s-ease-out),
     background-color var(--s-t-micro) var(--s-ease-out),
     color var(--s-t-micro) var(--s-ease-out),
+    border-color var(--s-t-micro) var(--s-ease-out),
     box-shadow var(--s-t-micro) var(--s-ease-out),
     opacity var(--s-t-micro) var(--s-ease-out);
 }
@@ -172,7 +175,7 @@
   left: -80%;
   width: 60%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
   transform: translateX(0);
   transition: transform var(--s-t-standard) var(--s-ease-out);
   pointer-events: none;
@@ -182,56 +185,60 @@
   transform: translateX(260%);
 }
 
+/* 主按钮：炭黑（bad-cheetah-74 submit 同款） */
 .s-btn--primary {
-  background: var(--s-primary);
-  color: var(--s-primary-ink);
-  box-shadow: var(--s-hard-black);
+  background: var(--s-ink);
+  color: #fff;
+  border-color: var(--s-ink);
 }
 
 .s-btn--primary:hover {
-  background: var(--s-primary-deep);
+  background: var(--s-ink-hover);
 }
 
 .s-btn--primary:active {
-  transform: translate(3px, 3px);
-  box-shadow: 1px 1px 0 var(--s-edge);
+  transform: scale(0.97);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-/* 深色卡 CTA：白色实心（黑底上白=最强对比） */
-.s-btn--white {
-  background: #fff;
-  color: var(--s-dark-card);
-  border-color: #fff;
-  box-shadow: 4px 4px 0 #000;
-}
-
-.s-btn--white:active {
-  transform: translate(3px, 3px);
-  box-shadow: 1px 1px 0 #000;
-}
-
+/* 次级：白底灰边，hover 蓝边（bad-cheetah-74 .btn 同款） */
 .s-btn--soft {
-  background: var(--s-primary-soft);
-  color: var(--s-primary-deep);
-  border-color: var(--s-edge);
-  box-shadow: var(--s-hard-soft);
+  background: var(--s-card);
+  color: var(--s-text);
+  border: 1px solid #ededef;
+}
+
+.s-btn--soft:hover {
+  border-color: var(--s-accent);
 }
 
 .s-btn--soft:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--s-edge);
+  transform: scale(0.97);
+  background: var(--s-bg-2);
 }
 
+/* 深色卡 CTA：白色实心 */
+.s-btn--white {
+  background: #fff;
+  color: var(--s-ink);
+  border-color: #fff;
+}
+
+.s-btn--white:active {
+  transform: scale(0.97);
+  background: #f3f4f6;
+}
+
+/* 危险 */
 .s-btn--danger-soft {
-  background: #fee2e2;
+  background: var(--s-danger-soft);
   color: var(--s-error-deep);
-  border-color: var(--s-edge);
-  box-shadow: var(--s-hard-soft);
+  border: 1px solid #fecaca;
 }
 
 .s-btn--danger-soft:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--s-edge);
+  transform: scale(0.97);
+  background: #fecaca;
 }
 
 .s-btn--block {
@@ -249,8 +256,8 @@
 .s-spinner {
   width: 20px;
   height: 20px;
-  border: 2.5px solid rgba(18, 16, 14, 0.25);
-  border-top-color: var(--s-dark-card);
+  border: 2.5px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
   border-radius: 50%;
   animation: s-spin 0.7s linear infinite;
 }
@@ -262,9 +269,8 @@
 }
 
 .s-btn--ok {
-  background: var(--s-success);
-  color: #0b2f22;
-  box-shadow: var(--s-hard-black);
+  background: var(--s-success-deep);
+  border-color: var(--s-success-deep);
 }
 
 /* ============================================================
@@ -274,42 +280,47 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 38px;
+  min-height: 36px;
   padding: 0 14px;
-  border: 2.5px solid var(--s-edge);
+  border: 1px solid var(--s-card-border);
   border-radius: var(--s-r-pill);
-  background: var(--s-primary-soft);
-  color: var(--s-primary-deep);
-  font: 700 13px var(--s-font);
+  background: var(--s-card);
+  color: var(--s-text);
+  font: 600 13px var(--s-font);
   cursor: pointer;
-  box-shadow: var(--s-hard-soft);
   transition:
     transform var(--s-t-micro) var(--s-ease-out),
-    background-color var(--s-t-micro) var(--s-ease-out),
-    box-shadow var(--s-t-micro) var(--s-ease-out);
+    border-color var(--s-t-micro) var(--s-ease-out),
+    background-color var(--s-t-micro) var(--s-ease-out);
 }
 
 .s-chip:hover {
-  background: #ffd1bb;
+  border-color: var(--s-accent);
+  color: var(--s-accent);
 }
 
 .s-chip:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--s-edge);
+  transform: scale(0.94);
+}
+
+.s-chip.is-active {
+  background: var(--s-accent);
+  border-color: var(--s-accent);
+  color: #fff;
 }
 
 /* ============================================================
- * 卡片（纯黑 3px 描边 + 纯黑硬偏移阴影）
+ * 卡片（白 + 1.5px 细灰边 + 软阴影）
  * ============================================================ */
 .s-card {
   background: var(--s-card);
-  border: 3px solid var(--s-edge);
+  border: 1.5px solid var(--s-card-border);
   border-radius: var(--s-r-card);
-  box-shadow: var(--s-hard-black);
+  box-shadow: var(--s-shadow-card);
 }
 
 /* ============================================================
- * 底部 Tab 栏
+ * 底部 Tab 栏（白浮卡 + 蓝激活）
  * ============================================================ */
 .s-tabbar {
   position: fixed;
@@ -322,10 +333,10 @@
   gap: 2px;
   width: min(calc(100vw - 32px), 448px);
   padding: 8px;
-  background: #fff;
-  border: 3px solid var(--s-edge);
-  border-radius: 26px;
-  box-shadow: 5px 5px 0 var(--s-edge);
+  background: rgba(255, 255, 255, 0.98);
+  border: 1.5px solid var(--s-card-border);
+  border-radius: 24px;
+  box-shadow: var(--s-shadow-float);
 }
 
 .s-tab {
@@ -336,7 +347,7 @@
   justify-content: center;
   gap: 3px;
   min-height: 56px;
-  border-radius: 18px;
+  border-radius: 16px;
   color: var(--s-text-3);
   font: 600 11px var(--s-font);
   text-decoration: none;
@@ -350,9 +361,8 @@
 }
 
 .s-tab.active {
-  color: var(--s-primary-deep);
-  background: var(--s-primary-soft);
-  border: 2px solid var(--s-edge);
+  color: var(--s-accent);
+  background: var(--s-accent-soft);
 }
 
 .s-tab.active svg {
@@ -369,21 +379,19 @@
   height: 56px;
   margin: 0 4px;
   border-radius: 50%;
-  background: var(--s-primary);
-  color: var(--s-primary-ink);
-  border: 3px solid var(--s-edge);
+  background: var(--s-accent);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 3px 3px 0 var(--s-edge);
+  box-shadow: 0 6px 14px rgba(45, 121, 243, 0.35);
   transition:
     transform var(--s-t-standard) var(--s-ease-spring),
     box-shadow var(--s-t-standard) var(--s-ease-out);
 }
 
 .s-tab--main:active {
-  transform: translate(2px, 2px) scale(0.94);
-  box-shadow: 1px 1px 0 var(--s-edge);
+  transform: scale(0.9);
 }
 
 /* ============================================================
@@ -402,10 +410,9 @@
   width: 48px;
   height: 48px;
   border-radius: 16px;
-  background: var(--s-primary-soft);
-  color: var(--s-primary-deep);
-  border: 2.5px solid var(--s-edge);
-  box-shadow: 3px 3px 0 var(--s-edge);
+  background: var(--s-accent-soft);
+  color: var(--s-accent);
+  border: 1.5px solid var(--s-card-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -416,32 +423,24 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 9px 16px;
+  padding: 8px 14px;
   border-radius: var(--s-r-pill);
-  background: var(--s-accent);
-  color: var(--s-accent-ink);
-  border: 2.5px solid var(--s-edge);
-  box-shadow: 3px 3px 0 var(--s-edge);
+  background: var(--s-gold);
+  color: var(--s-gold-ink);
   font: 700 13px var(--s-font);
   margin-bottom: 16px;
 }
 
-/* ---- 墨黑焦点卡（贴纸化：白色 3px 厚边 + 纯黑硬阴影 + 三文鱼徽章/CTA） ---- */
+/* ---- 炭黑焦点卡（记忆点 · 白 CTA · 蓝徽章 · 插画装饰） ---- */
 .s-plan {
   position: relative;
   padding: 24px;
   margin-bottom: 24px;
   border-radius: var(--s-r-card);
-  background: var(--s-dark-card);
+  background: var(--s-ink);
   color: #fff;
-  border: 3px solid #fff;
-  box-shadow: 6px 6px 0 var(--s-edge);
+  box-shadow: var(--s-shadow-float);
   overflow: hidden;
-  transition: transform var(--s-t-standard) var(--s-ease-out);
-}
-
-.s-plan:hover {
-  transform: rotate(-0.6deg);
 }
 
 .s-plan__badge {
@@ -450,9 +449,8 @@
   gap: 5px;
   padding: 4px 12px;
   border-radius: var(--s-r-pill);
-  background: var(--s-primary);
-  color: var(--s-primary-ink);
-  border: 2.5px solid #fff;
+  background: var(--s-accent);
+  color: #fff;
   font: 700 12px var(--s-font);
 }
 
@@ -476,11 +474,11 @@
   gap: 8px;
   font-size: 14px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.82);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .s-plan__step.is-done {
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.42);
   text-decoration: line-through;
 }
 
@@ -500,7 +498,7 @@
   position: absolute;
   top: -8px;
   right: -6px;
-  opacity: 0.4;
+  opacity: 0.35;
   pointer-events: none;
 }
 
@@ -541,7 +539,7 @@
   color: #9a6b00;
 }
 
-/* ---- 分段控件：暖灰轨 + 白浮起 pill（选中棕字加粗） ---- */
+/* ---- 分段控件：灰轨 + 白浮起 pill（选中 = 蓝边 + 蓝字加粗） ---- */
 .s-segment {
   position: relative;
   display: flex;
@@ -549,8 +547,7 @@
   padding: 5px;
   border-radius: var(--s-r-pill);
   background: var(--s-bg-2);
-  border: 3px solid var(--s-edge);
-  box-shadow: var(--s-hard-soft);
+  border: 1.5px solid var(--s-card-border);
   margin-bottom: 24px;
 }
 
@@ -562,8 +559,8 @@
   height: calc(100% - 8px);
   border-radius: var(--s-r-pill);
   background: var(--s-card);
-  border: 2.5px solid var(--s-edge);
-  box-shadow: 3px 3px 0 var(--s-edge);
+  border: 1.5px solid var(--s-accent);
+  box-shadow: 0 2px 6px rgba(45, 121, 243, 0.18);
   transition: transform var(--s-t-standard) var(--s-ease-out);
 }
 
@@ -585,33 +582,37 @@
 }
 
 .s-segment__btn.active {
-  color: var(--s-text);
+  color: var(--s-accent);
   font-weight: 700;
 }
 
-/* ---- 列表行 ---- */
+/* ---- 列表行（白卡细边 + 类别色图标块） ---- */
 .s-row {
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 76px;
   padding: 12px 14px;
-  border-radius: var(--s-r-inner);
+  border-radius: var(--s-r-btn);
   background: var(--s-card);
-  border: 3px solid var(--s-edge);
-  box-shadow: var(--s-hard-black);
+  border: 1.5px solid var(--s-card-border);
+  box-shadow: var(--s-shadow-card);
   text-decoration: none;
   color: var(--s-text);
   cursor: pointer;
   transition:
     transform var(--s-t-press) var(--s-ease-out),
     background-color var(--s-t-press) var(--s-ease-out),
-    box-shadow var(--s-t-press) var(--s-ease-out);
+    border-color var(--s-t-press) var(--s-ease-out);
+}
+
+.s-row:hover {
+  border-color: var(--s-accent);
 }
 
 .s-row:active {
-  transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0 var(--s-edge);
+  transform: scale(0.985);
+  background: var(--s-bg-2);
 }
 
 .s-row + .s-row {
@@ -622,21 +623,22 @@
   flex: 0 0 48px;
   width: 48px;
   height: 48px;
-  border-radius: 16px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2.5px solid var(--s-edge);
+  background: var(--s-bg-2);
+  color: var(--s-text-2);
 }
 
 .s-row__icon--speaking {
-  background: var(--s-primary-soft);
-  color: #c2410c;
+  background: var(--s-accent-soft);
+  color: var(--s-accent);
 }
 
 .s-row__icon--singing {
-  background: #fbeec2;
-  color: #8a6100;
+  background: var(--s-gold-soft);
+  color: #9a6b00;
 }
 
 .s-row__main {
@@ -679,7 +681,7 @@
   line-height: 1.2;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--s-primary-deep);
+  color: var(--s-accent);
 }
 
 .s-row__value--ink {
@@ -692,7 +694,6 @@
   padding: 2px 10px;
   border-radius: var(--s-r-pill);
   font: 700 11px var(--s-font);
-  border: 2px solid var(--s-edge);
 }
 
 .s-badge--success {
@@ -701,8 +702,8 @@
 }
 
 .s-badge--star {
-  background: #f9e6a8;
-  color: #7a5400;
+  background: var(--s-gold-soft);
+  color: var(--s-gold-ink);
 }
 
 .s-badge--neutral {
@@ -724,10 +725,9 @@
   height: 72px;
   margin: 0 auto 16px;
   border-radius: 24px;
-  background: var(--s-primary-soft);
-  color: var(--s-primary-deep);
-  border: 3px solid var(--s-edge);
-  box-shadow: var(--s-hard-black);
+  background: var(--s-accent-soft);
+  color: var(--s-accent);
+  border: 1.5px solid var(--s-card-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -746,32 +746,32 @@
 }
 
 /* ============================================================
- * 登录页（插画焦点 + 厚边输入 + 三文鱼硬阴影按钮）
+ * 登录页 v5（bad-cheetah-74 表单：白卡 / 标签+图标输入 / 蓝焦点 / 炭黑提交）
  * ============================================================ */
 .s-login {
-  position: relative;
   min-height: 100dvh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 24px 64px;
-  background:
-    radial-gradient(120% 70% at 18% 0%, #ffe0d2 0%, transparent 60%),
-    radial-gradient(110% 80% at 85% 100%, #f6ead2 0%, transparent 55%),
-    linear-gradient(170deg, var(--s-bg) 0%, #f6efdd 60%, #f6ead2 100%);
-  overflow: hidden;
+  padding: 24px 16px;
+  background: var(--s-bg);
 }
 
-.s-login__hero {
+.s-login__card {
+  width: min(100%, 400px);
+  background: var(--s-card);
+  padding: 28px;
+  border-radius: var(--s-r-card);
+}
+
+.s-login__brand {
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .s-login__name {
-  margin-top: 16px;
   font-family: var(--s-font);
-  font-size: 32px;
+  font-size: 24px;
   line-height: 1.2;
   font-weight: 800;
   letter-spacing: -0.03em;
@@ -780,78 +780,132 @@
 
 .s-login__tag {
   margin-top: 4px;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--s-text-2);
-  font-weight: 500;
 }
 
+/* 字段：label(600 深墨) + 图标输入行（focus-within 蓝边，bad-cheetah-74 同款） */
 .s-login__form {
-  width: min(100%, 340px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+}
+
+.s-field__label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--s-text);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.s-inputForm {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding-left: 12px;
+  border: 1.5px solid #ecedec;
+  border-radius: var(--s-r-field);
+  background: #fff;
+  transition: border-color 0.2s ease-in-out;
+}
+
+.s-inputForm:focus-within {
+  border-color: var(--s-accent);
+}
+
+.s-inputForm__icon {
+  flex: 0 0 auto;
+  color: var(--s-text);
+  display: flex;
+  align-items: center;
 }
 
 .s-input {
+  margin-left: 10px;
+  border: none;
   width: 100%;
-  height: 56px;
-  padding: 0 16px;
-  border: 3px solid var(--s-edge);
-  border-radius: 18px;
-  background: #fff;
+  height: 100%;
+  background: transparent;
+  font: 500 15px var(--s-font);
   color: var(--s-text);
-  font: 600 16px var(--s-font);
-  text-align: center;
-  box-shadow: 4px 4px 0 var(--s-edge);
-  transition:
-    border-color var(--s-t-micro) var(--s-ease-out),
-    box-shadow var(--s-t-micro) var(--s-ease-out),
-    transform var(--s-t-press) var(--s-ease-out);
+}
+
+.s-input:focus {
+  outline: none;
 }
 
 .s-input::placeholder {
   color: var(--s-text-3);
 }
 
-.s-input:focus {
-  outline: none;
-  border-color: var(--s-primary-deep);
-  box-shadow: 4px 4px 0 var(--s-edge), 0 0 0 4px rgba(232, 80, 31, 0.15);
+/* 行内选项：记住我 + 演示账号（蓝色链接样） */
+.s-login__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
 }
 
-.s-login__submit {
-  margin-top: 16px;
+.s-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--s-text);
+  cursor: pointer;
+  user-select: none;
 }
 
-.s-login__demo {
-  margin-top: 24px;
-  min-height: 44px;
-  padding: 0 16px;
+.s-check input {
+  accent-color: var(--s-accent);
+  width: 16px;
+  height: 16px;
+}
+
+.s-link {
   border: none;
   background: none;
-  color: var(--s-text-2);
-  font: 600 13px var(--s-font);
+  padding: 4px 0;
+  font-size: 14px;
+  color: var(--s-accent);
+  font-weight: 500;
   cursor: pointer;
-  border-radius: var(--s-r-pill);
-  transition: color var(--s-t-micro) var(--s-ease-out);
+  min-height: 32px;
 }
 
-.s-login__demo:hover {
-  color: var(--s-primary-deep);
+.s-link:active {
+  transform: scale(0.96);
 }
 
-.s-login__demo:active {
-  transform: scale(0.97);
+/* 提交按钮（炭黑 #151717 · 高 50 · 圆角 10，同款比例） */
+.s-login__submit {
+  margin-top: 18px;
+  height: 50px;
+  width: 100%;
+  border-radius: var(--s-r-field);
+}
+
+.s-login__hint {
+  text-align: center;
+  color: var(--s-text);
+  font-size: 14px;
+  margin: 10px 0 0;
 }
 
 .s-error {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 14px 0 0;
+  margin: 10px 0 0;
   color: var(--s-error-deep);
   font: 600 13px var(--s-font);
+}
+
+.s-error svg {
+  flex: 0 0 auto;
 }
 
 /* ============================================================
@@ -893,9 +947,14 @@
 .s-tab--main:focus-visible,
 .s-segment__btn:focus-visible,
 .s-row:focus-visible,
-.s-input:focus-visible {
-  outline: 2px solid var(--s-primary-deep);
+.s-link:focus-visible {
+  outline: 2px solid var(--s-accent);
   outline-offset: 2px;
+}
+
+.input:focus-visible,
+.s-input:focus-visible {
+  outline: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -907,7 +966,6 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  .s-plan:hover,
   .s-tab--main,
   .s-tab--main:active {
     transform: none;
