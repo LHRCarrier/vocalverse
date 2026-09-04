@@ -891,19 +891,21 @@ body {
   max-width: 76%;
 }
 
-/* 重听按钮（AI 气泡内：音量图标 → 播放时均衡器扩音动画） */
+/* 重听按钮（AI 气泡内：完整听一遍后出现；行内排布 = 末行字末尾，垂直对齐末行字中心） */
 .u-replay {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  margin-top: 8px;
-  padding: 6px 12px;
+  margin-left: 8px;
+  padding: 5px 12px;
+  height: 32px;
   border: none;
   border-radius: var(--u-r-pill);
   background: rgba(28, 28, 26, 0.06);
   color: var(--u-ink);
   cursor: pointer;
+  vertical-align: middle;
   transition: background-color 150ms ease-out, transform 60ms ease-out;
 }
 

@@ -23,6 +23,8 @@ interface Bubble {
   role: 'assistant' | 'user'
   text: string
   chips?: Array<{ phrase: string }>
+  /** 首次播完整听与否（重听按钮出现条件，2026-09-08） */
+  played?: boolean
 }
 
 const route = useRoute()
@@ -81,7 +83,11 @@ async function boot() {
     await track('scene_start', { sceneId: scenario.value.id, payload: { session_id: session.id } })
     if (scenario.value.opening_line) {
       bubbles.value.push({ role: 'assistant', text: scenario.value.opening_line })
-      playTts(scenario.value.opening_line)
+      // 注意：必须持有响应式代理对象（从 ref 数组取回），否则改 played 不触发重渲染
+      const first = bubbles.value[bubbles.value.length - 1]!
+      playTts(scenario.value.opening_line, () => {
+        first.played = true
+      })
     }
     phase.value = 'ready'
   } catch (e) {
@@ -90,10 +96,22 @@ async function boot() {
   }
 }
 
-/** 播放/重听 TTS；index 存在时记录播放态（重听按钮扩音动画） */
-async function playTts(text: string, index?: number) {
+/** 播放/重听 TTS；onDone = 播完回调（重听按钮出现条件）；index = 重听播放态记录 */
+async function playTts(text: string, onDone?: () => void, index?: number) {
+  let done = false
+  const doneOnce = () => {
+    if (!done) {
+      done = true
+      onDone?.()
+    }
+  }
   try {
     const blob = await tts(text)
+    if (!blob.size) {
+      // Fake 桩/未配音：空音频视为"已听过"（演示环境按钮可用）
+      doneOnce()
+      return
+    }
     const url = URL.createObjectURL(blob)
     const audio = new Audio(url)
     audio.onended = () => {
@@ -102,15 +120,33 @@ async function playTts(text: string, index?: number) {
         playingBubble.value = null
         replayAudio = null
       }
+      doneOnce()
     }
+    // 兜底：ended 事件在部分环境（headless/无音频设备）可能不触发 —— 按时长定时 + 15s 硬上限标记播完
+    audio.addEventListener(
+      'loadedmetadata',
+      () => {
+        const ms = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration * 1000 + 400 : 8000
+        setTimeout(doneOnce, Math.min(ms, 15000))
+      },
+      { once: true },
+    )
+    setTimeout(doneOnce, 15000)
     if (index != null) {
       replayAudio?.pause()
       replayAudio = audio
       playingBubble.value = index
     }
-    await audio.play()
+    await audio.play().catch(() => {
+      // autoplay 被拒/环境不支持：视为可重听入口已可用（用户点击时再播）
+      if (index != null) {
+        playingBubble.value = null
+        replayAudio = null
+      }
+      doneOnce()
+    })
   } catch {
-    /* 无声字幕继续 */
+    /* TTS 接口失败：不阻塞对话；重听按钮不出现 */
   }
 }
 
@@ -122,7 +158,7 @@ function replay(index: number, text: string) {
     playingBubble.value = null
     return
   }
-  void playTts(text, index)
+  void playTts(text, undefined, index)
 }
 
 function playChunk(url: string) {
@@ -130,6 +166,11 @@ function playChunk(url: string) {
   audioQueue.push(audio)
   audio.onended = () => {
     audioQueue.shift()?.play().catch(() => undefined)
+    // 全部音频块播完 = 本回合语音完整听了一遍 → 解锁重听按钮
+    if (!audioQueue.length) {
+      const lastAssistant = [...bubbles.value].reverse().find((b) => b.role === 'assistant')
+      if (lastAssistant) lastAssistant.played = true
+    }
   }
   if (audioQueue.length === 1) audio.play().catch(() => undefined)
 }
@@ -197,13 +238,13 @@ function onSseEvent(e: SseStreamEvent) {
       bubbles.value.push({ role: 'user', text: e.text })
       break
     case 'turn_start':
-      currentAssistant.value = { role: 'assistant', text: e.question ?? '' }
-      bubbles.value.push(currentAssistant.value)
+      bubbles.value.push({ role: 'assistant', text: e.question ?? '' })
+      currentAssistant.value = bubbles.value[bubbles.value.length - 1]!
       break
     case 'text_delta':
       if (!currentAssistant.value) {
-        currentAssistant.value = { role: 'assistant', text: '' }
-        bubbles.value.push(currentAssistant.value)
+        bubbles.value.push({ role: 'assistant', text: '' })
+        currentAssistant.value = bubbles.value[bubbles.value.length - 1]!
       }
       currentAssistant.value.text += e.text
       break
@@ -275,7 +316,7 @@ function onSseEvent(e: SseStreamEvent) {
           <div class="u-bubble" :class="m.role === 'user' ? 'u-bubble--user' : 'u-bubble--ai'">
             {{ m.text || '…' }}
             <button
-              v-if="m.role === 'assistant'"
+              v-if="m.role === 'assistant' && m.played"
               class="u-replay"
               :class="{ 'is-playing': playingBubble === i }"
               type="button"
@@ -286,7 +327,7 @@ function onSseEvent(e: SseStreamEvent) {
               <template v-if="playingBubble === i">
                 <span class="u-eq" aria-hidden="true"><i /><i /><i /></span>
               </template>
-              <MobileIcon v-else name="volume" :size="15" />
+              <MobileIcon v-else name="volume" :size="20" />
             </button>
           </div>
         </div>

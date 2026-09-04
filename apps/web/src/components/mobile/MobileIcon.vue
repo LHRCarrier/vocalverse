@@ -173,11 +173,11 @@ const props = withDefaults(
     <template v-else-if="props.name === 'stop'">
       <path d="M7 7h10v10H7z" stroke-width="2" />
     </template>
-    <!-- 音量（重听） -->
+    <!-- 音量（重听）：加粗圆润版（2.4px 圆头 + 实底音箱体） -->
     <template v-else-if="props.name === 'volume'">
-      <path d="M4 10v4h3l4 3.5v-11L7 10H4Z" />
-      <path d="M15 9.5a4 4 0 0 1 0 5" />
-      <path d="M17.5 7a7.5 7.5 0 0 1 0 10" />
+      <path d="M4.5 9.7v4.6h3.2l4.6 3.9V5.8l-4.6 3.9H4.5Z" fill="currentColor" stroke="none" />
+      <path d="M15.6 9.2a4.3 4.3 0 0 1 0 5.6" stroke-width="2.4" />
+      <path d="M18.3 6.6a8.2 8.2 0 0 1 0 10.8" stroke-width="2.4" />
     </template>
   </svg>
 </template>
