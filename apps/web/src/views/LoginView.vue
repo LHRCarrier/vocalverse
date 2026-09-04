@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
- * 登录页 v5.1 —— uiverse @JohnnyCSilva/bad-cheetah-74【精准复刻】（MIT，保留版权声明）
- * 结构/样式/图标/配色全部照搬：.form(白卡 450/30/20) + .flex-column>label + .inputForm(图标输入行)
- * + .flex-row(radio 记住我 / span 忘记密码?) + .button-submit(炭黑 50/10) + .p 注册行 + Or With + Google/Apple
- * 产品接线（视觉保持原版）：提交=真实登录；「注册」=一键演示账号；「忘记密码?」/第三方=提示占位。
+ * 登录页 v5.2 —— uiverse @JohnnyCSilva/bad-cheetah-74【精准复刻·最终版】（MIT，保留版权声明）
+ * v5.2：去除「用户名/密码」label（图标+占位已传达信息）；全文案英文（与元素一致）；
+ *       选中（focus-within）蓝框线修正（1.5px #2d79f3，0.2s transition）。
+ * 产品接线（视觉保持原版）：Sign In=真实登录；Sign Up=一键演示账号；Forgot/第三方=占位提示。
  */
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -37,7 +37,7 @@ async function submit() {
   }
 }
 
-/* 「注册」= 一键演示账号（团队联调；视觉保持原版无破坏） */
+/* Sign Up = 一键演示账号（团队联调） */
 function demoLogin() {
   if (loading.value) return
   email.value = 'demoadult'
@@ -45,7 +45,6 @@ function demoLogin() {
   void submit()
 }
 
-/* 「忘记密码?」/ 第三方登录：占位提示 */
 const notice = ref('')
 function notReady(text: string) {
   notice.value = text
@@ -58,9 +57,6 @@ function notReady(text: string) {
 <template>
   <div class="s-login">
     <form class="form" @submit.prevent="submit">
-      <div class="flex-column">
-        <label for="vv-email">用户名 </label>
-      </div>
       <div class="inputForm">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" viewBox="0 0 32 32" height="20">
           <g id="Layer_3" data-name="Layer 3">
@@ -73,15 +69,13 @@ function notReady(text: string) {
           id="vv-email"
           v-model="email"
           class="input"
-          placeholder="请输入用户名"
+          placeholder="Enter your Username"
+          aria-label="Username"
           name="username"
           autocomplete="username"
         >
       </div>
 
-      <div class="flex-column">
-        <label for="vv-password">密码 </label>
-      </div>
       <div class="inputForm">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" viewBox="-64 0 512 512" height="20">
           <path
@@ -95,7 +89,8 @@ function notReady(text: string) {
           id="vv-password"
           v-model="password"
           class="input"
-          placeholder="请输入密码"
+          placeholder="Enter your Password"
+          aria-label="Password"
           type="password"
           name="password"
           autocomplete="current-password"
@@ -105,21 +100,20 @@ function notReady(text: string) {
       <div class="flex-row">
         <div>
           <input id="remember" type="radio" name="remember">
-          <label for="remember">记住我 </label>
+          <label for="remember">Remember me </label>
         </div>
-        <span class="span" role="button" tabindex="0" @click="notReady('演示环境：请联系管理员重置')">忘记密码?</span>
+        <span class="span" role="button" tabindex="0" @click="notReady('Demo: contact admin to reset')">Forgot password?</span>
       </div>
       <button class="button-submit" type="submit" :disabled="loading">
-        {{ success ? '登录成功' : loading ? '登录中…' : '登录' }}
+        {{ success ? 'Signed In' : loading ? 'Signing in…' : 'Sign In' }}
       </button>
-      <p class="p">还没有账号？<span class="span" role="button" tabindex="0" @click="demoLogin">注册</span></p>
+      <p class="p">Don't have an account? <span class="span" role="button" tabindex="0" @click="demoLogin">Sign Up</span></p>
 
       <p class="p line">Or With</p>
 
       <div class="flex-row">
-        <button class="btn google" type="button" @click="notReady('第三方登录即将开放')">
+        <button class="btn google" type="button" @click="notReady('Third-party sign in coming soon')">
           <svg
-            id="Layer_1"
             xml:space="preserve"
             style="enable-background:new 0 0 512 512"
             viewBox="0 0 512 512"
@@ -150,9 +144,8 @@ function notReady(text: string) {
 
           Google
         </button>
-        <button class="btn apple" type="button" @click="notReady('第三方登录即将开放')">
+        <button class="btn apple" type="button" @click="notReady('Third-party sign in coming soon')">
           <svg
-            id="Capa_1"
             xml:space="preserve"
             style="enable-background:new 0 0 22.773 22.773"
             viewBox="0 0 22.773 22.773"
@@ -187,7 +180,7 @@ function notReady(text: string) {
 
 <style scoped>
 /* ============================================================
- * bad-cheetah-74 精准复刻样式（原样照搬；仅注释与移动适配改动）
+ * bad-cheetah-74 精准复刻样式（原样照搬 + 选中框线修正）
  * 版权与授权：© 2026 JohnnyCSilva (João Silva) · MIT（保留声明）
  * ============================================================ */
 .s-login {
@@ -218,11 +211,6 @@ function notReady(text: string) {
   align-self: flex-end;
 }
 
-.flex-column > label {
-  color: #151717;
-  font-weight: 600;
-}
-
 .inputForm {
   border: 1.5px solid #ecedec;
   border-radius: 10px;
@@ -230,23 +218,27 @@ function notReady(text: string) {
   display: flex;
   align-items: center;
   padding-left: 10px;
-  transition: 0.2s ease-in-out;
+  transition: border 0.2s ease-in-out;
+  min-width: 0;
+}
+
+.inputForm:focus-within {
+  border: 1.5px solid #2d79f3;
 }
 
 .input {
   margin-left: 10px;
   border-radius: 10px;
   border: none;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   height: 100%;
+  appearance: none;
+  background: transparent;
 }
 
 .input:focus {
   outline: none;
-}
-
-.inputForm:focus-within {
-  border: 1.5px solid #2d79f3;
 }
 
 .flex-row {
@@ -321,7 +313,7 @@ function notReady(text: string) {
   border: 1px solid #ededef;
   background-color: white;
   cursor: pointer;
-  transition: 0.2s ease-in-out;
+  transition: border-color 0.2s ease-in-out;
 }
 
 .btn:hover {
