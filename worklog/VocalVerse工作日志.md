@@ -3,6 +3,18 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 app 端 UI 重设计（Soft UI Evolution · 样板阶段：首页 + 登录）
+
+- 触发：组长反馈现 app 端 UI（v2 纸面米白+手绘线稿）不行，要求重做；选定 ui-ux-pro-max skill（DSH 已装 `~/.agents/skills/`，`search.py` 本机验证可跑）作为设计智能；
+- **方向拍板**：排除夜店深色（Dark OLED）/程序员极简（Minimalism+Inter）/少儿低幼（Baloo 2/Comic Neue）→ **Soft UI Evolution + Voice-First 元素层 + Micro-interactions 动效层**；组长四条硬要求（UI 即信息 / 排版呼吸感 / 交互必有反馈 / app 丝滑）落为 docs/31 规则；范围：app 端五页 + 登录/入门流程（先样板后铺开）；
+- **产出**（样板 v1）：
+  - 设计系统：`docs/31-移动端UI重设计（Soft UI Evolution）.md`（app 端唯一真相源）+ `docs/design-system/vocalverse/`（MASTER.md + pages/home.md + pages/login.md 分层检索副本）+ README 文档索引登记 2 行；
+  - 代码：`styles/mobile-soft.css`（s-* 前缀完整组件系统：token 变量/字级/按钮三态/卡片/56px 分段滑块/Tab 栏 safe-area/焦点/reduced-motion/触控 48dp）；重制 `MobileTabBar.vue`（悬浮白胶囊 + 激活 pill + spring 主钮）、`MobileHomeView.vue`（问候→打卡黄徽章→primary-soft 任务焦点卡→统计卡（绿=成绩/黄=激励）→56px 分段→列表行）、`LoginView.vue`（去 Naive 依赖、原生表单 autocomplete 兼容、波形装饰、按钮三态 loading/success/错误 aria-live）；
+  - 旧样式 `mobile-uic.css`（u-*）暂保留给未重制页；旧 WIP 先提交留底（4bbfd29/70d4429，可回滚对照）；
+- 验证：门禁 lint（0 errors）/ typecheck / vitest 19 全过 / build 全绿；dev server + Playwright（390×844）截图自检两页（`local/ui-check/soft-{login,home}.png`），首轮发现任务卡底色缺失与列表行内联文字问题并修复；页面数据口径沿用演示帧（M3 接入后替换）。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
 ## 2026-09-08 fix(apps/web): 整页刷新/App 冷启后会话不恢复（bootstrapAuth 时序 bug · 实测命中）
 
 - 现象（app 端电脑测试验证时暴露）：登录后一切正常，但 **F5/重启 WebView 后所有 `/api/v1` 请求 401「missing bearer token」**（token 明明还在 localStorage，手动带头上请求 = 200）；
