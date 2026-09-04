@@ -3,6 +3,30 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 fix(apps/web): 整页刷新/App 冷启后会话不恢复（bootstrapAuth 时序 bug · 实测命中）
+
+- 现象（app 端电脑测试验证时暴露）：登录后一切正常，但 **F5/重启 WebView 后所有 `/api/v1` 请求 401「missing bearer token」**（token 明明还在 localStorage，手动带头上请求 = 200）；
+- 根因：`main.ts` 里 `void bootstrapAuth()` 写在 `createApp(App).use(createPinia())` **之前**——`useAuthStore()` 此刻无 active pinia 直接抛错，被 `.catch(() => undefined)` 静默吞掉 → `setAuthToken` 从未执行，client.ts 全局 token 恒 null。SPA 内跳转不受影响（登录时 persist 已设置），所以此前 W1-W6 联调没暴露；
+- 修复：`createPinia()` 先安装、`bootstrapAuth()` 在 mount 前调用（同步段先于页面 onMounted，首个请求即带 token）；注释写明时序硬约束；
+- 验证：dev(5173) 代理到 compose 真后端——登录 → **reload** → `/m/chat`：`POST /manage/auth/refresh 200` → `GET /api/v1/scenarios 200` → `POST /api/v1/sessions` → `POST /api/v1/tts` 全通，页面渲染真实开场白（机场值机）与目标轮数；lint/typecheck/build 全绿；
+- 影响面：APK 冷启动（WebView 每次加载都是整页刷新）同样受益——之前每次冷启都必须重新登录，修复后自动恢复会话。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
+## 2026-09-08 app 端 UI 重制（依据 ui-concept-design skill · 5 页替换真实路由）
+
+- 触发：按组长要求用 `LHRCarrier/ui-concept-design` skill（download 至 `local/skills/`）重做 app 端 UI——不参考现有实现，按功能点重新设计；范围拍板：**重做 3 页 + 新增唱吧/我的 = 5 页，替换 `views/mobile/*` 真实路由**；
+- **设计重制要点**（对照 skill 参考帧/tokens，中文文案取代原型英文拷贝）：
+  - 新增 `MobileArt.vue` 手绘线稿锚点（2.5px ink 圆头线 + pop-green 单色填涂：日历/音符/热气球/星星/麦克风声波/完成对勾）+ `MobileIcon.vue` 线性图标（统一 1.5px 圆头，Lucide 风）；
+  - `mobile-uic.css` 全量重写为完整组件系统：胶囊按钮五态（primary 炭黑/次级 track/纸面白底描边/深卡幽灵/危险白底红字，高 48，120-150ms）、56px 分段控件、Stat 32px+、实色图标块 + 点线时间轴（左缩进对齐图标中心）、深色展示卡（每屏 ≤1）、chips/badge 变色体系、toast、focus-visible、disabled/loading 态；
+  - **M2 真功能保留接线**：对话页（建会话/开启 TTS/录音 15s/SSE 流/救援 8s/报告跳转）与报告页（?reportId= 真实 metrics：逐轮 attempts/覆盖度/语义子分/建议）；新增：忙碌旋转弧、错误空态（插图+重试）、会话完成卡（查看报告 CTA）；
+  - **新页**：`/m/sing` 唱吧（M3 UI 先行：深青精选卡 + 56px 分段 + 点线歌单，选歌 toast 提示 M3 开放）；`/m/me` 我的（档案卡/学习目标 chips/统计行/设置列表/退出登录危险按钮——修复底部 Tab「我的」死链）；Tab 栏 5 项路由全部可达（原「口语」Tab 指向不存在的 `/m/speaking` 已修正）；
+- **页面层次**：首页 = 问候+打卡徽章+今日任务卡（线稿日历锚点+步骤点线+主 CTA 真跳 /m/chat）+统计卡+56px 分段+最近练习点线时间轴（口语/唱歌卡分别真跳）；报告默认 = 跟唱演示帧（Total 92.4），真实分支 = 综合分（attempts 均值）+ 发音/语法/流利/覆盖四维 + 语义子分卡（注明不计入总分）+ 逐轮明细；
+- **验证**：`pnpm lint`（0/0）/`typecheck`/`vitest 19`/`build` 全绿；dev server + Playwright（390×844，stub 后端）逐页截图对照参考帧自检：6 页构图/圆角/留白/插画锚点均达标，修了报告演示帧 Total 显示 em dash 的偏差；`local/ui-check/` 留截图与脚本（gitignore，不入库）；
+- 注：本机环境 Java 签发 token 被 Python `/api/v1` 拒（401 · jwt_secret 不一致迹象）为既有环境问题，非本次改动引入（旧页同样命中）；真机演示前请核对双端 JWT secret 对齐。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
 ## 2026-09-07 UI Concept Design skill 返工 v2：诊断规则漏洞 + 原型页对照参考帧重做
 
 - 触发：组长反馈 v1 原型"效果一般"。对照 skill 自带的 7 张原版设计帧逐项诊断，问题一半在 skill 规则、一半在 v1 执行：
