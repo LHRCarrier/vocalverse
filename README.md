@@ -207,6 +207,7 @@ worklog/          团队工作日志（VocalVerse工作日志.md，按日追加�
 | `docs/30-移动端App测试方法.md` | **移动端 App 测试方法**：L0 门禁 / L1 Web 功能联调（W1~W10 用例表）/ L2 壳专项（A1~A7）/ L3+L4 真机八约束+蓝牙麦专项（B1~B12，docs/27 §8 实测表口径）/ L5 商店预检 + 回归 DoD + 已知缺口（自记「勿当通过」）；核心思想：功能测结构化状态断言、视觉测原型基线并排比对 |
 | `docs/31-移动端UI重设计（Soft UI Evolution）.md` | **移动端 app UI 重设计（app 端唯一真相源，样板阶段）**：拍板方向 Soft UI Evolution + Voice-First 元素层 + Micro-interactions（排除夜店深色/程序员极简/少儿低幼）；四条硬规则（UI 即信息 / 排版呼吸感 / 交互必有反馈 / app 丝滑）+ token 表 + 组件规范 + 页面落地顺序（首页/登录样板已完成）+ 验收清单；机器副本 `docs/design-system/vocalverse/`（MASTER + pages/home + pages/login） |
 | `docs/32-图标库与UI库调研与选型.md` | **图标库/UI 库选型（双原子代理全网调研）**：17 家图标库对照（主选 Tabler MIT / 深色卡大图形用 Phosphor fill-duotone 经 `@iconify-json/ph` / 对比 Lucide **ISC**；接入走 unplugin-icons 编译期按需内联）；组件基座 = reka-ui(unstyled) + cva + 自研三层 token（只抄 shadcn-vue 模式不抄 Tailwind 堆栈）；Naive 只留管理端；动效 VueUse + Motion for Vue，排除 GSAP；许可合规 + 素材库 `docs/assets/ui-lib-reference/`（48 样本 SVG + 许可原文） |
+| `docs/33-UI修改SOP.md` | **App 端 UI 修改标准作业流程**：参考源优先（B 站视频/带注释参考图/uiverse 元素）→ 反馈分类（删/改/增/不动）→ 设计决策先写 → 实现 → 截图自检（真实后端链路 + focus 态）→ 门禁 → 文档与日志归位（UI 记录进 `worklog/安卓开发日志.md`）→ 分离 commit；含踩坑清单（色板普查/@iconify-json/ph 包名/Lucide ISC/中文负字距等） |
 
 ## 里程碑（详见 docs/04、docs/06）
 
