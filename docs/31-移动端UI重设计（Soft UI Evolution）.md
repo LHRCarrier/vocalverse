@@ -49,7 +49,7 @@
 
 ## 5. 页面落地顺序
 
-1. **样板（已完成）**：`MobileTabBar` → `MobileHomeView`（今日首页）→ `LoginView`（登录）
+1. **样板（已完成）**：`MobileTabBar` → `MobileHomeView`（今日首页）→ `LoginView`（登录，v2 极简版：无卡片/无演示文案堆砌/一键演示登录，见 pages/login.md）
 2. 验收后铺开：`MobileSpeakingView`（口语）→ `MobileSingView`（唱吧）→ `MobileReportView`（报告）→ `MobileMeView`（我的）
 3. 收尾：删除旧样式 `mobile-uic.css`（及未再引用的 MobileArt/MobileIcon 组件按需保留），旧 u-* 类全部下线；
    全局 `tokens.ts` / `theme.ts` / `uno.config.ts` 按新 token 收敛（Web 端视觉联动，另行评估）
