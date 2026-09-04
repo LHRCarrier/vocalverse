@@ -7,7 +7,9 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -18,6 +20,17 @@ from app.api.routes import audio, defense, events, health, placement, practice, 
 from app.core.config import get_settings
 from app.core.response import BizError
 from app.core.trace import RequestIdLogFilter, RequestIdMiddleware
+
+# HF 缓存约定（docs/06 §8：huggingface 被墙，一律本地缓存）：容器由 compose 注入
+# HF_HOME/HF_HUB_OFFLINE/HF_HUB_DISABLE_XET（挂载 ./data/models）；方式 B 本地默认同款——
+# HF_HOME=仓库 data/models（宿主预下载的 HF 缓存结构）、HF_HUB_OFFLINE=1。
+# 必须在任何 huggingface_hub / faster_whisper 导入之前生效；用户进程已显式设置时尊重之
+# (setdefault)。未设时首次 ASR 会尝试连 huggingface.co → SSL/连接失败 → items/audio 500
+# （2026-09-04 实测）。
+_repo_root = Path(__file__).resolve().parents[3]
+os.environ.setdefault("HF_HOME", str(_repo_root / "data" / "models"))
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 logger = logging.getLogger("vocalverse")
 logger.addFilter(RequestIdLogFilter())  # 每条日志带 request_id（docs/06 §11）
