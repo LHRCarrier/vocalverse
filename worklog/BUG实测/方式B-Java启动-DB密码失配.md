@@ -55,7 +55,7 @@ org.hibernate.HibernateException: Unable to determine Dialect without JDBC metad
    ```sql
    ALTER USER vocalverse PASSWORD 'vocalverse-dev';
    ```
-2. **根 `.env`**：`POSTGRES_PASSWORD=change-me-db-password` → `vocalverse-dev`；顺带把残留占位 `JWT_SECRET=change-me-please-use-64-char-random` → `vocalverse-dev-jwt-secret-0123456789abcdef`（对齐 `.env.example`/Java 默认；否则方式 A 的 compose 注入 `APP_JWT_SECRET` 会与 Java 验签失配——工作日志坑 2 翻版）。`SERVICE_TOKEN` 已一致，未动。
+2. **根 `.env`**：`POSTGRES_PASSWORD=change-me-db-password` → `vocalverse-dev`；顺带把残留占位 `JWT_SECRET=change-me-please-use-64-char-random` → `vocalverse-dev-jwt-secret-0123456789abcdef`（对齐 `.env.example` 与 Java `application.yml` 默认值；compose 未注入 `JWT_SECRET`，Java 走默认——显式一致可防未来 compose 注入时验签失配）。`SERVICE_TOKEN` 已一致，未动。
 3. **`services/python/.env`**：`APP_DATABASE_URL` 密码同步为 `vocalverse-dev`（该文件注释也同步更新）。
 4. **`services/java/.env.example`**：把残留的 `DB_PASSWORD=change-me-db-password`、`JWT_SECRET=change-me-please-use-64-char-random` 对齐为约定值，并补「方式 B 需手动导出环境变量、compose 下由根 .env 注入」的说明。
 5. **README FAQ**：新增一行区分「漏起依赖（`JdbcEnvironmentInitiator` 无 auth 字样）」与「密码失配（含 `password authentication failed`，退出码 1）」。

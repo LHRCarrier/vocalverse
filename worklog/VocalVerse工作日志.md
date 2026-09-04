@@ -46,6 +46,22 @@
 
 —— 执行人：LHRCarrier
 
+## 2026-09-04 PR#27 复审整改：容器布局 `parents[3]` 越界 P0 + 「compose 注入 HF 三件套」失实表述更正
+
+**背景**：PR#27（方式 B 三连排障）复审（LHRCarrier，`gh pr review --request-changes`）发现三点阻断：① `Path(__file__).resolve().parents[3]` 在容器布局（Dockerfile `WORKDIR /app` + `COPY . .` → `/app/app/main.py`，parents 仅 3 级）越界 → `IndexError` → 容器导入即崩，方式 A 全栈不可用（现有 CI 结构上测不出：python-ci 在 runner 上路径成立、docker-build 只 build 不 run）；② 代码注释/README/归档所述「容器由 compose 注入 HF 三件套（挂载 ./data/models）」与仓库事实不符——`docker-compose.yml` 无任何 `HF_*` 变量、仅挂载 `./data/audio`，docs/06 §8 模型缓存约定为 `hf-cache:/root/.cache/huggingface` 命名卷（默认缓存路径），审计 `docs/audit/语音链路现状与风险清单-V2.0.md` K03 明言 xet 变量未进 compose/Dockerfile；③ 与 main 冲突（worklog），且 PR 带入一个**无正文的游离标题**「## 2026-09-09 PR#25 推荐系统落地…」（main 本就有该记录，正文在 09-02 组）。
+
+**修复**（2026-09-04 深夜 · LHRCarrier 执行）：
+1. `services/python/app/main.py`：`try/except IndexError` 布局感知——本地布局（parents[3]=仓库根）注入 `HF_HOME=<仓库>/data/models` + `HF_HUB_OFFLINE=1`（setdefault，尊重显式覆盖）；容器布局跳过二者（维持 HF 默认缓存路径 = hf-cache 卷约定，不破坏容器首次下载流程）；`HF_HUB_DISABLE_XET=1` 两布局通用（docs/18：xet 401 绕过）；
+2. 失实表述全仓更正：main.py 注释 / dev-up.ps1 注释与 setdefault 语义 / README FAQ 行 / BUG 实测归档两篇 / 主日志四条记录 / PR 描述——统一为「方式 B 本地 = 仓库 `data/models`；容器 = hf-cache 卷 + 默认路径（compose 未注入，K03 未闭合，另立整改）」；
+3. `scripts/dev-up.ps1`：三变量改为仅在用户未显式设置时注入（与 main.py `setdefault` 同语义，尊重显式覆盖）；
+4. `.gitignore` 补 `data/models/`（模型权重红线：禁止提交；此前未忽略 → `git status` 污染 + 误提交风险）；
+5. rebase origin/main 解决 worklog 冲突：四条 09-04 记录按日期归入 09-04 组（main 顶部已是 09-07/08/09 记录）、删除游离标题；推送后重跑 python-ci（workflow_dispatch；本仓 `pull_request` 触发未生效是已知问题，python-ci.yml:8 注释）。
+
+**验证**：`ruff check` / `format --check` 绿；`pytest -m "not gpu"` 全量绿；容器布局模拟导入（`<tmp>/app/main.py` 两级深度 = `/app/app/main.py` 等价布局）`import app.main` 成功——修复前同一模拟抛 `IndexError: 3`；方式 A 容器实测待 Docker Desktop 就绪后补（docker-build CI 不覆盖运行期导入）。
+
+—— 执行人：LHRCarrier
+
+
 ## 2026-09-04 方式 B 三连排障 · 代码改动全过程记录（diff 级，供审 PR 回溯）
 
 > 本日方式 B 联调连续三个故障（①Java 启动退出码 1 ②Python ASR 500 ③评分恒 90/86），修复涉及 **4 个仓库文件 + 2 个 BUG 实测归档**。本篇按「动机 → 方案取舍 → 最终 diff → 验证」完整记录每一步（三个故障的复现/根因见各自 BUG 实测文档，此处不再重复）。**09-04 深夜复审整改：容器布局 P0 + 「compose 注入 HF 三件套」失实表述更正，详见文末记录。**
