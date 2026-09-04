@@ -80,7 +80,6 @@ docker compose ps                          #    确认 postgres、redis 均为 h
 
 # 2. 前端（终端 1）——注意：本地 dev 端口是 5173（不是 8088）
 cd apps/web; pnpm install; pnpm dev        # http://localhost:5173（代理已配 8000/8080）
-
 # 3. Python（终端 2）——首次 uv sync 会下载 CPU 版 torch，较慢
 cd services/python
 uv sync
@@ -104,6 +103,22 @@ mvn spring-boot:run
 > pwsh -File scripts/dev-up.ps1 stop     # 按端口杀三端
 > ```
 > 注意：Windows PowerShell 5.1 会因 UTF-8 解析报错，必须用 `pwsh`（7）执行。
+
+### 3.5 手机端（Android APK · 今日交付形态）
+
+方式 A 全栈起好后（8088 可用），手机壳 = Capacitor 8 远程 URL 型：Android WebView 直接加载
+`http://<局域网IP>:8088`（nginx 同源反代，后端零改动）。
+
+```powershell
+# 构建 APK（已预置 server.url=http://10.133.33.185:8088；换环境改 apps/mobile/capacitor.config.json 后 npx cap sync）
+cd apps/mobile/android; .\gradlew.bat assembleDebug
+# 产物：apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk（≈4MB）
+# 安装：adb install -r <apk>（手机开 USB 调试），或传 APK 到手机直接安装
+```
+
+- 演示账号：`demoadult` / `demoteen` / `demosenior`，密码 `demo123456`；
+- 手机与后端起在**同一局域网**；Web 体验入口同源（PWA：`/manifest.webmanifest`，安卓可"添加到主屏幕"）；
+- 详细说明/删除清单见 `apps/mobile/README.md`，产品与技术决策见 `docs/27`~`docs/29`。
 
 ### 4. 启动成功判定（验收清单）
 
@@ -138,7 +153,8 @@ mvn spring-boot:run
 ## 仓库结构
 
 ```
-apps/web/         前端（Vue3+TS+Vite6；录音 / SSE / 埋点）
+apps/web/         前端（Vue3+TS+Vite6；录音 / SSE / 埋点 / PWA manifest）
+apps/mobile/      Capacitor 手机壳（Android 首发；server.url 型加载线上全栈，详见 apps/mobile/README.md）
 services/python/  语音管线 + LLM Agent + 推荐（FastAPI；Alembic 唯一 schema 真源）
 services/java/    薄管理端（Spring Boot；JWT 签发）
 infra/            部署与 nginx 配置
@@ -184,6 +200,9 @@ worklog/          团队工作日志（VocalVerse工作日志.md，按日追加�
 | `docs/24-InternalBeyond借鉴落地计划.md` | **IB 借鉴落地计划 v3（三官拷问修订定稿）**：范围裁定（⑤前缀缓存⑥画像注入①韵律引擎；④/⑦/②③不做或后置）+ 详细设计（`build_llm_context` 静态/动态**重写**（保留 conclude 指令与 `(none)` 兜底）、`learner.py` 画像注入（Python 侧聚合+白名单+TTL 缓存+收尾失效挂钩）、`prosody.ts` 纯函数韵律引擎（线性域 VAD+f0 最小滞后拾取）、`llm_cache_hit.py` POC）+ 测试用例（修复前必失败）+ 单人时间块（A 硬底线+B 骨架）/PR 拆分（今日就绪待审不合并）/风险回退/答辩口径；许可红线（只借思路不拷代码素材） |
 | `docs/25-InternalBeyond落地计划拷问报告.md` | **IB 落地计划三官火力拷问报告**：技术（A 系列 P0×2：删 conclude 指令/锚点自相矛盾）、算法（B 系列 P0×3：VAD 单位域/特征作用域/f0 平局错频）、范围排期（全量 6.5h 不可行裁决：A 硬底线+B 骨架）、P1×12/P2×15 整改全部落地 docs/24 v3 + 事实核查修正（日期误标/.env/章节号） |
 | `docs/26-LLM框架对齐ai4u评估与实施计划.md` | **LLM 框架对齐 ai4u 评估与实施计划**：ai4u（组内自研桌面 AI 伴侣）Agent 运行时解剖（scenes/runtime/domains/hooks/core）+ 映射表（→ `app/agent/` 分层：ContextBuilder/TurnRunner/MetaExecutor/MessageSink/学习者记忆域/persona）+ 不迁移清单（proactive/IM/TRPG/journal/RAG）+ 分期（P0 内核 2.5~3.5 人日 → P1 memory 双轨 → P2 persona）+ 风险回退 + 答辩口径；docs/24 A 系列并入 P0 内核；仅迁移架构模式不拷贝代码（ai4u 无 LICENSE、含外部素材） |
+| `docs/27-移动端方案.md` | **移动端方案（待评审稿）**：真实产品化定位 → Capacitor 8 壳（远程 URL 型，Android 首发 iOS 跟后）复用现有 Vue 应用零后端改动；MVP 只做「口语对话闭环」；调研借鉴（道法术器：Freemium 定价/三问/渠道/合规工具）+ 周计划 W0~W4 + 真机实测表 + ADR 修订申请（§13，拍板后执行）+ 开源调研（ETOS §4.1 / MobileGym §4.2 / 22 候选采纳清单 §4.3） |
+| `docs/28-开源语音音频能力借鉴落地计划.md` | **开源语音/音频能力借鉴落地计划（待评审稿）**：语言学习类+音频处理类开源项目调研（10 候选，node 抓 GitHub + npm 许可证核验）→ 转译落地；P0 三切片（A 前端音频底座 = wavesurfer.js BSD-3 + recorder polyfill MIT；B 服务端 ASR 降级 = sherpa-onnx Apache-2.0 第二引擎；C 跟读交互增强 = 借鉴 SpeechShadowing 出句→录音→对照 + 静音切句）+ 红线表（pitchfinder GPL/peaks.js LGPL/AGPL 两项目一律只借思路）+ ADR 修订申请（§6）+ 答辩口径；浏览器 WASM 离线 ASR 结论「服务端降级 + 移动端原生性价比更高（P1）」 + 正确包名警示（`wavesurfer.js@7.12.11`，勿装占位包 `wavesurfer@1.3.4`） |
+| `docs/29-移动端与音频底座实施详细设计.md` | **移动端与音频底座实施详细设计（四路拷问合流·待评审稿）**：79 问拷问（前端/音频/后端/排期）→ 五条交叉共振发现（P0 归属错配·排期矛盾·存量三红旗·降级语义空洞·许可细化）+ 裁决建议表（A 组先决 G1~G3 / B 组实施 G4~G11 / C 组文档修正）+ 切片重排（S1 波形组件随 M3 落 / S2 ASR 降级+信号量前置 / S3 跟读后置 / S4 手机壳加分项）+ 文件级详细设计（S1~S2 含 TDD 用例）+ W 计划修订（6 周弹性+提审并行）+ 合规清单 + PR 拆分与门禁 |
 
 ## 里程碑（详见 docs/04、docs/06）
 
