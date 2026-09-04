@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 图标库 / UI 库全网调研与选型（docs/32 + 素材库）
+
+- 触发：组长要求"全网搜集图标库和 UI 库，符合我们设计的存到文件夹里"；参考依据 = B 站视频（Kole Jain《Every UI/UX Concept Explained in Under 10 Minutes》）+ 13 张带注释参考图（`实训项目作业/project/.trae/skills/ui-concept-design/references/`）；
+- **图标库结论**（17 家对照，报告见 `docs/32`）：主选 **Tabler Icons**（MIT，5,900+，统一 2px 圆头圆角，line↔filled 同库切换）；特殊场景 **Phosphor** fill/duotone（深蓝渐变焦点卡/大图形，⚠️ 官方 `@phosphor-icons/vue` 已停更 → 走 `unplugin-icons` + `@iconify-json/ph`，注意**不存在** `@iconify-json/phosphor` 包）；对比基准 Lucide（**ISC 非 MIT**）；接入 = **unplugin-icons 编译期按需内联 SVG**（离线/换肤/体积最优，`currentColor`），自绘品牌件走 assets；
+- **UI 库/基座结论**：组件 = **reka-ui（Radix Vue 继任，unstyled）+ cva + 自研三层 token**（只抄 shadcn-vue 模式不抄 Tailwind 堆栈；不纯自研无障碍）；**Naive 只留 Web 管理端**（受限 themeOverrides 沾品牌，不搬进移动端）；移动端 5 壳件自研；排除 Vant/NutUI/EP/AntD/panda-css；动效 = VueUse（基座）+ Motion for Vue（增强），排除 GSAP；
+- **素材**：`docs/assets/ui-lib-reference/`（48 个样本 SVG：tabler 25/ph 12/lucide 11 + MANIFEST.json 出处清单 + 4 份许可原文 + 3 份 iconify 数据集）；
+- 验证：许可元数据取自 2026-09 npm registry 实测；素材抽取脚本产物与 MANIFEST 对账 48/48。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
 ## 2026-09-08 app 端 UI 重设计（Soft UI Evolution · 样板阶段：首页 + 登录）
 
 - 触发：组长反馈现 app 端 UI（v2 纸面米白+手绘线稿）不行，要求重做；选定 ui-ux-pro-max skill（DSH 已装 `~/.agents/skills/`，`search.py` 本机验证可跑）作为设计智能；
