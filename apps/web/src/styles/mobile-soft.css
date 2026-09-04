@@ -1,54 +1,49 @@
 /* ============================================================
- * VocalVerse app 端 UI 设计系统 v3.3 —— Soft-Brutalism（uiverse @0xnihilism 语言 + 大众友好度）
+ * VocalVerse app 端 UI 设计系统 v4.0 —— Warm Brutalism
+ * （uiverse @0xnihilism 配色基因：奶油白底 + 纯黑描边/硬阴影 + 三文鱼/金黄/深绿暖强调）
  * 权威文档：docs/31 + docs/design-system/vocalverse/MASTER.md
  *
- * v3.3 视觉语言（源自 uiverse.io/@0xnihilism 15 元素提炼，只借模式不拷代码）：
- *  - 硬偏移阴影（hard-offset shadow）：4px 4px 0 实色 → 卡片"浮起来"有态度
- *  - 厚描边（3px）：卡片/按钮/输入框/徽章，把边界当成设计语言
- *  - 扫光（sweep sheen）：主按钮 hover 一道高光扫过（::after translateX）
- *  - 按压下沉：active 时 translate(2px,2px) + 阴影收缩到 2px → 物理按压感
- *  - 微旋转（-1deg）：焦点卡 hover 轻轻一歪（reduced-motion 下关闭）
- * 保留 v3.1 全部底层规则：单字体 PJS、6 档字级、8/16/24/32 间距、蓝灰白语义色、
- * 深蓝渐变焦点卡、灰轨白 pill、8/16/24/32 分组、触控 ≥48dp、丝滑 transform/opacity。
+ * 配色基因（取自 0xnihilism 元素色板统计：黑/白 x10-9 为基底，暖浅鱼 #FFA07A、金黄 #E9B50B、
+ * 深绿 #356854/#063525 为强调系，阴影=纯黑硬偏移 10px10px0，描边 3px #000）：
+ *  - 底 #FBF6EC 奶油纸感 / 墨 #12100E 近黑 / 卡片白
+ *  - 主色（行动）三文鱼 #FF7A50：配深墨字（brutalist：强调色不配白字）
+ *  - 激励金 #E9B50B / 成绩绿 #1A5C46 / 错误红 #EE2020（仅语义）
+ *  - 硬偏移阴影两档：浅卡 4px4px0 #E3D4BC / 强元素 4px4px0 纯黑
+ *  - 2.5-3px 纯黑厚描边（边界=设计语言）；按钮按压下沉 + 扫光；焦点卡黑色贴纸化
+ * 底层规则不变：单字体 PJS、6 档字级、8/16/24/32 间距、触控 ≥48dp、reduced-motion 降级。
  * ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  /* ---- 色彩 ---- */
-  --s-primary: #0ea5e9;
-  --s-primary-deep: #0284c7;
-  --s-primary-soft: #d6effc;
-  --s-secondary: #38bdf8;
-  --s-accent: #fbbf24;
-  --s-accent-ink: #7a4b00;
+  /* ---- 色彩（温暖 brutal 基因） ---- */
+  --s-primary: #ff7a50; /* 三文鱼（行动/进行中） */
+  --s-primary-deep: #e8501f; /* hover/深一度 */
+  --s-primary-ink: #12100e; /* 强调色上的文字 = 深墨（不是白） */
+  --s-primary-soft: #ffe0d2; /* 浅底/选中底 */
+  --s-accent: #e9b50b; /* 金黄（激励/打卡 glyph） */
+  --s-accent-ink: #5c4000;
   --s-success: #22c55e;
-  --s-success-deep: #15803d;
-  --s-error: #ef4444;
-  --s-error-deep: #dc2626;
-  --s-listening: #6b8faf;
-  --s-speaking: #22c55e;
-  --s-dark-1: #1d4ed8;
-  --s-dark-2: #172554;
-  --s-bg: #edf5fe;
-  --s-bg-2: #e8f2f8;
+  --s-success-deep: #1a5c46; /* 文字级深绿（AA） */
+  --s-success-soft: #d9ebe1;
+  --s-error: #ee2020;
+  --s-error-deep: #c81e1e;
+  --s-dark-card: #12100e; /* 深色焦点卡（墨黑） */
+  --s-bg: #fbf6ec; /* 奶油纸感底 */
+  --s-bg-2: #f1ead9; /* 轨道/分区底 */
   --s-card: #ffffff;
-  --s-card-border: #172554; /* 厚描边用深墨色（brutalist 边界） */
-  --s-text: #0f2a45;
-  --s-text-2: #5b6b7e;
-  --s-text-3: #8fa3b5;
-  /* 硬偏移阴影（实色两档：浅卡用浅蓝灰、强元素用深墨） */
-  --s-edge-soft: #c7def7;
-  --s-edge-strong: #172554;
+  --s-edge: #12100e; /* 纯黑厚描边 */
+  --s-text: #12100e; /* 主墨 */
+  --s-text-2: #5c554a; /* 次级（≥4.5:1） */
+  --s-text-3: #99917f; /* 弱化（仅注释） */
+  /* 硬偏移阴影（暖沙 / 纯黑两档） */
+  --s-hard-soft: 4px 4px 0 #e3d4bc;
+  --s-hard-black: 4px 4px 0 #12100e;
 
   --s-r-card: 20px;
   --s-r-inner: 14px;
   --s-r-chip: 10px;
   --s-r-pill: 999px;
-
-  --s-shadow-card: 4px 4px 0 var(--s-edge-soft);
-  --s-shadow-float: 5px 5px 0 rgba(23, 37, 84, 0.16);
-  --s-shadow-hard: 4px 4px 0 var(--s-edge-strong);
 
   --s-font: 'Plus Jakarta Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 
@@ -145,7 +140,7 @@
 }
 
 /* ============================================================
- * 按钮（厚描边 + 硬阴影 + 扫光 + 按压下沉）
+ * 按钮（纯黑厚描边 + 纯黑硬阴影 + 扫光 + 按压下沉）
  * ============================================================ */
 .s-btn {
   display: inline-flex;
@@ -154,9 +149,9 @@
   gap: 8px;
   min-height: 52px;
   padding: 0 26px;
-  border: 3px solid var(--s-card-border);
+  border: 3px solid var(--s-edge);
   border-radius: var(--s-r-pill);
-  font: 700 16px var(--s-font);
+  font: 800 16px var(--s-font);
   cursor: pointer;
   text-decoration: none;
   user-select: none;
@@ -170,7 +165,6 @@
     opacity var(--s-t-micro) var(--s-ease-out);
 }
 
-/* 扫光（hover 一道高光闪过；只有 transform/opacity 参与动画） */
 .s-btn::after {
   content: '';
   position: absolute;
@@ -178,7 +172,7 @@
   left: -80%;
   width: 60%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
   transform: translateX(0);
   transition: transform var(--s-t-standard) var(--s-ease-out);
   pointer-events: none;
@@ -190,8 +184,8 @@
 
 .s-btn--primary {
   background: var(--s-primary);
-  color: #fff;
-  box-shadow: var(--s-shadow-hard);
+  color: var(--s-primary-ink);
+  box-shadow: var(--s-hard-black);
 }
 
 .s-btn--primary:hover {
@@ -200,44 +194,44 @@
 
 .s-btn--primary:active {
   transform: translate(3px, 3px);
-  box-shadow: 1px 1px 0 var(--s-edge-strong);
+  box-shadow: 1px 1px 0 var(--s-edge);
 }
 
-/* 深色焦点卡 CTA：白实心（深底最高对比） */
+/* 深色卡 CTA：白色实心（黑底上白=最强对比） */
 .s-btn--white {
   background: #fff;
-  color: var(--s-dark-2);
+  color: var(--s-dark-card);
   border-color: #fff;
-  box-shadow: 4px 4px 0 rgba(11, 19, 46, 0.5);
+  box-shadow: 4px 4px 0 #000;
 }
 
 .s-btn--white:active {
   transform: translate(3px, 3px);
-  box-shadow: 1px 1px 0 rgba(11, 19, 46, 0.5);
+  box-shadow: 1px 1px 0 #000;
 }
 
 .s-btn--soft {
   background: var(--s-primary-soft);
   color: var(--s-primary-deep);
-  border-color: var(--s-primary-deep);
-  box-shadow: 3px 3px 0 var(--s-edge-soft);
+  border-color: var(--s-edge);
+  box-shadow: var(--s-hard-soft);
 }
 
 .s-btn--soft:active {
   transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--s-edge-soft);
+  box-shadow: 1px 1px 0 var(--s-edge);
 }
 
 .s-btn--danger-soft {
   background: #fee2e2;
   color: var(--s-error-deep);
-  border-color: var(--s-error-deep);
-  box-shadow: 3px 3px 0 #fca5a5;
+  border-color: var(--s-edge);
+  box-shadow: var(--s-hard-soft);
 }
 
 .s-btn--danger-soft:active {
   transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 #fca5a5;
+  box-shadow: 1px 1px 0 var(--s-edge);
 }
 
 .s-btn--block {
@@ -255,8 +249,8 @@
 .s-spinner {
   width: 20px;
   height: 20px;
-  border: 2.5px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #fff;
+  border: 2.5px solid rgba(18, 16, 14, 0.25);
+  border-top-color: var(--s-dark-card);
   border-radius: 50%;
   animation: s-spin 0.7s linear infinite;
 }
@@ -268,13 +262,13 @@
 }
 
 .s-btn--ok {
-  background: var(--s-success-deep);
-  box-shadow: 3px 3px 0 #0d5c31;
-  border-color: var(--s-success-deep);
+  background: var(--s-success);
+  color: #0b2f22;
+  box-shadow: var(--s-hard-black);
 }
 
 /* ============================================================
- * 芯片（次级操作）
+ * 芯片
  * ============================================================ */
 .s-chip {
   display: inline-flex;
@@ -282,13 +276,13 @@
   gap: 6px;
   min-height: 38px;
   padding: 0 14px;
-  border: 2.5px solid var(--s-card-border);
+  border: 2.5px solid var(--s-edge);
   border-radius: var(--s-r-pill);
   background: var(--s-primary-soft);
   color: var(--s-primary-deep);
   font: 700 13px var(--s-font);
   cursor: pointer;
-  box-shadow: 3px 3px 0 var(--s-edge-soft);
+  box-shadow: var(--s-hard-soft);
   transition:
     transform var(--s-t-micro) var(--s-ease-out),
     background-color var(--s-t-micro) var(--s-ease-out),
@@ -296,26 +290,26 @@
 }
 
 .s-chip:hover {
-  background: #c4e8fb;
+  background: #ffd1bb;
 }
 
 .s-chip:active {
   transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--s-edge-soft);
+  box-shadow: 1px 1px 0 var(--s-edge);
 }
 
 /* ============================================================
- * 卡片（厚描边 + 硬偏移阴影）
+ * 卡片（纯黑 3px 描边 + 纯黑硬偏移阴影）
  * ============================================================ */
 .s-card {
   background: var(--s-card);
-  border: 3px solid var(--s-card-border);
+  border: 3px solid var(--s-edge);
   border-radius: var(--s-r-card);
-  box-shadow: var(--s-shadow-card);
+  box-shadow: var(--s-hard-black);
 }
 
 /* ============================================================
- * 底部 Tab 栏（悬浮卡 + hard shadow + safe-area）
+ * 底部 Tab 栏
  * ============================================================ */
 .s-tabbar {
   position: fixed;
@@ -328,10 +322,10 @@
   gap: 2px;
   width: min(calc(100vw - 32px), 448px);
   padding: 8px;
-  background: rgba(255, 255, 255, 0.98);
-  border: 3px solid var(--s-card-border);
+  background: #fff;
+  border: 3px solid var(--s-edge);
   border-radius: 26px;
-  box-shadow: 5px 5px 0 rgba(23, 37, 84, 0.16);
+  box-shadow: 5px 5px 0 var(--s-edge);
 }
 
 .s-tab {
@@ -358,7 +352,7 @@
 .s-tab.active {
   color: var(--s-primary-deep);
   background: var(--s-primary-soft);
-  border: 2px solid var(--s-primary-deep);
+  border: 2px solid var(--s-edge);
 }
 
 .s-tab.active svg {
@@ -376,12 +370,12 @@
   margin: 0 4px;
   border-radius: 50%;
   background: var(--s-primary);
-  color: #fff;
-  border: 3px solid var(--s-card-border);
+  color: var(--s-primary-ink);
+  border: 3px solid var(--s-edge);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 3px 3px 0 var(--s-card-border);
+  box-shadow: 3px 3px 0 var(--s-edge);
   transition:
     transform var(--s-t-standard) var(--s-ease-spring),
     box-shadow var(--s-t-standard) var(--s-ease-out);
@@ -389,7 +383,7 @@
 
 .s-tab--main:active {
   transform: translate(2px, 2px) scale(0.94);
-  box-shadow: 1px 1px 0 var(--s-card-border);
+  box-shadow: 1px 1px 0 var(--s-edge);
 }
 
 /* ============================================================
@@ -410,8 +404,8 @@
   border-radius: 16px;
   background: var(--s-primary-soft);
   color: var(--s-primary-deep);
-  border: 2.5px solid var(--s-card-border);
-  box-shadow: 3px 3px 0 var(--s-edge-soft);
+  border: 2.5px solid var(--s-edge);
+  box-shadow: 3px 3px 0 var(--s-edge);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -426,22 +420,22 @@
   border-radius: var(--s-r-pill);
   background: var(--s-accent);
   color: var(--s-accent-ink);
-  border: 2.5px solid var(--s-card-border);
-  box-shadow: 3px 3px 0 var(--s-edge-soft);
+  border: 2.5px solid var(--s-edge);
+  box-shadow: 3px 3px 0 var(--s-edge);
   font: 700 13px var(--s-font);
   margin-bottom: 16px;
 }
 
-/* ---- 深蓝渐变焦点卡（硬边 sticker 化：白色厚描边 + 深色硬阴影） ---- */
+/* ---- 墨黑焦点卡（贴纸化：白色 3px 厚边 + 纯黑硬阴影 + 三文鱼徽章/CTA） ---- */
 .s-plan {
   position: relative;
   padding: 24px;
   margin-bottom: 24px;
   border-radius: var(--s-r-card);
-  background: linear-gradient(180deg, var(--s-dark-1) 0%, var(--s-dark-2) 100%);
+  background: var(--s-dark-card);
   color: #fff;
   border: 3px solid #fff;
-  box-shadow: 6px 6px 0 rgba(23, 37, 84, 0.28);
+  box-shadow: 6px 6px 0 var(--s-edge);
   overflow: hidden;
   transition: transform var(--s-t-standard) var(--s-ease-out);
 }
@@ -456,8 +450,8 @@
   gap: 5px;
   padding: 4px 12px;
   border-radius: var(--s-r-pill);
-  background: var(--s-accent);
-  color: var(--s-accent-ink);
+  background: var(--s-primary);
+  color: var(--s-primary-ink);
   border: 2.5px solid #fff;
   font: 700 12px var(--s-font);
 }
@@ -482,11 +476,11 @@
   gap: 8px;
   font-size: 14px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.86);
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .s-plan__step.is-done {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.45);
   text-decoration: line-through;
 }
 
@@ -506,7 +500,7 @@
   position: absolute;
   top: -8px;
   right: -6px;
-  opacity: 0.5;
+  opacity: 0.4;
   pointer-events: none;
 }
 
@@ -544,10 +538,10 @@
 }
 
 .s-stat-value--star {
-  color: #b45309;
+  color: #9a6b00;
 }
 
-/* ---- 分段控件：灰轨厚边 + 白色浮起 pill（选中加粗 + 蓝描边） ---- */
+/* ---- 分段控件：暖灰轨 + 白浮起 pill（选中棕字加粗） ---- */
 .s-segment {
   position: relative;
   display: flex;
@@ -555,8 +549,8 @@
   padding: 5px;
   border-radius: var(--s-r-pill);
   background: var(--s-bg-2);
-  border: 3px solid var(--s-card-border);
-  box-shadow: var(--s-shadow-card);
+  border: 3px solid var(--s-edge);
+  box-shadow: var(--s-hard-soft);
   margin-bottom: 24px;
 }
 
@@ -568,8 +562,8 @@
   height: calc(100% - 8px);
   border-radius: var(--s-r-pill);
   background: var(--s-card);
-  border: 2.5px solid var(--s-primary-deep);
-  box-shadow: 3px 3px 0 var(--s-edge-soft);
+  border: 2.5px solid var(--s-edge);
+  box-shadow: 3px 3px 0 var(--s-edge);
   transition: transform var(--s-t-standard) var(--s-ease-out);
 }
 
@@ -591,11 +585,11 @@
 }
 
 .s-segment__btn.active {
-  color: var(--s-primary-deep);
+  color: var(--s-text);
   font-weight: 700;
 }
 
-/* ---- 列表行（厚边 + 硬阴影；类别色图标块） ---- */
+/* ---- 列表行 ---- */
 .s-row {
   display: flex;
   align-items: center;
@@ -604,8 +598,8 @@
   padding: 12px 14px;
   border-radius: var(--s-r-inner);
   background: var(--s-card);
-  border: 3px solid var(--s-card-border);
-  box-shadow: var(--s-shadow-card);
+  border: 3px solid var(--s-edge);
+  box-shadow: var(--s-hard-black);
   text-decoration: none;
   color: var(--s-text);
   cursor: pointer;
@@ -617,7 +611,7 @@
 
 .s-row:active {
   transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0 var(--s-edge-soft);
+  box-shadow: 2px 2px 0 var(--s-edge);
 }
 
 .s-row + .s-row {
@@ -632,19 +626,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--s-bg-2);
-  color: var(--s-text-2);
-  border: 2.5px solid var(--s-card-border);
+  border: 2.5px solid var(--s-edge);
 }
 
 .s-row__icon--speaking {
-  background: #d6effc;
-  color: #0284c7;
+  background: var(--s-primary-soft);
+  color: #c2410c;
 }
 
 .s-row__icon--singing {
-  background: #ece6f8;
-  color: #6d28d9;
+  background: #fbeec2;
+  color: #8a6100;
 }
 
 .s-row__main {
@@ -700,17 +692,17 @@
   padding: 2px 10px;
   border-radius: var(--s-r-pill);
   font: 700 11px var(--s-font);
-  border: 2px solid var(--s-card-border);
+  border: 2px solid var(--s-edge);
 }
 
 .s-badge--success {
-  background: #dcfce7;
+  background: var(--s-success-soft);
   color: var(--s-success-deep);
 }
 
 .s-badge--star {
-  background: #fef3c7;
-  color: #92400e;
+  background: #f9e6a8;
+  color: #7a5400;
 }
 
 .s-badge--neutral {
@@ -734,8 +726,8 @@
   border-radius: 24px;
   background: var(--s-primary-soft);
   color: var(--s-primary-deep);
-  border: 3px solid var(--s-card-border);
-  box-shadow: var(--s-shadow-card);
+  border: 3px solid var(--s-edge);
+  box-shadow: var(--s-hard-black);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -754,7 +746,7 @@
 }
 
 /* ============================================================
- * 登录页（插画焦点 + 厚边输入 + 硬阴影按钮）
+ * 登录页（插画焦点 + 厚边输入 + 三文鱼硬阴影按钮）
  * ============================================================ */
 .s-login {
   position: relative;
@@ -765,9 +757,9 @@
   justify-content: center;
   padding: 40px 24px 64px;
   background:
-    radial-gradient(120% 70% at 18% 0%, #d6effc 0%, transparent 60%),
-    radial-gradient(110% 80% at 85% 100%, #dceffb 0%, transparent 55%),
-    linear-gradient(170deg, var(--s-bg) 0%, var(--s-bg-2) 60%, #dceffb 100%);
+    radial-gradient(120% 70% at 18% 0%, #ffe0d2 0%, transparent 60%),
+    radial-gradient(110% 80% at 85% 100%, #f6ead2 0%, transparent 55%),
+    linear-gradient(170deg, var(--s-bg) 0%, #f6efdd 60%, #f6ead2 100%);
   overflow: hidden;
 }
 
@@ -805,13 +797,13 @@
   width: 100%;
   height: 56px;
   padding: 0 16px;
-  border: 3px solid var(--s-card-border);
+  border: 3px solid var(--s-edge);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.96);
+  background: #fff;
   color: var(--s-text);
   font: 600 16px var(--s-font);
   text-align: center;
-  box-shadow: 3px 3px 0 var(--s-edge-soft);
+  box-shadow: 4px 4px 0 var(--s-edge);
   transition:
     border-color var(--s-t-micro) var(--s-ease-out),
     box-shadow var(--s-t-micro) var(--s-ease-out),
@@ -825,7 +817,7 @@
 .s-input:focus {
   outline: none;
   border-color: var(--s-primary-deep);
-  box-shadow: 3px 3px 0 var(--s-edge-soft), 0 0 0 4px rgba(14, 165, 233, 0.15);
+  box-shadow: 4px 4px 0 var(--s-edge), 0 0 0 4px rgba(232, 80, 31, 0.15);
 }
 
 .s-login__submit {
