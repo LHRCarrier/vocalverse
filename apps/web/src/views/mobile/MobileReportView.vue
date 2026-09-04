@@ -8,6 +8,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { fetchReport, type ReportPayload } from '@/api/practice'
+import '@/styles/mobile-uic.css'
 
 const route = useRoute()
 const router = useRouter()

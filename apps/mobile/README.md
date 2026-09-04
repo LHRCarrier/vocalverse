@@ -1,7 +1,7 @@
 # apps/mobile · VocalVerse 手机壳（Capacitor）
 
 > 2026 今日交付形态：**远程 URL 型壳**——Android WebView 直接加载局域网内全栈地址
-> `http://10.133.33.185:8088`（docker compose 一键栈，nginx 同源反代 `/api/v1` 与 `/manage`）。
+> `http://192.168.1.3:8088`（docker compose 一键栈，nginx 同源反代 `/api/v1` 与 `/manage`；IP 以实际局域网为准）。
 > 无需在前端构建产物装入壳内；壳与 Web 应用解耦、后端零改动。
 
 ## 目录

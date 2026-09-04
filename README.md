@@ -110,7 +110,7 @@ mvn spring-boot:run
 `http://<局域网IP>:8088`（nginx 同源反代，后端零改动）。
 
 ```powershell
-# 构建 APK（已预置 server.url=http://10.133.33.185:8088；换环境改 apps/mobile/capacitor.config.json 后 npx cap sync）
+# 构建 APK（已预置 server.url=http://192.168.1.3:8088；换环境改 apps/mobile/capacitor.config.json 后 npx cap sync）
 cd apps/mobile/android; .\gradlew.bat assembleDebug
 # 产物：apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk（≈4MB）
 # 安装：adb install -r <apk>（手机开 USB 调试），或传 APK 到手机直接安装

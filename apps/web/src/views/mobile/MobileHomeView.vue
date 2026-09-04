@@ -9,6 +9,7 @@ import { computed, onMounted, ref } from 'vue'
 import { fetchScenarios, type ScenarioItem } from '@/api/practice'
 import { useAuthStore } from '@/stores/auth'
 import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
+import '@/styles/mobile-uic.css'
 
 const auth = useAuthStore()
 const scenes = ref<ScenarioItem[]>([])

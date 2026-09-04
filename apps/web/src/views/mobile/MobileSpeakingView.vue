@@ -13,6 +13,7 @@ import { createSession, fetchScenarios, streamTurn, tts, type ScenarioItem } fro
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 import { useTurnTimers } from '@/composables/useTurnTimers'
+import '@/styles/mobile-uic.css'
 
 interface Bubble {
   role: 'assistant' | 'user'
@@ -267,7 +268,7 @@ function onSseEvent(e: SseStreamEvent) {
 
       <!-- 救援提示卡（8s 无录音） -->
       <div v-if="hintText" class="u-hint">
-        💡 {{ hintText }} —— 点击按钮说出这句，或点上方「🔊」让它示范。
+        💡 {{ hintText }} —— 点击下方按钮，大声说出这句话。
       </div>
 
       <!-- 最近得分 -->
