@@ -24,6 +24,13 @@ $Root = Split-Path -Parent $PSScriptRoot
 $LogDir = Join-Path $Root "local\dev-logs"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
+# HF 缓存约定（docs/06 §8 · 与容器 compose 同款，2026-09-04 修复）：
+# huggingface 被墙 → 一律走仓库 data/models 本地缓存（宿主预下载 faster-whisper-small）。
+# 不设则首次 ASR 尝试联网下载 → 连接/SSL 失败 → /placement/items/*/audio 500。
+$env:HF_HOME = Join-Path $Root "data\models"
+$env:HF_HUB_OFFLINE = "1"
+$env:HF_HUB_DISABLE_XET = "1"
+
 function Get-PortPid([int]$Port) {
     $c = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
     if ($c) { [int[]]$c.OwningProcess | Select-Object -Unique } else { @() }
