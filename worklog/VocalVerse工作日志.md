@@ -3,6 +3,18 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 app 端 UI v6.0（首页重设计 · 与登录页同源 clean 语言）
+
+- 触发：组长「首页不行，重新设计」（登录页已验收为 bad-cheetah-74 语言，首页沿用其视觉基因）；
+- **v6 变更**：删除深色焦点卡/硬阴影/黄色大块/插画装饰 → 灰底 `#F0F0F0` + 白卡 1.5px `#ECEDEC` 细边 +
+  炭黑主按钮（与 Sign In 同款）+ 蓝 `#2D79F3` 交互/选中/数值；激励改白 chip 金 glyph；分段改白色 pill
+  按钮组（选中蓝边蓝字）；Tab 栏中央钮改炭黑；列表图标块二色 tint（口语蓝/唱歌金）；修复 ArtCalendar/
+  ArtWave 已不再被引用（随旧样式统一收尾时删除）；
+- 验证：门禁 lint/typecheck/vitest 19/build 全绿；Playwright 截图 `local/ui-check/soft-home.png`；
+  pages/home.md v6 规格定稿。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
 ## 2026-09-08 app 端 UI v5.x（登录页拍板 = uiverse bad-cheetah-74 精准复刻）
 
 - 触发：组长指定 `uiverse.io/JohnnyCSilva/bad-cheetah-74` 为登录框标准（"照搬着来"+配色同源），并逐步指示：去字段 label（图标+占位已传达信息）、全文案英文、修 focus 框线、@ 图标换用户图标；
