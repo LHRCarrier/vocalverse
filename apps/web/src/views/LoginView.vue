@@ -1,14 +1,17 @@
 <script setup lang="ts">
 /**
- * 登录页（移动优先 · Soft UI 极简版，docs/31 §5.1 + pages/login.md v2）
+ * 登录页 v3.1（移动优先 · 极简 + 设计语言焦点，docs/31 §5.1 + pages/login.md）
  *
- * 极简原则：无卡片、无演示文案堆砌、无装饰动画。
- * 构成：居中品牌（波形标 + 字标 + 一行短标语）→ 两个药丸输入框 → 主按钮 → 一行「演示账号登录」。
- * 无障碍：placeholder + aria-label + autocomplete（密码管理器/粘贴兼容）；错误内联 aria-live。
+ * 焦点 = 大尺寸声波图形（Phosphor duotone，唯一高饱和元素）——设计语言表达"声语"，不是靠文字；
+ * 字标 24px（拉丁 -0.03em收紧）退为次级 + 一行 14px 弱化副标题；表单组（16px 内距）→ 蓝按钮（32px）；
+ * 底部单行「演示账号登录」。无卡片、无装饰动画、少文字（全屏 ≤15 词）。
+ * 无障碍：placeholder + aria-label + autocomplete（密码管理器/粘贴兼容）；回车提交；错误 aria-live。
  */
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import IconMicrophone from '~icons/tabler/microphone'
+import IconWaveDuotone from '~icons/ph/wave-sine-duotone'
 import { useAuthStore } from '@/stores/auth'
 import '@/styles/mobile-soft.css'
 
@@ -50,22 +53,20 @@ function demoLogin() {
 
 <template>
   <div class="s-login">
-    <!-- 品牌：波形标 + 字标 + 一行短标语 -->
+    <!-- 品牌焦点：声波大图形（设计语言 = 记忆点） -->
     <div class="s-login__hero">
-      <span class="s-login__logo" aria-hidden="true">
-        <svg width="26" height="26" viewBox="0 0 22 22" fill="none">
-          <path d="M4 9v4M8.5 5v12M13 8v6M17.5 3v16" stroke="#fff" stroke-width="2.4" stroke-linecap="round" />
-        </svg>
+      <span class="s-login__wave">
+        <IconWaveDuotone aria-hidden="true" />
       </span>
       <h1 class="s-login__name">VocalVerse</h1>
       <p class="s-login__tag">说得好，唱得准</p>
     </div>
 
-    <!-- 表单：两个药丸输入框 + 主按钮 -->
+    <!-- 表单组：药丸输入 ×2（16 内距）→ 蓝按钮 -->
     <form class="s-login__form" @submit.prevent="submit">
       <input
         v-model="username"
-        class="s-input s-input--pill"
+        class="s-input"
         name="username"
         placeholder="用户名"
         aria-label="用户名"
@@ -75,7 +76,7 @@ function demoLogin() {
       >
       <input
         v-model="password"
-        class="s-input s-input--pill"
+        class="s-input"
         type="password"
         name="password"
         placeholder="密码"
@@ -89,9 +90,7 @@ function demoLogin() {
         :disabled="loading"
       >
         <span v-if="loading" class="s-spinner" aria-hidden="true" />
-        <svg v-else-if="success" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-          <path d="M3 9.5l4 4 8-9" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
+        <IconMicrophone v-else-if="success" style="width: 18px; height: 18px" aria-hidden="true" />
         <template v-else>登录</template>
       </button>
     </form>

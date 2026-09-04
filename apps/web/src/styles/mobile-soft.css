@@ -1,68 +1,76 @@
 /* ============================================================
- * VocalVerse app 端 UI 设计系统 v3 —— Soft UI Evolution + Voice-First
- * 权威文档：docs/31-移动端UI重设计（Soft UI Evolution）.md
- * 机器副本：docs/design-system/vocalverse/MASTER.md（分层检索）
+ * VocalVerse app 端 UI 设计系统 v3.1 —— Soft UI Evolution + Voice-First
+ * 权威文档：docs/31 + docs/design-system/vocalverse/MASTER.md
  *
- * 硬规则（用户要求）：
- *  1) UI 即信息：语义色=信息（蓝=行动/进行中、黄=激励、绿=成绩、红=错误）
- *  2) 排版呼吸感：8px 节奏 / 行高≥1.6 / measure≤34ch / 字级≤4 档
- *  3) 交互必有反馈：三态齐全 / press 60ms / loading/成功/错误反馈
- *  4) 丝滑：只动 transform/opacity/box-shadow / 时长分层 / reduced-motion 降级
- * 触控：≥48dp、相邻≥8dp；safe-area 底部留白。
- * 单位：px。所有颜色一律引用 --s-* 变量，禁止自造 hex。
- * 注意：本文件类名前缀 s-；旧样式 mobile-uic.css（u-*）在页面重制完成后整体下线。
+ * v3.1 关键修订（对抗评审后定稿）：
+ *  - 单一字体 Plus Jakarta Sans（不再区分 Display/Body 两族）
+ *  - 字级 6 档：12/14/16/20/24/32；每屏 ≤4 档；32 仅登录/品牌 display
+ *  - 间距 4 档：8/16/24/32（相关贴 8-16、区块分 24-32；删除 28/40）
+ *  - 负字距仅用于拉丁大字（ls -0.02~-0.03em）；中文 lh 1.25 / ls 0；正文 lh 1.6
+ *  - 深蓝渐变焦点卡（#1D4ED8→#172554）+ 白色实心 CTA（不蓝叠蓝）
+ *  - 分段控件 = 灰轨 + 白色浮起 pill（材质派）+ 选中加粗（双信号）
+ *  - 列表图标块中性化（背景/图标双灰色），数值列文字级蓝 #0284C7
+ *  - 白卡加 1px 淡描边（底色 #EDF5FE 上不丢边界）
+ * 硬规则：UI 即信息 / 呼吸感 / 交互必有反馈 / 丝滑（只动 transform/opacity）
+ * 触控 ≥48dp + safe-area；reduced-motion 全降级。
  * ============================================================ */
 
-/* 可选外网字体（演示机断网回退系统栈，不阻塞；中文回退 PingFang/雅黑） */
-@import url('https://fonts.googleapis.com/css2?family=Varela+Round&family=Nunito+Sans:wght@300;400;600;700&display=swap');
+/* 可选外网字体（演示机断网回退系统栈；中文回退 PingFang/雅黑）——单一字体 */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  /* ---- 色彩（docs/31 §3 token 表，语义=信息） ---- */
-  --s-primary: #0ea5e9; /* 学习蓝：行动/进行中 */
-  --s-primary-deep: #0284c7; /* 按压/文字级蓝（AA） */
-  --s-primary-soft: #e0f2fe; /* 选中底/图标底 */
+  /* ---- 色彩（语义=信息：蓝=行动、红=错误、绿=成功、黄=激励 glyph） ---- */
+  --s-primary: #0ea5e9; /* 品牌蓝：图形/按钮/大号粗体（不做正文级文本） */
+  --s-primary-deep: #0284c7; /* 文字级蓝（AA ≥4.5:1）：数值/强调文本/选中 */
+  --s-primary-soft: #d6effc; /* 浅蓝底：选中底/标签底 */
   --s-secondary: #38bdf8;
-  --s-accent: #fbbf24; /* 微笑黄：打卡/激励（配深墨文字） */
-  --s-accent-ink: #0c4a6e;
-  --s-success: #22c55e; /* 成绩/成功 */
+  --s-accent: #fbbf24; /* 微笑黄：仅星/火苗 glyph 与打卡徽章（配深墨文字） */
+  --s-accent-ink: #7a4b00;
+  --s-success: #22c55e;
   --s-success-deep: #15803d; /* 文字级绿（AA） */
-  --s-warning: #f59e0b;
   --s-error: #ef4444;
   --s-error-deep: #dc2626;
-  --s-score: #fb923c;
   --s-listening: #6b8faf; /* 语音元素层：聆听态 */
   --s-speaking: #22c55e; /* 语音元素层：说话态 */
-  --s-voice-accent: #9b8fbb; /* 语音元素层：点缀紫（图形专用） */
-  --s-bg: #f0f9ff; /* 页面底 */
-  --s-bg-2: #e8f2f8; /* 分区底/轨道 */
+  /* 深蓝渐变焦点卡（每屏 ≤1；与浅底形成最大对比） */
+  --s-dark-1: #1d4ed8;
+  --s-dark-2: #172554;
+  --s-bg: #edf5fe; /* 页面底（比上版深一档，白卡不丢边界） */
+  --s-bg-2: #e8f2f8; /* 控件轨道/分区底 */
   --s-card: #ffffff;
-  --s-text: #0c4a6e; /* 主墨（白底 ≥7:1） */
-  --s-text-2: #475569;
-  --s-text-3: #94a3b8;
-  --s-border: #dceffb;
+  --s-card-border: #dceffb;
+  --s-text: #0f2a45; /* 主墨（深藏蓝偏黑，白底 ≥8:1） */
+  --s-text-2: #5b6b7e; /* 次级文字（≥4.5:1） */
+  --s-text-3: #8fa3b5; /* 弱化文字（仅非关键/注释） */
 
-  /* ---- 圆角（宁大勿小） ---- */
+  /* ---- 圆角 ---- */
   --s-r-card: 20px;
   --s-r-inner: 14px;
   --s-r-chip: 10px;
   --s-r-pill: 999px;
 
-  /* ---- 阴影（仅两档） ---- */
-  --s-shadow-card:
-    0 2px 10px rgba(12, 74, 110, 0.06),
-    0 8px 28px rgba(12, 74, 110, 0.08);
-  --s-shadow-float: 0 12px 32px rgba(12, 74, 110, 0.14);
+  /* ---- 阴影（仅两档，低透明度大模糊） ---- */
+  --s-shadow-card: 0 2px 10px rgba(15, 42, 69, 0.06), 0 8px 28px rgba(15, 42, 69, 0.08);
+  --s-shadow-float: 0 12px 32px rgba(15, 42, 69, 0.14);
 
-  /* ---- 字体（Display/正文；中文回退） ---- */
-  --s-font-display: 'Varela Round', 'Nunito Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  --s-font: 'Nunito Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  /* ---- 字体（唯一族：Plus Jakarta Sans） ---- */
+  --s-font: 'Plus Jakarta Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 
-  /* ---- 时长（分层：press/micro/standard/spring） ---- */
+  /* ---- 时长（press/micro/standard/spring） ---- */
   --s-t-press: 60ms;
   --s-t-micro: 150ms;
   --s-t-standard: 220ms;
   --s-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --s-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 拉丁大字收紧（仅用于英文/数字/品牌字标；中文标题勿用） */
+.s-lat {
+  letter-spacing: -0.02em;
+}
+
+.s-lat--tight {
+  letter-spacing: -0.03em;
 }
 
 /* ============================================================
@@ -89,69 +97,64 @@
 }
 
 /* ============================================================
- * 字级（同屏 ≤4 档；行高 ≥1.6；呼吸感）
+ * 字级（6 档锁死 12/14/16/20/24/32；每屏 ≤4 档；16=正文基准）
+ * 中文标题 lh 1.25 / ls 0；拉丁标题用 .s-lat 收紧
  * ============================================================ */
 .s-display {
-  font-family: var(--s-font-display);
-  font-size: 28px;
-  line-height: 1.2;
-  font-weight: 400;
+  /* 32px：全 app 唯一 display 档（登录品牌/hero 大数字） */
+  font-family: var(--s-font);
+  font-size: 32px;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .s-h1 {
-  font-family: var(--s-font-display);
   font-size: 24px;
-  line-height: 1.3;
-  font-weight: 400;
+  line-height: 1.25;
+  font-weight: 700;
 }
 
 .s-h2 {
-  font-family: var(--s-font-display);
   font-size: 20px;
-  line-height: 1.35;
-  font-weight: 400;
+  line-height: 1.25;
+  font-weight: 700;
 }
 
 .s-h3 {
-  font-size: 17px;
-  line-height: 1.45;
+  font-size: 16px;
+  line-height: 1.3;
   font-weight: 700;
 }
 
 .s-body {
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.6;
 }
 
 .s-caption {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--s-text-2);
+  font-weight: 500;
 }
 
 .s-note {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.6;
   color: var(--s-text-3);
   max-width: 34ch;
 }
 
-.s-stat {
-  font-family: var(--s-font-display);
-  font-size: 32px;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-}
-
 .s-metric {
-  font-family: var(--s-font-display);
-  font-size: 22px;
+  font-size: 24px;
   line-height: 1.2;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 /* ============================================================
- * 按钮（三态齐全：default / press 60ms / disabled）
+ * 按钮（默认/hover 按压/disabled 四态；宽=2×高 比例）
  * ============================================================ */
 .s-btn {
   display: inline-flex;
@@ -159,10 +162,10 @@
   justify-content: center;
   gap: 8px;
   min-height: 52px;
-  padding: 0 24px;
+  padding: 0 26px;
   border: none;
   border-radius: var(--s-r-pill);
-  font: 700 16px var(--s-font);
+  font: 600 16px var(--s-font);
   cursor: pointer;
   text-decoration: none;
   user-select: none;
@@ -189,6 +192,16 @@
   box-shadow: 0 2px 8px rgba(14, 165, 233, 0.24);
 }
 
+/* 深色焦点卡 CTA：白实心（深底最高对比；不蓝叠蓝） */
+.s-btn--white {
+  background: #fff;
+  color: var(--s-dark-2);
+}
+
+.s-btn--white:active {
+  transform: scale(0.97);
+}
+
 .s-btn--soft {
   background: var(--s-primary-soft);
   color: var(--s-primary-deep);
@@ -196,7 +209,7 @@
 
 .s-btn--soft:active {
   transform: scale(0.97);
-  background: #d3edfb;
+  background: #c4e8fb;
 }
 
 .s-btn--danger-soft {
@@ -221,7 +234,7 @@
   box-shadow: none;
 }
 
-/* 加载 spinner（>300ms 必出） */
+/* 加载 spinner */
 .s-spinner {
   width: 20px;
   height: 20px;
@@ -237,14 +250,13 @@
   }
 }
 
-/* 成功反馈（主 CTA 200ms 内切绿勾） */
 .s-btn--ok {
   background: var(--s-success-deep);
   box-shadow: 0 6px 16px rgba(21, 128, 61, 0.28);
 }
 
 /* ============================================================
- * 芯片（次级操作：选中/填充/轻度动作；120ms 反馈）
+ * 芯片（次级操作：120ms 反馈）
  * ============================================================ */
 .s-chip {
   display: inline-flex;
@@ -264,7 +276,7 @@
 }
 
 .s-chip:hover {
-  background: #d3edfb;
+  background: #c4e8fb;
 }
 
 .s-chip:active {
@@ -272,21 +284,17 @@
 }
 
 /* ============================================================
- * 卡片
+ * 卡片（白卡带 1px 淡描边，浅蓝底上不丢边界）
  * ============================================================ */
 .s-card {
   background: var(--s-card);
+  border: 1px solid var(--s-card-border);
   border-radius: var(--s-r-card);
   box-shadow: var(--s-shadow-card);
 }
 
-.s-card--soft {
-  background: var(--s-primary-soft);
-  box-shadow: none;
-}
-
 /* ============================================================
- * 底部 Tab 栏（悬浮胶囊；4 项 + 中央主按钮；safe-area）
+ * 底部 Tab 栏（悬浮白胶囊；4 项 + 中央主按钮；safe-area）
  * ============================================================ */
 .s-tabbar {
   position: fixed;
@@ -296,11 +304,12 @@
   z-index: 50;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   width: min(calc(100vw - 32px), 448px);
   padding: 8px;
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.97);
   backdrop-filter: blur(12px);
+  border: 1px solid var(--s-card-border);
   border-radius: 26px;
   box-shadow: var(--s-shadow-float);
 }
@@ -311,7 +320,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
   min-height: 56px;
   border-radius: 18px;
   color: var(--s-text-3);
@@ -339,7 +348,6 @@
   transform: scale(0.95);
 }
 
-/* 中央主按钮（开始新会话）：spring 弹起 */
 .s-tab--main {
   flex: 0 0 56px;
   width: 56px;
@@ -366,14 +374,14 @@
 }
 
 /* ============================================================
- * 首页组件
+ * 首页组件（v3.1）
  * ============================================================ */
 .s-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .s-avatar {
@@ -386,10 +394,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 700 18px var(--s-font-display);
+  font: 700 18px var(--s-font);
 }
 
-/* 打卡徽章：黄色 = 激励（全屏唯一黄色） */
+/* 打卡徽章：黄 = 激励（全屏唯一黄色元素） */
 .s-streak {
   display: inline-flex;
   align-items: center;
@@ -402,27 +410,40 @@
   margin-bottom: 16px;
 }
 
-/* 今日任务卡：primary-soft 底 = 今日行动焦点 */
+/* ---- 深蓝渐变焦点卡（唯一记忆点；白 CTA；装饰声波） ---- */
 .s-plan {
-  display: flex;
-  gap: 14px;
-  align-items: center;
+  position: relative;
   padding: 20px;
-  margin-bottom: 16px;
-  background: var(--s-primary-soft);
+  margin-bottom: 24px;
   border-radius: var(--s-r-card);
+  background: linear-gradient(180deg, var(--s-dark-1) 0%, var(--s-dark-2) 100%);
+  color: #fff;
+  overflow: hidden;
 }
 
-.s-plan__body {
-  flex: 1;
-  min-width: 0;
+.s-plan__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: var(--s-r-pill);
+  background: rgba(255, 255, 255, 0.18);
+  color: #eef4ff;
+  font: 700 12px var(--s-font);
+}
+
+.s-plan__title {
+  margin-top: 8px;
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 700;
 }
 
 .s-plan__steps {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin: 10px 0 16px;
+  margin: 12px 0 20px;
 }
 
 .s-plan__step {
@@ -431,11 +452,11 @@
   gap: 8px;
   font-size: 14px;
   line-height: 1.5;
-  color: var(--s-text);
+  color: rgba(255, 255, 255, 0.86);
 }
 
 .s-plan__step.is-done {
-  color: var(--s-text-3);
+  color: rgba(255, 255, 255, 0.5);
   text-decoration: line-through;
 }
 
@@ -444,23 +465,29 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--s-border);
+  background: rgba(255, 255, 255, 0.35);
 }
 
 .s-plan__dot.is-done {
   background: var(--s-success);
 }
 
-/* 统计卡：3 列，颜色即语义（成绩绿 / 激励黄 / 常规墨） */
+/* 装饰性声波（右下沉底，弱存在，不抢文字） */
+.s-plan__wave {
+  position: absolute;
+  right: -12px;
+  bottom: -16px;
+  color: rgba(255, 255, 255, 0.14);
+  pointer-events: none;
+}
+
+/* ---- 统计卡（白卡次级：12 灰标签 / 24 粗数字；颜色=语义） ---- */
 .s-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  padding: 18px 16px;
-  margin-bottom: 20px;
-}
-
-.s-stat-cell {
+  padding: 16px;
+  margin-bottom: 24px;
   text-align: center;
 }
 
@@ -469,12 +496,13 @@
   line-height: 1.4;
   color: var(--s-text-2);
   margin-bottom: 4px;
+  font-weight: 500;
 }
 
 .s-stat-value {
-  font-family: var(--s-font-display);
-  font-size: 22px;
+  font-size: 24px;
   line-height: 1.2;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--s-text);
   display: inline-flex;
@@ -490,27 +518,27 @@
   color: #b45309;
 }
 
-/* 分段控件：56px 白胶囊轨道，选中滑块 translateX（不重排） */
+/* ---- 分段控件：灰轨 + 白色浮起 pill（材质派）+ 选中加粗（双信号） ---- */
 .s-segment {
   position: relative;
   display: flex;
   height: 56px;
   padding: 4px;
   border-radius: var(--s-r-pill);
-  background: var(--s-card);
-  box-shadow: var(--s-shadow-card);
+  background: var(--s-bg-2);
+  border: 1px solid var(--s-card-border);
   margin-bottom: 24px;
 }
 
 .s-segment__thumb {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  width: calc((100% - 8px) / 3);
-  height: calc(100% - 8px);
+  top: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / 3);
+  height: calc(100% - 6px);
   border-radius: var(--s-r-pill);
-  background: var(--s-primary);
-  box-shadow: 0 4px 10px rgba(14, 165, 233, 0.3);
+  background: var(--s-card);
+  box-shadow: 0 2px 8px rgba(15, 42, 69, 0.12);
   transition: transform var(--s-t-standard) var(--s-ease-out);
 }
 
@@ -525,17 +553,18 @@
   border: none;
   background: transparent;
   color: var(--s-text-2);
-  font: 700 14px var(--s-font);
+  font: 500 14px var(--s-font);
   cursor: pointer;
   border-radius: var(--s-r-pill);
   transition: color var(--s-t-micro) var(--s-ease-out);
 }
 
 .s-segment__btn.active {
-  color: #fff;
+  color: var(--s-text);
+  font-weight: 700;
 }
 
-/* 列表行：≥72px 高（44pt 触控 + 8dp）；按压 60ms + 底色切换 */
+/* ---- 列表行（中性图标块；数值列文字级蓝；≥72px=44pt 触控+8dp） ---- */
 .s-row {
   display: flex;
   align-items: center;
@@ -544,6 +573,7 @@
   padding: 12px 14px;
   border-radius: var(--s-r-inner);
   background: var(--s-card);
+  border: 1px solid var(--s-card-border);
   box-shadow: var(--s-shadow-card);
   text-decoration: none;
   color: var(--s-text);
@@ -552,12 +582,6 @@
     transform var(--s-t-press) var(--s-ease-out),
     background-color var(--s-t-press) var(--s-ease-out),
     box-shadow var(--s-t-press) var(--s-ease-out);
-}
-
-.s-row:hover {
-  box-shadow:
-    0 4px 14px rgba(12, 74, 110, 0.1),
-    0 10px 32px rgba(12, 74, 110, 0.1);
 }
 
 .s-row:active {
@@ -578,7 +602,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  background: var(--s-bg-2);
+  color: var(--s-text-2);
 }
 
 .s-row__main {
@@ -588,9 +613,9 @@
 
 .s-row__title {
   display: block;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.4;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--s-text);
   white-space: nowrap;
   overflow: hidden;
@@ -617,8 +642,9 @@
 }
 
 .s-row__value {
-  font-family: var(--s-font-display);
-  font-size: 17px;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--s-primary-deep);
 }
@@ -627,7 +653,7 @@
   color: var(--s-text);
 }
 
-/* 徽章：只表状态，不重复数值 */
+/* 徽章：只表状态（success/star/neutral），不重复数值 */
 .s-badge {
   display: inline-flex;
   align-items: center;
@@ -651,13 +677,8 @@
   color: var(--s-text-2);
 }
 
-/* 区块标题/间隔 */
 .s-section {
-  margin: 4px 0 12px;
-}
-
-.s-gap {
-  height: 28px;
+  margin: 4px 0 8px;
 }
 
 /* 空状态 */
@@ -691,7 +712,7 @@
 }
 
 /* ============================================================
- * 登录页（移动优先 · 极简：无卡片、少文字、无装饰动画）
+ * 登录页（极简：大图形焦点 = 设计语言；无卡片、无文字堆砌）
  * ============================================================ */
 .s-login {
   position: relative;
@@ -700,77 +721,89 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0;
   padding: 40px 24px 64px;
   background:
-    radial-gradient(120% 70% at 18% 0%, #e0f2fe 0%, transparent 60%),
+    radial-gradient(120% 70% at 18% 0%, #d6effc 0%, transparent 60%),
     radial-gradient(110% 80% at 85% 100%, #dceffb 0%, transparent 55%),
     linear-gradient(170deg, var(--s-bg) 0%, var(--s-bg-2) 60%, #dceffb 100%);
   overflow: hidden;
 }
 
-/* 品牌区：居中波形标 + 字标 + 一行短标语 */
+/* 品牌焦点：声波大图形（唯一高饱和元素 = 记忆点/设计语言） */
 .s-login__hero {
   text-align: center;
-  margin-bottom: 36px;
+  margin-bottom: 24px;
+}
+
+.s-login__wave {
+  display: inline-flex;
+  width: 160px;
+  height: 160px;
+  align-items: center;
+  justify-content: center;
+  color: var(--s-primary);
+  filter: drop-shadow(0 12px 28px rgba(14, 165, 233, 0.3));
 }
 
 .s-login__name {
-  font-family: var(--s-font-display);
-  font-size: 30px;
+  margin-top: 12px;
+  font-family: var(--s-font);
+  font-size: 24px;
   line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.03em;
   color: var(--s-text);
-  margin: 14px 0 0;
 }
 
 .s-login__tag {
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 14px;
   line-height: 1.5;
   color: var(--s-text-2);
+  font-weight: 500;
 }
 
-.s-login__logo {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto;
-  border-radius: 24px;
-  background: var(--s-primary);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 12px 28px rgba(14, 165, 233, 0.35);
-}
-
-/* 表单：药丸输入框 + 主按钮（无卡片、无字段标签） */
+/* 表单：药丸输入框（16px 组内 → 32px 到按钮） */
 .s-login__form {
   width: min(100%, 340px);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
-.s-input.s-input--pill {
+.s-input {
+  width: 100%;
   height: 54px;
+  padding: 0 16px;
+  border: 1.5px solid transparent;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.92);
-  border-color: transparent;
-  box-shadow: 0 2px 10px rgba(12, 74, 110, 0.06);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--s-text);
+  font: 500 16px var(--s-font);
   text-align: center;
+  box-shadow: 0 2px 10px rgba(15, 42, 69, 0.06);
+  transition:
+    border-color var(--s-t-micro) var(--s-ease-out),
+    box-shadow var(--s-t-micro) var(--s-ease-out);
 }
 
-.s-input--pill:focus {
+.s-input::placeholder {
+  color: var(--s-text-3);
+}
+
+.s-input:focus {
+  outline: none;
   border-color: var(--s-primary);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.15);
 }
 
 .s-login__submit {
-  margin-top: 8px;
+  margin-top: 16px;
 }
 
-/* 演示账号：单行次级入口（团队联调用，不占视觉） */
+/* 演示账号：单行弱化入口 */
 .s-login__demo {
-  margin-top: 20px;
+  margin-top: 24px;
   min-height: 44px;
   padding: 0 16px;
   border: none;
@@ -790,7 +823,7 @@
   transform: scale(0.97);
 }
 
-/* 错误提示（aria-live）：内联，不打断输入 */
+/* 错误提示（aria-live） */
 .s-error {
   display: flex;
   align-items: center;
@@ -800,28 +833,45 @@
   font: 600 13px var(--s-font);
 }
 
-.s-input {
-  width: 100%;
-  height: 52px;
-  padding: 0 16px;
-  border: 1.5px solid var(--s-border);
-  border-radius: var(--s-r-inner);
-  background: var(--s-card);
-  color: var(--s-text);
-  font: 400 16px var(--s-font);
-  transition:
-    border-color var(--s-t-micro) var(--s-ease-out),
-    box-shadow var(--s-t-micro) var(--s-ease-out);
+/* 图标尺寸（unplugin-icons 组件默认 1em，由容器 font-size 或以下规则定尺寸） */
+.s-tab svg {
+  width: 22px;
+  height: 22px;
 }
 
-.s-input::placeholder {
-  color: var(--s-text-3);
+.s-tab--main svg {
+  width: 26px;
+  height: 26px;
 }
 
-.s-input:focus {
-  outline: none;
-  border-color: var(--s-primary);
-  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.15);
+.s-segment__btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.s-streak svg {
+  width: 16px;
+  height: 16px;
+}
+
+.s-row__icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.s-plan__wave svg {
+  width: 120px;
+  height: 120px;
+}
+
+.s-login__wave svg {
+  width: 160px;
+  height: 160px;
+}
+
+.s-empty__icon svg {
+  width: 30px;
+  height: 30px;
 }
 
 /* ============================================================
