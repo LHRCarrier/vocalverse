@@ -3,6 +3,15 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 app 端 UI v3.3（uiverse @0xnihilism 语言 · soft-brutalism）
+
+- 触发：组长连续两版判「low」，指出参考 uiverse.io/0xnihilism（全部效果开源）；Playwright 真浏览器抓取（Cloudflare 403 → 有头模式过验证）得该作者 15 个元素（卡片×7/按钮×4/输入×3/加载×1，源码存 `local/uiverse/*.md`）；
+- 风格画像：**硬偏移阴影（4px 4px 0 实色）+ 厚描边（3px）+ 扫光 + 按压下沉 + 微旋转**——此前 v3.1/v3.2 的柔和蓝系被批"太安全/模板化"的根因；
+- **v3.3 落地（soft-brutalism = 0xnihilism 腔调 + 大众友好度）**：白卡/统计/列表/分段/Tab 栏全部厚深墨描边 + 硬偏移阴影；主按钮 hover 扫光（::after translateX，只动 transform）+ active 下沉 3px；焦点卡白色 3px 厚边 + 6px 硬阴影 + hover -0.6° 微旋转；输入 3px 厚边 + 3px 硬阴影；徽章/头像/打卡黄 pill 同步硬边化；插画（ArtWave/ArtCalendar）保留；底层规则（单字体 PJS/6 档字级/8-16-24-32 间距/语义色/灰轨白 pill/触控 48dp/reduced-motion 降级）不变；
+- 验证：门禁 lint/typecheck/vitest 19/build 全绿；Playwright 390×844 截图两张（`local/ui-check/soft-{login,home}.png`）；文档 MASTER/pages/docs31 同步 v3.3（仅借模式不拷代码，元素许可以 uiverse 页面为准，入库代码为自研）。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
 ## 2026-09-08 app 端 UI v3.1（对抗评审定稿版：首页 + 登录样板重做）
 
 - 触发：组长对 v1/v2 连续否决（花哨/文字多/无记忆点/留白垃圾/排版乱），给出 5 条硬要求 + 参考（B 站《10分钟讲解所有UI/UX概念》文字稿 + 13 张带注释参考图 `实训项目作业/project/.trae/skills/ui-concept-design/references/`）；并派子代理对我 v3 方案做美学攻击（10 条质疑全部采纳）；
