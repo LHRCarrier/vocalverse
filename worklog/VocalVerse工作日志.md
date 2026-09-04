@@ -46,6 +46,170 @@
 
 —— 执行人：LHRCarrier
 
+## 2026-09-04 方式 B 三连排障 · 代码改动全过程记录（diff 级，供审 PR 回溯）
+
+> 本日方式 B 联调连续三个故障（①Java 启动退出码 1 ②Python ASR 500 ③评分恒 90/86），修复涉及 **4 个仓库文件 + 2 个 BUG 实测归档**。本篇按「动机 → 方案取舍 → 最终 diff → 验证」完整记录每一步（三个故障的复现/根因见各自 BUG 实测文档，此处不再重复）。**09-04 深夜复审整改：容器布局 P0 + 「compose 注入 HF 三件套」失实表述更正，详见文末记录。**
+
+### 一、改动总览（均已提交本 PR；容器布局防护为复审后追加修复）
+
+| 文件 | 类型 | 动机 |
+|---|---|---|
+| `services/python/app/main.py` | 代码（+13 行） | ②ASR 500：HF 缓存环境默认值 |
+| `scripts/dev-up.ps1` | 脚本（+7 行） | ②同上：一键起停显式注入同款变量 |
+| `README.md` | 文档（+2 FAQ 行、1 行注释修正） | ①②③的 FAQ 落位 + 过时迁移注释 |
+| `services/java/.env.example` | 文档/示例（±6 行） | ①残留占位值对齐 + 方式 A/B 说明 |
+| `worklog/BUG实测/方式B-Java启动-DB密码失配.md` | 新增归档 | ①完整实测记录 |
+| `worklog/BUG实测/方式B-Python-ASR-HF缓存失配.md` | 新增归档 | ②完整实测记录 |
+
+另有 3 处 **gitignored 本地状态**（根 `.env`、`services/python/.env`、postgres 库密码），见第三节，不入库。
+
+### 二、逐文件改动过程
+
+#### 1. `services/python/app/main.py`（③前置修复，①②后置预防）
+
+- **动机**：`score_item` 里 `asr.transcribe()` 是唯一无 fail-open 的环节，whisper 模型加载失败（hf_hub 1.29 走同步 httpx 联网 → huggingface 被墙 → `LocalEntryNotFoundError`）直接 500。
+- **方案取舍**（三选一）：
+  - 只写文档让用户手动设 `HF_HOME` → 记不住、每次联调必踩（本次就是踩了这个坑）；
+  - 只改 `dev-up.ps1` → 只覆盖一键路径，IDE/裸 `uv run uvicorn` 仍会炸；
+  - **进程入口 `os.environ.setdefault`（采纳）** → 覆盖一切启动方式，且 `setdefault` 尊重用户进程已显式设置的环境变量（不抢权）；
+- **细节**：
+  - 位置放在 `logger` 初始化前、任何 `huggingface_hub`/`faster_whisper` 导入之前（hf_hub 在首次 `WhisperModel()` 时按 `os.environ` 定缓存路径，必须在那一刻之前生效）；仓库内 `faster_whisper` 仅在 `app/audio/asr.py` 函数内延迟导入，路由导入不触发，顺序成立；
+  - `_repo_root = Path(__file__).resolve().parents[3]`：`app/main.py` → parents[0]=app、[1]=services/python、[2]=services、[3]=仓库根，未硬编码绝对路径，团队其他机器克隆后自动成立；**复审修正（09-04 深夜）**：该写法在容器布局（Dockerfile `WORKDIR /app` + `COPY . .` → `/app/app/main.py`，parents 只有 3 级）越界抛 `IndexError` → 容器导入即崩（方式 A 全栈不可用），已改为 `try/except IndexError` 布局感知——本地布局注入 `HF_HOME`/`HF_HUB_OFFLINE`；容器布局不注入（维持 HF 默认缓存路径 = docs/06 §8 hf-cache 卷约定，不破坏首次下载流程），仅 `HF_HUB_DISABLE_XET=1`（docs/18：xet 401 绕过）；
+  - 三变量口径改为：**方式 B 本地 = 仓库 `data/models` + offline=1**；**容器 = `hf-cache:/root/.cache/huggingface` 卷 + 默认路径（compose 当前未注入任何 HF_* 变量、未挂载 data/models——K03 未闭合，另立整改）**。早前版本写「与容器 compose 同约定（挂载 ./data/models）」经复审确认与仓库事实不符，全仓已更正；
+  - setdefault 尊重显式覆盖；
+- **不改的**：未把 HF 变量加进 pydantic Settings——它们不是业务配置而是 hf_hub 的系统环境变量语义，塞进 Settings 反而造成「两个真源」。
+
+最终 diff（复审整改后）：
+
+```python
+# HF 缓存约定（docs/06 §8：huggingface 被墙，一律本地缓存）：方式 B 本地默认走仓库
+# data/models（宿主预下载的 HF 缓存结构）+ offline=1；容器（/app/app/main.py）无「仓库根」，
+# 不注入 HF_HOME/HF_HUB_OFFLINE（维持 HF 默认缓存路径 = hf-cache 卷约定，docs/06 §8；compose
+# 未注入 HF 变量为 K03 未闭合项，另立整改）。必须在任何 huggingface_hub / faster_whisper 导入
+# 之前生效；用户进程已显式设置时尊重之 (setdefault)。未设时首次 ASR 会尝试连 huggingface.co
+# → SSL/连接失败 → items/audio 500（2026-09-04 实测）。
+try:
+    _repo_root = Path(__file__).resolve().parents[3]
+except IndexError:
+    _repo_root = None  # 容器布局（WORKDIR /app）：无第四级父目录，跳过本地缓存注入
+if _repo_root is not None:
+    os.environ.setdefault("HF_HOME", str(_repo_root / "data" / "models"))
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+```
+
+#### 2. `scripts/dev-up.ps1`
+
+- **动机**：方式 B 一键路径**显式注入**同款变量——入口 setdefault 是「兜底默认」，脚本显式设置是「可审计的启动契约」；两者同值，无冲突；脚本负责日志落盘（`local/dev-logs/`），显式变量让排查者一眼看到 HF 约定在生效。**复审修正**：改为仅在用户未显式设置时注入（`if (-not $env:HF_HOME)`，与 main.py `setdefault` 语义一致，尊重用户覆盖）。
+- **位置**：`$Root/$LogDir` 初始化之后、`Get-PortPid` 之前（进程启动前完成注入，`Start-Process` 子进程继承）。
+- **diff（+7 行）**：
+
+```powershell
+# HF 缓存约定（docs/06 §8 · 方式 B 本地，2026-09-04 修复）：
+# huggingface 被墙 → 一律走仓库 data/models 本地缓存（宿主预下载 faster-whisper-small）。
+# 不设则首次 ASR 尝试联网下载 → 连接/SSL 失败 → /placement/items/*/audio 500。
+# 用户已显式设置时尊重之（与 main.py setdefault 同语义）。
+if (-not $env:HF_HOME) { $env:HF_HOME = Join-Path $Root "data\models" }
+if (-not $env:HF_HUB_OFFLINE) { $env:HF_HUB_OFFLINE = "1" }
+if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
+```
+
+#### 3. `README.md`（4 处）
+
+| 位置 | 改前 → 改后 | 动机 |
+|---|---|---|
+| 方式 B §3 Python 步骤 | `# 建表（schema 真源=Alembic；M2 迁移 0001+0002）` → `# 建表（schema 真源=Alembic；合并后需升到最新 revision）` | 仓库已有 0003~0005，旧注释误导「只要 0001+0002」（首轮「迁移做了没」误判即源于此） |
+| FAQ（`mvn spring-boot:run` 行后） | **新增**：`启动日志含 FATAL: password authentication failed ... 退出码 1` → 指向 DB 密码失配三处同步 + BUG 实测归档 | ①的报错与「漏起依赖」症状不同，原 FAQ 行覆盖不到 |
+| FAQ（「语音接口返回固定文本」行后） | **新增**：`本地 ASR 500 / LocalEntryNotFoundError / httpx 连接错误` → HF_HOME 指向 data/models + 归档 | ②的报错特征独立成行（含同步栈识别线索 httpcore `_sync`） |
+| — | FAQ 引用的 BUG 实测文件名 | 两处引用分别写 `worklog/BUG实测/2026-09-04-...` 与 `worklog/BUG实测/方式B-Python-...`，命名风格不统一，已统一为不带日期（与既有 `asr词级时间戳空.md` 等一致） |
+
+#### 4. `services/java/.env.example`（±6 行）
+
+- **动机**：①的残留——该文件仍带旧占位符 `DB_PASSWORD=change-me-db-password`、`JWT_SECRET=change-me-please-use-64-char-random`（09-01 的「三处默认值对齐」漏了这一处），且头注释只说「compose 下由根 .env 注入」，未说明方式 B 手动导出路径。
+- **diff**：头注释改写为「方式 B 按需导出（给出 `$env:` 示例）／方式 A 由 compose 注入、本文件不参与／密码三处同步」，两个值改为 `vocalverse-dev` 与 `vocalverse-dev-jwt-secret-0123456789abcdef`（与 `application.yml` 默认、compose 回退值一致）。
+- **注意**：Git 提示本文件工作区 LF→CRLF 转换（仓库 `.gitattributes` 强制 LF）——提交时以 Git 规范为准即可，**不要在提交前手动转 CRLF**。
+
+#### 5. 新增 BUG 实测归档（2 篇）
+
+- `worklog/BUG实测/方式B-Java启动-DB密码失配.md`：①复现/根因/修复/验证/踩坑 5 条（Dialect 表象、同步口径含 Java、根 .env 是 GBK 编码、POSTGRES_PASSWORD 仅初始化生效、PG 排查三步）。
+- `worklog/BUG实测/方式B-Python-ASR-HF缓存失配.md`：②复现/根因/修复/验证/踩坑 5 条（httpx 栈分同步/异步、报错文案反查 site-packages、预热吞异常、容器/本地环境契约缺口应落代码默认值、ASR 无 fail-open）。**复审整改**：文中「容器由 compose 注入 HF 三件套（挂载 ./data/models）」等表述与事实不符，已更正为「容器 = hf-cache 卷 + 默认路径（compose 未注入，K03 未闭合）」。
+
+### 三、本地（gitignored）状态变更（不入库，仅本机）
+
+| 对象 | 变更 | 手法 |
+|---|---|---|
+| 根 `.env`（GBK 编码，保留原编码） | `POSTGRES_PASSWORD`→`vocalverse-dev`；`JWT_SECRET`→`vocalverse-dev-jwt-secret-0123456789abcdef` | 936 解码→替换→写回；与备份 diff 仅 2 行，注释完好 |
+| `services/python/.env`（UTF-8） | `APP_DATABASE_URL` 密码→`vocalverse-dev` + 注释同步；四组密钥从根 .env 搬运（`APP_DEEPSEEK_API_KEY`/`APP_ISE_APP_ID`/`APP_ISE_API_KEY`/`APP_ISE_API_SECRET`） | edit/脚本，值未打印未入库 |
+| postgres 库 | `ALTER USER vocalverse PASSWORD 'vocalverse-dev'`（不丢数据） | docker exec + scram 实测新旧密码互斥 |
+
+### 四、验证与门禁
+
+| 门禁 | 结果 |
+|---|---|
+| `uv run ruff check app/main.py` + `format --check` | ✓ 全绿（E501 修正后复跑） |
+| `uv run pytest -q`（全量） | ✓ **265 passed**（17s；1 条无关 StarletteDeprecationWarning） |
+| Python 端到端（:8001 隔离实例，edge-tts 真实语音） | ✓ `code=0`：转写逐词正确；**真实评分** pron=100.0 / flu=98.08 / completeness=100.0 / gram=100（ISE+DeepSeek 连通；此前 Fake 恒 90/86） |
+| Java 端到端（`mvn spring-boot:run`） | ✓ `Started VocalverseApplication in 8.505s`；`/actuator/health`=UP；`/api/v1/ping` code=0 |
+| 容器布局模拟导入（复审整改后补验：`<tmp>/app/main.py` 两级深度，= `/app/app/main.py` 等价） | ✓ `import app.main` 成功（修复前 `IndexError: 3`） |
+| 清理 | ✓ 测试 attempts 已 DELETE；验证音频/日志文件已删；:8001 已停 |
+
+### 五、待办 / 未决
+
+1. **8000 现行进程未重启**（PID 21316，我方可读但无终止权限）：密钥/HF 变更需重启 uvicorn 生效，待成员在本人终端 `Ctrl+C` 后 `uv run uvicorn app.main:app --reload --port 8000`（或 `dev-up.ps1 stop; start`）。
+2. **提交拆分**（已执行，按仓库纪律代码/文档分开）：`fix(py): 方式B HF 缓存默认值…`（`app/main.py`）、`chore(dev): dev-up.ps1 显式注入 HF 三变量`、`docs: 方式B 排障归档与 FAQ…`（README + worklog 三处）、`chore(java): .env.example 占位值对齐约定…`；**09-04 深夜复审整改追加**：容器布局防护 + 失实表述全仓更正（见文末记录）。
+3. **FAQ 引用文件名风格**：已统一为不带头日期（与既有 `asr词级时间戳空.md` 等命名一致）；README 引用已改 `方式B-Java启动-DB密码失配.md`。
+4. **根 `.env` 编码**：本机为 GBK（用户历史）；后续编辑务必按原编码（936）读写，UTF-8 工具会毁中文注释（已在归档踩坑 3 记录）。
+5. **容器侧 HF 缓存未闭合（K03）**：compose 无 `hf-cache` 卷、无 `HF_*` 变量注入——容器内模型加载仍回退默认路径（无本地缓存时首次联网下载，被墙即 500）；建议后续独立 PR 补齐 compose（volume + XET 变量），本 PR 只保证不更坏、不误导。
+
+—— 执行人：Faust-sudo
+
+
+## 2026-09-04 入学测试评分恒为 90/86 → 密钥填错文件（根 .env vs services/python/.env）
+
+**现象**：密钥已填、三端重启后入学测试仍恒 发音90/流利86/语法—（Fake 桩常数；`stubs.py L43` 硬编码 `ScoreResult(pron=90.0, flu=86.0)`，`FakeLLM` 输出非 JSON → grammar fail-open None）。
+
+**根因**：方式 B 的 Python 进程读的是 **`services/python/.env`**（`config.py:17` `env_file=(".env", ".env.local")` 按 CWD 相对解析；启动约定 CWD=services/python），而密钥被填进了**根 `.env`**（那是 docker-compose/方式 A 注入用）→ `get_scorer_client`/`get_llm_client` 判空走 Fake。另外 `uvicorn --reload` **不监听 .env**——就算改对文件不重启也无效。
+
+**处置**：根 `.env` → `services/python/.env` 同步四键（APP_DEEPSEEK_API_KEY / APP_ISE_APP_ID / APP_ISE_API_KEY / APP_ISE_API_SECRET；全程脚本搬运、日志不打印值）；隔离实例 :8001 实测真实管线 ✓ `pron=100.0, flu=98.08, completeness=100.0, gram=100`（edge-tts 合成语音，ISE/DeepSeek 均连通）；测试 attempt 已清理。
+
+**教训**：① .env 按「哪个进程读它」分账——compose 读根 .env、方式 B 读 services/{py,java}/.env，填错位置 = 配置不生效且无任何日志；② `--reload` 只管 .py，.env 变更必须硬重启；③ 「恒定评分」先验桩/真（`FakeScorerClient` 常数即 90/86），再谈算法——README FAQ「语音接口返回固定文本」已写此约定。
+
+—— 执行人：Faust-sudo
+
+
+## 2026-09-04 入学测试录音 500 排障 · 方式 B 缺 HF 缓存约定（whisper 模型加载失败）
+
+**现象**：`POST /api/v1/placement/items/1/audio` → 500；uvicorn 日志出现 httpx **同步**客户端栈（`httpcore/_sync` + `default.py::HTTPTransport`）与截断文案「…local disk. Please check your internet connection and try again.」。
+
+**根因**：方式 B 本地 uvicorn 无 `HF_HOME`/`HF_HUB_OFFLINE` 注入（容器侧约定本为 `hf-cache:/root/.cache/huggingface` 命名卷承载默认缓存路径，docs/06 §8；但 **compose 当前未注入任何 HF_* 变量、也无 hf-cache 卷——K03 未闭合**，方式 B 更没有任何等价注入）→ `faster-whisper` 的模型在默认缓存（`%USERPROFILE%\.cache\huggingface`）里**没有**（只有 Qwen），而仓库 `data/models/hub` 里 **faster-whisper-small 完整存在** → huggingface_hub 1.29 试图联网下载 → huggingface.co 被墙（SSL `CERTIFICATE_VERIFY_FAILED`）→ `LocalEntryNotFoundError`（链出 httpx `ConnectError`）→ `score_item` 的 `asr.transcribe()` **无 try/except** → 500。与 DB/迁移/Java 无关；`_prewarm_asr` 预热失败只打 WARN 不阻塞，故服务照常启动、首请求才炸。
+
+**修复**（docs/06 §8 本地缓存约定）：
+1. `app/main.py`：进程入口 `os.environ.setdefault` `HF_HOME=<仓库>/data/models` + `HF_HUB_OFFLINE=1` + `HF_HUB_DISABLE_XET=1`（任何 hf 导入前生效；尊重显式覆盖；**复审整改**：容器布局自动跳过 `HF_HOME`/`HF_HUB_OFFLINE`——`parents[3]` 越界即视为容器布局，维持 hf-cache 卷默认路径，避免破坏容器首次下载流程）；
+2. `scripts/dev-up.ps1`：启动 Python 显式注入同款三变量（仅在未显式设置时，尊重用户覆盖）；
+3. `README.md` FAQ 新增该场景行，§3 迁移注释改为「升到最新 revision」。
+
+**验证**（无 HF 环境变量冷起 :8001 隔离实例）：readyz OK → edge-tts 合成语音提交 → `code=0`，转写逐词正确、pron 90/flu 86/wpm 203.7；测试 attempt 已清理。复审后补：容器布局模拟导入 ✓（修复前 IndexError: 3）。详见 `worklog/BUG实测/方式B-Python-ASR-HF缓存失配.md`（踩坑 5 条：httpx 栈分同步/异步定位第三方库、报错文案反查 site-packages、预热吞异常、容器/本地环境变量契约缺口应落代码默认值、ASR 无 fail-open）。
+
+—— 执行人：Faust-sudo
+
+
+## 2026-09-04 方式 B（`mvn spring-boot:run`）Java 启动失败排障 · 三端 DB 密码对齐
+
+**现象**：`Process terminated with exit code: 1`，`-e` 可见 `FATAL: password authentication failed for user "vocalverse"`；Hibernate 届时只抛表象 `Unable to determine Dialect without JDBC metadata`（SQL 异常是 WARN 级）。
+
+**根因**：本机 postgres 容器 09-01 用根 `.env` 的 **`change-me-db-password`**（旧 `.env.example` 占位符）初始化；`services/python/.env` 已同步为同一值所以 Python 能连；唯独 Java 走 `application.yml` 默认 `vocalverse-dev`（shell 无 `DB_PASSWORD`）→ 建连被拒 → 启动即退。**与合并组长代码 / 迁移无关**：实测 `alembic_version=0005`（head）+ 26 表，已是最新；迁移缺失的症状是「启动成功、请求 500」，不是启动即退。
+
+**修复**（三端对齐仓库约定 `vocalverse-dev`，零数据丢失）：
+1. `ALTER USER vocalverse PASSWORD 'vocalverse-dev'`（scram 实测新旧密码互斥 ✓）；
+2. 根 `.env`：`POSTGRES_PASSWORD` 对齐；顺带 `JWT_SECRET` 占位符 `change-me-please-use-64-char-random` → `vocalverse-dev-jwt-secret-0123456789abcdef`（对齐 `.env.example` 与 Java `application.yml` 默认；compose 未注入 `JWT_SECRET`，Java 走默认值——显式一致可防未来 compose 注入时验签失配）；
+3. `services/python/.env`：`APP_DATABASE_URL` 密码同步 + 注释更新；
+4. `services/java/.env.example`：残留占位值对齐并补「方式 B 手动导出 / compose 注入」说明；
+5. README FAQ 增「`password authentication failed` + 退出码 1」独立行（与「漏起依赖」区分）。
+
+**验证**：`mvn spring-boot:run` → `Started VocalverseApplication in 8.505s`；`/actuator/health`=UP；`/api/v1/ping` code=0；DemoSeeder 就绪。详见 `worklog/BUG实测/方式B-Java启动-DB密码失配.md`（含踩坑 5 条：Dialect 表象、密码同步口径含 Java、根 .env 是 GBK 编码、`POSTGRES_PASSWORD` 仅初始化生效、PG 排查三步次序）。
+
+—— 执行人：Faust-sudo
+
 ## 2026-09-04 影子跟读联调台：录音完成 → 试听自己读的 → 确认提交/重录
 
 - 需求（组员复测反馈「方便测试」）：录完先听自己的跟读再提交，避免闭眼提交后才发现录歪；
