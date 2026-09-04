@@ -12,6 +12,9 @@ export interface PreviewPage {
 
 export const previewPages: PreviewPage[] = [
   { path: '/preview/home', label: '学习主页', group: '用户端', layout: 'user' },
+  { path: '/preview/uic-home', label: 'UIC 概念 · 学习主页', group: '用户端', layout: 'gallery' },
+  { path: '/preview/uic-speaking', label: 'UIC 概念 · 口语陪练', group: '用户端', layout: 'gallery' },
+  { path: '/preview/uic-singing', label: 'UIC 概念 · 唱歌评分报告', group: '用户端', layout: 'gallery' },
   { path: '/preview/agent-lab', label: 'Agent Lab · LLM 框架测试台', group: '用户端', layout: 'gallery' },
   {
     path: '/preview/fluency',
