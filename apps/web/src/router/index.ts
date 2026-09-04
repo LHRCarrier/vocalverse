@@ -9,11 +9,28 @@ import { previewRoute } from './preview'
  * 懒加载：图表/动效等重依赖在各自的页面 chunk 里（按页动态 import），不进首屏。
  */
 const routes: RouteRecordRaw[] = [
+  /* ---- 移动端真形态（App 主界面 · 原型 ui-concept-design/app）---- */
+  {
+    path: '/m/home',
+    component: () => import('@/views/mobile/MobileHomeView.vue'),
+    meta: { title: '今日学习', requiresAuth: true },
+  },
+  {
+    path: '/m/chat/:sceneId?',
+    component: () => import('@/views/mobile/MobileSpeakingView.vue'),
+    meta: { title: '场景对话', requiresAuth: true },
+  },
+  {
+    path: '/m/report',
+    component: () => import('@/views/mobile/MobileReportView.vue'),
+    meta: { title: '评分报告', requiresAuth: true },
+  },
+
   {
     path: '/',
     component: () => import('@/layouts/UserLayout.vue'),
     children: [
-      { path: '', redirect: '/demo' },
+      { path: '', redirect: '/m/home' },
       {
         path: 'demo',
         component: () => import('@/views/DemoView.vue'),

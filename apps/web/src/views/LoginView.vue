@@ -24,7 +24,7 @@ async function submit() {
   try {
     await auth.login(username.value.trim(), password.value)
     message.success(`欢迎回来！`)
-    router.push((router.currentRoute.value.query.redirect as string) ?? '/practice')
+    router.push((router.currentRoute.value.query.redirect as string) ?? '/m/home')
   } catch (e) {
     errorMsg.value = (e as Error).message
   } finally {
