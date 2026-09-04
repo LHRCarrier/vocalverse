@@ -1,21 +1,26 @@
-# Login Page Overrides（登录 · /login · v2 极简版）
+# Login Page Overrides（登录 · /login · v3.1 极简设计语言版）
 
 > **PROJECT:** VocalVerse — 本文件覆盖 MASTER.md 的页面级规则。
-> **设计意图（组长反馈 v2）**：登录页必须**极简、少文字、有设计感**——它是给用户看的，不是给团队看的；
-> 团队联调入口收为一键演示登录。无卡片、无装饰动画、无演示文案堆砌。
+> **设计意图（组长 v2→v3 反馈定稿）**：登录页要极简、少文字、有设计感、有记忆点——焦点必须是**设计语言**
+> （图形/尺寸/位置传达），不是文字；团队联调入口收为一键演示登录单行。无卡片、无装饰动画。
 
-## 布局
+## 布局（移动优先；桌面居中）
 
-- 全屏浅天蓝渐变底（CSS radial + linear 三层，静态无动画）；**无卡片、无波形装饰、无 logo 副文案堆砌**
-- 品牌区居中：72px 波形标（sky-blue 圆角 24 + 白色波形 SVG + 柔和投影）→ 字标 `VocalVerse`（Varela Round 30px）→ 一行短标语「说得好，唱得准」（14px）
-- 表单（无字段标签，宽度 min(100%, 340px) 居中）：两个**药丸输入框**（54px / 圆角 18 / 白底微投影 / 占位文案居中 / focus 蓝色描边）→ 全宽主按钮 54px 登录（loading spinner / 成功绿勾 200ms 后跳转）
-- 表单下方一行次级入口「演示账号登录」（13px 弱化文字，44px 触控高，点击即填充 demoadult + 自动提交）——**团队联调唯一入口，单行**
-- 错误提示：内联红字 + 图标（aria-live），不打断输入
+- 全屏浅蓝静态渐变（radial×2 + linear，无动画无波形装饰动画）；
+- **品牌焦点（唯一高饱和元素）**：**Phosphor 声波 duotone 160px**（`~icons/ph/wave-sine-duotone`，
+  品牌蓝 `#0EA5E9` + drop-shadow 柔光）——"Voice-First"记忆点，替代文字品牌区；
+- 字标 `VocalVerse` **24px / 800 / 行高 1.2 / letter-spacing -0.03em**（拉丁收紧规则）→ 一行副标题
+  「说得好，唱得准」14px 中灰（全屏文字只有：2 占位词 + 1 按钮词 + 1 行副题 + 1 行演示入口 ≈ <15 词）;
+- **表单组**（宽 min(100%,340px)，无卡片无字段标签）：药丸输入 ×2（54px / 圆角 18 / 白 94% 底 /
+  占位居中 16px / focus 蓝描边 + 4px 光圈）16px 内距 → **登录按钮**（52px 蓝实心胶囊）32px 距;
+- 单行「演示账号登录」（13px 中灰 / 44px 触控高 / 点击 = 填充 demoadult + 自动提交）;
+- 错误：内联红字 + 图标（aria-live），不打断输入。
 
 ## 无障碍
 
-- 输入框：placeholder + aria-label + autocomplete="username"/"current-password"（密码管理器/粘贴兼容），回车提交
-- 文本极少：品牌 6 字标语 + 2 个占位词 + 按钮词 ≈ 全屏 <15 个词
+- input：placeholder + aria-label + autocomplete="username"/"current-password"；允许粘贴；回车提交；
+- 按钮三态（loading spinner / 成功绿勾 200ms / 禁用降透明）；focus-visible 蓝描边；
+- 字标 24px 拉丁（-0.03em）为唯一 display 使用（32 档本轮保留给后续引导页 hero）。
 
 ## 后续（入门流程，样板阶段不实现）
 

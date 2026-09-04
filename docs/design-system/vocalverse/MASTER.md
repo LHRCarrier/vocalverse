@@ -1,86 +1,87 @@
-# VocalVerse 设计系统 MASTER（app 端 · Soft UI Evolution + Voice-First）
+# VocalVerse 设计系统 MASTER（app 端 · Soft UI Evolution + Voice-First · v3.1）
 
-> 生成工具：ui-ux-pro-max skill（`--design-system` 推理）输出已按项目拍板修正。
+> 生成工具：ui-ux-pro-max skill（`--design-system` 推理）+ 项目拍板修正 + 对抗评审定稿（docs/32 选型）。
 > 唯一真相源：`docs/31-移动端UI重设计（Soft UI Evolution）.md`（人类可读），本文件为分层检索用机器副本。
-> 页面覆盖：`pages/home.md`（今日首页）、`pages/login.md`（登录/入门）。构建页面时先读本文件，再读对应 page 文件（存在则其规则覆盖本文件）。
+> 页面覆盖：`pages/home.md`（今日首页 v3.1）、`pages/login.md`（登录 v3.1）。构建页面时先读本文件，再读对应 page 文件（存在则其规则覆盖本文件）。
 
 ## 定位
 
 大众英语学习产品（全年龄学习者在用：adult / teen / senior demo）的 AI 发音教练 app。
 **不是程序员工具、不是夜店风、不是少儿玩具**——亲切、可信、有温度；视觉本身要传递信息。
+v3.1 硬性修正：**单一字体**、**≤6 档字级**、**间距分组（16 贴 / 32 分）**、**每屏 1 个记忆点**、
+负字距/紧行高**仅用于拉丁大字**（中文 0 字距、行高 1.25）。
 
 ## 设计风格
 
-- **主体**：Soft UI Evolution——柔和双投影（柔而不糊）、大圆角、轻盈层次、克制用色
-- **元素层**：Voice-First Multimodal——语音波形可视化、聆听脉冲（listening pulse）、说话动画
-- **动效层**：Micro-interactions——50-100ms 按压反馈、成功/错误即时反馈、spring 主交互
+- **主体**：Soft UI Evolution——柔和双投影、大圆角、克制用色；白卡带 1px 淡描边（浅蓝底上边界清晰）
+- **元素层**：Voice-First Multimodal——声波可视化（焦点卡/登录大图形用 Phosphor duotone/fill）、聆听/说话态
+- **动效层**：Micro-interactions——60ms 按压、120-150ms 微动、spring 主交互；只动 transform/opacity
 
-## 色彩 Token（浅色模式；深色后续版本另行验证）
+## 色彩 Token（浅色模式；深色模式后续版本另行验证）
 
 | Role | Hex | 语义（UI 即信息） |
 |---|---|---|
-| `--s-primary` | `#0EA5E9` | 学习蓝：可点/进行中/专注状态（唯一"行动"色） |
-| `--s-primary-deep` | `#0284C7` | 按压态/文字级蓝（AA 对比度） |
-| `--s-primary-soft` | `#E0F2FE` | 浅蓝底：选中态/图标底/标签底 |
+| `--s-primary` | `#0EA5E9` | 品牌蓝：图形/按钮/大号粗体（**不做正文级文本**） |
+| `--s-primary-deep` | `#0284C7` | **文字级蓝**（AA ≥4.5:1）：数值/强调文本/选中态 |
+| `--s-primary-soft` | `#D6EFFC` | 浅蓝底：选中底/标签底/激活 pill |
 | `--s-secondary` | `#38BDF8` | hover/渐变辅色 |
-| `--s-accent` | `#FBBF24` | 微笑黄：打卡/激励/奖励（一律配深墨文字 `#0C4A6E`） |
-| `--s-success` | `#22C55E` | 成绩/完成/成功 |
-| `--s-success-deep` | `#15803D` | 文字级绿（AA） |
-| `--s-warning` | `#F59E0B` | 待提升/提示 |
-| `--s-error` | `#EF4444` | 错误/危险（`--s-error-deep #DC2626` 文字级） |
-| `--s-score` | `#FB923C` | 评分轨迹/图表强调 |
-| `--s-listening` | `#6B8FAF` | 语音元素层：聆听态（波形/脉冲） |
+| `--s-accent` | `#FBBF24` | 微笑黄：**仅星/火苗 glyph 与打卡徽章**（配深墨文字 `#7A4B00`） |
+| `--s-success` | `#22C55E` | 成绩/完成/成功（文字级 `--s-success-deep #15803D`） |
+| `--s-error` | `#EF4444` | 错误/危险（文字级 `#DC2626`） |
+| `--s-listening` | `#6B8FAF` | 语音元素层：聆听态 |
 | `--s-speaking` | `#22C55E` | 语音元素层：说话态 |
-| `--s-voice-accent` | `#9B8FBB` | 语音元素层：柔和点缀紫（图形专用） |
-| `--s-bg` | `#F0F9FF` | 页面底（浅天蓝调） |
-| `--s-bg-2` | `#E8F2F8` | 分区底/轨道 |
-| `--s-card` | `#FFFFFF` | 卡片 |
-| `--s-text` | `#0C4A6E` | 主墨（深藏蓝，白底 ≥7:1） |
-| `--s-text-2` | `#475569` | 次级文字 |
-| `--s-text-3` | `#94A3B8` | 弱化文字（仅非关键） |
-| `--s-border` | `#DCEFFB` | 分隔/描边（浅蓝灰） |
+| `--s-dark-1` / `--s-dark-2` | `#1D4ED8` / `#172554` | **深蓝渐变焦点卡**（每屏 ≤1；白 CTA；配 tint 徽章 `rgba(255,255,255,.18)` 白字） |
+| `--s-bg` | `#EDF5FE` | 页面底（浅蓝，白卡需描边定界） |
+| `--s-bg-2` | `#E8F2F8` | 控件轨道/分区底/中性图标块底 |
+| `--s-card` | `#FFFFFF` | 卡片（1px `--s-card-border #DCEFFB` 描边） |
+| `--s-text` | `#0F2A45` | 主墨（白底 ≥8:1） |
+| `--s-text-2` | `#5B6B7E` | 次级文字（≥4.5:1） |
+| `--s-text-3` | `#8FA3B5` | 弱化文字（仅非关键/注释；≥3:1） |
+
+**色彩纪律**：一蓝（行动）+ 红（报错）+ 绿（成功）+ 一颗黄星（激励）；橙删除；进度用蓝/中性灰；
+除深蓝焦点卡外，全屏 ≤3 种语义色；高饱和只给焦点与语义，其余中性。
 
 ## 圆角 / 阴影 / 间距
 
-- 圆角：card `20px` · inner `14px` · chip `10px` · pill `999px`（宁大勿小）
-- 阴影（仅两档）：`--s-shadow-card: 0 2px 10px rgba(12,74,110,.06), 0 8px 28px rgba(12,74,110,.08)`
-  `--s-shadow-float: 0 12px 32px rgba(12,74,110,.14)`（Tab 栏/浮层）
-- 间距：4/8/12/16/20/24/32/40（8px 节奏）；区块间距 28-32px；卡片内边距 20-24px
+- 圆角：card `20px` · inner `14px` · chip `10px` · pill `999px`
+- 阴影（仅两档）：`--s-shadow-card: 0 2px 10px rgba(15,42,69,.06), 0 8px 28px rgba(15,42,69,.08)`；
+  `--s-shadow-float: 0 12px 32px rgba(15,42,69,.14)`（Tab 栏/浮层/白 pill）
+- 间距 **4 档：8 / 16 / 24 / 32**：卡内标题-描述 8、卡内边距 16、卡片之间 24、大区块 32（删除 28/40）
+- 12 列网格只作内部对齐参考：图标列 / 标题列 / 数值列锁定列位，文本不得"不对齐任何一列"
 
-## 字体（呼吸感）
+## 字体（**单一字体**：Plus Jakarta Sans；中文回退 PingFang/雅黑）
 
-- Display：**Varela Round**（标题/数字，圆润友善）· Body：**Nunito Sans**（正文高可读）
-- 中文回退：PingFang SC / Microsoft YaHei；无外网时回退系统栈（不阻塞，演示机可离线）
-- 字级表：display 28/1.2 · h1 24/1.3 · h2 20/1.35 · h3 17 · body 16/1.6 · caption 13/1.5 ·
-  stat 32/1.1（数字带 tabular-nums）· metric 22（统计卡）
-- 行高 ≥1.6；段落 measure ≤34ch；标题与正文间距 ≥8px；同屏字级 ≤4 档
+- 全 app 仅此一个字体族（无外网时回退系统栈，不阻塞）
+- 字级 6 档锁死：**12 / 14 / 16 / 20 / 24 / 32**；每屏 ≤4 档；16=正文基准；**32 仅登录/品牌 display**
+- 标题大写拉丁：`letter-spacing -0.02~-0.03em` + 行高 110-120%（**只允许英文/数字/品牌字标**）；
+  **中文标题行高 1.25、字距 0**；正文行高 1.5-1.6；数字 tabular-nums
+- 统计数字封顶 **24 粗体**（`--s-metric`），不得与 display 档（32）抢重量；标签 12 灰
 
-## 交互反馈（硬规则：每次交互必有反馈）
+## 组件规范要点（v3.1）
 
-1. 三态齐全：default / press（60ms 内 `scale(0.97)` + 阴影收缩）/ disabled（降透明 + 语义禁用）
-2. 时长分层：press 60ms · micro 120-150ms · standard 200-240ms `cubic-bezier(0.22,1,0.36,1)` ·
-   主 CTA spring `cubic-bezier(0.34,1.56,0.64,1)` ≤400ms
-3. 反馈类型：按压变形/按钮状态切换/加载 spinner（>300ms 必出）/成功出现（200ms 内 绿勾+缩放 float in）/
-   错误 inline 提示（aria-live）
-4. 只动 transform / opacity / box-shadow（丝滑：无 layout thrash，保持 60fps）；波形层 `will-change: transform`
-5. `prefers-reduced-motion: reduce` → 动效全部降级（瞬时完成，保留状态语义）
-
-## 触控与布局（app 端）
-
-- 触控目标 ≥48dp（Android WebView 按 48dp）+ 相邻目标间距 ≥8dp
-- Tab 栏 ≤5 项（4 项 + 中央主按钮）；`padding-bottom: env(safe-area-inset-bottom)`
-- 内容滚动区避开固定 Tab 栏（底部留白 ≥120px + safe area）
-- 开发验证：375px 断点 · 横屏不塌 · 文本缩放 200% 不裁切
+- **深蓝渐变焦点卡**：`#1D4ED8→#172554` 渐变 + tint 徽章（白 18% 底白字）+ 白 24px 标题 +
+  步骤（白 86%/完成 绿勾 白 50% 删除线）+ **白色实心 CTA**（深底最高对比，不蓝叠蓝）+
+  右下角 120px 声波装饰（白色 14%）—— 每屏 ≤1 张
+- **分段控件**：灰轨（`--s-bg-2` + 1px 描边）+ **白色浮起 pill**（阴影浮起 = 选中，材质派）+
+  选中项**加粗加深**（双信号，弱视友好）；滑块 translateX 150ms 不重排
+- **列表行**：≥72px（44pt 触控）；**中性图标块**（`--s-bg-2` 底 + `--s-text-2` 图标，色彩是特权不给行）；
+  标题 14 半粗 / 副行 12 灰；数值列 **16 粗 文字级蓝 `#0284C7`**；徽章只表状态（success/star/neutral）
+- **统计卡**：白卡 3 列居中；标签 12 灰；数值 24 粗 tabular；绿=平均分、黄星=连续天数
+- **Tab 栏**：悬浮白胶囊（float 阴影 + 1px 描边 + safe-area）；4 项 + 中央主按钮（spring）;
+  激活 = primary-soft pill + 图标 1.15 弹起；60ms 按压
+- **按钮**：三态齐全（default/press `scale(0.97)` /disabled 降透明）；高 52（CTA），宽≈2×高；focus-visible 2px 蓝描边
+- **登录页**：声波大图形（Phosphor duotone 160px）＝设计语言焦点 → 字标 24（-0.03em）→ 一行副标题 →
+  药丸输入 ×2（16 内距，54px，居中占位）→ 蓝按钮（32 距）→ 单行「演示账号登录」（44px 触控）
 
 ## 反模式（Avoid）
 
-Emoji 当图标（用统一 SVG 家族）· 大面积毛玻璃/纯色渐变闪烁 · 默认深色 · 同屏 >3 种语义色混用
-· 仪表面板式堆数据 · 无按压反馈的按钮 · 进度信息只用颜色（必须用数值/图形双通道）
+Emoji 当图标 · 第二字体/≤6 字级外的新字级 · 均匀 32px 撒留白 · 中文负字距 ·
+蓝 CTA 叠深蓝卡 · 深色卡双张 · 列表行彩色图标块 · 大面积毛玻璃/渐变闪烁 · 默认深色 ·
+无按压反馈 · 颜色单通道状态（数值/图形双通道）
 
 ## 交付前检查（voice-first 语音页必过）
 
-- [ ] 对比度：正文 ≥4.5:1（白底对 `--s-text-2` 同样达标）
-- [ ] 触控 ≥48dp；点按 60ms 内有视觉反馈
-- [ ] reduced-motion 下状态仍可读（不丢失语义）
-- [ ] 波形/脉冲动画不干扰文字阅读；聆听/说话/处理三态有文字或颜色双通道提示
-- [ ] 表单：autocomplete 兼容（username / current-password）、允许粘贴
+- [ ] 正文 ≥4.5:1（白底 `--s-text-2` 达）；触控 ≥48dp；按压 60ms 内有反馈
+- [ ] reduced-motion 下状态仍可读；仅 transform/opacity 动画；波形不干扰文字阅读
+- [ ] 表单 autocomplete（username / current-password）、允许粘贴；每屏字级 ≤4 档、间距 8/16/24/32
+- [ ] 12 列对齐：图标列/标题列/数值列一致；统计数字 ≤24 不抢 display 档

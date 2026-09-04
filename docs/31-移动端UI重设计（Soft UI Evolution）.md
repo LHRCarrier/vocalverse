@@ -4,6 +4,10 @@
 > 依据：文档 `docs/13`（前端设计系统总纲）的 app 端落地方案；设计智能出自 ui-ux-pro-max skill
 > （`search.py --design-system` 推理 + 项目拍板修正），机器副本见 `docs/design-system/vocalverse/`。
 > **本文件是 app 端设计的唯一真相源**；页面级规则以 `docs/design-system/vocalverse/pages/*.md` 为准。
+> **v3.1 修订（对抗评审 + B 站视频稿参考 + 组长注释图定稿）**：单字体 Plus Jakarta Sans（不再双族）；
+> 字级 6 档 12/14/16/20/24/32（每屏 ≤4）；间距 4 档 8/16/24/32；负字距/紧行高仅限拉丁大字（中文 0 字距/1.25）；
+> 深蓝渐变焦点卡（#1D4ED8→#172554）+ 白色 CTA；灰轨 + 白浮起 pill 选中（材质派）+ 加粗双信号；
+> 列表图标块中性化；统计数字封顶 24；白卡 1px 描边；图标 Tabler（ph 服务深色卡/大图形），接入见 docs/32。
 
 ---
 
