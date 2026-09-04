@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 app 端 UI v3.1（对抗评审定稿版：首页 + 登录样板重做）
+
+- 触发：组长对 v1/v2 连续否决（花哨/文字多/无记忆点/留白垃圾/排版乱），给出 5 条硬要求 + 参考（B 站《10分钟讲解所有UI/UX概念》文字稿 + 13 张带注释参考图 `实训项目作业/project/.trae/skills/ui-concept-design/references/`）；并派子代理对我 v3 方案做美学攻击（10 条质疑全部采纳）；
+- **v3.1 关键修正**：① 单字体 Plus Jakarta Sans（删 Varela Round/Nunito 双族）；② 字级 6 档 12/14/16/20/24/32（每屏 ≤4，32 仅 display 档，统计数字封顶 24）；③ 间距 4 档 8/16/24/32（组内 8-16 / 区块 24-32，删 28/40——"垃圾留白"根源）；④ 负字距 -0.02~-0.03em + 行高 115% **仅限拉丁大字**（中文 0 字距/1.25，避免方块字挤压）；⑤ 深蓝渐变焦点卡 `#1D4ED8→#172554` + tint 徽章 + **白色实心 CTA**（不蓝叠蓝）+ 120px 声波装饰 = 每屏唯一记忆点；⑥ 分段改**灰轨 + 白色浮起 pill**（材质派，选中加粗双信号）；⑦ 列表图标块中性化 + 数值列文字级蓝 `#0284C7`（颜色是特权）；⑧ 语义色收敛一蓝+红+绿+一颗黄星（删橙）；⑨ 白卡 1px 描边（底 `#EDF5FE` 不丢边界）；⑩ 文字级对比度（文本蓝用 #0284C7、灰 ≥#5B6B7E）；
+- **图标/基座接入**（docs/32 选型落地）：`unplugin-icons` 编译期内联（vite 插件 + `~icons/tabler/*` 主 / `~icons/ph/*` 深色卡大图形）+ vite-env 类型引用；`mobile-soft.css` 重写为 v3.1 规范（含图标尺寸规则）；
+- 页面：登录 = Phosphor 声波 duotone 160px 焦点（设计语言）+ 字标 24（-0.03em）+ 药丸输入 ×2 + 蓝按钮 + 单行演示登录（全屏 <15 词）；首页 = 深蓝焦点卡 + 统计白卡（12/24 字级对）+ 灰轨白 pill + 中性列表 + 浮动 Tab；
+- 验证：门禁 lint/typecheck/vitest 19/build 全绿；Playwright 390×844 截图两张（`local/ui-check/soft-{login,home}.png`）；文档 MASTER/pages/home/login 同步 v3.1。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
 ## 2026-09-08 图标库 / UI 库全网调研与选型（docs/32 + 素材库）
 
 - 触发：组长要求"全网搜集图标库和 UI 库，符合我们设计的存到文件夹里"；参考依据 = B 站视频（Kole Jain《Every UI/UX Concept Explained in Under 10 Minutes》）+ 13 张带注释参考图（`实训项目作业/project/.trae/skills/ui-concept-design/references/`）；
