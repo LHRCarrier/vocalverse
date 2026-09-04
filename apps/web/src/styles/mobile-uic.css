@@ -891,6 +891,80 @@ body {
   max-width: 76%;
 }
 
+/* 重听按钮（AI 气泡内：音量图标 → 播放时均衡器扩音动画） */
+.u-replay {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: var(--u-r-pill);
+  background: rgba(28, 28, 26, 0.06);
+  color: var(--u-ink);
+  cursor: pointer;
+  transition: background-color 150ms ease-out, transform 60ms ease-out;
+}
+
+.u-replay:hover {
+  background: rgba(28, 28, 26, 0.1);
+}
+
+.u-replay:active {
+  transform: scale(0.95);
+}
+
+.u-replay.is-playing {
+  background: rgba(47, 107, 255, 0.12);
+  color: var(--u-accent);
+}
+
+/* 均衡器三柱（扩音动画：只动 transform/opacity，reduced-motion 降级为静态） */
+.u-eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 14px;
+}
+
+.u-eq i {
+  width: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  animation: u-eq-bounce 0.8s ease-in-out infinite;
+}
+
+.u-eq i:nth-child(1) {
+  height: 60%;
+}
+
+.u-eq i:nth-child(2) {
+  height: 100%;
+  animation-delay: 0.15s;
+}
+
+.u-eq i:nth-child(3) {
+  height: 45%;
+  animation-delay: 0.3s;
+}
+
+@keyframes u-eq-bounce {
+  0%,
+  100% {
+    transform: scaleY(0.55);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u-eq i {
+    animation: none;
+  }
+}
+
 /* 语言点 / 得分 chips 区（左缩进对齐气泡左侧 = 图标列 44 + 间距 12） */
 .u-tips {
   display: flex;

@@ -14,7 +14,6 @@ import { track } from '@/api/events'
 import { createSession, fetchScenarios, streamTurn, tts, type ScenarioItem } from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
-import { useTurnTimers } from '@/composables/useTurnTimers'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
@@ -40,14 +39,17 @@ const lastScore = ref<{ pron?: number | null; flu?: number | null; gram?: number
 const scoreStatus = ref<'ok' | 'pending' | 'unavailable' | null>(null)
 const corpusDone = ref<string[]>([])
 const hitCount = computed(() => corpusDone.value.length)
-const hintText = ref<string | null>(null)
+const summaryText = ref<string | null>(null)
 const errorMsg = ref<string | null>(null)
 const reportId = ref<number | null>(null)
+/* 聊天化：当前 AI 气泡（流式目标）+ 重听播放态 */
+const currentAssistant = ref<Bubble | null>(null)
+const playingBubble = ref<number | null>(null)
+let replayAudio: HTMLAudioElement | null = null
 
 const recorder = new VoiceRecorder()
 const audioQueue: HTMLAudioElement[] = []
 const abort = new AbortController()
-const { setTimer, clearAll } = useTurnTimers()
 
 onMounted(async () => {
   await boot()
@@ -56,7 +58,7 @@ onMounted(async () => {
 onUnmounted(() => {
   abort.abort()
   audioQueue.forEach((a) => a.pause())
-  clearAll()
+  replayAudio?.pause()
 })
 
 async function boot() {
@@ -82,40 +84,45 @@ async function boot() {
       playTts(scenario.value.opening_line)
     }
     phase.value = 'ready'
-    armRescueTimer()
   } catch (e) {
     errorMsg.value = (e as Error).message
     phase.value = 'done'
   }
 }
 
-function armRescueTimer() {
-  clearAll()
-  if (phase.value !== 'ready') return
-  setTimer(() => {
-    if (!recording.value && phase.value === 'ready' && !hintText.value) {
-      hintText.value = firstCorpusPhrase() ?? "Let's try: 'I would like a coffee, please.'"
-    }
-  }, 8000)
-}
-
-function firstCorpusPhrase(): string | null {
-  const raw = scenario.value?.target_corpus ?? null
-  if (!raw) return null
-  const line = raw.split('\n').find((l) => l.includes('|'))
-  return line ? line.split('|')[0]?.trim() ?? null : null
-}
-
-async function playTts(text: string) {
+/** 播放/重听 TTS；index 存在时记录播放态（重听按钮扩音动画） */
+async function playTts(text: string, index?: number) {
   try {
     const blob = await tts(text)
     const url = URL.createObjectURL(blob)
     const audio = new Audio(url)
-    audio.onended = () => URL.revokeObjectURL(url)
+    audio.onended = () => {
+      URL.revokeObjectURL(url)
+      if (index != null && playingBubble.value === index) {
+        playingBubble.value = null
+        replayAudio = null
+      }
+    }
+    if (index != null) {
+      replayAudio?.pause()
+      replayAudio = audio
+      playingBubble.value = index
+    }
     await audio.play()
   } catch {
     /* 无声字幕继续 */
   }
+}
+
+function replay(index: number, text: string) {
+  if (!text) return
+  if (playingBubble.value === index) {
+    replayAudio?.pause()
+    replayAudio = null
+    playingBubble.value = null
+    return
+  }
+  void playTts(text, index)
 }
 
 function playChunk(url: string) {
@@ -134,7 +141,6 @@ async function startRecording() {
     return
   }
   if (phase.value !== 'ready') return
-  hintText.value = null
   errorMsg.value = null
   recording.value = true
   try {
@@ -167,12 +173,11 @@ recorder.onStop = (blob, _mime, durationMs) => {
 async function sendTurn(action: 'normal' | 'retry' | 'hint' | 'demo' | 'abandon', blob?: Blob) {
   if (!sessionId.value) return
   phase.value = 'busy'
-  armRescueTimer()
+  currentAssistant.value = null
   const form = new FormData()
   if (blob) form.append('audio', blob, 'recording.webm')
   form.append('action', action)
   form.append('expected_turn', String(currentTurn.value))
-  bubbles.value.push({ role: 'assistant', text: '' })
   streamTurn(
     sessionId.value,
     form,
@@ -186,14 +191,21 @@ async function sendTurn(action: 'normal' | 'retry' | 'hint' | 'demo' | 'abandon'
 }
 
 function onSseEvent(e: SseStreamEvent) {
-  const last = bubbles.value[bubbles.value.length - 1]
   switch (e.type) {
+    case 'user_transcript':
+      /* 用户语音 → 文字气泡（聊天效果，先于 AI 提问出现） */
+      bubbles.value.push({ role: 'user', text: e.text })
+      break
     case 'turn_start':
-      if (e.reference_text) hintText.value = e.reference_text
-      if (e.question) last.text = e.question
+      currentAssistant.value = { role: 'assistant', text: e.question ?? '' }
+      bubbles.value.push(currentAssistant.value)
       break
     case 'text_delta':
-      last.text += e.text
+      if (!currentAssistant.value) {
+        currentAssistant.value = { role: 'assistant', text: '' }
+        bubbles.value.push(currentAssistant.value)
+      }
+      currentAssistant.value.text += e.text
       break
     case 'audio_chunk':
       playChunk(e.url)
@@ -202,8 +214,11 @@ function onSseEvent(e: SseStreamEvent) {
       for (const hit of e.corpus_hits) {
         if (!corpusDone.value.includes(hit.phrase)) {
           corpusDone.value.push(hit.phrase)
-          last.chips = last.chips ?? []
-          last.chips.push({ phrase: hit.phrase })
+          const target = currentAssistant.value ?? bubbles.value[bubbles.value.length - 1]
+          if (target) {
+            target.chips = target.chips ?? []
+            target.chips.push({ phrase: hit.phrase })
+          }
         }
       }
       if (e.corpus_hits.length) void track('corpus_hit', { sceneId: scenario.value?.id, payload: { hits: e.corpus_hits } })
@@ -217,11 +232,10 @@ function onSseEvent(e: SseStreamEvent) {
       scoreStatus.value = e.score_status === 'ok' ? scoreStatus.value : e.score_status
       currentTurn.value += 1
       phase.value = 'ready'
-      armRescueTimer()
       break
     case 'session_end':
       phase.value = 'done'
-      hintText.value = e.summary ?? '完成！'
+      summaryText.value = e.summary ?? '完成！'
       reportId.value = e.report_id ?? null
       void track('practice_complete', { sceneId: scenario.value?.id, payload: { report_id: e.report_id } })
       if (e.report_id) {
@@ -260,6 +274,20 @@ function onSseEvent(e: SseStreamEvent) {
           </span>
           <div class="u-bubble" :class="m.role === 'user' ? 'u-bubble--user' : 'u-bubble--ai'">
             {{ m.text || '…' }}
+            <button
+              v-if="m.role === 'assistant'"
+              class="u-replay"
+              :class="{ 'is-playing': playingBubble === i }"
+              type="button"
+              :title="playingBubble === i ? '停止' : '重听'"
+              :aria-label="playingBubble === i ? '停止播放' : '重听语音'"
+              @click="replay(i, m.text)"
+            >
+              <template v-if="playingBubble === i">
+                <span class="u-eq" aria-hidden="true"><i /><i /><i /></span>
+              </template>
+              <MobileIcon v-else name="volume" :size="15" />
+            </button>
           </div>
         </div>
         <div v-if="m.chips?.length" class="u-tips">
@@ -276,12 +304,8 @@ function onSseEvent(e: SseStreamEvent) {
         <span v-if="lastScore.gram != null" class="u-chip u-chip--green">语法 {{ lastScore.gram }}</span>
       </div>
 
-      <!-- 救援提示卡（8s 无录音） -->
-      <div v-if="hintText && phase !== 'done'" class="u-hint">
-        💡 {{ hintText }} —— 点击下方按钮，大声说出这句话。
-      </div>
-
-      <!-- 错误空态（未能进入场景：服务不可达 / 无数据） -->
+      <!-- 会话中途错误（保留对话，红字提示） -->
+      <div v-if="errorMsg && bubbles.length" class="u-error">{{ errorMsg }}</div>
       <section v-if="errorMsg && !bubbles.length && phase === 'done'" class="u-empty">
         <div class="u-empty__art"><MobileArt name="mic" :size="96" /></div>
         <div class="u-empty__title">无法进入场景</div>
@@ -294,15 +318,12 @@ function onSseEvent(e: SseStreamEvent) {
         </div>
       </section>
 
-      <!-- 会话中途错误（保留对话，红字提示） -->
-      <div v-else-if="errorMsg" class="u-error">{{ errorMsg }}</div>
-
       <!-- 会话结束：完成卡 + 查看报告 -->
       <section v-if="phase === 'done' && !errorMsg" class="u-done">
         <div class="u-done__art"><MobileArt name="done" :size="88" /></div>
         <div class="u-done__title">今日练习完成</div>
         <div class="u-done__sub">
-          {{ hintText ?? `共 ${bubbles.length} 轮对话 · 覆盖 ${hitCount} 个表达` }}
+          {{ summaryText ?? `共 ${bubbles.length} 轮对话 · 覆盖 ${hitCount} 个表达` }}
         </div>
         <div class="u-done__actions">
           <button v-if="reportId" class="u-btn u-btn--primary u-btn--block" type="button" @click="router.push(`/m/report?reportId=${reportId}`)">

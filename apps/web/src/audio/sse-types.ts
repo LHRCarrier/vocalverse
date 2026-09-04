@@ -11,6 +11,13 @@ export interface TurnStartEvent {
   question?: string | null
 }
 
+/** 用户 ASR 转写回显（2026-09-08 新增：聊天气泡展示用户说的话） */
+export interface UserTranscriptEvent {
+  type: 'user_transcript'
+  turn_index: number
+  text: string
+}
+
 export interface TextDeltaEvent {
   type: 'text_delta'
   text: string
@@ -67,6 +74,7 @@ export interface SessionEndEvent {
 
 export type SseStreamEvent =
   | TurnStartEvent
+  | UserTranscriptEvent
   | TextDeltaEvent
   | AudioChunkEvent
   | MetaBlockEvent

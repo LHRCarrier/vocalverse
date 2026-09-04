@@ -30,6 +30,7 @@ const props = withDefaults(
       | 'music'
       | 'arrow'
       | 'stop'
+      | 'volume'
     size?: number
   }>(),
   { size: 20 },
@@ -171,6 +172,12 @@ const props = withDefaults(
     <!-- 停止（实心方块 · 录音中） -->
     <template v-else-if="props.name === 'stop'">
       <path d="M7 7h10v10H7z" stroke-width="2" />
+    </template>
+    <!-- 音量（重听） -->
+    <template v-else-if="props.name === 'volume'">
+      <path d="M4 10v4h3l4 3.5v-11L7 10H4Z" />
+      <path d="M15 9.5a4 4 0 0 1 0 5" />
+      <path d="M17.5 7a7.5 7.5 0 0 1 0 10" />
     </template>
   </svg>
 </template>
