@@ -11,7 +11,8 @@
   - 设计系统：`docs/31-移动端UI重设计（Soft UI Evolution）.md`（app 端唯一真相源）+ `docs/design-system/vocalverse/`（MASTER.md + pages/home.md + pages/login.md 分层检索副本）+ README 文档索引登记 2 行；
   - 代码：`styles/mobile-soft.css`（s-* 前缀完整组件系统：token 变量/字级/按钮三态/卡片/56px 分段滑块/Tab 栏 safe-area/焦点/reduced-motion/触控 48dp）；重制 `MobileTabBar.vue`（悬浮白胶囊 + 激活 pill + spring 主钮）、`MobileHomeView.vue`（问候→打卡黄徽章→primary-soft 任务焦点卡→统计卡（绿=成绩/黄=激励）→56px 分段→列表行）、`LoginView.vue`（去 Naive 依赖、原生表单 autocomplete 兼容、波形装饰、按钮三态 loading/success/错误 aria-live）；
   - 旧样式 `mobile-uic.css`（u-*）暂保留给未重制页；旧 WIP 先提交留底（4bbfd29/70d4429，可回滚对照）；
-- 验证：门禁 lint（0 errors）/ typecheck / vitest 19 全过 / build 全绿；dev server + Playwright（390×844）截图自检两页（`local/ui-check/soft-{login,home}.png`），首轮发现任务卡底色缺失与列表行内联文字问题并修复；页面数据口径沿用演示帧（M3 接入后替换）。
+- 验证：门禁 lint（0 errors）/ typecheck / vitest 19 全过 / build 全绿；dev server + Playwright（390×844）截图自检两页（`local/ui-check/soft-{login,home}.png`），首轮发现任务卡底色缺失与列表行内联文字问题并修复；页面数据口径沿用演示帧（M3 接入后替换）；
+- 组长反馈修正（当日）：登录页 v2 极简化——去掉白卡片/演示账号文案堆砌/波形装饰，改为「居中 72px 波形标 + 字标 + 一行 7 字标语 → 两个药丸输入框 → 主按钮 + 单行「演示账号登录」一键入口」；`pages/login.md` 同步 v2。
 
 —— 执行人：组长 LHRCarrier（AI 代工整理）
 
