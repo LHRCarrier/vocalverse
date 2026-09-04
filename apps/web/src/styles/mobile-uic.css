@@ -813,13 +813,22 @@ body {
 }
 
 /* ============================================================
- * 场景对话页：气泡 / 语言点与得分 chips / 救援卡 / 空态
+ * 场景对话页：气泡（从图标右下角展开）/ 语言点与得分 chips / 救援卡 / 空态
  * ============================================================ */
+/* 浮动返回按钮（无头部文字后置顶悬浮） */
+.u-back--float {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 20;
+}
+
+/* 消息行：图标置顶一行，气泡从图标右下角展开（尾部指向图标） */
 .u-chat {
   display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  margin-bottom: 16px;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .u-chat--user {
@@ -827,10 +836,11 @@ body {
 }
 
 .u-ava {
-  width: 32px;
-  height: 32px;
-  border-radius: 11px;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
   flex: none;
+  margin-top: 2px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -838,38 +848,55 @@ body {
 }
 
 .u-ava svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 .u-bubble {
-  max-width: 272px;
-  padding: 14px 18px;
+  flex: 1;
+  min-width: 0;
+  padding: 12px 16px;
   font-size: 15px;
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
+  position: relative;
 }
 
+/* AI 气泡：左下角尾巴 = 从图标右下角"长"出来 */
 .u-bubble--ai {
   background: var(--u-track);
   color: var(--u-ink);
-  border-radius: 20px 20px 20px 6px;
+  border-radius: 16px 16px 16px 4px;
+}
+
+.u-bubble--ai::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  bottom: 10px;
+  width: 12px;
+  height: 12px;
+  background: var(--u-track);
+  border-radius: 3px;
+  transform: rotate(45deg);
 }
 
 .u-bubble--user {
   background: var(--u-ink);
   color: #fff;
-  border-radius: 20px 20px 6px 20px;
+  border-radius: 16px 16px 4px 16px;
   margin-left: auto;
+  flex: 0 1 auto;
+  max-width: 76%;
 }
 
-/* 语言点 / 得分 chips 区（左缩进对齐头像） */
+/* 语言点 / 得分 chips 区（左缩进对齐气泡左侧 = 图标列 44 + 间距 12） */
 .u-tips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 4px 0 24px 42px;
+  margin: 4px 0 24px 56px;
 }
 
 /* 救援提示卡（8s 无录音） */
@@ -879,7 +906,7 @@ body {
   font-size: 13px;
   border-radius: var(--u-r-chip);
   padding: 12px 14px;
-  margin: 4px 0 16px 42px;
+  margin: 4px 0 16px 56px;
   line-height: 1.6;
 }
 

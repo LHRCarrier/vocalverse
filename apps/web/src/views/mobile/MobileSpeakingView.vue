@@ -49,8 +49,6 @@ const audioQueue: HTMLAudioElement[] = []
 const abort = new AbortController()
 const { setTimer, clearAll } = useTurnTimers()
 
-const DIFFICULTY_LABEL: Record<number, string> = { 1: 'L1', 2: 'L2', 3: 'L3', 4: 'L4' }
-
 onMounted(async () => {
   await boot()
 })
@@ -241,24 +239,11 @@ function onSseEvent(e: SseStreamEvent) {
 
 <template>
   <div class="u-phone">
-    <div class="u-content">
-      <!-- 头部：返回 + 场景关键词 -->
-      <header class="u-head" style="margin-bottom: 6px">
-        <button class="u-back" type="button" title="返回" @click="router.back()">
-          <MobileIcon name="back" />
-        </button>
-        <div style="flex: 1; min-width: 0">
-          <h1 style="font-size: 22px; font-weight: 700">{{ scenario?.title ?? '场景对话' }}</h1>
-          <p class="u-head__sub">
-            {{ DIFFICULTY_LABEL[scenario?.difficulty ?? 1] }} · 目标约
-            {{ assignedTurns }} 轮 · 覆盖度 {{ hitCount }}
-          </p>
-        </div>
-        <span class="u-chip u-chip--accent" style="flex: none">
-          <MobileIcon name="clock" />
-          {{ currentTurn }}/{{ assignedTurns }}
-        </span>
-      </header>
+    <div class="u-content" style="padding-top: 72px">
+      <!-- 顶部只留返回按钮（文字全部去掉） -->
+      <button class="u-back u-back--float" type="button" title="返回" @click="router.back()">
+        <MobileIcon name="back" />
+      </button>
 
       <!-- 加载态：声波线稿锚点 -->
       <div v-if="!bubbles.length && phase === 'loading'" class="u-empty">
