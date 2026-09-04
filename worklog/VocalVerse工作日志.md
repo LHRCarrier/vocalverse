@@ -3,6 +3,14 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 app 端 UI v4.0（配色审美定稿 · 0xnihilism 暖色基因）
+
+- 触发：组长 v3.3 仍判「差远了！尤其是配色审美」，要求继续从 uiverse @0xnihilism 提取；对其 15 个元素做**色板普查**（黑 #000 x10 / 白 #FFF x9 为基底，强调系 = 三文鱼 #FFA07A、金黄 #E9B50B、深绿 #356854/#063525、暖棕，阴影 = 纯黑硬偏移 10px10px0，描边 3px #000，注意 #4A90E2 蓝仅个例、非其语言）；
+- **v4.0 warm brutalism**：底改**奶油纸感 #FBF6EC**；描边/墨/硬阴影全**纯黑 #12100E**；主色改**三文鱼 #FF7A50**（配深墨字，废弃蓝+白字组合）；激励金黄 #E9B50B、成绩深绿 #1A5C46、错误 #EE2020；焦点卡改**墨黑贴纸卡**（白 3px 边 + 6px 黑硬阴影 + 三文鱼徽章 + 白 CTA）；插画 ArtWave 转三文鱼/金黄；列表类别色（口语=三文鱼 tint/唱歌=金黄 tint）；分段/输入/按钮/Tab 栏全套纯黑描边 + 硬阴影；
+- 验证：门禁 lint/typecheck/vitest 19/build 全绿；截图 `local/ui-check/soft-{login,home}.png` 两页；MASTER 色板表 + docs/31 v4.0 同步。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
 ## 2026-09-08 app 端 UI v3.3（uiverse @0xnihilism 语言 · soft-brutalism）
 
 - 触发：组长连续两版判「low」，指出参考 uiverse.io/0xnihilism（全部效果开源）；Playwright 真浏览器抓取（Cloudflare 403 → 有头模式过验证）得该作者 15 个元素（卡片×7/按钮×4/输入×3/加载×1，源码存 `local/uiverse/*.md`）；
