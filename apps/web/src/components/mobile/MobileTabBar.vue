@@ -23,14 +23,14 @@ const route = useRoute()
       首页
     </RouterLink>
     <RouterLink
-      to="/m/speaking"
+      to="/m/chat"
       class="s-tab"
-      :class="{ active: route.path.startsWith('/m/speaking') || route.path.startsWith('/m/chat') || route.path.startsWith('/m/free-chat') }"
+      :class="{ active: route.path.startsWith('/m/chat') || route.path.startsWith('/m/free-chat') }"
     >
       <IconMicrophone />
       口语
     </RouterLink>
-    <RouterLink to="/m/speaking" class="s-tab--main" title="开始新会话" aria-label="开始新会话">
+    <RouterLink to="/m/chat" class="s-tab--main" title="开始新会话" aria-label="开始新会话">
       <IconPlus />
     </RouterLink>
     <RouterLink to="/m/sing" class="s-tab" :class="{ active: route.path === '/m/sing' }">

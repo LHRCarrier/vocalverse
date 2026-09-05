@@ -1744,3 +1744,110 @@ body {
   outline: 2px solid var(--u-accent);
   outline-offset: 2px;
 }
+
+/* ============================================================
+ * 场景选择弹层（口语 Hub 已收敛删除，预置场景列表并入此处；2026-09-05）
+ * ============================================================ */
+.u-sheet-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 28, 26, 0.4);
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.u-sheet {
+  width: 100%;
+  max-width: 480px;
+  max-height: 72vh;
+  max-height: 72dvh;
+  overflow-y: auto;
+  background: var(--u-card);
+  border-radius: 24px 24px 0 0;
+  padding: 16px 16px calc(20px + env(safe-area-inset-bottom));
+}
+
+.u-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.u-sheet__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--u-ink);
+}
+
+.u-sheet__close {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: var(--u-track);
+  color: var(--u-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 150ms ease-out;
+}
+
+.u-sheet__close svg {
+  transform: rotate(45deg); /* plus → × */
+}
+
+.u-sheet__close:hover {
+  background: var(--u-track-hover);
+}
+
+.u-sheet__sub {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--u-sub);
+}
+
+.u-sheet__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 0;
+  border: none;
+  background: none;
+  color: var(--u-ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.u-sheet__item + .u-sheet__item {
+  border-top: 1px solid var(--u-paper-grid);
+}
+
+.u-sheet__item:active {
+  background: var(--u-track);
+}
+
+.u-sheet-enter-active,
+.u-sheet-leave-active {
+  transition: opacity 180ms ease-out;
+}
+
+.u-sheet-enter-active .u-sheet,
+.u-sheet-leave-active .u-sheet {
+  transition: transform 180ms ease-out;
+}
+
+.u-sheet-enter-from,
+.u-sheet-leave-to {
+  opacity: 0;
+}
+
+.u-sheet-enter-from .u-sheet,
+.u-sheet-leave-to .u-sheet {
+  transform: translateY(100%);
+}

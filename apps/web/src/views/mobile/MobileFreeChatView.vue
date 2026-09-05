@@ -6,7 +6,7 @@
  * 输入 = 麦克风（ASR）或打字，输出 = 流式文本 + 回合结束后 TTS 自动播报（可点喇叭重听）。
  * 不做评分/报告/入库（分期见 docs/14 §12）。
  */
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { track } from '@/api/events'
@@ -16,6 +16,7 @@ import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
+import ScenePickerSheet from '@/components/mobile/ScenePickerSheet.vue'
 import '@/styles/mobile-uic.css'
 
 interface Bubble {
@@ -24,13 +25,6 @@ interface Bubble {
   /** 有可播语音（喇叭按钮出现条件；回合语音就绪即启用） */
   speakable?: boolean
 }
-
-/* 回复语速档位（后端 /api/v1/tts 已支持 rate 参数；本地记忆，2026-09-05 Grok 式功能行） */
-const RATE_CYCLE = [
-  { value: '+0%', label: '正常' },
-  { value: '+15%', label: '稍快' },
-  { value: '-25%', label: '稍慢' },
-] as const
 
 const router = useRouter()
 
@@ -43,8 +37,7 @@ const errorMsg = ref<string | null>(null)
 const currentAssistant = ref<Bubble | null>(null)
 const playingBubble = ref<number | null>(null)
 const chatBox = ref<HTMLElement | null>(null)
-const rateIndex = ref((Number(localStorage.getItem('vv_rate_idx') ?? 0) % RATE_CYCLE.length + RATE_CYCLE.length) % RATE_CYCLE.length)
-const rate = computed(() => RATE_CYCLE[rateIndex.value])
+const sheetOpen = ref(false)
 
 let replayAudio: HTMLAudioElement | null = null
 let autoPlayToken = 0 // 回合自增：mounted 时递增，旧回合的播放回调失效
@@ -71,30 +64,14 @@ watch(
   },
 )
 
-function resetChat() {
-  abort.abort()
-  bubbles.value = []
-  history.value = []
-  errorMsg.value = null
-  sending.value = false
-  currentAssistant.value = null
-  autoPlayToken += 1
-  replayAudio?.pause()
-  replayAudio = null
-  playingBubble.value = null
-  void track('free_chat_reset', {})
-}
-
-function goScene() {
-  // 自由对话 → 口语 Hub（用户自选场景；边界不由自由对话直入具体场景，见 docs/14 §12.4）
-  void track('free_chat_switch', { payload: { to: 'scene' } })
-  router.push('/m/speaking')
-}
-
-function cycleRate() {
-  rateIndex.value = (rateIndex.value + 1) % RATE_CYCLE.length
-  localStorage.setItem('vv_rate_idx', String(rateIndex.value))
-  void track('free_chat_rate', { payload: { rate: rate.value.value } })
+function goScene(sceneId?: number) {
+  // 功能行（2026-09-05 组长拍板：Hub 已删）：场景对话 = 直达场景模式（场景选择可带指定场景）
+  void track('free_chat_switch', { payload: sceneId ? { to: 'scene', scene_id: sceneId } : { to: 'scene' } })
+  if (sceneId) {
+    router.push(`/m/chat/${sceneId}`)
+  } else {
+    router.push('/m/chat')
+  }
 }
 
 function pushUser(text: string) {
@@ -209,7 +186,7 @@ async function playTts(text: string, index: number) {
     }
   }
   try {
-    const blob = await tts(text, rate.value.value)
+    const blob = await tts(text)
     if (!blob.size) {
       finish()
       return
@@ -289,30 +266,15 @@ function replay(index: number, text: string) {
       </div>
 
       <div class="u-fc-bar-wrap">
-        <!-- Grok 式功能行（2026-09-05 组长拍板）：切场景 / 新对话 / 语速 -->
-        <div class="u-tb" role="toolbar" aria-label="自由对话功能">
-          <button class="u-tb-item" type="button" title="回到口语 Hub 选择场景" @click="goScene">
+        <!-- 功能行（2026-09-05 组长拍板：删 Hub/语速；模式互切 + 场景选择） -->
+        <div class="u-tb" role="toolbar" aria-label="口语功能">
+          <button class="u-tb-item" type="button" title="切换到场景对话（固定题卡跟练）" @click="goScene()">
             <MobileIcon name="coffee" :size="22" />
             <span class="u-tb-item__label">场景对话</span>
           </button>
-          <button
-            class="u-tb-item"
-            type="button"
-            :disabled="!bubbles.length"
-            title="清空当前对话，重新开始"
-            @click="resetChat"
-          >
-            <MobileIcon name="refresh" :size="22" />
-            <span class="u-tb-item__label">新对话</span>
-          </button>
-          <button
-            class="u-tb-item"
-            type="button"
-            :title="`回复语速：${rate.label}（点击切换）`"
-            @click="cycleRate"
-          >
-            <MobileIcon name="clock" :size="22" />
-            <span class="u-tb-item__label">语速 · {{ rate.label }}</span>
+          <button class="u-tb-item" type="button" title="选择预置场景开始场景对话" @click="sheetOpen = true">
+            <MobileIcon name="chevron" :size="22" />
+            <span class="u-tb-item__label">场景选择</span>
           </button>
         </div>
 
@@ -353,6 +315,8 @@ function replay(index: number, text: string) {
           </button>
         </div>
       </div>
+
+      <ScenePickerSheet :open="sheetOpen" @update:open="sheetOpen = $event" @select="goScene" />
     </div>
   </div>
 </template>

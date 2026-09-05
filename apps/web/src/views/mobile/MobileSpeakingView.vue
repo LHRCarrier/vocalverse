@@ -7,7 +7,7 @@
  * AI 气泡 = track 灰底圆角 + 实色声波头像块；用户气泡 = 炭黑；语言点 = accent chip；
  * 得分 = 绿色 chip；救援 = 暖色卡；底部 = ink 实心圆形录音按钮（外圈波纹 + 忙碌旋转弧）。
  */
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { track } from '@/api/events'
@@ -17,6 +17,7 @@ import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
+import ScenePickerSheet from '@/components/mobile/ScenePickerSheet.vue'
 import '@/styles/mobile-uic.css'
 
 interface Bubble {
@@ -51,7 +52,8 @@ let replayAudio: HTMLAudioElement | null = null
 
 const recorder = new VoiceRecorder()
 const audioQueue: HTMLAudioElement[] = []
-const abort = new AbortController()
+let abort = new AbortController()
+const sheetOpen = ref(false)
 
 onMounted(async () => {
   await boot()
@@ -62,6 +64,41 @@ onUnmounted(() => {
   audioQueue.forEach((a) => a.pause())
   replayAudio?.pause()
 })
+
+/* 功能行「场景选择」：页内切场景 = 重置状态后重新 boot（Hub 已删，2026-09-05） */
+watch(
+  () => route.params.sceneId,
+  (v, old) => {
+    if (old !== undefined && v !== old) void startScene()
+  },
+)
+
+async function startScene() {
+  abort.abort()
+  abort = new AbortController()
+  audioQueue.forEach((a) => a.pause())
+  audioQueue.length = 0
+  replayAudio?.pause()
+  replayAudio = null
+  if (recorder.state === 'recording') recorder.cancel()
+  bubbles.value = []
+  currentTurn.value = 0
+  lastScore.value = null
+  scoreStatus.value = null
+  corpusDone.value = []
+  summaryText.value = null
+  errorMsg.value = null
+  reportId.value = null
+  currentAssistant.value = null
+  playingBubble.value = null
+  phase.value = 'loading'
+  await boot()
+}
+
+function onScenePicked(sceneId: number) {
+  if (sceneId === scenario.value?.id) return
+  router.push(`/m/chat/${sceneId}`)
+}
 
 async function boot() {
   try {
@@ -375,6 +412,22 @@ function onSseEvent(e: SseStreamEvent) {
     </div>
 
     <!-- 录音大按钮（ink 圆形 + 波纹 / 忙碌旋转弧） -->
+    <div class="u-tb" role="toolbar" aria-label="口语功能">
+      <button
+        class="u-tb-item"
+        type="button"
+        title="切换到自由对话（AI 对聊，无固定题卡）"
+        @click="router.push('/m/free-chat')"
+      >
+        <MobileIcon name="wave" :size="22" />
+        <span class="u-tb-item__label">自由对话</span>
+      </button>
+      <button class="u-tb-item" type="button" title="切换预置场景" @click="sheetOpen = true">
+        <MobileIcon name="chevron" :size="22" />
+        <span class="u-tb-item__label">场景选择</span>
+      </button>
+    </div>
+
     <div v-if="phase !== 'done'" class="u-rec-label">
       {{ recording ? '录音中，点击 ■ 停止并提交' : phase === 'busy' ? '评分中，请稍候…' : '点击录音（≤15s）' }}
     </div>
@@ -391,5 +444,7 @@ function onSseEvent(e: SseStreamEvent) {
       <MobileIcon v-else-if="recording" name="stop" :size="26" />
       <MobileIcon v-else name="mic" :size="30" />
     </button>
+
+    <ScenePickerSheet :open="sheetOpen" @update:open="sheetOpen = $event" @select="onScenePicked" />
   </div>
 </template>
