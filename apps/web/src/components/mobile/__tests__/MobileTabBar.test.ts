@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -51,15 +51,22 @@ describe('MobileTabBar（全局显隐 · 5 位对称）', () => {
   })
 })
 
-describe('MobilePracticeView（练习 Hub）', () => {
-  it('渲染三张入口卡：场景对话 / 自由对话 / 唱吧', async () => {
+describe('MobilePracticeView（练习首页）', () => {
+  it('渲染完整首页结构：今日目标 / 统计 / 场景推荐（fallback）/ 自由对话 / 唱吧精选', async () => {
     await router.push('/m/practice')
     await router.isReady()
     const wrapper = mount(MobilePracticeView, { global: { plugins: [router] } })
+    await flushPromises()
     const text = wrapper.text()
+    expect(text).toContain('今日目标')
+    expect(text).toContain('连续 12 天')
     expect(text).toContain('场景对话')
-    expect(text).toContain('自由对话')
-    expect(text).toContain('唱吧')
-    expect(wrapper.findAll('.u-hub-card')).toHaveLength(3)
+    expect(text).toContain('AI 自由对话')
+    expect(text).toContain('本周精选') // 唱吧精选暗卡 chip
+    expect(text).toContain('Perfect Night')
+    expect(text).toContain('开始练习')
+    // 场景 ×3 + 自由对话 = 4 张 u-hub-card；唱吧精选 = 唯一深色卡
+    expect(wrapper.findAll('.u-hub-card')).toHaveLength(4)
+    expect(wrapper.findAll('.u-dark-card')).toHaveLength(1)
   })
 })
