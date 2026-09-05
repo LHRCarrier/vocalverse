@@ -43,12 +43,16 @@
 - 顶栏 icon-only 按钮 `title` + `aria-label`（既有，保留）；
 - 骨架区 `aria-busy="true"` + `aria-label="动态加载中"`。
 
-## 交互边界（组长明示，不可越界）
+## 交互边界（2026-09-05 组长升级拍板：互动全交互 · 演示帧级，本地不落库）
 
-- 分享/评论/投币**仍为展示**（不追加交互）；
-- 点赞**本地交互不落库**（演示帧）；M3 接真实流（docs/10 注记：sessions/attempts JOIN 派生 + post_likes）时
-  **只换数据源，组件层不返工**（docs/34 §7）；
-- 分页游标/下拉刷新/新帖提示条 = **M3 与真实流一起落**（docs/34 §5-1），pinia store 届时新增，本页不改。
+- **评论**：点击 → 底部评论面板（`MobileCommentsSheet`，复用 u-sheet 体系）：标题摘要 + 演示评论列表 + 发表输入条（enter/发送钮）；
+  发送 → 追加「你 · 刚刚」评论 + 计数 +1；**嵌套评论楼 = M3**（docs/34 §5 P1）；
+- **投币**：button toggle——已投币 = `--u-star` 星黄 + pop + 计数 ±1（与点赞同交互语言）；M3 对齐真实投币模型（累积/余额/扣减）；
+- **分享**：`navigator.share` 可用 → 系统分享面板（成功 toast「已分享」）；不可用 → `clipboard.writeText(演示链接)` + toast「链接已复制」；
+  均失败 → toast「复制失败，请手动复制」；**分享计数 = 转发数语义，点击不加计**；
+- 点赞：is-liked 红 + aria-pressed + pop（既有）；四个操作全部为 button，`aria-label` 齐全；
+- M3 接真实流（docs/10 注记：sessions/attempts JOIN 派生 + post_likes/comments/coins）时**只换数据源，组件层不返工**（docs/34 §7）；
+- 分页游标/下拉刷新/新帖提示条 = M3 真实流（docs/34 §5-1），pinia store 届时新增，本页不改。
 
 ## 后续（M3）
 
