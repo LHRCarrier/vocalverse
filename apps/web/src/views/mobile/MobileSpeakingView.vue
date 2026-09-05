@@ -63,7 +63,9 @@ const sheetOpen = ref(false)
 
 onMounted(async () => {
   // 无 sceneId（口语 Tab/中央 + 直达）→ 先让用户选场景；带 sceneId（场景选择/自由对话切换）→ 直接开工
-  if (route.params.sceneId !== undefined) {
+  // 注意：params 缺省可能为 undefined 或 ''，两种都要判（2026-09-05 踩坑：'' 时被误放进场 → 未选场景先出题）
+  const sid = route.params.sceneId
+  if (sid !== undefined && sid !== '') {
     await startScene()
   } else {
     stage.value = 'choose'
@@ -76,15 +78,21 @@ onUnmounted(() => {
   replayAudio?.pause()
 })
 
-/* 功能行「场景选择」/空态 CTA：页内切场景 = 重置状态后重新开工（Hub 已删，2026-09-05） */
+/* 功能行「场景选择」/空态 CTA：页内切场景 = 重置状态后重新开工；:id → 无 id 回退到选场景态 */
 watch(
   () => route.params.sceneId,
   (v, old) => {
-    if (v !== old && v !== undefined) void startScene()
+    if (v === old) return
+    if (v !== undefined && v !== '') {
+      void startScene()
+    } else if (old !== undefined && old !== '') {
+      resetToChoose()
+    }
   },
 )
 
-async function startScene() {
+/** 清除全部会话状态（startScene / resetToChoose 共用） */
+function resetChatState() {
   abort.abort()
   abort = new AbortController()
   audioQueue.forEach((a) => a.pause())
@@ -102,9 +110,20 @@ async function startScene() {
   reportId.value = null
   currentAssistant.value = null
   playingBubble.value = null
+}
+
+async function startScene() {
+  resetChatState()
   phase.value = 'loading'
   stage.value = 'practice' // 加载中先挂到练习态（隐藏「选场景」空态；boot 完成后按开场白落在 intro/practice）
   await boot()
+}
+
+/** :id → 无 id（如从 /m/chat/2 回到 /m/chat）：回退到「先选场景」 */
+function resetToChoose() {
+  resetChatState()
+  phase.value = 'loading'
+  stage.value = 'choose'
 }
 
 function onScenePicked(sceneId: number) {

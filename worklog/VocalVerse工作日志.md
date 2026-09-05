@@ -13,6 +13,7 @@
 - 边界：`/m/chat`（无参数，从口语 Tab/自由对话「场景选择」不带 id 时）走 choose；`/m/chat/:id` 直入 intro；页内切场景仍回 intro（重听开场白）；带 sceneId 的失败重试不丢场景；
 - 埋点：不加新事件（开场播放复用既有气泡喇叭交互，不进指标口径）；
 - 验证：前端 lint 0 warning / typecheck / vitest / build 全绿；后端零改动。
+- **BUG 修复（同日，组员复测）**：home 点口语 Tab 未选场景直接出题（机场·值机开场白）——根因：**vue-router 可选参数 `:sceneId?` 无值时 params.sceneId = `''`（空串）而非 undefined**（node 实测 `r.resolve('/m/chat').params → {"sceneId":""}`），旧判定 `!== undefined` 放行 → `boot()` → `Number('')=0` 找不到 → `?? scenes[0]` 落默认场景；修复：判定补 `&& !== ''`，且 watch 补 `:id → 无 id` 回退到「先选场景」态（resetToChoose）。
 
 —— 执行人：组长 LHRCarrier（AI 代工整理）
 
