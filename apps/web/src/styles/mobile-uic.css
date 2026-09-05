@@ -3194,9 +3194,84 @@ body {
 }
 
 /* ============================================================
- * 发帖页（底部中央 ＋ · 2026-09-05 组长拍板 4；演示帧）
+ * 笔记页（练习组中央 · 2026-09-05 组长拍板；词汇速记演示帧）
  * ============================================================ */
-.u-compose__body {
+.u-notes {
+  padding: 4px 16px 120px;
+}
+
+.u-notes__list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.u-notes__card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--u-card);
+  border-radius: var(--u-r-inner);
+  box-shadow: var(--u-shadow-float);
+}
+
+.u-notes__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.u-notes__word {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--u-ink);
+}
+
+.u-notes__meaning {
+  font-size: 13px;
+  color: var(--u-sub);
+}
+
+.u-notes__source {
+  font-size: 11px;
+  color: var(--u-weak);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.u-notes__star {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--u-weak);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 150ms ease-out, transform 60ms ease-out;
+}
+
+.u-notes__star:active {
+  transform: scale(0.92);
+}
+
+.u-notes__star.is-starred {
+  color: var(--u-star);
+}
+
+/* ============================================================
+ * 发帖页（底部中央 ＋ · 2026-09-05 组长拍板 4；演示帧）
+ * ============================================================ */.u-compose__body {
   padding: 6px 20px 48px;
 }
 

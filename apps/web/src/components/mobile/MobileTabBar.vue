@@ -10,6 +10,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
+import IconBook from '~icons/tabler/book'
 import IconCoffee from '~icons/tabler/coffee'
 import IconHome from '~icons/tabler/home'
 import IconMail from '~icons/tabler/mail'
@@ -27,7 +28,13 @@ const group = computed<null | 'community' | 'practice'>(() => {
   if (p === '/m/home' || p === '/m/search' || p === '/m/me' || p === '/m/report' || p.startsWith('/m/messages')) {
     return 'community'
   }
-  if (p === '/m/practice' || p.startsWith('/m/chat') || p === '/m/free-chat' || p === '/m/sing') {
+  if (
+    p === '/m/practice' ||
+    p === '/m/notes' ||
+    p.startsWith('/m/chat') ||
+    p === '/m/free-chat' ||
+    p === '/m/sing'
+  ) {
     return 'practice'
   }
   return null // /m/compose 沉浸页
@@ -86,8 +93,8 @@ const group = computed<null | 'community' | 'practice'>(() => {
     >
       <IconCoffee />
     </RouterLink>
-    <RouterLink to="/m/chat" class="u-tab--main" title="开始练习" aria-label="开始练习">
-      <IconMicrophone />
+    <RouterLink to="/m/notes" class="u-tab--main" title="笔记" aria-label="笔记">
+      <IconBook />
     </RouterLink>
     <RouterLink
       to="/m/sing"
