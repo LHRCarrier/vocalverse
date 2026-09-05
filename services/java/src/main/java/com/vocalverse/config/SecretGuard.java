@@ -7,8 +7,7 @@ import org.springframework.context.annotation.Configuration;
  * 密钥 fail-fast（P0-1 / docs/20:185）：production 环境下拒绝已知默认/过短密钥，防伪造 JWT 与内部回调。
  *
  * <p>仅当 {@code vocalverse.app-env == 'production'} 时触发；development/docker/test（compose 用
- * development）不受影响，避免破坏本地一键起。强制生产在 compose/.env 注入非默认 JWT_SECRET 与
- * SERVICE_TOKEN（两服务须独立且不一致）。
+ * development）不受影响，避免破坏本地一键起。强制生产在 compose/.env 注入非默认 JWT_SECRET 与 SERVICE_TOKEN（两服务须独立且不一致）。
  */
 @Configuration
 public class SecretGuard {
