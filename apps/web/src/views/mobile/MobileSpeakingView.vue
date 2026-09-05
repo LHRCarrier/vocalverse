@@ -140,6 +140,11 @@ function onScenePicked(sceneId: number) {
 async function boot() {
   try {
     const scenes = await fetchScenarios()
+    if (!scenes.length) {
+      errorMsg.value = '暂无可用场景，请先执行 seed 初始化演示数据。'
+      phase.value = 'done'
+      return
+    }
     const sceneId = Number(route.params.sceneId)
     scenario.value = scenes.find((s) => s.id === sceneId) ?? scenes[0] ?? null
     if (!scenario.value) {
@@ -163,8 +168,9 @@ async function boot() {
       stage.value = 'practice'
     }
     phase.value = 'ready'
-  } catch (e) {
-    errorMsg.value = (e as Error).message
+  } catch {
+    // 区分失败与无数据（2026-09-05：401/网络失败 ≠ 未 seed）
+    errorMsg.value = '进入场景失败：请检查登录状态与网络后重试'
     phase.value = 'done'
   }
 }

@@ -5,7 +5,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { request, setAuthToken } from '@/api/client'
+import { request, setAuthRefresher, setAuthToken } from '@/api/client'
 
 interface TokenResponse {
   accessToken: string
@@ -111,6 +111,8 @@ export const useAuthStore = defineStore('auth', () => {
 export async function bootstrapAuth() {
   const store = useAuthStore()
   setAuthToken(store.token)
+  // 会话中途 401 静默续期（docs/18 F3；client.ts 注入式钩子，2026-09-05 补：原来只有启动时刷新）
+  setAuthRefresher(() => store.refresh())
   if (store.token) {
     await store.refresh().catch(() => undefined)
   }

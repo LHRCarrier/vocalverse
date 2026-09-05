@@ -2081,6 +2081,10 @@ body {
   color: var(--u-sub);
 }
 
+.u-sheet__retry {
+  padding: 4px 0 10px;
+}
+
 .u-sheet__item {
   width: 100%;
   display: flex;

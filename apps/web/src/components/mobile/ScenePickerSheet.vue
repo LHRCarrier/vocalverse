@@ -18,6 +18,7 @@ const emit = defineEmits<{
 
 const scenes = ref<ScenarioItem[]>([])
 const loading = ref(false)
+const loadError = ref(false)
 
 const DIFF_LABEL: Record<number, string> = { 1: 'L1', 2: 'L2', 3: 'L3', 4: 'L4' }
 
@@ -26,12 +27,15 @@ onMounted(() => {
 })
 
 async function load() {
-  if (scenes.value.length) return
+  if (loading.value) return
+  if (scenes.value.length && !loadError.value) return
   loading.value = true
+  loadError.value = false
   try {
     scenes.value = await fetchScenarios()
   } catch {
     scenes.value = []
+    loadError.value = true // 401/网络失败 ≠ 无数据（2026-09-05：之前误显「请先执行 seed」）
   } finally {
     loading.value = false
   }
@@ -61,9 +65,12 @@ function pick(sceneId: number) {
             </button>
           </header>
           <p class="u-sheet__sub">
-            {{ loading ? '加载中…' : scenes.length ? '选一个预置场景，开始固定题目的场景对话' : '暂无场景，请先执行 seed 初始化演示数据。' }}
+            {{ loading ? '加载中…' : loadError ? '场景加载失败（可能登录已过期），请重试' : scenes.length ? '选一个预置场景，开始固定题目的场景对话' : '暂无场景，请先执行 seed 初始化演示数据。' }}
           </p>
-          <div class="u-sheet__list">
+          <div v-if="loadError && !loading" class="u-sheet__retry">
+            <button class="u-btn u-btn--secondary u-btn--block" type="button" @click="load">重试</button>
+          </div>
+          <div v-if="!loadError" class="u-sheet__list">
             <button
               v-for="s in scenes"
               :key="s.id"
