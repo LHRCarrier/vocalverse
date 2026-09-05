@@ -3,87 +3,22 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
-## 2026-09-05 晚2 场景对话改「先选场景再开工」开始流程（组长拍板）
+## 2026-09-05 【迁移】App 端 UI 记录迁入安卓开发日志（组长指正 · 2026-09-08 已定规）
 
-- 触发（组长反馈）：① 删「点击录音（≤15s）」提示行；② 现状是进 `/m/chat` 立刻自动开题（气泡马上有开场白、连场景都没选）——要求：进页**先让用户选场景**，选好再进流程；
-- 实现（用户给的产品形态，样式不变只换 Icon）：`stage: choose → intro → practice` 三态——
-  - **choose**：无 sceneId 进页（Tab/中央 + 直达）→「先选一个场景开始」空态 + CTA（打开场景选择弹层），不建会话不自动开题；带回显 demo 无效（旧 boots 场景[0]）已废弃;
-  - **intro**：选定场景（或直入 `/m/chat/:id`）→ 会话就绪 + 开场气泡（`speakable` 可点播、**不自动播**）→ 底部大按钮 = **播放图标**（新增 `MobileIcon play` 模板，样式与录音钮完全一致）；
-  - **practice**：点播放 → `playOpening()`（播开场白，气泡喇叭 spinner 复用既有 playTts）→ 按钮**变回录音图标**，进入正常回合流；
-- 边界：`/m/chat`（无参数，从口语 Tab/自由对话「场景选择」不带 id 时）走 choose；`/m/chat/:id` 直入 intro；页内切场景仍回 intro（重听开场白）；带 sceneId 的失败重试不丢场景；
-- 埋点：不加新事件（开场播放复用既有气泡喇叭交互，不进指标口径）；
-- 验证：前端 lint 0 warning / typecheck / vitest / build 全绿；后端零改动。
-- **BUG 修复（同日，组员复测）**：home 点口语 Tab 未选场景直接出题（机场·值机开场白）——根因：**vue-router 可选参数 `:sceneId?` 无值时 params.sceneId = `''`（空串）而非 undefined**（node 实测 `r.resolve('/m/chat').params → {"sceneId":""}`），旧判定 `!== undefined` 放行 → `boot()` → `Number('')=0` 找不到 → `?? scenes[0]` 落默认场景；修复：判定补 `&& !== ''`，且 watch 补 `:id → 无 id` 回退到「先选场景」态（resetToChoose）。
-- **组员反馈（同日）**：「先选一个场景开始」空态文字说明太多 → 标题 + 副文案全部删除，只留线稿锚点 + 「选择场景」按钮。
-- **组员反馈（同日）**：空态出现两个「选择场景」入口（空态按钮 + 底部功能行）——按「不重复不浪费」原则：**choose 态隐藏底部功能行的「场景选择」**（选完场景后的页内切场景入口保留）；空态整体垂直居中，按钮落位在**视觉中点下方**（`.u-empty--center`：min-height 视口-顶栏-dock、按钮 margin-top 32px）。
-- **组员指正（同日）**：**自由对话页功能行出现的「场景选择」是设计失误**——场景选择只属于场景对话页（先选场景流程）；自由对话功能行删「场景选择」（含 sheet 挂载与带 scene_id 跳转分支），只留「场景对话」（切回 `/m/chat` 由该页自己走选场景流程）。
-- **组员反馈（同日）**：自由对话的「场景选择」换成**「新对话」**（清空当前对话记忆重新开始；空态禁用；`free_chat_reset` 事件由预留恢复触发）；顺带修潜在 bug：`abort` 由 const 改 let，新对话后重建 AbortController（abort 过的 signal 复用会导致下一回合立即失败）。
-- **组员反馈（同日）**：自由对话空态提示文字（标题「自由对话」+ 副文案）也全部删掉——与场景对话空态同标准，只留插画并垂直居中（`.u-empty--center`）。
-- **组员反馈（同日）**：加载动画用**墨水下落效果**（组员给的 css-rain-bg 方案，36 层 radial-gradient 交错点阵 + 150s 线性循环）——适配纸面主题（面板底 `--u-paper`、墨色保留组员 `#272257`），落地 `.u-load` 两个场景：① 场景对话进场景加载态（替换原「正在进入场景…」图文）；② 自由对话「AI 思考中」状态改为 44px 雨条动画；`prefers-reduced-motion` 关闭动画；等组员视觉验收。
-- **组员澄清（同日）**：墨雨原意是「**各个功能页之间/APP 启动**」的整幅加载动画，不是页内加载；且被启发后拍板改为**更轻的方案**：**一条 3px AI 状态线**（`.v-line`）——静默 = 纯黑一条线、AI 处理中 = **彩色流光**（repeating-gradient 四色 96px 周期无缝循环）、出错 = 纯红；落地两页顶部（场景对话：loading/busy → 流光，errorMsg → 红；自由对话：sending → 流光，errorMsg → 红）；页内加载回归极简（场景对话加载态 = 居中插画，仅状态线表达处理中）；**.u-load 墨雨 CSS 保留未引用**（预留给启动页/整幅加载，注释已标明）。
-- **组员反馈（同日）**：彩色流光效果不佳——参照墨雨的自然过渡，改为**浅→深平滑彩虹渐变**（8 档色标无硬边、头尾同色 `#cdd7fe` → 100% 循环无缝；`background-size:200%` + `background-position:0%→200%`）；速度降为 2.2s。
-- **组员反馈（同日）**：场景选择弹层显示「暂无场景，请先执行 seed」——**排查结论：DB 有 8 场景、接口正常，是前端 access token 过期**（1h TTL；旧代码只在启动时 bootstrapAuth 刷新一次，会话中途 401 无兜底）；修复三层：① `client.ts` 加 **401 静默续期**（注入式 `setAuthRefresher` 防循环依赖，防重入，refresh 后重试一次，docs/18 F3 落全）；② `stores/auth.ts` bootstrapAuth 注册 refresher；③ 场景弹层与场景页 boot **区分「加载失败」与「无数据」**——失败 → 可操作提示 + 重试按钮，不再误报 seed（seed 提示只在接口 200 且列表为空时显示）。
-- **纠正误诊（同日，组员复测仍空）**：上述「token 过期」**不是真因**——真正根因是弹层懒加载条件写错：`ScenePickerSheet` 平时就挂载着（`open=false`），原代码只在 `onMounted && open` 时 `load()` → **之后打开弹层从不 fetch**（API 一次都没调，永远停在「暂无场景」）；修复：改 `watch(props.open, {immediate:true})` 打开即加载；**教训：懒加载要 watch 打开态，不能挂在 onMounted 上**；401 静默续期与失败态改进保留（仍有效，属于并发防患）。
-- **组长拍板（同日）主页改版**：① 底部 Tab 栏（首页/口语/+/唱吧/我的）功能不变，**样式换成口语同款 uic 新样式**（浮卡圆角 + 炭黑中央主钮，复用既有 `.u-tabbar/.u-tab*`）；② **主页换成社区**（组长：很常见也很不错）——结构 = 「社区」标题 + 问候 + **今日练习 CTA**（护栏：核心闭环入口必须醒目，防被社交淹没）+ 打卡动态流（演示帧 5 条，点赞本地交互不落库）；后端动态流按 docs/10 注记（sessions/attempts JOIN 派生，无新表），M3 排期接真实接口；组长观点已记录：社交激励型主页适合打卡/成绩分享驱动的产品，对答辩演示效果尤其好。
-- **组长概念细化（同日）**：做**英语社区**——互动 = 点赞/分享/评论/**投币**；有**帖子 + 视频**；按**领域**分享动态：① 英语新闻稿 ② 英文教学/学习分享 ③ 外国学习生活·地方习俗习惯（视频 = 帖子视频版，排版参考 X）；重写社区主页（**仅数据展示**）：领域 Tab（横滑 pills，推荐=全量混排）→ 混合信息流（图文帖卡 + 视频封面卡：时长角标/播放钮/封面渐变）→ 互动行（评论/点赞/投币/分享，X 式）＋保留今日练习 CTA 护栏；`MobileIcon` 新增 chat（评论）/ coin（投币）/ share（分享）三图标；数据演示帧 8 条（Global Post 新闻/BBC 6-min 视频/Emma 俚语教学/Teacher Lee 影子法视频/Liz Bonfire Night/大米 MIT 宿舍/Saki 学校午餐），互动计数展示、点赞本地交互。
-- **组长反馈（同日）**：删除「社区标题+问候+今日练习 CTA」整块（不再保留练习入口——组长定稿），顶栏与标签行按 X 来：**X 式顶栏**（左头像 / 中 Logo「社区」/ 右＋发布钮→demo toast「发布动态演示·M3 上线」）+ **X 式文字标签行**（为你推荐▾ / 新闻稿 / 教学分享 / 海外生活，激活=加粗墨色、无 pill 底、下细分隔线）；**顶栏与标签行不固定**——随滚动自然移出屏幕（组员观察 X 行为：看似固定实则随内容滚走）。
-- **组员反馈（同日）**：顶栏右侧「＋发布」改为**「加好友」**（与 X 截图右上角同款图标：人形+加号）——`MobileIcon` 新增 `user-plus`；点击 toast「好友请求已发送 · M3 上线」。
-- **组员反馈（同日，复测看到后）**：底部主导航与社区卡片格格不入（太圆润/显粗）且带中文标签 → **改扁平贴底**：去悬浮胶囊卡（无大圆角/无重阴影，白底 + 1px 细分割线 + safe-area），**中文标签全部删除**（图标 only，无障碍走 title/aria-label），中央 + 主钮缩至 44px 圆角 14 轻微上浮；内容页底部留白 140→96px。另：本轮排查「看不到改动」——先后确认 5173 服务已是最新（curl 模块含 user-plus）、无 PWA/SW 缓存、手机壳地址 `192.168.1.3:8088` 对应容器未起（手机上不可能看到）、重启 Vite 后复测正常；疑似旧 tab 缓存/HMR 未刷，过程记录备查。
-- **组员反馈（同日）**：中央 + 上浮负边距造成错位 → **改为行内平齐**：去掉 `margin-top:-22px`，40px 圆角 12 方块与图标行垂直居中（阴影同步减淡）。
-- **组员反馈（同日）**：移动端容器背景换**点格背景**（组员给的 dot-grid 方案：双 radial-gradient 交错点阵、48px 网格）——落 `.u-phone`，点色用 token 墨色 5% 代替纯黑（与纸面底一致）；底部输入/功能栏 `u-fc-bar-wrap` 由纯纸色改透明让点格透出；等组员视觉验收（不合意可调点色/间距）。
-- **组员反馈（同日）**：点格浓度 5% → **20%**（看效果；参数就三处：点半径 5% / 淡出 6% / 网格 48px）。
+> 组长指正：**App 端 UI/设计相关记录归属 `worklog/安卓开发日志.md`**（本日志只留 Web/后端/全局事项）。
+> 今日以下 App 端 UI 记录已全部迁往安卓开发日志（含后续组员反馈修正痕线，未改动内容）：
+> 场景对话「先选场景再开工」开始流程 · 口语 Hub 收敛删除 · 自由对话页 Grok 式改造（3 子代理评审）·
+> 口语界面 3 项（气泡尾巴/自动播/Hub 与自由对话最小可用版）· 移动端场景对话 2 个 UI 修（气泡尾巴+开场白自动播）。
+> 其中涉及后端/迁移/契约的部分在主线下条留存，UI 与前端交互细节以安卓开发日志为准。
 
 —— 执行人：组长 LHRCarrier（AI 代工整理）
 
-## 2026-09-05 晚 口语 Hub 收敛删除：两页聊天模式 + 功能行互切 + 场景选择弹层
+## 2026-09-05 自由对话后端与埋点（非 UI 主线留存：接口 / 迁移 / 契约 / 登记）
 
-- 触发（组长反馈）：`/m/speaking`（口语 Hub）不再需要——全部收敛成聊天页模式：点击「场景对话」按钮直接切换；功能行中间的「新对话」改为「场景选择」；「语速」按钮去掉；
-- 拍板（组长）：删 Hub 页（路由 `/m/speaking`+组件+Tab 指向）；口语 Tab 与中央 + 直达 `/m/chat`（默认场景）；预置场景列表平移到「**场景选择**」底部弹层（`components/mobile/ScenePickerSheet.vue`，两页共用，懒加载场景列表）；自由对话页功能行 = `[场景对话] [场景选择]`；场景对话页功能行 = `[自由对话] [场景选择]`（页内切场景：`watch route.params.sceneId` → 重置状态重启会话）；语速（含 `/tts` rate 接线）与「新对话」移除；
-- 边界保持：场景对话不直入随机场景——「场景选择」由用户点选后才进 `/m/chat/:id`（原 Hub 场景列表语义原样保留）；
-- 埋点：`free_chat_switch{to:scene, scene_id?}` 保留触发；`free_chat_reset`/`free_chat_rate` 因功能改版**暂不触发**，白名单（CHECK 15 类）与 docs/06 §9.1 预留登记（避免再造迁移回退）；
-- 验证：前端 lint 0 warning / typecheck / vitest / build 绿；后端未动（0 变更，无迁移）；本改动无 OpenAPI 影响；
-- 注：上一轮「语速三档 + 新对话收编」的 code 已随本轮提交历史保留在仓库（git 历史可回溯），但 UI 不再暴露。
-- **组员反馈修正（同日）**：① `/m/free-chat` 返回键用 `router.back()` 会撞 `/demo`（history 依赖，直进 URL 场景可复现）→ 改为确定性导航：自由对话返回 → `/m/chat`、场景对话返回 → `/m/home`；② `/m/chat` 排版错乱——录音钮/录音标签为 `position:fixed`，功能行却是文档流元素排到页面中部 → 功能行改 `.u-tb--dock`；③ 组长再反馈：录音按钮要"到上面去" → 初版调 fixed 坐标（功能行贴底/钮上移），**但标签仍被按钮遮挡**（多 fixed 元素各自定位难保不叠）→ **彻底重构为单一固定容器 `.u-chat-dock`**（标签→录音钮→功能行 flex 自然堆叠，指针穿透容器、子元素恢复），内容区留白 216px；再调坐标的教训：fixed 元素多了以后坐标对表不可靠，改用容器布局。
-
-—— 执行人：组长 LHRCarrier（AI 代工整理）
-
-## 2026-09-05 自由对话页 Grok 式改造（3 子代理评审 → 建议落地 → 提交）
-
-- 触发（组员截图）：①「新对话」浮动按钮压住第一条用户气泡（P0 遮挡）；② 用户指 X·Grok 客户端作参照——底部一排功能卡切换产品能力，要求同款落我们的功能；并明确「先派子代理出设计缺陷报告再动手」；
-- 评审：3 个子代理并行（布局交互 / 视觉组件映射 / 功能信息架构），交付三份只读报告，要点：
-  - **P0** 浮动 `u-fc-reset--float`（absolute top:24/right:16/z-index:20）压内容 → 收编进底部功能行（顶栏三段式被否：上轮已按组长反馈删标题）；
-  - **P1** `.u-content` 140px 底部留白死区（本页无浮动 Tab 栏）+ `min-height:100vh` 导致整页滚动、输入栏被顶出 → `100dvh` + `.u-fc-box{flex:1;min-height:0}` 内部滚动；
-  - **P2** 触控 <48dp（圆钮 38px）、内联自造色 `#16303a`（= `--u-dark-teal` 重复写死）、placeholder 对比度、字号 12.5/14.5/11.5 非网格、`.u-fc-mic` 无 disabled 态；
-  - **功能行候选裁定**（IA 代理）：放**自由对话页输入栏上方**（非 Hub/非全局导航）；`场景对话`（跳 Hub 保边界，不直入随机场景）｜`新对话`（空态禁用）｜`语速`（`+0%→+15%→-25%`，后端 `/tts` rate 已支持，纯前端接线 + localStorage）；**不做**：角色预设（后端 `_SYSTEM_PROMPT` 全静态）、语音/打字模式开关（双通道已并存，开关冗余）、评分/报告（违反 MVP 无评分契约）、音色（属「我的-设置」口径）；
-- 落地：功能行 `.u-tb` 浅色 chip（track 底 + ink 反白选中态语义，64px 高）；输入栏主/次钮——麦克风 = 右侧 48px ink 英雄钮（voice-first，录音态转 error 红）、发送 = 48px track 次钮；删浮动「新对话」；头像 token 化`var(--u-dark-teal)`；字号回收；埋点 3 类 `free_chat_switch/reset/rate`（EventTypes + **迁移 0006** CHECK 12→15 + docs/06 §9.1 / docs/14 §6.3 登记）；
-- 验证：前端 lint 0 warning / typecheck / build 绿；后端 ruff+format+全量 pytest 绿（埋点 15 类逐类落库断言）；alembic 单头 0006 且本地 PG 已应用；契约无 OpenAPI 变更（events 路由 schema 未动，快照零 diff）；
-- 坑：① EventTypes 注释行 103 字符触发 E501（注释也计列宽，重排）；② docs/31 §3 token 表指向 mobile-soft.css（`--s-*` 天蓝）与已落地 mobile-uic.css（`--u-*` 纸灰）不一致——文档漂移已记录，待补（不在本轮范围）。
-
-—— 执行人：组长 LHRCarrier（AI 代工整理）
-
-## 2026-09-05 口语界面 3 项：气泡尾巴修复 + 进页自动播修复 + 口语 Hub 与自由对话（最小可用版）
-
-- 触发（用户截图 + 拍板）：① AI 气泡尾巴长在气泡**左下角**（`.u-bubble--ai::before` bottom:10px），头像在行首——参照微信应从**头像垂直中心**发出；② 进 `/m/chat` 页 `boot()` 对开场白自动 `playTts()`，**进页必响**；③ 用户认为「口语」Tab 定义不清——口语应 = **场景对话（固定出题）+ 自由对话（LLM + TTS）**；
-- 真相澄清：自由对话此前**只有 LLM 框架 + Agent Lab 测试台**（2026-09-03：dev-only、默认关闭、文本输入、不建会话不入库），并非产品页；会话 kind 也只有 `dialog | defense`；
-- 拍板（组长）：按**最小可用版**落地；自由对话输入 = **语音 + 打字都要**，输出 = LLM 流式文本 + 回合后 TTS 自动播报（喇叭可重听）；MVP 不做评分/报告/入库（刷新即失忆，二期见 docs/14 §12.4）；
-- 产出：
-  1. **气泡尾巴**：`bottom:10px` → `top:18px`（头像 44px + 2px 顶距 → 中心 24px；菱形 12px 中心对齐），圆角 `16px 16px 16px 4px` → 全 `16px`；`played` 语义改名 `speakable`（喇叭出现条件）；
-  2. **自动播**：开场白删自动播放（喇叭立即可点）；录音提交后的回合语音仍自动播放（跟读流程需要，用户边界确认）；
-  3. **后端** `routes/free_chat.py`：`POST /api/v1/free-chat/turn`（multipart `audio`/`text` + `history` JSON，至少其一）→ SSE 子集 `user_transcript→text_delta*→turn_end`；无状态 LLM 转发器（TurnRunner 复用、system 全静态人设、无 corpus）；限流 asr+llm；**进 OpenAPI 契约**（快照 + gen:api 已同步）；
-  4. **前端**：`/m/speaking` 口语 Hub（场景对话/自由对话两模式卡 + 预置场景列表）· `/m/free-chat`（气泡同款 + 文本输入 + 麦克风 ≤15s + 「新对话」重置）；TabBar 口语与中央 + → `/m/speaking`；埋点 `free_chat_open`/`free_chat_turn{audio}`（EventTypes + **迁移 0005** 扩 `events.event_type` CHECK 10→12 类；docs/06 §9.1 登记）；
-  5. **文档**：docs/14 §12（定义/接口/前端/分期）+ §6.3 埋点、docs/06 §9.1、docs/10 注记、docs/30 W11/W12；
-- 验证：后端 ruff+format+全量 pytest 绿（新增 `test_free_chat` 6 用例；12 类事件逐类落库）；前端 lint 0 warning / typecheck / vitest 19 / build 绿；**CI 同款契约对账**（app.openapi() vs 快照）一致；alembic 单头 0005 且已应用到本地 PG；**真机链路实测**：Java 登录取 JWT → 自由对话打字轮（真实 DeepSeek 流式 + turn_end）→ 第二轮带 history（turn_index=2、上下文连续）→ 空输入 422；
-- 踩坑：① uvicorn `--reload` 多轮重载后子进程僵在 lifespan → 杀掉重启 dev-up 恢复；② `refresh-openapi.ps1` 导出的 Java 快照与库内差异只有 `servers` 字段 + 格式化（本地 springdoc 与 CI 生成路径不同）→ **回滚 Java 快照**，只提交 Python 快照 + 生成类型；③ 埋点事件是 **DB CHECK** 白名单：只改前端 `EventName` 会静默丢事件，后端 `EventTypes` + 迁移缺一不可（本次一并登记 docs/06-09.1、docs/10）；
-- **组员反馈修正（同日晚，截图验收）**：① 自由对话页左上「自由对话」标题与返回钮重叠 → 删除标题（保留返回钮 + 右上角浮动「新对话」）；② 输入栏发送钮渲染成空圆圈——`MobileIcon` 联合类型早声明了 `'arrow'` 但**从未实现模板** → 补模板（code 审查盲区：类型允许 ≠ 可渲染）；③ 口语 Hub 无返回导航 → 补 `.u-back--float` 返回钮（与其它移动页一致）。
-
-—— 执行人：组长 LHRCarrier（AI 代工整理）
-
-## 2026-09-05 移动端场景对话 2 个 UI 修：气泡尾巴位置 + 进页自动播开场白
-
-- 触发（用户截图反馈）：① AI 气泡尾巴长在气泡**左下角**（`.u-bubble--ai::before` bottom:10px），而头像在行首——参照微信，小尾巴应从**头像垂直中心**发出；② 进 `/m/chat` 页 `boot()` 对开场白自动 `playTts()`，**进页必响**，像微信应点喇叭才出声；
-- 修复：`apps/web/src/styles/mobile-uic.css`——尾巴 `bottom:10px` → `top:18px`（头像 44px+2px 顶距 → 头像中心=距气泡顶 24px；菱形高 12px 中心对齐 24px），气泡圆角由 `16px 16px 16px 4px` 改全 `16px`（4px 小角是配旧左下尾巴的切角，尾巴上移后残留显得像缺口）；`MobileSpeakingView.vue`——开场白删除自动播放、气泡直接 `speakable:true`（喇叭立即可点）；`played` 语义改名 `speakable`（「该气泡有可播语音 / 喇叭出现条件」，原语义是「首次完整播过才有重听按钮」）；
-- 边界（按用户意图保留）：**录音提交后 AI 回合语音仍自动播放**（跟读流程需要：先听后说）；若也要改成全手动点播，一行 `playChunk` 可再调；
-- 验证：`pnpm lint` / `pnpm typecheck` / `pnpm test:run` / `pnpm build` 全绿。
+- **接口**：`routes/free_chat.py` `POST /api/v1/free-chat/turn`（multipart `audio`/`text` + `history` JSON，至少其一 → 422 404 码 42203/42204）→ SSE 子集 `user_transcript→text_delta*→turn_end`（`score_status=unavailable`）；无状态 LLM 转发器（TurnRunner 复用、system 全静态人设、无 corpus）；限流 asr+llm；**进 OpenAPI 契约**（快照 + gen:api 同步，frontend-ci 对账一致）；
+- **埋点白名单扩值（迁移 0005/0006）**：`events.event_type` CHECK 10→12→15 类（`free_chat_open`/`free_chat_turn`/`free_chat_switch`/`free_chat_reset`/`free_chat_rate`；reset 随功能行改版恢复触发、rate 为预留）；alembic 单头 0006，本地 PG 已应用；docs/06 §9.1、docs/10 注记、docs/14 §6.3 登记；
+- **测试**：`tests/test_free_chat.py` 6 用例（流式/校验/多轮 turn_index）+ `test_m2_core.py` 埋点 12→15 类逐类落库断言；后端 ruff+format+全量 pytest 绿；
+- **坑**：① uvicorn `--reload` 多轮重载后子进程僵在 lifespan → 杀进程重启 dev-up；② `refresh-openapi.ps1` 导出的 Java 快照与库内差异仅 `servers` 字段 + 格式化（本地 springdoc 与 CI 生成路径不同）→ 回滚 Java 快照只提交 Python 快照；③ 埋点事件是 **DB CHECK** 白名单：改前端 `EventName` 之外必须同步 `EventTypes` + 迁移，缺一不可；④ `EventTypes` 注释超 100 列触发 E501。
 
 —— 执行人：组长 LHRCarrier（AI 代工整理）
 
