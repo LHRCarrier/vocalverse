@@ -1169,14 +1169,6 @@ body {
   animation: u-spin 0.9s linear infinite;
 }
 
-.u-rec-label {
-  width: 100%;
-  font-size: 13px;
-  color: var(--u-weak);
-  text-align: center;
-  pointer-events: none;
-}
-
 @keyframes u-pulse {
   0% {
     transform: scale(0.92);

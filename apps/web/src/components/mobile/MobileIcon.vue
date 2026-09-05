@@ -29,6 +29,7 @@ const props = withDefaults(
       | 'heart'
       | 'music'
       | 'arrow'
+      | 'play'
       | 'stop'
       | 'volume'
     size?: number
@@ -93,6 +94,11 @@ const props = withDefaults(
     <template v-else-if="props.name === 'arrow'">
       <path d="M5 12h14" />
       <path d="M13 5.5l6.5 6.5-6.5 6.5" />
+    </template>
+
+    <!-- 播放（开始流程：播开场白；2026-09-05） -->
+    <template v-else-if="props.name === 'play'">
+      <path d="M8 5.5L19 12l-11 6.5z" />
     </template>
 
     <!-- 时钟（回合） -->

@@ -68,7 +68,7 @@ pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
 |---|---|---|---|
 | W1 | 登录 | `/login` → demoadult/demo123456 → 登 | 进入 `/m/home`，问候含「成年中级」 |
 | W2 | 首页演示帧 | 观察 | 问候/打卡/统计/分段/三张会话卡（Coffee Shop 86.4 / Perfect Night 88.1 / Job Interview 79.8）与 `ui-concept-design/assets/app-home.png` **逐项一致**（图标块分色、字级、间距） |
-| W3 | 对话开场 | `/m/chat` | Round 0/N、AI 开场气泡 + TTS 播放；8s 无录音出现救援提示卡 |
+| W3 | 对话开场（2026-09-05 改开始流程） | `/m/chat` | 先出现「先选一个场景开始」空态（不自动开题）；选场景 → AI 开场气泡（不自动播）+ 底部**播放钮** → 点播放 → 播开场白 → 按钮变录音钮；8s 无录音出现救援提示卡 |
 | W4 | 录音太短 | 点录 <1s 即停 | 提示「录音太短（x.x s）」，**不推进回合** |
 | W5 | 完整回合 | 录 ~3s 停止 | SSE：字幕流 + 音频队列播放 + 覆盖度 +2 chips；回合数 +1 |
 | W6 | 收尾 | 打满 N 轮（或超时收尾） | session_end → 跳 `/m/report?reportId=…`，真实报告渲染（coverage/建议） |

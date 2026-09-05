@@ -37,6 +37,12 @@ const currentTurn = ref(0)
 const assignedTurns = ref(8)
 const bubbles = ref<Bubble[]>([])
 const recording = ref(false)
+/**
+ * 开始流程（2026-09-05 组长拍板：进页先选场景，选完 → 播放开场白 → 变回录音）：
+ * choose = 未选场景（空态引导）；intro = 已就绪、开场白未播（底部按钮 = 播放图标）；
+ * practice = 已点开始（底部按钮 = 录音图标，进入正常回合流）
+ */
+const stage = ref<'choose' | 'intro' | 'practice'>('choose')
 const phase = ref<'loading' | 'ready' | 'busy' | 'done'>('loading')
 const lastScore = ref<{ pron?: number | null; flu?: number | null; gram?: number | null } | null>(null)
 const scoreStatus = ref<'ok' | 'pending' | 'unavailable' | null>(null)
@@ -56,7 +62,12 @@ let abort = new AbortController()
 const sheetOpen = ref(false)
 
 onMounted(async () => {
-  await boot()
+  // 无 sceneId（口语 Tab/中央 + 直达）→ 先让用户选场景；带 sceneId（场景选择/自由对话切换）→ 直接开工
+  if (route.params.sceneId !== undefined) {
+    await startScene()
+  } else {
+    stage.value = 'choose'
+  }
 })
 
 onUnmounted(() => {
@@ -65,11 +76,11 @@ onUnmounted(() => {
   replayAudio?.pause()
 })
 
-/* 功能行「场景选择」：页内切场景 = 重置状态后重新 boot（Hub 已删，2026-09-05） */
+/* 功能行「场景选择」/空态 CTA：页内切场景 = 重置状态后重新开工（Hub 已删，2026-09-05） */
 watch(
   () => route.params.sceneId,
   (v, old) => {
-    if (old !== undefined && v !== old) void startScene()
+    if (v !== old && v !== undefined) void startScene()
   },
 )
 
@@ -92,6 +103,7 @@ async function startScene() {
   currentAssistant.value = null
   playingBubble.value = null
   phase.value = 'loading'
+  stage.value = 'practice' // 加载中先挂到练习态（隐藏「选场景」空态；boot 完成后按开场白落在 intro/practice）
   await boot()
 }
 
@@ -119,13 +131,26 @@ async function boot() {
     assignedTurns.value = session.assigned_turns ?? 8
     await track('scene_start', { sceneId: scenario.value.id, payload: { session_id: session.id } })
     if (scenario.value.opening_line) {
-      // 开场白不自动播放（微信式：点喇叭才出声；2026-09-05 修「进页就自动响」）
+      // 开场白不自动播放：进页不响；由底部「播放」按钮触发（2026-09-05 开始流程）
       bubbles.value.push({ role: 'assistant', text: scenario.value.opening_line, speakable: true })
+      stage.value = 'intro'
+    } else {
+      stage.value = 'practice'
     }
     phase.value = 'ready'
   } catch (e) {
     errorMsg.value = (e as Error).message
     phase.value = 'done'
+  }
+}
+
+/** 开始流程第 2 步：点「播放」→ 播开场白 → 底部按钮变回录音；气泡喇叭态用既有 playTts 呈现 */
+function playOpening() {
+  if (stage.value !== 'intro') return
+  stage.value = 'practice'
+  const first = bubbles.value[0]
+  if (first && first.text) {
+    void playTts(first.text, undefined, 0)
   }
 }
 
@@ -227,9 +252,14 @@ async function startRecording() {
 }
 
 function bootAgain() {
-  errorMsg.value = null
-  phase.value = 'loading'
-  void boot().catch(() => undefined)
+  // 失败重试 = 重置后重开（含「先选场景」分支：带 sceneId 直接重开，无则回到 choose 态）
+  if (route.params.sceneId !== undefined) {
+    void startScene().catch(() => undefined)
+  } else {
+    stage.value = 'choose'
+    errorMsg.value = null
+    phase.value = 'loading'
+  }
 }
 
 recorder.onStateChange = (state) => {
@@ -333,8 +363,20 @@ function onSseEvent(e: SseStreamEvent) {
         <MobileIcon name="back" />
       </button>
 
+      <!-- 开始流程第 1 步：先选场景（组长拍板 2026-09-05：进页不再自动开题） -->
+      <section v-if="stage === 'choose'" class="u-empty">
+        <div class="u-empty__art"><MobileArt name="mic" :size="96" /></div>
+        <div class="u-empty__title">先选一个场景开始</div>
+        <div class="u-empty__sub">场景对话基于预置题目卡（8 轮引导 + 三维评分）；自由对话可在底部随时切换。</div>
+        <div class="u-done__actions" style="width: 100%; max-width: 280px">
+          <button class="u-btn u-btn--primary u-btn--block" type="button" @click="sheetOpen = true">
+            选择场景
+          </button>
+        </div>
+      </section>
+
       <!-- 加载态：声波线稿锚点 -->
-      <div v-if="!bubbles.length && phase === 'loading'" class="u-empty">
+      <div v-else-if="!bubbles.length && phase === 'loading'" class="u-empty">
         <div class="u-empty__art"><MobileArt name="wave" :size="104" /></div>
         <div class="u-empty__title">正在进入场景…</div>
         <div class="u-empty__sub">数字人正在准备开场白，稍等片刻。</div>
@@ -411,21 +453,23 @@ function onSseEvent(e: SseStreamEvent) {
       </section>
     </div>
 
-    <!-- 底部 dock（2026-09-05 重构：单一固定容器内标签/录音钮/功能行自然堆叠，杜绝 fixed 坐标重叠） -->
+    <!-- 底部 dock（2026-09-05：标签已删；开始流程 = 播放图标 → 点击开始 → 变回录音） -->
     <div class="u-chat-dock">
-      <div v-if="phase !== 'done'" class="u-rec-label">
-        {{ recording ? '录音中，点击 ■ 停止并提交' : phase === 'busy' ? '评分中，请稍候…' : '点击录音（≤15s）' }}
-      </div>
       <button
+        v-if="stage !== 'choose'"
         class="u-rec"
         :class="{ 'u-rec--recording': recording, 'u-rec--busy': phase === 'busy' }"
         :disabled="phase !== 'ready' && !recording"
         type="button"
-        :title="recording ? '停止录音' : '开始录音'"
-        @click="startRecording"
+        :title="stage === 'intro' ? '开始练习（播放开场白）' : recording ? '停止录音' : '开始录音'"
+        :aria-label="stage === 'intro' ? '开始练习' : recording ? '停止录音' : '开始录音'"
+        @click="stage === 'intro' ? playOpening() : startRecording()"
       >
         <span v-if="phase !== 'busy'" class="ring" />
         <span v-if="phase === 'busy'" class="arc" />
+        <template v-else-if="stage === 'intro'">
+          <MobileIcon name="play" :size="30" />
+        </template>
         <MobileIcon v-else-if="recording" name="stop" :size="26" />
         <MobileIcon v-else name="mic" :size="30" />
       </button>
