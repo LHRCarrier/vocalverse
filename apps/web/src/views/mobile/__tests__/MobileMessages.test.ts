@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import MobileChatView from '@/views/mobile/MobileChatView.vue'
@@ -12,6 +13,8 @@ const router = createRouter({
     { path: '/m/messages/:id', component: MobileChatView },
   ],
 })
+
+beforeEach(() => setActivePinia(createPinia()))
 
 describe('MobileMessagesView', () => {
   it('渲染会话列表：名字 / 最后消息 / 未读点（仅 Kai）', async () => {
