@@ -16,7 +16,6 @@ import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
-import ScenePickerSheet from '@/components/mobile/ScenePickerSheet.vue'
 import '@/styles/mobile-uic.css'
 
 interface Bubble {
@@ -37,7 +36,6 @@ const errorMsg = ref<string | null>(null)
 const currentAssistant = ref<Bubble | null>(null)
 const playingBubble = ref<number | null>(null)
 const chatBox = ref<HTMLElement | null>(null)
-const sheetOpen = ref(false)
 
 let replayAudio: HTMLAudioElement | null = null
 let autoPlayToken = 0 // 回合自增：mounted 时递增，旧回合的播放回调失效
@@ -64,14 +62,10 @@ watch(
   },
 )
 
-function goScene(sceneId?: number) {
-  // 功能行（2026-09-05 组长拍板：Hub 已删）：场景对话 = 直达场景模式（场景选择可带指定场景）
-  void track('free_chat_switch', { payload: sceneId ? { to: 'scene', scene_id: sceneId } : { to: 'scene' } })
-  if (sceneId) {
-    router.push(`/m/chat/${sceneId}`)
-  } else {
-    router.push('/m/chat')
-  }
+function goScene() {
+  // 功能行（2026-09-05 组长拍板：自由对话不做场景选择——切回场景对话页，由该页的「先选场景」流程处理）
+  void track('free_chat_switch', { payload: { to: 'scene' } })
+  router.push('/m/chat')
 }
 
 function pushUser(text: string) {
@@ -267,15 +261,11 @@ function replay(index: number, text: string) {
       </div>
 
       <div class="u-fc-bar-wrap">
-        <!-- 功能行（2026-09-05 组长拍板：删 Hub/语速；模式互切 + 场景选择） -->
+        <!-- 功能行（2026-09-05：自由对话只保留「切回场景对话」；场景选择归场景对话页的选场景流程） -->
         <div class="u-tb" role="toolbar" aria-label="口语功能">
           <button class="u-tb-item" type="button" title="切换到场景对话（固定题卡跟练）" @click="goScene()">
             <MobileIcon name="coffee" :size="22" />
             <span class="u-tb-item__label">场景对话</span>
-          </button>
-          <button class="u-tb-item" type="button" title="选择预置场景开始场景对话" @click="sheetOpen = true">
-            <MobileIcon name="chevron" :size="22" />
-            <span class="u-tb-item__label">场景选择</span>
           </button>
         </div>
 
@@ -316,8 +306,6 @@ function replay(index: number, text: string) {
           </button>
         </div>
       </div>
-
-      <ScenePickerSheet :open="sheetOpen" @update:open="sheetOpen = $event" @select="goScene" />
     </div>
   </div>
 </template>
