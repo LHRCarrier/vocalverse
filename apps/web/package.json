@@ -31,7 +31,7 @@
     "@iconify-json/ph": "^1.2.2",
     "@iconify-json/tabler": "^1.2.38",
     "@types/d3": "^7.4.3",
-    "@types/node": "^22.10.0",
+    "@types/node": "^26.4.1",
     "@types/p5": "^1.7.7",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/test-utils": "^2.5.0",
