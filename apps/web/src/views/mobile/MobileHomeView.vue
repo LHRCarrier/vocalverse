@@ -1,227 +1,285 @@
 <script setup lang="ts">
 /**
- * 移动端 · 今日学习（首页）—— v6 clean 重设计（docs/31 §5.1 + pages/home.md v6）
+ * 移动端 · 英语社区主页（组长概念拍板 2026-09-05：点赞/分享/评论/投币 · 帖子+视频 · 三个领域）
  *
- * 设计语言 = 与登录页同源（user 验收的 bad-cheetah-74）：
- *  - 灰底白卡 / 1.5px #ECEDEC 细边 / 圆角 20-10 / 无硬阴影
- *  - 炭黑按钮（与 Sign In 同款）＝ 唯一行动；蓝 #2D79F3 ＝ 交互·链接·选中
- *  - 焦点 = 今日任务白卡（含炭黑主按钮）→ 统计 → 白 pill 分段（蓝边选中）→ 列表
- *  - 移除深色卡/硬阴影/黄色大块（金色只做激励 glyph）
- * 数据口径：【占位·M3】演示帧值；真实可用：问候名 + CTA/会话卡跳转。
+ * 领域：① 英语新闻稿 ② 英文教学/学习分享 ③ 外国学习生活·地方习俗习惯；视频 = 帖子视频版（排版另设计，参考 X）。
+ * 排版参考 X：领域 Tab（推荐=全量）→ 混合信息流（帖子图文卡 / 视频封面卡）→ 互动行（评论/点赞/投币/分享）。
+ * 仅数据展示（组长明示）：演示帧数据 + 点赞为本地点赞交互；分享/评论/投币暂为展示。
+ * 后端真流 = docs/10 注记（sessions/attempts JOIN 派生 + post_likes）；M3 排期。
  */
 import { computed, ref } from 'vue'
 
 import { useAuthStore } from '@/stores/auth'
 
-import IconBriefcase from '~icons/tabler/briefcase'
-import IconChartBar from '~icons/tabler/chart-bar'
-import IconCheck from '~icons/tabler/check'
-import IconCoffee from '~icons/tabler/coffee'
-import IconFlame from '~icons/tabler/flame'
-import IconHeadphones from '~icons/tabler/headphones'
-import IconMicrophone from '~icons/tabler/microphone'
-import IconMusic from '~icons/tabler/music'
-import IconStarFilled from '~icons/tabler/star-filled'
+import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
-import '@/styles/mobile-soft.css'
+import '@/styles/mobile-uic.css'
 
 const auth = useAuthStore()
 
-/* ---------- 问候（真实账户） ---------- */
-function greeting(): string {
-  const h = new Date().getHours()
-  if (h < 12) return '早上好'
-  if (h < 18) return '下午好'
-  return '晚上好'
+const displayName = ref(auth.me?.nickname ?? auth.me?.username ?? '同学')
+const avatarLetter = ref(displayName.value.slice(0, 1).toUpperCase())
+
+/* ---------- 领域标签（X 式：为你推荐 = 全量混排） ---------- */
+type Domain = '新闻稿' | '教学分享' | '海外生活'
+const tabs = ['为你推荐', '新闻稿', '教学分享', '海外生活'] as const
+const activeTab = ref<(typeof tabs)[number]>('为你推荐')
+
+/* 加好友演示 toast（仅数据展示 · M3 接真实好友/关注流） */
+const toastText = ref('')
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+
+function demoAddFriend() {
+  toastText.value = '好友请求已发送 · M3 上线'
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastText.value = ''
+  }, 2200)
 }
 
-const displayName = computed(() => auth.me?.nickname ?? auth.me?.username ?? '同学')
-const avatarLetter = computed(() => displayName.value.slice(0, 1).toUpperCase())
-
-/* ---------- 分段筛选（选中 = 蓝边蓝字加粗） ---------- */
-type Tab = 'all' | 'speaking' | 'singing'
-
-const tab = ref<Tab>('all')
-
-const tabs: { key: Tab; label: string; icon: typeof IconChartBar }[] = [
-  { key: 'all', label: '全部', icon: IconChartBar },
-  { key: 'speaking', label: '口语', icon: IconMicrophone },
-  { key: 'singing', label: '唱歌', icon: IconMusic },
-]
-
-/* ---------- 最近练习（【占位·M3】演示帧数据，接入后替换） ---------- */
-interface Session {
+/* ---------- 动态流（【演示帧】仅数据展示；M3 接真实 JOIN 流） ---------- */
+interface FeedItem {
   id: number
-  kind: 'speaking' | 'singing'
-  icon: typeof IconCoffee
+  author: string
+  handle: string
+  level: string
+  time: string
+  domain: Domain
+  kind: 'post' | 'video'
   title: string
-  sub: string
-  value: string
-  valueInk?: boolean
-  badge: { text: string; variant: 'success' | 'star' | 'neutral' }
+  desc?: string
+  /** 图文帖的配图（演示：渐变块 + 标签）；视频为封面渐变 */
+  media?: { gradient: string; label: string }
+  duration?: string
+  stats: { like: number; comment: number; coin: number; share: number }
+  liked: boolean
+  tint: string
 }
 
-const sessions: Session[] = [
+const feed = ref<FeedItem[]>([
   {
     id: 1,
-    kind: 'speaking',
-    icon: IconCoffee,
-    title: '情景对话 · 咖啡店点单',
-    sub: '今天 9:30 · 8 轮 · 用时 3 分 12 秒',
-    value: '86.4',
-    badge: { text: '完成', variant: 'success' },
+    author: 'Global Post',
+    handle: '@globalpost',
+    level: 'L4',
+    time: '12 分钟前',
+    domain: '新闻稿',
+    kind: 'post',
+    title: "'AI learning' is taking over China's classrooms — what it means for English learners",
+    desc: 'Education experts say AI partners are changing how students practice speaking, but human teachers remain the gold standard for feedback.',
+    media: { gradient: 'linear-gradient(135deg, #16303a, #2b5566)', label: '📰 NEWS' },
+    stats: { like: 328, comment: 46, coin: 37, share: 15 },
+    liked: false,
+    tint: '#16303a',
   },
   {
     id: 2,
-    kind: 'singing',
-    icon: IconMusic,
-    title: '跟唱 · Perfect Night',
-    sub: '昨天 20:15 · 跟唱 2 遍 · 音准 88',
-    value: '88.1',
-    badge: { text: '新纪录', variant: 'star' },
+    author: 'BBC Learning English',
+    handle: '@bbcle',
+    level: 'L3',
+    time: '32 分钟前',
+    domain: '新闻稿',
+    kind: 'video',
+    title: '6 Minute English: Why do we procrastinate?',
+    desc: 'A new episode with vocabulary that’s actually used in daily conversation.',
+    media: { gradient: 'linear-gradient(135deg, #3a2440, #6b3f78)', label: '🎬 VIDEO' },
+    duration: '6:23',
+    stats: { like: 1240, comment: 189, coin: 210, share: 96 },
+    liked: false,
+    tint: '#3a2440',
   },
   {
     id: 3,
-    kind: 'speaking',
-    icon: IconBriefcase,
-    title: '情景对话 · 面试自我介绍',
-    sub: '9 月 12 日 · 6 轮 · 中级难度',
-    value: '79.8',
-    valueInk: true,
-    badge: { text: '待提升', variant: 'neutral' },
+    author: 'Emma · 英文教学',
+    handle: '@emmashare',
+    level: 'L3',
+    time: '1 小时前',
+    domain: '教学分享',
+    kind: 'post',
+    title: '5 phrasal verbs that make you sound natural at a coffee shop',
+    desc: '1) pick up 2) sit down 3) pour out 4) hand over 5) run out of — with example dialogues for each. Save this before your next role-play!',
+    media: { gradient: 'linear-gradient(135deg, #1e2b26, #3d5648)', label: '✍️ STUDY' },
+    stats: { like: 86, comment: 12, coin: 25, share: 8 },
+    liked: false,
+    tint: '#1e2b26',
   },
   {
     id: 4,
-    kind: 'singing',
-    icon: IconHeadphones,
-    title: '跟唱 · Yesterday Once More',
-    sub: '9 月 10 日 · 跟唱 1 遍 · 节奏 91',
-    value: '91.5',
-    badge: { text: '优秀', variant: 'success' },
+    author: 'Teacher Lee',
+    handle: '@leeenglish',
+    level: 'L4',
+    time: '2 小时前',
+    domain: '教学分享',
+    kind: 'video',
+    title: 'How I memorize 100 new words a month — the shadowing method',
+    desc: 'My 10-minute daily routine: listen, shadow, record, compare. Full breakdown inside.',
+    media: { gradient: 'linear-gradient(135deg, #232044, #4a4396)', label: '🎬 VIDEO' },
+    duration: '8:12',
+    stats: { like: 512, comment: 77, coin: 130, share: 41 },
+    liked: false,
+    tint: '#232044',
   },
-]
+  {
+    id: 5,
+    author: 'Liz 在伦敦',
+    handle: '@lizinlondon',
+    level: 'L3',
+    time: '3 小时前',
+    domain: '海外生活',
+    kind: 'post',
+    title: 'My first Bonfire Night — why Brits burn effigies on 5th November',
+    desc: 'Guy Fawkes Night explained in 3 sentences: a failed plot, a bonfire tradition, and my first "penny for the guy". Tonight we watched sparks over the Thames.',
+    stats: { like: 150, comment: 23, coin: 18, share: 12 },
+    liked: false,
+    tint: '#0f3a44',
+  },
+  {
+    id: 6,
+    author: '大米在 Boston',
+    handle: '@damilinboston',
+    level: 'L2',
+    time: '昨天 21:40',
+    domain: '海外生活',
+    kind: 'video',
+    title: 'Dorm life at MIT: my morning in 60 seconds',
+    desc: 'Kitchen talk, roommate practices, and the shortest walk to class I could find.',
+    media: { gradient: 'linear-gradient(135deg, #2b4a3a, #5c8a6a)', label: '🎬 VIDEO' },
+    duration: '1:02',
+    stats: { like: 73, comment: 9, coin: 22, share: 5 },
+    liked: false,
+    tint: '#2b4a3a',
+  },
+  {
+    id: 7,
+    author: 'Saki 在京都',
+    handle: '@sakiinkyoto',
+    level: 'L2',
+    time: '昨天 15:06',
+    domain: '海外生活',
+    kind: 'post',
+    title: 'Japanese school lunch culture — 25 minutes of mindful eating',
+    desc: 'Students serve each other, eat together, and never waste. The "kyushoku" system teaches more than nutrition — it teaches community.',
+    stats: { like: 201, comment: 34, coin: 41, share: 19 },
+    liked: false,
+    tint: '#4a3320',
+  },
+  {
+    id: 8,
+    author: 'Global Post',
+    handle: '@globalpost',
+    level: 'L4',
+    time: '2 天前',
+    domain: '新闻稿',
+    kind: 'post',
+    title: 'Tourism rebound: the quiet villages welcoming slow travellers',
+    desc: 'As visa policies ease, small towns across Europe are betting on "slow travel" — longer stays, fewer tourists, richer culture.',
+    media: { gradient: 'linear-gradient(135deg, #37546e, #6e96b4)', label: '🗺️ TRAVEL' },
+    stats: { like: 468, comment: 55, coin: 63, share: 27 },
+    liked: false,
+    tint: '#37546e',
+  },
+])
 
-const visibleSessions = computed(() =>
-  tab.value === 'all' ? sessions : sessions.filter((s) => s.kind === tab.value),
+const visibleFeed = computed(() =>
+  activeTab.value === '为你推荐' ? feed.value : feed.value.filter((f) => f.domain === activeTab.value),
 )
 
-/* ---------- 今日任务（【占位·M3】学习计划 P1 演示帧） ---------- */
-const planSteps = [
-  { text: '场景对话 · 1 轮', done: false },
-  { text: '跟唱练习 · 1 遍', done: true },
-] as const
+function fmt(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
+}
+
+function toggleLike(item: FeedItem) {
+  item.liked = !item.liked
+  item.stats.like += item.liked ? 1 : -1
+}
 </script>
 
 <template>
-  <div class="s-phone">
-    <div class="s-page">
-      <!-- 身份：问候 + 头像 -->
-      <header class="s-head">
-        <div>
-          <h1 class="s-h1">{{ greeting() }}，{{ displayName }}</h1>
-          <p class="s-caption" style="margin-top: 4px">今天练完这 1 次，就能保住连胜。</p>
-        </div>
-        <div class="s-avatar" aria-label="头像">{{ avatarLetter }}</div>
+  <div class="u-phone">
+    <div class="u-comm">
+      <!-- X 式顶栏（左头像 / 中 Logo / 右加好友；随滚动移出屏幕，非 sticky） -->
+      <header class="u-x-top">
+        <span class="u-x-avatar" aria-label="头像">{{ avatarLetter }}</span>
+        <span class="u-x-logo">社区</span>
+        <button class="u-x-act" type="button" title="加好友（演示）" aria-label="加好友" @click="demoAddFriend">
+          <MobileIcon name="user-plus" :size="18" />
+        </button>
       </header>
 
-      <!-- 激励 chip（金色只做 glyph） -->
-      <div class="s-streak">
-        <IconFlame />
-        连续打卡 12 天 · 本周 5/7
-      </div>
-
-      <!-- 焦点：今日任务白卡 + 炭黑主按钮（与 Sign In 同款） -->
-      <section class="s-plan s-card" aria-label="今日练习">
-        <span class="s-plan__badge"><IconFlame style="width: 13px; height: 13px" />今日</span>
-        <h2 class="s-plan__title">今日练习</h2>
-        <p class="s-plan__sub s-caption">目标 5/7 · 已完成 1 项</p>
-        <div class="s-plan__steps">
-          <template v-for="s in planSteps" :key="s.text">
-            <div class="s-plan__step" :class="{ 'is-done': s.done }">
-              <span class="s-plan__dot" :class="{ 'is-done': s.done }" aria-hidden="true" />
-              {{ s.text }}
-              <IconCheck
-                v-if="s.done"
-                style="width: 14px; height: 14px; color: var(--s-success)"
-              />
-            </div>
-          </template>
-        </div>
-        <RouterLink to="/m/chat" class="s-btn s-btn--primary s-btn--block">
-          <IconMicrophone style="width: 18px; height: 18px" />
-          开始今日练习
-        </RouterLink>
-      </section>
-
-      <!-- 统计白卡（绿=成绩 / 金 glyph=连续） -->
-      <section class="s-stats s-card" aria-label="学习统计">
-        <div>
-          <div class="s-stat-label">累计轮数</div>
-          <div class="s-stat-value">38</div>
-        </div>
-        <div>
-          <div class="s-stat-label">平均分</div>
-          <div class="s-stat-value s-stat-value--score">86.4</div>
-        </div>
-        <div>
-          <div class="s-stat-label">连续天数</div>
-          <div class="s-stat-value s-stat-value--star">
-            <IconStarFilled style="width: 16px; height: 16px" />12
-          </div>
-        </div>
-      </section>
-
-      <!-- 筛选：白 pill 按钮组（选中 = 蓝边蓝字，复用表单 .btn hover 语言） -->
-      <div class="s-segment" role="tablist" aria-label="练习类型筛选">
+      <!-- 领域标签行（X 式文字标签：为你推荐▾ + 三个领域） -->
+      <nav class="u-x-tabs" aria-label="社区领域">
         <button
           v-for="t in tabs"
-          :key="t.key"
+          :key="t"
+          class="u-x-tab"
+          :class="{ active: activeTab === t }"
           type="button"
-          role="tab"
-          :aria-selected="tab === t.key"
-          class="s-segment__btn"
-          :class="{ active: tab === t.key }"
-          @click="tab = t.key"
+          :aria-selected="activeTab === t"
+          @click="activeTab = t"
         >
-          <component :is="t.icon" aria-hidden="true" />{{ t.label }}
+          {{ t }}
+          <span v-if="t === '为你推荐'" class="u-x-caret" aria-hidden="true">▾</span>
         </button>
-      </div>
+      </nav>
 
-      <!-- 轨迹：最近练习（类别色 tint 图标块 + 蓝色数值） -->
-      <h3 class="s-h3 s-section">最近练习</h3>
-      <template v-for="s in visibleSessions" :key="s.id">
-        <RouterLink
-          :to="s.kind === 'speaking' ? '/m/chat' : '/m/sing'"
-          class="s-row"
-          :aria-label="`查看 ${s.sub}`"
+      <!-- 信息流：帖子图文卡 / 视频封面卡（参考 X） -->
+      <section v-for="item in visibleFeed" :key="item.id" class="u-comm-item" :aria-label="`${item.author} 的动态`">
+        <header class="u-comm-item__head">
+          <span class="u-comm-item__ava" :style="{ background: item.tint }">{{ item.author.slice(0, 1) }}</span>
+          <span class="u-comm-item__who">
+            <span class="u-comm-item__name">{{ item.author }} <span class="u-comm-item__domain">{{ item.domain }}</span></span>
+            <span class="u-comm-item__meta">{{ item.handle }} · {{ item.level }} · {{ item.time }}</span>
+          </span>
+        </header>
+
+        <h3 class="u-comm-item__title">{{ item.title }}</h3>
+        <p v-if="item.desc" class="u-comm-item__desc">{{ item.desc }}</p>
+
+        <!-- 配图 / 视频封面 -->
+        <div
+          v-if="item.media"
+          class="u-comm-media"
+          :class="{ 'u-comm-media--video': item.kind === 'video' }"
+          :style="{ background: item.media.gradient }"
         >
-          <span
-            class="s-row__icon"
-            :class="s.kind === 'speaking' ? 's-row__icon--speaking' : 's-row__icon--singing'"
+          <span v-if="item.kind === 'video'" class="u-comm-media__play"><MobileIcon name="play" :size="22" /></span>
+          <span v-if="item.duration" class="u-comm-media__dur">{{ item.duration }}</span>
+          <span class="u-comm-media__label">{{ item.media.label }}</span>
+        </div>
+
+        <!-- 互动行：评论 / 点赞 / 投币 / 分享（X 式） -->
+        <footer class="u-comm-item__foot">
+          <span class="u-comm-action">
+            <MobileIcon name="chat" :size="15" />
+            {{ fmt(item.stats.comment) }}
+          </span>
+          <button
+            class="u-comm-action"
+            :class="{ 'is-liked': item.liked }"
+            type="button"
+            :aria-pressed="item.liked"
+            :aria-label="item.liked ? '取消点赞' : '点赞'"
+            @click="toggleLike(item)"
           >
-            <component :is="s.icon" aria-hidden="true" />
+            <MobileIcon name="heart" :size="15" />
+            {{ fmt(item.stats.like) }}
+          </button>
+          <span class="u-comm-action">
+            <MobileIcon name="coin" :size="15" />
+            {{ fmt(item.stats.coin) }}
           </span>
-          <span class="s-row__main">
-            <span class="s-row__title">{{ s.title }}</span>
-            <span class="s-row__sub">{{ s.sub }}</span>
+          <span class="u-comm-action">
+            <MobileIcon name="share" :size="15" />
+            {{ fmt(item.stats.share) }}
           </span>
-          <span class="s-row__right">
-            <span class="s-row__value" :class="{ 's-row__value--ink': s.valueInk }">{{ s.value }}</span>
-            <span class="s-badge" :class="`s-badge--${s.badge.variant}`">{{ s.badge.text }}</span>
-          </span>
-        </RouterLink>
-      </template>
+        </footer>
+      </section>
 
-      <div v-if="!visibleSessions.length" class="s-empty">
-        <div class="s-empty__icon"><IconMicrophone /></div>
-        <div class="s-empty__title">还没有记录</div>
-        <div class="s-empty__sub">完成第一次练习后，这里会展示你的成长轨迹。</div>
-      </div>
-
-      <p class="s-note" style="margin-top: 20px">
-        统计与列表为演示帧数据，M3 接入真实会话记录后自动替换。
-      </p>
+      <p class="u-comm__note">内容为演示数据，仅展示；互动与真实流的接口按 docs/10 注记排期 M3。</p>
     </div>
+
+    <!-- 发布演示 toast（X 式蓝药丸 → 我们白卡 + 圆点） -->
+    <div v-if="toastText" class="u-toast show"><span class="dot" aria-hidden="true" />{{ toastText }}</div>
 
     <MobileTabBar />
   </div>

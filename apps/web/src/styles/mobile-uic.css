@@ -65,7 +65,15 @@ body {
   max-width: 480px;
   margin: 0 auto;
   min-height: 100vh;
-  background: var(--u-paper);
+  background-color: var(--u-paper);
+  /* 点格背景（组员提供的 dot-grid 方案，2026-09-05：双 radial-gradient 交错点阵；点色 = 墨色 20%，网格 48px） */
+  background-image:
+    radial-gradient(rgba(28, 28, 26, 0.2) 5%, transparent 6%),
+    radial-gradient(rgba(28, 28, 26, 0.2) 5%, transparent 6%);
+  background-position:
+    0 0,
+    24px 24px;
+  background-size: 48px 48px;
   position: relative;
   overflow-x: hidden;
   font-family: var(--u-font);
@@ -79,6 +87,38 @@ body {
 
 .u-content--free {
   padding-bottom: 48px;
+}
+
+/* 场景对话页：底部 dock 固定容器（标签/录音钮/功能行自然堆叠，杜绝 fixed 坐标重叠；2026-09-05） */
+.u-chat-dock {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px calc(12px + env(safe-area-inset-bottom));
+  z-index: 5;
+  pointer-events: none; /* 容器不拦截；子元素单独恢复 */
+}
+
+.u-chat-dock > * {
+  pointer-events: auto;
+}
+
+/* 场景对话页：底部 dock 加大留白（新版 dock 高 ≈200px） */
+.u-content--dock {
+  padding-bottom: 216px;
+}
+
+/* 场景对话页功能行：dock 内最底一行（组长反馈 2026-09-05：录音按钮要"到上面去"） */
+.u-tb--dock {
+  width: 100%;
+  margin: 0; /* 覆盖 .u-tb 的 margin-bottom */
 }
 
 /* ============================================================
@@ -863,18 +903,19 @@ body {
   position: relative;
 }
 
-/* AI 气泡：左下角尾巴 = 从图标右下角"长"出来 */
+/* AI 气泡：尾巴指向头像垂直中心（微信式；2026-09-05 修：原 bottom:10px 尾巴在气泡底部、离头像远） */
 .u-bubble--ai {
   background: var(--u-track);
   color: var(--u-ink);
-  border-radius: 16px 16px 16px 4px;
+  border-radius: 16px;
 }
 
+/* 尾巴：头像 44px + margin-top 2px → 头像中心距气泡顶 24px；菱形高 12px → top = 24-6 = 18px */
 .u-bubble--ai::before {
   content: '';
   position: absolute;
   left: -5px;
-  bottom: 10px;
+  top: 18px;
   width: 12px;
   height: 12px;
   background: var(--u-track);
@@ -997,6 +1038,17 @@ body {
   color: var(--u-ink);
 }
 
+/* 垂直居中的空态（场景对话「先选场景」：按钮落在视觉中点下方一点；2026-09-05） */
+.u-empty--center {
+  min-height: calc(100dvh - 72px - 210px); /* 视口 - 顶栏 - 底部 dock */
+  justify-content: center;
+  padding-bottom: 24px;
+}
+
+.u-empty--center .u-done__actions {
+  margin-top: 32px; /* 组整体居中后，按钮再下移 → 位于视觉中点下方 */
+}
+
 .u-empty__art {
   width: 120px;
   color: var(--u-ink);
@@ -1017,6 +1069,501 @@ body {
   color: var(--u-weak);
   line-height: 1.6;
   max-width: 240px;
+}
+
+/* ============================================================
+ * AI 状态线（组员拍板 2026-09-05：彩色流光一条线替代大加载面板）
+ * 静默 = 纯黑；AI 处理中 = 彩色流光；出错 = 纯红；整宽 3px 贴容器顶部
+ * ============================================================ */
+.v-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--u-ink);
+  z-index: 30;
+}
+
+.v-line--busy {
+  animation: v-line-flow 2.2s linear infinite;
+  /* 平滑彩虹渐变（浅→深、无硬边；头尾同色 → 流动无缝；2026-09-05 组员反馈：参考墨雨的自然过渡） */
+  background-image: linear-gradient(
+    90deg,
+    #cdd7fe 0%,
+    #93c5fd 14%,
+    #67e8f9 28%,
+    #86efac 42%,
+    #fcd34d 56%,
+    #fda4af 70%,
+    #f0abfc 84%,
+    #cdd7fe 100%
+  );
+  background-size: 200% 100%;
+}
+
+.v-line--error {
+  background: var(--u-error);
+}
+
+@keyframes v-line-flow {
+  from {
+    background-position: 0% 0;
+  }
+  to {
+    background-position: 200% 0; /* 平移整幅渲染图（2 倍宽）→ 无缝循环 */
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v-line--busy {
+    animation: none;
+  }
+}
+
+/* ============================================================
+ * 社区主页（组长拍板 2026-09-05：英语社区；X 式顶栏 + 文字标签 + 帖子/视频混合流）
+ * ============================================================ */
+.u-comm {
+  padding: 0 16px 96px; /* 底部留白给贴底主导航（2026-09-05 改扁平后 92px 足够） */
+}
+
+/* X 式顶栏（左头像 / 中 Logo / 右发布；随滚动移出屏幕，非 sticky） */
+.u-x-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0 10px;
+}
+
+.u-x-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--u-track);
+  color: var(--u-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.u-x-logo {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--u-ink);
+}
+
+.u-x-act {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: var(--u-track);
+  color: var(--u-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 150ms ease-out, transform 60ms ease-out;
+}
+
+.u-x-act:hover {
+  background: var(--u-track-hover);
+}
+
+.u-x-act:active {
+  transform: scale(0.94);
+}
+
+/* 领域标签行（X 式文字标签，激活 = 加粗墨色；无 pill 底） */
+.u-x-tabs {
+  display: flex;
+  align-items: baseline;
+  gap: 22px;
+  padding: 0 0 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--u-paper-grid);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.u-x-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.u-x-tab {
+  flex: none;
+  border: none;
+  background: none;
+  padding: 0;
+  font: 600 13px var(--u-font);
+  color: var(--u-sub);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 150ms ease-out;
+}
+
+.u-x-tab.active {
+  color: var(--u-ink);
+  font-weight: 800;
+}
+
+.u-x-caret {
+  font-size: 10px;
+  margin-left: 3px;
+  color: var(--u-ink);
+}
+
+/* 动态卡片（帖子/视频混合） */
+.u-comm-item {
+  background: var(--u-card);
+  border-radius: var(--u-r-card);
+  box-shadow: var(--u-shadow-float);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.u-comm-item__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.u-comm-item__ava {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  flex: none;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.u-comm-item__who {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.u-comm-item__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--u-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.u-comm-item__domain {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--u-r-chip);
+  background: var(--u-track);
+  color: var(--u-ink);
+  vertical-align: 1px;
+}
+
+.u-comm-item__meta {
+  font-size: 12px;
+  color: var(--u-sub);
+}
+
+.u-comm-item__title {
+  margin: 10px 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--u-ink);
+}
+
+.u-comm-item__desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--u-ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 配图 / 视频封面（演示渐变块） */
+.u-comm-media {
+  position: relative;
+  margin-top: 10px;
+  border-radius: var(--u-r-inner);
+  min-height: 140px;
+  display: flex;
+  align-items: flex-end;
+  padding: 10px 12px;
+  overflow: hidden;
+}
+
+.u-comm-media--video {
+  min-height: 190px;
+  align-items: center;
+  justify-content: center;
+}
+
+.u-comm-media__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.u-comm-media__play {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--u-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.u-comm-media__dur {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 3px 8px;
+  border-radius: var(--u-r-chip);
+  background: rgba(28, 28, 26, 0.75);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* 互动行（评论 / 点赞 / 投币 / 分享 · X 式） */
+.u-comm-item__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 22px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--u-paper-grid);
+}
+
+.u-comm-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: none;
+  padding: 0;
+  font: 500 12px var(--u-font);
+  color: var(--u-sub);
+  cursor: pointer;
+  transition: color 150ms ease-out;
+}
+
+.u-comm-action.is-liked {
+  color: var(--u-error);
+}
+
+.u-comm__note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--u-weak);
+  text-align: center;
+}
+
+/* ============================================================
+ * 墨水流动加载动画（组员提供的 css-rain-bg 方案，2026-09-05 适配纸面主题）
+ * 注：当前未被页面引用——预留给「APP 启动页 / 页面切换」类整幅加载（组长原意），
+ * 后续需要时直接套 .u-load + .u-load__rain
+ * ============================================================ */
+.u-load {
+  position: relative;
+  width: 100%;
+  height: 240px;
+  border-radius: var(--u-r-card);
+  overflow: hidden;
+  background: var(--u-paper);
+  border: 1px solid var(--u-paper-grid);
+}
+
+.u-load--bar {
+  height: 44px;
+  border-radius: var(--u-r-inner);
+}
+
+.u-load__rain {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(4px 100px at 0px 235px, #272257, #0000),
+    radial-gradient(4px 100px at 300px 235px, #272257, #0000),
+    radial-gradient(1.5px 1.5px at 150px 117.5px, #272257 100%, #0000 150%),
+    radial-gradient(4px 100px at 0px 252px, #272257, #0000),
+    radial-gradient(4px 100px at 300px 252px, #272257, #0000),
+    radial-gradient(1.5px 1.5px at 150px 126px, #272257 100%, #0000 150%),
+    radial-gradient(4px 100px at 0px 150px, #272257, #0000),
+    radial-gradient(4px 100px at 300px 150px, #272257, #0000),
+    radial-gradient(1.5px 1.5px at 150px 75px, #272257 100%, #0000 150%),
+    radial-gradient(4px 100px at 0px 253px, #272257, #0000),
+    radial-gradient(4px 100px at 300px 253px, #272257, #0000),
+    radial-gradient(1.5px 1.5px at 150px 126.5px, #272257 100%, #0000 150%),
+    radial-gradient(4px 100px at 0px 204px, #272257, #0000),
+    radial-gradient(4px 100px at 300px 204px, #272257, #0000),
+    radial-gradient(1.5px 1.5px at 150px 102px, #272257 100%, #0000 150%),
+    radial-gradient(4px 100px at 0px 134px, #272257, #0000),
+    radial-gradient(4px 100px at 300px 134px, #272257, #0000),
+    radial-gradient(1.5px 1.5px at 150px 67px, #272257 100%, #0000 150%),
+    radial-gradient(4px 100px at 0px 179px, #272257, #0000),
+    radial-gradient(4px 100px at 300px 179px, #272257, #0000),
+    radial-gradient(1.5px 1.5px at 150px 89.5px, #272257 100%, #0000 150%),
+    radial-gradient(4px 100px at 0px 299px, #272257, #0000),
+    radial-gradient(4px 100px at 300px 299px, #272257, #0000),
+    radial-gradient(1.5px 1.5px at 150px 149.5px, #272257 100%, #0000 150%),
+    radial-gradient(4px 100px at 0px 215px, #272257, #0000),
+    radial-gradient(4px 100px at 300px 215px, #272257, #0000),
+    radial-gradient(1.5px 1.5px at 150px 107.5px, #272257 100%, #0000 150%),
+    radial-gradient(4px 100px at 0px 281px, #272257, #0000),
+    radial-gradient(4px 100px at 300px 281px, #272257, #0000),
+    radial-gradient(1.5px 1.5px at 150px 140.5px, #272257 100%, #0000 150%),
+    radial-gradient(4px 100px at 0px 158px, #272257, #0000),
+    radial-gradient(4px 100px at 300px 158px, #272257, #0000),
+    radial-gradient(1.5px 1.5px at 150px 79px, #272257 100%, #0000 150%),
+    radial-gradient(4px 100px at 0px 210px, #272257, #0000),
+    radial-gradient(4px 100px at 300px 210px, #272257, #0000),
+    radial-gradient(1.5px 1.5px at 150px 105px, #272257 100%, #0000 150%);
+  background-size:
+    300px 235px,
+    300px 235px,
+    300px 235px,
+    300px 252px,
+    300px 252px,
+    300px 252px,
+    300px 150px,
+    300px 150px,
+    300px 150px,
+    300px 253px,
+    300px 253px,
+    300px 253px,
+    300px 204px,
+    300px 204px,
+    300px 204px,
+    300px 134px,
+    300px 134px,
+    300px 134px,
+    300px 179px,
+    300px 179px,
+    300px 179px,
+    300px 299px,
+    300px 299px,
+    300px 299px,
+    300px 215px,
+    300px 215px,
+    300px 215px,
+    300px 281px,
+    300px 281px,
+    300px 281px,
+    300px 158px,
+    300px 158px,
+    300px 158px,
+    300px 210px,
+    300px 210px,
+    300px 210px;
+  animation: u-rain 150s linear infinite;
+}
+
+@keyframes u-rain {
+  0% {
+    background-position:
+      0px 220px,
+      3px 220px,
+      151.5px 337.5px,
+      25px 24px,
+      28px 24px,
+      176.5px 150px,
+      50px 16px,
+      53px 16px,
+      201.5px 91px,
+      75px 224px,
+      78px 224px,
+      226.5px 350.5px,
+      100px 19px,
+      103px 19px,
+      251.5px 121px,
+      125px 120px,
+      128px 120px,
+      276.5px 187px,
+      150px 31px,
+      153px 31px,
+      301.5px 120.5px,
+      175px 235px,
+      178px 235px,
+      326.5px 384.5px,
+      200px 121px,
+      203px 121px,
+      351.5px 228.5px,
+      225px 224px,
+      228px 224px,
+      376.5px 364.5px,
+      250px 26px,
+      253px 26px,
+      401.5px 105px,
+      275px 75px,
+      278px 75px,
+      426.5px 180px;
+  }
+  to {
+    background-position:
+      0px 6800px,
+      3px 6800px,
+      151.5px 6917.5px,
+      25px 13632px,
+      28px 13632px,
+      176.5px 13758px,
+      50px 5416px,
+      53px 5416px,
+      201.5px 5491px,
+      75px 17175px,
+      78px 17175px,
+      226.5px 17301.5px,
+      100px 5119px,
+      103px 5119px,
+      251.5px 5221px,
+      125px 8428px,
+      128px 8428px,
+      276.5px 8495px,
+      150px 9876px,
+      153px 9876px,
+      301.5px 9965.5px,
+      175px 13391px,
+      178px 13391px,
+      326.5px 13540.5px,
+      200px 14741px,
+      203px 14741px,
+      351.5px 14848.5px,
+      225px 18770px,
+      228px 18770px,
+      376.5px 18910.5px,
+      250px 5082px,
+      253px 5082px,
+      401.5px 5161px,
+      275px 6375px,
+      278px 6375px,
+      426.5px 6480px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u-load__rain {
+    animation: none;
+  }
 }
 
 /* 错误提示 */
@@ -1073,10 +1620,7 @@ body {
  * 录音大按钮（ink 实心圆形 + 外圈波纹；忙碌=旋转弧）
  * ============================================================ */
 .u-rec {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 48px;
+  position: relative; /* ring 的定位锚（原 fixed：现由 u-chat-dock 承载） */
   width: 76px;
   height: 76px;
   border-radius: 50%;
@@ -1091,7 +1635,6 @@ body {
   transition:
     background-color 150ms ease-out,
     transform 150ms ease-out;
-  z-index: 5;
 }
 
 .u-rec:hover {
@@ -1099,7 +1642,7 @@ body {
 }
 
 .u-rec:active {
-  transform: translateX(-50%) scale(0.96);
+  transform: scale(0.96);
 }
 
 .u-rec svg {
@@ -1140,20 +1683,6 @@ body {
   animation: u-spin 0.9s linear infinite;
 }
 
-.u-rec-label {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 142px;
-  font-size: 13px;
-  color: var(--u-weak);
-  z-index: 5;
-  text-align: center;
-  width: 100%;
-  max-width: 480px;
-  pointer-events: none;
-}
-
 @keyframes u-pulse {
   0% {
     transform: scale(0.92);
@@ -1177,56 +1706,56 @@ body {
 /* ============================================================
  * 底部浮动 Tab 栏（白卡 pill + 居中主按钮）
  * ============================================================ */
+/* 底部主导航（2026-09-05 组长反馈：与社区卡格格不入/太圆润/带字 → 扁平贴底、图标 only、细分割线） */
 .u-tabbar {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 20px;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-around;
-  width: calc(100% - 32px);
-  max-width: 448px;
-  height: 72px;
-  padding: 0 8px;
+  width: 100%;
+  max-width: 480px;
+  height: 56px;
+  padding: 0 12px calc(6px + env(safe-area-inset-bottom));
   background: var(--u-card);
-  border-radius: 28px;
-  box-shadow: var(--u-shadow-tabbar);
+  border-top: 1px solid var(--u-paper-grid);
   z-index: 6;
 }
 
 .u-tab {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 3px;
-  width: 56px;
+  justify-content: center;
+  width: 48px;
+  height: 40px;
   border: none;
   background: transparent;
   cursor: pointer;
-  color: var(--u-weak);
-  font: 600 11px var(--u-font);
+  color: var(--u-sub);
   text-decoration: none;
   transition: color 150ms ease-out;
 }
 
 .u-tab svg {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
 }
 
 .u-tab:hover {
-  color: var(--u-sub);
+  color: var(--u-ink);
 }
 
 .u-tab.active {
   color: var(--u-ink);
 }
 
+/* 中央主钮：与图标行平齐（组长反馈 2026-09-05：上浮负边距造成错位 → 改为行内居中） */
 .u-tab--main {
-  width: 56px;
-  height: 56px;
-  border-radius: 19px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   background: var(--u-ink);
   color: #fff;
   border: none;
@@ -1234,8 +1763,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: -22px;
-  box-shadow: 0 8px 20px rgba(28, 28, 26, 0.25);
+  box-shadow: 0 2px 8px rgba(28, 28, 26, 0.18);
   transition:
     background-color 150ms ease-out,
     transform 150ms ease-out;
@@ -1250,8 +1778,8 @@ body {
 }
 
 .u-tab--main svg {
-  width: 26px;
-  height: 26px;
+  width: 20px;
+  height: 20px;
 }
 
 /* ============================================================
@@ -1423,4 +1951,434 @@ body {
 .u-item[tabindex]:focus-visible {
   outline: 2px solid var(--u-accent);
   outline-offset: 2px;
+}
+
+/* ============================================================
+ * 口语 Hub（docs/14 §12：口语 = 场景对话 + 自由对话；2026-09-05）
+ * ============================================================ */
+.u-hub__head {
+  margin: 4px 4px 18px;
+}
+
+.u-hub__title {
+  margin: 0 0 4px;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--u-ink);
+}
+
+.u-hub__sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--u-sub);
+}
+
+/* 模式卡 */
+.u-hub-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: var(--u-card);
+  border-radius: var(--u-r-inner);
+  box-shadow: var(--u-shadow-float);
+  color: var(--u-ink);
+  text-decoration: none;
+  transition: background-color 150ms ease-out, transform 60ms ease-out;
+}
+
+.u-hub-card:hover {
+  background: #fbfbfa;
+}
+
+.u-hub-card:active {
+  transform: scale(0.985);
+}
+
+.u-hub-card__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.u-hub-card__icon--scene {
+  background: var(--u-dark-teal);
+}
+
+.u-hub-card--free .u-hub-card__icon--free {
+  background: var(--u-dark-purple);
+}
+
+.u-hub-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.u-hub-card__title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.u-hub-card__desc {
+  font-size: 12px;
+  color: var(--u-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.u-hub-card__go {
+  margin-left: auto;
+  color: var(--u-weak);
+  flex: none;
+}
+
+/* 预置场景列表 */
+.u-hub-scenes {
+  margin-top: 20px;
+}
+
+.u-hub-scenes__title {
+  margin: 0 4px 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--u-ink);
+}
+
+.u-hub-scenes__sub {
+  margin: 0 4px;
+  font-size: 13px;
+  color: var(--u-sub);
+}
+
+.u-hub-scene {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 0;
+  color: var(--u-ink);
+  text-decoration: none;
+}
+
+.u-hub-scene + .u-hub-scene {
+  border-top: 1px solid var(--u-paper-grid);
+}
+
+.u-hub-scene__meta {
+  flex: none;
+  min-width: 34px;
+  padding: 3px 8px;
+  border-radius: var(--u-r-chip);
+  background: var(--u-track);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--u-ink);
+  text-align: center;
+}
+
+.u-hub-scene__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.u-hub-scene__title {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.u-hub-scene__sub {
+  font-size: 12px;
+  color: var(--u-sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================
+ * 自由对话页（docs/14 §12；2026-09-05）
+ * ============================================================ */
+/* 固定视口高度 + 内部滚动（2026-09-05：原 min-height:100vh 不约束 flex 子项 → 整页滚动、输入栏被顶出） */
+.u-fc-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  padding-bottom: 0; /* 本页无浮动 Tab 栏：覆盖 .u-content 的 140px 底部留白 */
+  overflow: hidden;
+}
+
+/* 对话流（可滚动区，底部输入栏之外） */
+.u-fc-box {
+  flex: 1;
+  min-height: 0; /* flex 溢出约束 → box 内部滚动 */
+  overflow-y: auto;
+  padding: 0 4px 12px;
+}
+
+/* Grok 式功能行（组长拍板 2026-09-05：切场景/新对话/语速；浅色主题映射，深卡每屏 ≤1 的约束下用 track 底） */
+.u-tb {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.u-tb-item {
+  flex: 1;
+  min-width: 0;
+  height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border: none;
+  border-radius: var(--u-r-inner);
+  background: var(--u-track);
+  color: var(--u-ink);
+  cursor: pointer;
+  transition: background-color 150ms ease-out, transform 60ms ease-out;
+}
+
+.u-tb-item:hover {
+  background: var(--u-track-hover);
+}
+
+.u-tb-item:active {
+  transform: scale(0.96);
+}
+
+.u-tb-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.u-tb-item__label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 输入栏 */
+.u-fc-bar-wrap {
+  padding: 10px 4px calc(14px + env(safe-area-inset-bottom));
+  background: transparent; /* 点格背景透出（2026-09-05 组员 dot-grid 方案） */
+}
+
+.u-fc-state {
+  margin: 0 4px 8px;
+  font-size: 12px;
+  color: var(--u-accent);
+}
+
+.u-fc-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--u-card);
+  border: 1px solid var(--u-paper-grid);
+  border-radius: var(--u-r-pill);
+  box-shadow: var(--u-shadow-float);
+}
+
+.u-fc-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 4px 4px 4px 10px;
+  font-size: 14px;
+  font-family: var(--u-font);
+  color: var(--u-ink);
+}
+
+.u-fc-input::placeholder {
+  color: var(--u-sub);
+}
+
+.u-fc-input:disabled {
+  opacity: 0.55;
+}
+
+/* 主/次钮（2026-09-05 voice-first：麦克风 = 右侧英雄钮 48px ink；发送 = 次钮 48px track） */
+.u-fc-mic,
+.u-fc-send {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 150ms ease-out, transform 60ms ease-out;
+}
+
+.u-fc-mic {
+  background: var(--u-ink);
+  color: #fff;
+  box-shadow: var(--u-shadow-float);
+}
+
+.u-fc-mic--rec {
+  background: var(--u-error);
+}
+
+.u-fc-mic:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.u-fc-send {
+  background: var(--u-track);
+  color: var(--u-ink);
+}
+
+.u-fc-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.u-fc-mic:active,
+.u-fc-send:active {
+  transform: scale(0.94);
+}
+
+.u-fc-page .u-fc-mic:focus-visible,
+.u-fc-page .u-fc-send:focus-visible,
+.u-fc-page .u-tb-item:focus-visible {
+  outline: 2px solid var(--u-accent);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+ * 场景选择弹层（口语 Hub 已收敛删除，预置场景列表并入此处；2026-09-05）
+ * ============================================================ */
+.u-sheet-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 28, 26, 0.4);
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.u-sheet {
+  width: 100%;
+  max-width: 480px;
+  max-height: 72vh;
+  max-height: 72dvh;
+  overflow-y: auto;
+  background: var(--u-card);
+  border-radius: 24px 24px 0 0;
+  padding: 16px 16px calc(20px + env(safe-area-inset-bottom));
+}
+
+.u-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.u-sheet__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--u-ink);
+}
+
+.u-sheet__close {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: var(--u-track);
+  color: var(--u-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 150ms ease-out;
+}
+
+.u-sheet__close svg {
+  transform: rotate(45deg); /* plus → × */
+}
+
+.u-sheet__close:hover {
+  background: var(--u-track-hover);
+}
+
+.u-sheet__sub {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--u-sub);
+}
+
+.u-sheet__retry {
+  padding: 4px 0 10px;
+}
+
+.u-sheet__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 0;
+  border: none;
+  background: none;
+  color: var(--u-ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.u-sheet__item + .u-sheet__item {
+  border-top: 1px solid var(--u-paper-grid);
+}
+
+.u-sheet__item:active {
+  background: var(--u-track);
+}
+
+.u-sheet-enter-active,
+.u-sheet-leave-active {
+  transition: opacity 180ms ease-out;
+}
+
+.u-sheet-enter-active .u-sheet,
+.u-sheet-leave-active .u-sheet {
+  transition: transform 180ms ease-out;
+}
+
+.u-sheet-enter-from,
+.u-sheet-leave-to {
+  opacity: 0;
+}
+
+.u-sheet-enter-from .u-sheet,
+.u-sheet-leave-to .u-sheet {
+  transform: translateY(100%);
 }

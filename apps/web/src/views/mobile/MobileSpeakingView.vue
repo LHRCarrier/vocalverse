@@ -7,7 +7,7 @@
  * AI 气泡 = track 灰底圆角 + 实色声波头像块；用户气泡 = 炭黑；语言点 = accent chip；
  * 得分 = 绿色 chip；救援 = 暖色卡；底部 = ink 实心圆形录音按钮（外圈波纹 + 忙碌旋转弧）。
  */
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { track } from '@/api/events'
@@ -17,14 +17,15 @@ import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
+import ScenePickerSheet from '@/components/mobile/ScenePickerSheet.vue'
 import '@/styles/mobile-uic.css'
 
 interface Bubble {
   role: 'assistant' | 'user'
   text: string
   chips?: Array<{ phrase: string }>
-  /** 首次播完整听与否（重听按钮出现条件，2026-09-08） */
-  played?: boolean
+  /** 有可播语音（喇叭按钮出现条件；开场白进页即启用，回合语音播完后自动解锁，2026-09-08） */
+  speakable?: boolean
 }
 
 const route = useRoute()
@@ -36,11 +37,23 @@ const currentTurn = ref(0)
 const assignedTurns = ref(8)
 const bubbles = ref<Bubble[]>([])
 const recording = ref(false)
+/**
+ * 开始流程（2026-09-05 组长拍板：进页先选场景，选完 → 播放开场白 → 变回录音）：
+ * choose = 未选场景（空态引导）；intro = 已就绪、开场白未播（底部按钮 = 播放图标）；
+ * practice = 已点开始（底部按钮 = 录音图标，进入正常回合流）
+ */
+const stage = ref<'choose' | 'intro' | 'practice'>('choose')
 const phase = ref<'loading' | 'ready' | 'busy' | 'done'>('loading')
 const lastScore = ref<{ pron?: number | null; flu?: number | null; gram?: number | null } | null>(null)
 const scoreStatus = ref<'ok' | 'pending' | 'unavailable' | null>(null)
 const corpusDone = ref<string[]>([])
 const hitCount = computed(() => corpusDone.value.length)
+/** AI 状态线：loading（进场景）/busy（评分中）→ 流光；errorMsg → 纯红；其余纯黑（2026-09-05 组长拍板） */
+const lineStatus = computed<'idle' | 'busy' | 'error'>(() => {
+  if (errorMsg.value) return 'error'
+  if (phase.value === 'loading' || phase.value === 'busy') return 'busy'
+  return 'idle'
+})
 const summaryText = ref<string | null>(null)
 const errorMsg = ref<string | null>(null)
 const reportId = ref<number | null>(null)
@@ -51,10 +64,18 @@ let replayAudio: HTMLAudioElement | null = null
 
 const recorder = new VoiceRecorder()
 const audioQueue: HTMLAudioElement[] = []
-const abort = new AbortController()
+let abort = new AbortController()
+const sheetOpen = ref(false)
 
 onMounted(async () => {
-  await boot()
+  // 无 sceneId（口语 Tab/中央 + 直达）→ 先让用户选场景；带 sceneId（场景选择/自由对话切换）→ 直接开工
+  // 注意：params 缺省可能为 undefined 或 ''，两种都要判（2026-09-05 踩坑：'' 时被误放进场 → 未选场景先出题）
+  const sid = route.params.sceneId
+  if (sid !== undefined && sid !== '') {
+    await startScene()
+  } else {
+    stage.value = 'choose'
+  }
 })
 
 onUnmounted(() => {
@@ -63,9 +84,67 @@ onUnmounted(() => {
   replayAudio?.pause()
 })
 
+/* 功能行「场景选择」/空态 CTA：页内切场景 = 重置状态后重新开工；:id → 无 id 回退到选场景态 */
+watch(
+  () => route.params.sceneId,
+  (v, old) => {
+    if (v === old) return
+    if (v !== undefined && v !== '') {
+      void startScene()
+    } else if (old !== undefined && old !== '') {
+      resetToChoose()
+    }
+  },
+)
+
+/** 清除全部会话状态（startScene / resetToChoose 共用） */
+function resetChatState() {
+  abort.abort()
+  abort = new AbortController()
+  audioQueue.forEach((a) => a.pause())
+  audioQueue.length = 0
+  replayAudio?.pause()
+  replayAudio = null
+  if (recorder.state === 'recording') recorder.cancel()
+  bubbles.value = []
+  currentTurn.value = 0
+  lastScore.value = null
+  scoreStatus.value = null
+  corpusDone.value = []
+  summaryText.value = null
+  errorMsg.value = null
+  reportId.value = null
+  currentAssistant.value = null
+  playingBubble.value = null
+}
+
+async function startScene() {
+  resetChatState()
+  phase.value = 'loading'
+  stage.value = 'practice' // 加载中先挂到练习态（隐藏「选场景」空态；boot 完成后按开场白落在 intro/practice）
+  await boot()
+}
+
+/** :id → 无 id（如从 /m/chat/2 回到 /m/chat）：回退到「先选场景」 */
+function resetToChoose() {
+  resetChatState()
+  phase.value = 'loading'
+  stage.value = 'choose'
+}
+
+function onScenePicked(sceneId: number) {
+  if (sceneId === scenario.value?.id) return
+  router.push(`/m/chat/${sceneId}`)
+}
+
 async function boot() {
   try {
     const scenes = await fetchScenarios()
+    if (!scenes.length) {
+      errorMsg.value = '暂无可用场景，请先执行 seed 初始化演示数据。'
+      phase.value = 'done'
+      return
+    }
     const sceneId = Number(route.params.sceneId)
     scenario.value = scenes.find((s) => s.id === sceneId) ?? scenes[0] ?? null
     if (!scenario.value) {
@@ -82,17 +161,27 @@ async function boot() {
     assignedTurns.value = session.assigned_turns ?? 8
     await track('scene_start', { sceneId: scenario.value.id, payload: { session_id: session.id } })
     if (scenario.value.opening_line) {
-      bubbles.value.push({ role: 'assistant', text: scenario.value.opening_line })
-      // 注意：必须持有响应式代理对象（从 ref 数组取回），否则改 played 不触发重渲染
-      const first = bubbles.value[bubbles.value.length - 1]!
-      playTts(scenario.value.opening_line, () => {
-        first.played = true
-      })
+      // 开场白不自动播放：进页不响；由底部「播放」按钮触发（2026-09-05 开始流程）
+      bubbles.value.push({ role: 'assistant', text: scenario.value.opening_line, speakable: true })
+      stage.value = 'intro'
+    } else {
+      stage.value = 'practice'
     }
     phase.value = 'ready'
-  } catch (e) {
-    errorMsg.value = (e as Error).message
+  } catch {
+    // 区分失败与无数据（2026-09-05：401/网络失败 ≠ 未 seed）
+    errorMsg.value = '进入场景失败：请检查登录状态与网络后重试'
     phase.value = 'done'
+  }
+}
+
+/** 开始流程第 2 步：点「播放」→ 播开场白 → 底部按钮变回录音；气泡喇叭态用既有 playTts 呈现 */
+function playOpening() {
+  if (stage.value !== 'intro') return
+  stage.value = 'practice'
+  const first = bubbles.value[0]
+  if (first && first.text) {
+    void playTts(first.text, undefined, 0)
   }
 }
 
@@ -166,10 +255,10 @@ function playChunk(url: string) {
   audioQueue.push(audio)
   audio.onended = () => {
     audioQueue.shift()?.play().catch(() => undefined)
-    // 全部音频块播完 = 本回合语音完整听了一遍 → 解锁重听按钮
+    // 全部音频块播完 = 本回合语音完整听了一遍 → 解锁喇叭按钮
     if (!audioQueue.length) {
       const lastAssistant = [...bubbles.value].reverse().find((b) => b.role === 'assistant')
-      if (lastAssistant) lastAssistant.played = true
+      if (lastAssistant) lastAssistant.speakable = true
     }
   }
   if (audioQueue.length === 1) audio.play().catch(() => undefined)
@@ -194,9 +283,14 @@ async function startRecording() {
 }
 
 function bootAgain() {
-  errorMsg.value = null
-  phase.value = 'loading'
-  void boot().catch(() => undefined)
+  // 失败重试 = 重置后重开（含「先选场景」分支：带 sceneId 直接重开，无则回到 choose 态）
+  if (route.params.sceneId !== undefined) {
+    void startScene().catch(() => undefined)
+  } else {
+    stage.value = 'choose'
+    errorMsg.value = null
+    phase.value = 'loading'
+  }
 }
 
 recorder.onStateChange = (state) => {
@@ -294,29 +388,44 @@ function onSseEvent(e: SseStreamEvent) {
 
 <template>
   <div class="u-phone">
-    <div class="u-content" style="padding-top: 72px">
-      <!-- 顶部只留返回按钮（文字全部去掉） -->
-      <button class="u-back u-back--float" type="button" title="返回" @click="router.back()">
+    <!-- AI 状态线（静默纯黑 / 处理中彩色流光 / 出错纯红） -->
+    <div
+      class="v-line"
+      :class="`v-line--${lineStatus}`"
+      role="status"
+      :aria-label="lineStatus === 'busy' ? 'AI 处理中' : lineStatus === 'error' ? '出错了' : '空闲'"
+    />
+    <div class="u-content u-content--dock" style="padding-top: 72px">
+      <!-- 顶部只留返回按钮（文字全部去掉）；返回 = 口语模式入口不再依赖 history（2026-09-05：router.back() 会撞 /demo） -->
+      <button class="u-back u-back--float" type="button" title="返回" @click="router.push('/m/home')">
         <MobileIcon name="back" />
       </button>
 
-      <!-- 加载态：声波线稿锚点 -->
-      <div v-if="!bubbles.length && phase === 'loading'" class="u-empty">
-        <div class="u-empty__art"><MobileArt name="wave" :size="104" /></div>
-        <div class="u-empty__title">正在进入场景…</div>
-        <div class="u-empty__sub">数字人正在准备开场白，稍等片刻。</div>
+      <!-- 开始流程第 1 步：先选场景（只留图 + 按钮；按钮仅此一个，底部功能行的重复入口在 choose 态隐藏） -->
+      <section v-if="stage === 'choose'" class="u-empty u-empty--center">
+        <div class="u-empty__art"><MobileArt name="mic" :size="96" /></div>
+        <div class="u-done__actions" style="width: 100%; max-width: 280px">
+          <button class="u-btn u-btn--primary u-btn--block" type="button" @click="sheetOpen = true">
+            选择场景
+          </button>
+        </div>
+      </section>
+
+      <!-- 加载态：状态线已表达”处理中“，这里只留居中线稿锚点（无文案；2026-09-05） -->
+      <div v-else-if="!bubbles.length && phase === 'loading'" class="u-empty u-empty--center" role="status" aria-label="正在进入场景">
+        <div class="u-empty__art"><MobileArt name="wave" :size="96" /></div>
       </div>
 
       <!-- 对话流：AI track 气泡 + 用户炭黑气泡 -->
       <template v-for="(m, i) in bubbles" :key="i">
         <div class="u-chat" :class="{ 'u-chat--user': m.role === 'user' }">
-          <span v-if="m.role === 'assistant'" class="u-ava" style="background: #16303a">
+          <span v-if="m.role === 'assistant'" class="u-ava" style="background: var(--u-dark-teal)">
             <MobileIcon name="wave" :size="16" />
           </span>
           <div class="u-bubble" :class="m.role === 'user' ? 'u-bubble--user' : 'u-bubble--ai'">
             {{ m.text || '…' }}
             <button
-              v-if="m.role === 'assistant' && m.played"
+              v-if="m.role === 'assistant' && m.speakable"
               class="u-replay"
               :class="{ 'is-playing': playingBubble === i }"
               type="button"
@@ -378,22 +487,50 @@ function onSseEvent(e: SseStreamEvent) {
       </section>
     </div>
 
-    <!-- 录音大按钮（ink 圆形 + 波纹 / 忙碌旋转弧） -->
-    <div v-if="phase !== 'done'" class="u-rec-label">
-      {{ recording ? '录音中，点击 ■ 停止并提交' : phase === 'busy' ? '评分中，请稍候…' : '点击录音（≤15s）' }}
+    <!-- 底部 dock（2026-09-05：标签已删；开始流程 = 播放图标 → 点击开始 → 变回录音） -->
+    <div class="u-chat-dock">
+      <button
+        v-if="stage !== 'choose'"
+        class="u-rec"
+        :class="{ 'u-rec--recording': recording, 'u-rec--busy': phase === 'busy' }"
+        :disabled="phase !== 'ready' && !recording"
+        type="button"
+        :title="stage === 'intro' ? '开始练习（播放开场白）' : recording ? '停止录音' : '开始录音'"
+        :aria-label="stage === 'intro' ? '开始练习' : recording ? '停止录音' : '开始录音'"
+        @click="stage === 'intro' ? playOpening() : startRecording()"
+      >
+        <span v-if="phase !== 'busy'" class="ring" />
+        <span v-if="phase === 'busy'" class="arc" />
+        <template v-else-if="stage === 'intro'">
+          <MobileIcon name="play" :size="30" />
+        </template>
+        <MobileIcon v-else-if="recording" name="stop" :size="26" />
+        <MobileIcon v-else name="mic" :size="30" />
+      </button>
+
+      <div class="u-tb u-tb--dock" role="toolbar" aria-label="口语功能">
+        <button
+          class="u-tb-item"
+          type="button"
+          title="切换到自由对话（AI 对聊，无固定题卡）"
+          @click="router.push('/m/free-chat')"
+        >
+          <MobileIcon name="wave" :size="22" />
+          <span class="u-tb-item__label">自由对话</span>
+        </button>
+        <button
+          v-if="stage !== 'choose'"
+          class="u-tb-item"
+          type="button"
+          title="切换预置场景"
+          @click="sheetOpen = true"
+        >
+          <MobileIcon name="chevron" :size="22" />
+          <span class="u-tb-item__label">场景选择</span>
+        </button>
+      </div>
     </div>
-    <button
-      class="u-rec"
-      :class="{ 'u-rec--recording': recording, 'u-rec--busy': phase === 'busy' }"
-      :disabled="phase !== 'ready' && !recording"
-      type="button"
-      :title="recording ? '停止录音' : '开始录音'"
-      @click="startRecording"
-    >
-      <span v-if="phase !== 'busy'" class="ring" />
-      <span v-if="phase === 'busy'" class="arc" />
-      <MobileIcon v-else-if="recording" name="stop" :size="26" />
-      <MobileIcon v-else name="mic" :size="30" />
-    </button>
+
+    <ScenePickerSheet :open="sheetOpen" @update:open="sheetOpen = $event" @select="onScenePicked" />
   </div>
 </template>

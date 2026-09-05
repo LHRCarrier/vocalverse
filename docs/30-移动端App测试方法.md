@@ -1,6 +1,6 @@
 # 30 · 移动端 App 测试方法（VocalVerse 手机壳）
 
-> 对象：`apps/mobile`（Capacitor 8 远程 URL 型壳，2026-09-04 交付）+ `apps/web` 移动端真形态页面（`/m/home` `/m/chat/:sceneId` `/m/report`）。
+> 对象：`apps/mobile`（Capacitor 8 远程 URL 型壳，2026-09-04 交付）+ `apps/web` 移动端真形态页面（`/m/home` `/m/chat/:sceneId` `/m/free-chat` `/m/report`）。
 > 依据：docs/06 §6 测试策略、docs/27 §8 真机实测表、docs/singing/22-轴线E Q6 八约束、AGENTS.md（门禁/联调页/红线）。
 > 核心思想（与 docs/29 §4.2 MobileGym 调研一致）：**功能测试尽量读结构化状态断言（URL/接口响应/DOM 数据），避免截图目测**；视觉验收用「原型基线并排比对」。
 
@@ -66,9 +66,9 @@ pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
 
 | # | 用例 | 步骤 | 期望 |
 |---|---|---|---|
-| W1 | 登录 | `/login` → demoadult/demo123456 → 登 | 进入 `/m/home`，问候含「成年中级」 |
-| W2 | 首页演示帧 | 观察 | 问候/打卡/统计/分段/三张会话卡（Coffee Shop 86.4 / Perfect Night 88.1 / Job Interview 79.8）与 `ui-concept-design/assets/app-home.png` **逐项一致**（图标块分色、字级、间距） |
-| W3 | 对话开场 | `/m/chat` | Round 0/N、AI 开场气泡 + TTS 播放；8s 无录音出现救援提示卡 |
+| W1 | 登录 | `/login` → demoadult/demo123456 → 登 | 进入 `/m/home`（社区主页），问候含「成年中级」 |
+| W2 | 社区主页（2026-09-05 组长拍板换版） | `/m/home` | 顶部「社区」+ 问候；「今日练习」CTA → `/m/chat`；下方打卡动态流（演示帧 5 条：类型/标题/分数/徽章/点赞）；底部 Tab 栏为 uic 新样式 |
+| W3 | 对话开场（2026-09-05 改开始流程） | `/m/chat` | 先出现「先选一个场景开始」空态（不自动开题）；选场景 → AI 开场气泡（不自动播）+ 底部**播放钮** → 点播放 → 播开场白 → 按钮变录音钮；8s 无录音出现救援提示卡 |
 | W4 | 录音太短 | 点录 <1s 即停 | 提示「录音太短（x.x s）」，**不推进回合** |
 | W5 | 完整回合 | 录 ~3s 停止 | SSE：字幕流 + 音频队列播放 + 覆盖度 +2 chips；回合数 +1 |
 | W6 | 收尾 | 打满 N 轮（或超时收尾） | session_end → 跳 `/m/report?reportId=…`，真实报告渲染（coverage/建议） |
@@ -76,6 +76,8 @@ pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
 | W8 | token 过期 | 停留 15min 后操作 | 静默 refresh 或回登录页；不出现裸 401 页 |
 | W9 | 服务不可达 | `docker compose stop web python-api` | 页面给可操作错误提示（ApiError 文案），不白屏 |
 | W10 | PWA | 手机 Chrome 菜单「添加到主屏幕」 | 图标/名称正确，standalone 全屏 |
+| W11 | 口语入口（2026-09-05 晚改版） | Tab 口语 / 中央 + → `/m/chat` | 直达场景对话（默认场景开场白）；底栏功能行「自由对话」「场景选择」可点 |
+| W12 | 自由对话（2026-09-05） | `/m/free-chat` | 打字「Hi」→ 流式回复 + TTS 播报 + 喇叭可重听；点麦克风说话 → 用户转写气泡 → 回复；底部功能行：场景对话（切 `/m/chat`）/场景选择（弹层选场景 → 直达 `/m/chat/:id`） |
 
 **结构化断言辅助**（推荐）：F12 Console 执行
 `document.querySelectorAll('.u-task').length` / `document.body.innerText` 核对渲染，替代目测。

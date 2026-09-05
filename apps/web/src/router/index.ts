@@ -16,6 +16,11 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '今日学习', requiresAuth: true },
   },
   {
+    path: '/m/free-chat',
+    component: () => import('@/views/mobile/MobileFreeChatView.vue'),
+    meta: { title: '自由对话', requiresAuth: true },
+  },
+  {
     path: '/m/chat/:sceneId?',
     component: () => import('@/views/mobile/MobileSpeakingView.vue'),
     meta: { title: '场景对话', requiresAuth: true },

@@ -216,6 +216,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/free-chat/turn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Free Chat Turn
+         * @description 单轮自由对话：audio / text 至少其一（都空 → 422，流外预检）。
+         *
+         *     流内事件序（音频轮）：user_transcript → text_delta* → turn_end；打字轮：text_delta* → turn_end。
+         */
+        post: operations["free_chat_turn_api_v1_free_chat_turn_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/defense/profiles": {
         parameters: {
             query?: never;
@@ -406,6 +428,18 @@ export interface components {
              * @default en
              */
             language: string;
+        };
+        /** Body_free_chat_turn_api_v1_free_chat_turn_post */
+        Body_free_chat_turn_api_v1_free_chat_turn_post: {
+            /** Audio */
+            audio?: string | null;
+            /** Text */
+            text?: string | null;
+            /**
+             * History
+             * @default []
+             */
+            history: string;
         };
         /** Body_llm_chat_api_v1_llm_chat_post */
         Body_llm_chat_api_v1_llm_chat_post: {
@@ -1012,6 +1046,42 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    free_chat_turn_api_v1_free_chat_turn_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_free_chat_turn_api_v1_free_chat_turn_post"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

@@ -29,6 +29,11 @@ const props = withDefaults(
       | 'heart'
       | 'music'
       | 'arrow'
+      | 'play'
+      | 'chat'
+      | 'coin'
+      | 'share'
+      | 'user-plus'
       | 'stop'
       | 'volume'
     size?: number
@@ -87,6 +92,42 @@ const props = withDefaults(
     <!-- 右箭头（列表跳转） -->
     <template v-else-if="props.name === 'chevron'">
       <path d="M9 5l7 7-7 7" />
+    </template>
+
+    <!-- 发送（右箭头 · 2026-09-05 补：联合类型已声明但缺模板 → 发送按钮渲染成空圆圈） -->
+    <template v-else-if="props.name === 'arrow'">
+      <path d="M5 12h14" />
+      <path d="M13 5.5l6.5 6.5-6.5 6.5" />
+    </template>
+
+    <!-- 播放（开始流程：播开场白；2026-09-05） -->
+    <template v-else-if="props.name === 'play'">
+      <path d="M8 5.5L19 12l-11 6.5z" />
+    </template>
+
+    <!-- 评论（社区互动 · 2026-09-05） -->
+    <template v-else-if="props.name === 'chat'">
+      <path d="M4 5h16v11H9.5L5 20.2V16H4z" />
+    </template>
+
+    <!-- 投币（社区互动 · 2026-09-05） -->
+    <template v-else-if="props.name === 'coin'">
+      <ellipse cx="12" cy="14.5" rx="6" ry="3.2" />
+      <path d="M6 14.5v4c0 1.8 2.7 3.2 6 3.2s6-1.4 6-3.2v-4" />
+      <path d="M12 4.5v6M9.5 7.5c.6-.9 1.5-1.4 2.5-1.4s1.9.5 2.5 1.4" />
+    </template>
+
+    <!-- 分享（社区互动 · 2026-09-05） -->
+    <template v-else-if="props.name === 'share'">
+      <path d="M14 6.5L20 12l-6 5.5" />
+      <path d="M20 12H9a6 6 0 0 0-5 6" />
+    </template>
+
+    <!-- 加好友（X 顶栏同款：人形 + 加号 · 2026-09-05） -->
+    <template v-else-if="props.name === 'user-plus'">
+      <circle cx="9" cy="8.5" r="3.5" />
+      <path d="M3 19a6 6 0 0 1 11.2-2" />
+      <path d="M18.5 8v7M15 11.5h7" />
     </template>
 
     <!-- 时钟（回合） -->

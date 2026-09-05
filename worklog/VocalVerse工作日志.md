@@ -3,6 +3,36 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-05 【迁移】App 端 UI 记录迁入安卓开发日志（组长指正 · 2026-09-08 已定规）
+
+> 组长指正：**App 端 UI/设计相关记录归属 `worklog/安卓开发日志.md`**（本日志只留 Web/后端/全局事项）。
+> 今日以下 App 端 UI 记录已全部迁往安卓开发日志（含后续组员反馈修正痕线，未改动内容）：
+> 场景对话「先选场景再开工」开始流程 · 口语 Hub 收敛删除 · 自由对话页 Grok 式改造（3 子代理评审）·
+> 口语界面 3 项（气泡尾巴/自动播/Hub 与自由对话最小可用版）· 移动端场景对话 2 个 UI 修（气泡尾巴+开场白自动播）。
+> 其中涉及后端/迁移/契约的部分在主线下条留存，UI 与前端交互细节以安卓开发日志为准。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
+## 2026-09-05 自由对话后端与埋点（非 UI 主线留存：接口 / 迁移 / 契约 / 登记）
+
+- **接口**：`routes/free_chat.py` `POST /api/v1/free-chat/turn`（multipart `audio`/`text` + `history` JSON，至少其一 → 422 404 码 42203/42204）→ SSE 子集 `user_transcript→text_delta*→turn_end`（`score_status=unavailable`）；无状态 LLM 转发器（TurnRunner 复用、system 全静态人设、无 corpus）；限流 asr+llm；**进 OpenAPI 契约**（快照 + gen:api 同步，frontend-ci 对账一致）；
+- **埋点白名单扩值（迁移 0005/0006）**：`events.event_type` CHECK 10→12→15 类（`free_chat_open`/`free_chat_turn`/`free_chat_switch`/`free_chat_reset`/`free_chat_rate`；reset 随功能行改版恢复触发、rate 为预留）；alembic 单头 0006，本地 PG 已应用；docs/06 §9.1、docs/10 注记、docs/14 §6.3 登记；
+- **测试**：`tests/test_free_chat.py` 6 用例（流式/校验/多轮 turn_index）+ `test_m2_core.py` 埋点 12→15 类逐类落库断言；后端 ruff+format+全量 pytest 绿；
+- **坑**：① uvicorn `--reload` 多轮重载后子进程僵在 lifespan → 杀进程重启 dev-up；② `refresh-openapi.ps1` 导出的 Java 快照与库内差异仅 `servers` 字段 + 格式化（本地 springdoc 与 CI 生成路径不同）→ 回滚 Java 快照只提交 Python 快照；③ 埋点事件是 **DB CHECK** 白名单：改前端 `EventName` 之外必须同步 `EventTypes` + 迁移，缺一不可；④ `EventTypes` 注释超 100 列触发 E501。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
+## 2026-09-05 dev-up.ps1 自动拉起 DB 容器（修「电脑重启后 Java 起不来」的坑）
+
+- 触发：重启电脑后跑 `pwsh -File scripts/dev-up.ps1 start`，健康等待后 `java(8080): False`；`local/dev-logs/java-8080.out.log`：`HikariPool-1 - Starting...` → `Connection to localhost:5432 refused` → `Unable to determine Dialect without JDBC metadata` → 上下文中止，mvn BUILD FAILURE（5.8s，非 30-60s 慢启动）；
+- 排除「数据库密码改过」疑点：**Connection refused 发生在 TCP 建连阶段**（密码错应是监听端口存在时的 `password authentication failed`），且核验三处一致——PG 容器 init 环境（docker inspect）＝根 `.env`＝`services/java/application.yml` 默认回退均为 `vocalverse-dev`；
+- 根因：主机睡眠/重启后 Docker 引擎恢复时杀掉容器——`docker ps -a`：`vocalverse-postgres-1` / `vocalverse-redis-1` 均 `Exited (255)` 且**同一秒同死**、容器日志无正常 shutdown 记录（止于 checkpoint）、exit=255 非 postgres 自身崩溃；而 `dev-up.ps1` 原文写明「脚本不负责数据库容器」，DB 死了无人拉起；
+- 修复：`scripts/dev-up.ps1` start 新增 `Wait-DockerBase`——5432/6379 已监听则跳过；否则检查 Docker 引擎（未就绪尝试启动 Docker Desktop，等待 ≤90s）→ `docker compose up -d postgres redis` → 轮询 `docker compose ps` 至 postgres/redis 均 healthy（≤90s，Exited/unhealthy 提前退出并给排查命令）；
+- 验证：`docker compose stop postgres redis` 制造复现 → `dev-up.ps1 start` 自动拉起两容器并 healthy → `python(8000)/vite(5173)/java(8080)` 全 True；`status` 复核 8000/8080/5173 全 LISTENING、health 全 True；
+- 踩坑：① `docker compose ps` 默认只列**运行中**容器，判 healthy 要 `--format "{{.Service}}:{{.Status}}"` 按 service 名匹配（容器名带项目前缀）；② 端口健康用 `Get-NetTCPConnection -State Listen`，Docker Desktop 的 docker-proxy 仍在监听即视为容器可服务，无需连库探测。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
 ## 2026-09-08 UI 相关记录迁移说明
 
 > 组长指正：**App 端 UI/设计相关的记录归属 `worklog/安卓开发日志.md`**（本日志只留 Web/后端/全局事项）。

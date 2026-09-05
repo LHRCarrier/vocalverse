@@ -96,9 +96,11 @@ mvn spring-boot:run
 > ⚠️ 方式 B 与方式 A 端口相同（8000/8080），**不要同时起**；各服务更多细节见 `services/*/README.md`。
 >
 > 💡 **一键起停（推荐，2026-09-04 起）**：三端用**独立进程**启动（日志 `local/dev-logs/`，gitignored），
-> 关终端不会再弹「Terminate batch job」：
+> 关终端不会再弹「Terminate batch job」；`start` 会**自动拉起 Docker 里的 postgres/redis**
+> （5432/6379 未监听时执行 `docker compose up -d postgres redis` 并等待 healthy，Docker Desktop
+> 未运行则尝试自动启动），电脑重启/断网后重跑一次即可：
 > ```powershell
-> pwsh -File scripts/dev-up.ps1 start    # 启动三端 + 健康等待（电脑重启/断网后重跑一次即可）
+> pwsh -File scripts/dev-up.ps1 start    # DB 容器 + 三端 + 健康等待（默认动作）
 > pwsh -File scripts/dev-up.ps1 status   # 查看监听与健康
 > pwsh -File scripts/dev-up.ps1 stop     # 按端口杀三端
 > ```

@@ -60,7 +60,18 @@ export function authHeaders(): HeadersInit {
   return authToken ? { Authorization: `Bearer ${authToken}` } : {}
 }
 
-export async function request<T>(path: string, init?: RequestInit, base = PYTHON_BASE): Promise<Envelope<T>> {
+/**
+ * 401 静默续期钩子（auth store 注册；docs/18 F3：不出现裸 401 页）。
+ * 注入而非 import 规避 client→store 循环依赖；刷新失败返回 false → 原错误继续抛。
+ */
+let authRefresher: (() => Promise<boolean>) | null = null
+let refreshing = false // 防重入：/auth/refresh 自身 401 时不再触发递归
+
+export function setAuthRefresher(refresher: (() => Promise<boolean>) | null): void {
+  authRefresher = refresher
+}
+
+async function fetchOnce<T>(path: string, init: RequestInit | undefined, base: string): Promise<Envelope<T>> {
   const headers = { ...(init?.headers ?? {}), ...authHeaders() }
   const resp = await fetch(`${base}${path}`, { ...init, headers })
   let body: Envelope<T>
@@ -79,6 +90,24 @@ export async function request<T>(path: string, init?: RequestInit, base = PYTHON
     throw new ApiError(body.code ?? -1, body.message ?? `HTTP ${resp.status}`, resp.status)
   }
   return body
+}
+
+export async function request<T>(path: string, init?: RequestInit, base = PYTHON_BASE): Promise<Envelope<T>> {
+  try {
+    return await fetchOnce<T>(path, init, base)
+  } catch (e) {
+    // 会话中途 access token 过期（TTL 1h）：静默 refresh 一次后重试（2026-09-05 修「场景弹层假无数据」）
+    if (e instanceof ApiError && e.httpStatus === 401 && authRefresher && !refreshing) {
+      refreshing = true
+      try {
+        const ok = await authRefresher()
+        if (ok) return await fetchOnce<T>(path, init, base)
+      } finally {
+        refreshing = false
+      }
+    }
+    throw e
+  }
 }
 
 export function readyz() {
