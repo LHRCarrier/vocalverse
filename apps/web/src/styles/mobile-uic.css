@@ -66,10 +66,10 @@ body {
   margin: 0 auto;
   min-height: 100vh;
   background-color: var(--u-paper);
-  /* 点格背景（组员提供的 dot-grid 方案，2026-09-05：双 radial-gradient 交错点阵；点色 = 墨色 5%，网格 48px） */
+  /* 点格背景（组员提供的 dot-grid 方案，2026-09-05：双 radial-gradient 交错点阵；点色 = 墨色 20%，网格 48px） */
   background-image:
-    radial-gradient(rgba(28, 28, 26, 0.05) 5%, transparent 6%),
-    radial-gradient(rgba(28, 28, 26, 0.05) 5%, transparent 6%);
+    radial-gradient(rgba(28, 28, 26, 0.2) 5%, transparent 6%),
+    radial-gradient(rgba(28, 28, 26, 0.2) 5%, transparent 6%);
   background-position:
     0 0,
     24px 24px;
