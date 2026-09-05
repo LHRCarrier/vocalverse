@@ -90,12 +90,12 @@ body {
 }
 
 /* 场景对话页：底部 dock 固定容器（标签/录音钮/功能行自然堆叠，杜绝 fixed 坐标重叠；2026-09-05）
- * 2026-09-05 晚：全局 tab bar 上移 56px，dock 随之抬升（tab 栏常驻） */
+ * 2026-09-05 晚：口语并入练习 Hub 后 /m/chat 为二级页（无 tab），dock 贴底 */
 .u-chat-dock {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 56px;
+  bottom: 0;
   width: 100%;
   max-width: 480px;
   display: flex;
