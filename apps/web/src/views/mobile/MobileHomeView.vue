@@ -12,6 +12,9 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import IconMail from '~icons/tabler/mail'
+import IconUserPlus from '~icons/tabler/user-plus'
+
 import MobileCommentsSheet from '@/components/mobile/MobileCommentsSheet.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobilePostCard from '@/components/mobile/MobilePostCard.vue'
@@ -103,10 +106,10 @@ function reloadFeed() {
     <MobileTopBar title="社区">
       <template #actions>
         <button class="u-topbar__act" type="button" title="加好友（演示）" aria-label="加好友" @click="demoAddFriend">
-          <MobileIcon name="user-plus" :size="18" />
+          <IconUserPlus />
         </button>
         <button class="u-topbar__act" type="button" title="写消息" aria-label="写消息" @click="openMessages">
-          <MobileIcon name="mail" :size="18" />
+          <IconMail />
         </button>
       </template>
     </MobileTopBar>

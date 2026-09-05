@@ -2911,9 +2911,12 @@ body {
 
 /* ============================================================
  * 统一顶栏 MobileTopBar（全局头像 / 页面标题 / 右侧扩展按钮 · 2026-09-05）
+ * 2026-09-05 晚：改 grid 三列 1fr auto 1fr（标题真居中，不受左右宽度影响）；
+ * 右侧按钮改底部 tab 同款 Tabler 线性图标（无底 icon-only，Grok 对照）
  * ============================================================ */
 .u-topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 10px;
   padding: 12px 16px 10px;
@@ -2923,21 +2926,27 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  justify-content: flex-start;
+  min-width: 0;
 }
 
 .u-topbar__back {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   flex: none;
   border: none;
   border-radius: 50%;
   background: none;
-  color: var(--u-ink);
+  color: var(--u-sub);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform 60ms ease-out;
+  transition: color 150ms ease-out, transform 60ms ease-out;
+}
+
+.u-topbar__back:hover {
+  color: var(--u-ink);
 }
 
 .u-topbar__back:active {
@@ -2970,12 +2979,10 @@ body {
 }
 
 .u-topbar__title {
-  flex: 1;
-  min-width: 0;
   margin: 0;
   font-size: 17px;
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 0; /* 中文标题 0 字距（docs/31）；grid auto 列天然居中 */
   color: var(--u-ink);
   text-align: center;
   overflow: hidden;
@@ -2986,30 +2993,37 @@ body {
 .u-topbar__acts {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+  justify-content: flex-end;
 }
 
+/* icon-only 无底线性按钮（与底部 tab 同风格；Tabler 图标 20px + 44px 触控区） */
 .u-topbar__act {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   flex: none;
   border: none;
   border-radius: 50%;
-  background: var(--u-track);
-  color: var(--u-ink);
+  background: none;
+  color: var(--u-sub);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 150ms ease-out, transform 60ms ease-out;
+  transition: color 150ms ease-out, transform 60ms ease-out;
 }
 
 .u-topbar__act:hover {
-  background: var(--u-track-hover);
+  color: var(--u-ink);
 }
 
 .u-topbar__act:active {
-  transform: scale(0.94);
+  transform: scale(0.92);
+}
+
+.u-topbar__act svg {
+  width: 20px;
+  height: 20px;
 }
 
 /* 顶栏文字主按钮（X 式「发帖」；蓝底白字小胶囊） */

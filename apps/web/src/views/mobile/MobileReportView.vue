@@ -9,6 +9,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import IconShare from '~icons/tabler/share'
+
 import { fetchReport, type ReportPayload } from '@/api/practice'
 import { shareDemoLink } from '@/composables/share'
 import { useUiStore } from '@/stores/ui'
@@ -111,7 +113,7 @@ const demoLines = [
     <MobileTopBar title="评分报告" back @back="router.back()">
       <template #actions>
         <button class="u-topbar__act" type="button" title="分享报告（演示）" aria-label="分享报告" @click="shareReport">
-          <MobileIcon name="share" :size="18" />
+          <IconShare />
         </button>
       </template>
     </MobileTopBar>

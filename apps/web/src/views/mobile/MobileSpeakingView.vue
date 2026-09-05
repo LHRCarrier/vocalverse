@@ -15,6 +15,8 @@ import { createSession, fetchScenarios, streamTurn, tts, type ScenarioItem } fro
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 
+import IconCoffee from '~icons/tabler/coffee'
+
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
@@ -400,7 +402,7 @@ function onSseEvent(e: SseStreamEvent) {
     <MobileTopBar title="口语" back @back="router.push('/m/home')">
       <template #actions>
         <button class="u-topbar__act" type="button" title="选择场景" aria-label="选择场景" @click="sheetOpen = true">
-          <MobileIcon name="coffee" :size="18" />
+          <IconCoffee />
         </button>
       </template>
     </MobileTopBar>

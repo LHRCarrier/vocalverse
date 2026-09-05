@@ -6,7 +6,9 @@
  */
 import { ref } from 'vue'
 
-import MobileIcon from '@/components/mobile/MobileIcon.vue'
+import IconMail from '~icons/tabler/mail'
+import IconSettings from '~icons/tabler/settings'
+
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { createDemoConversations } from '@/data/messages-demo'
 import { useUiStore } from '@/stores/ui'
@@ -29,10 +31,10 @@ function messageSettings() {
     <MobileTopBar title="私信">
       <template #actions>
         <button class="u-topbar__act" type="button" title="新消息（演示）" aria-label="新消息" @click="newMessage">
-          <MobileIcon name="mail" :size="18" />
+          <IconMail />
         </button>
         <button class="u-topbar__act" type="button" title="私信设置（演示）" aria-label="私信设置" @click="messageSettings">
-          <MobileIcon name="settings" :size="18" />
+          <IconSettings />
         </button>
       </template>
     </MobileTopBar>

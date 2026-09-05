@@ -14,6 +14,8 @@ import { streamFreeChat, tts, type FreeChatMsg } from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 
+import IconSettings from '~icons/tabler/settings'
+
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
@@ -254,7 +256,7 @@ function replay(index: number, text: string) {
     <MobileTopBar title="自由对话" back @back="router.push('/m/chat')">
       <template #actions>
         <button class="u-topbar__act" type="button" title="设置" aria-label="设置" @click="router.push('/m/me')">
-          <MobileIcon name="settings" :size="18" />
+          <IconSettings />
         </button>
       </template>
     </MobileTopBar>

@@ -8,6 +8,9 @@
  */
 import { computed } from 'vue'
 
+import IconSettings from '~icons/tabler/settings'
+import IconShare from '~icons/tabler/share'
+
 import { shareDemoLink } from '@/composables/share'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -60,10 +63,10 @@ function logout() {
     <MobileTopBar title="我的">
       <template #actions>
         <button class="u-topbar__act" type="button" title="分享档案（演示）" aria-label="分享档案" @click="shareProfile">
-          <MobileIcon name="share" :size="18" />
+          <IconShare />
         </button>
         <button class="u-topbar__act" type="button" title="设置" aria-label="设置" @click="scrollToSettings">
-          <MobileIcon name="settings" :size="18" />
+          <IconSettings />
         </button>
       </template>
     </MobileTopBar>

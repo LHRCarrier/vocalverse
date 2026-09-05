@@ -6,6 +6,9 @@
 import { computed, nextTick, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import IconArrowLeft from '~icons/tabler/arrow-left'
+import IconInfoCircle from '~icons/tabler/info-circle'
+
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import { createDemoConversations, type DemoMessage } from '@/data/messages-demo'
 import { useAuthStore } from '@/stores/auth'
@@ -62,7 +65,7 @@ onUnmounted(() => clearTimeout(replyTimer))
   <div class="u-phone u-chat">
     <header class="u-chat__top">
       <button class="u-topbar__back" type="button" title="返回私信" aria-label="返回私信" @click="router.push('/m/messages')">
-        <MobileIcon name="back" :size="18" />
+        <IconArrowLeft />
       </button>
       <button class="u-topbar__ava" type="button" title="账户菜单" aria-label="账户菜单" @click="ui.openDrawer()">
         {{ avatarLetter }}
@@ -75,7 +78,7 @@ onUnmounted(() => clearTimeout(replyTimer))
         aria-label="会话信息"
         @click="ui.showToast('会话信息 · M3 上线')"
       >
-        <MobileIcon name="info" :size="18" />
+        <IconInfoCircle />
       </button>
     </header>
 

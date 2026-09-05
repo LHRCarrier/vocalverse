@@ -7,6 +7,8 @@
  */
 import { computed, ref } from 'vue'
 
+import IconShare from '~icons/tabler/share'
+
 import { shareDemoLink } from '@/composables/share'
 import { useUiStore } from '@/stores/ui'
 
@@ -122,7 +124,7 @@ async function shareSong() {
     <MobileTopBar title="唱吧">
       <template #actions>
         <button class="u-topbar__act" type="button" title="分享歌曲（演示）" aria-label="分享歌曲" @click="shareSong">
-          <MobileIcon name="share" :size="18" />
+          <IconShare />
         </button>
       </template>
     </MobileTopBar>
