@@ -1,13 +1,13 @@
 <script setup lang="ts">
 /**
- * 移动端 · 社区主页（组长拍板 2026-09-05：主页换成社区；原「今日学习」演示帧撤下，列表不杂了）
+ * 移动端 · 英语社区主页（组长概念拍板 2026-09-05：点赞/分享/评论/投币 · 帖子+视频 · 三个领域）
  *
- * 结构：问候头 + 「今日练习」CTA（核心闭环入口，不被社交淹没）+ 打卡动态流。
- * 数据：演示帧——后端动态流按 docs/10 注记（单日打卡由 sessions 按日派生、跨用户流由
- * sessions/attempts/users JOIN 派生，无新表；M3 排期接真实接口）；点赞为本地交互演示不落库。
- * 设计语言：uic 纸面 + 白卡 24 圆角 + 炭黑主钮 + 点格底（与口语页同源）。
+ * 领域：① 英语新闻稿 ② 英文教学/学习分享 ③ 外国学习生活·地方习俗习惯；视频 = 帖子视频版（排版另设计，参考 X）。
+ * 排版参考 X：领域 Tab（推荐=全量）→ 混合信息流（帖子图文卡 / 视频封面卡）→ 互动行（评论/点赞/投币/分享）。
+ * 仅数据展示（组长明示）：演示帧数据 + 点赞为本地点赞交互；分享/评论/投币暂为展示。
+ * 后端真流 = docs/10 注记（sessions/attempts JOIN 派生 + post_likes）；M3 排期。
  */
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 import { useAuthStore } from '@/stores/auth'
 
@@ -27,120 +27,181 @@ function greeting(): string {
 const displayName = ref(auth.me?.nickname ?? auth.me?.username ?? '同学')
 const avatarLetter = ref(displayName.value.slice(0, 1).toUpperCase())
 
-/* ---------- 打卡动态流（【演示帧·M3】接真实接口后替换） ---------- */
+/* ---------- 领域 Tab（推荐 = 全量混排） ---------- */
+type Domain = '新闻稿' | '教学分享' | '海外生活'
+const tabs = ['推荐', '新闻稿', '教学分享', '海外生活'] as const
+const activeTab = ref<(typeof tabs)[number]>('推荐')
+
+/* ---------- 动态流（【演示帧】仅数据展示；M3 接真实 JOIN 流） ---------- */
 interface FeedItem {
   id: number
-  name: string
+  author: string
+  handle: string
   level: string
   time: string
-  kind: '场景对话' | '跟唱' | '自由对话'
+  domain: Domain
+  kind: 'post' | 'video'
   title: string
-  score: number | null
-  badge: { text: string; variant: 'success' | 'star' | 'neutral' }
-  meta: string
-  like: number
+  desc?: string
+  /** 图文帖的配图（演示：渐变块 + 标签）；视频为封面渐变 */
+  media?: { gradient: string; label: string }
+  duration?: string
+  stats: { like: number; comment: number; coin: number; share: number }
   liked: boolean
-  comments: number
   tint: string
 }
 
 const feed = ref<FeedItem[]>([
   {
     id: 1,
-    name: 'Luna',
-    level: 'L3',
-    time: '3 分钟前',
-    kind: '场景对话',
-    title: '咖啡馆 · 点单（进阶）',
-    score: 86.4,
-    badge: { text: '完成', variant: 'success' },
-    meta: '8 轮 · 用时 3′12″ · 三维评分',
-    like: 23,
+    author: 'Global Post',
+    handle: '@globalpost',
+    level: 'L4',
+    time: '12 分钟前',
+    domain: '新闻稿',
+    kind: 'post',
+    title: "'AI learning' is taking over China's classrooms — what it means for English learners",
+    desc: 'Education experts say AI partners are changing how students practice speaking, but human teachers remain the gold standard for feedback.',
+    media: { gradient: 'linear-gradient(135deg, #16303a, #2b5566)', label: '📰 NEWS' },
+    stats: { like: 328, comment: 46, coin: 37, share: 15 },
     liked: false,
-    comments: 4,
     tint: '#16303a',
   },
   {
     id: 2,
-    name: '大树',
+    author: 'BBC Learning English',
+    handle: '@bbcle',
     level: 'L3',
-    time: '28 分钟前',
-    kind: '跟唱',
-    title: 'Perfect Night',
-    score: 88.1,
-    badge: { text: '新纪录', variant: 'star' },
-    meta: '跟唱 2 遍 · 音准 88',
-    like: 41,
+    time: '32 分钟前',
+    domain: '新闻稿',
+    kind: 'video',
+    title: '6 Minute English: Why do we procrastinate?',
+    desc: 'A new episode with vocabulary that’s actually used in daily conversation.',
+    media: { gradient: 'linear-gradient(135deg, #3a2440, #6b3f78)', label: '🎬 VIDEO' },
+    duration: '6:23',
+    stats: { like: 1240, comment: 189, coin: 210, share: 96 },
     liked: false,
-    comments: 9,
     tint: '#3a2440',
   },
   {
     id: 3,
-    name: 'Momo',
-    level: 'L2',
+    author: 'Emma · 英文教学',
+    handle: '@emmashare',
+    level: 'L3',
     time: '1 小时前',
-    kind: '自由对话',
-    title: '和 Sam 聊周末计划',
-    score: null,
-    badge: { text: '打卡', variant: 'neutral' },
-    meta: '12 轮 · 自由聊 4′05″',
-    like: 8,
+    domain: '教学分享',
+    kind: 'post',
+    title: '5 phrasal verbs that make you sound natural at a coffee shop',
+    desc: '1) pick up 2) sit down 3) pour out 4) hand over 5) run out of — with example dialogues for each. Save this before your next role-play!',
+    media: { gradient: 'linear-gradient(135deg, #1e2b26, #3d5648)', label: '✍️ STUDY' },
+    stats: { like: 86, comment: 12, coin: 25, share: 8 },
     liked: false,
-    comments: 1,
     tint: '#1e2b26',
   },
   {
     id: 4,
-    name: 'Panda',
-    level: 'L1',
-    time: '3 小时前',
-    kind: '场景对话',
-    title: '机场 · 值机出行（入门）',
-    score: 79.8,
-    badge: { text: '待提升', variant: 'neutral' },
-    meta: '6 轮 · 语言点 3/5',
-    like: 12,
+    author: 'Teacher Lee',
+    handle: '@leeenglish',
+    level: 'L4',
+    time: '2 小时前',
+    domain: '教学分享',
+    kind: 'video',
+    title: 'How I memorize 100 new words a month — the shadowing method',
+    desc: 'My 10-minute daily routine: listen, shadow, record, compare. Full breakdown inside.',
+    media: { gradient: 'linear-gradient(135deg, #232044, #4a4396)', label: '🎬 VIDEO' },
+    duration: '8:12',
+    stats: { like: 512, comment: 77, coin: 130, share: 41 },
     liked: false,
-    comments: 2,
     tint: '#232044',
   },
   {
     id: 5,
-    name: '叽里呱啦',
-    level: 'L4',
-    time: '昨天 20:15',
-    kind: '跟唱',
-    title: 'Yesterday Once More',
-    score: 91.5,
-    badge: { text: '优秀', variant: 'success' },
-    meta: '跟唱 1 遍 · 节奏 91',
-    like: 66,
+    author: 'Liz 在伦敦',
+    handle: '@lizinlondon',
+    level: 'L3',
+    time: '3 小时前',
+    domain: '海外生活',
+    kind: 'post',
+    title: 'My first Bonfire Night — why Brits burn effigies on 5th November',
+    desc: 'Guy Fawkes Night explained in 3 sentences: a failed plot, a bonfire tradition, and my first "penny for the guy". Tonight we watched sparks over the Thames.',
+    stats: { like: 150, comment: 23, coin: 18, share: 12 },
     liked: false,
-    comments: 15,
-    tint: '#16303a',
+    tint: '#0f3a44',
+  },
+  {
+    id: 6,
+    author: '大米在 Boston',
+    handle: '@damilinboston',
+    level: 'L2',
+    time: '昨天 21:40',
+    domain: '海外生活',
+    kind: 'video',
+    title: 'Dorm life at MIT: my morning in 60 seconds',
+    desc: 'Kitchen talk, roommate practices, and the shortest walk to class I could find.',
+    media: { gradient: 'linear-gradient(135deg, #2b4a3a, #5c8a6a)', label: '🎬 VIDEO' },
+    duration: '1:02',
+    stats: { like: 73, comment: 9, coin: 22, share: 5 },
+    liked: false,
+    tint: '#2b4a3a',
+  },
+  {
+    id: 7,
+    author: 'Saki 在京都',
+    handle: '@sakiinkyoto',
+    level: 'L2',
+    time: '昨天 15:06',
+    domain: '海外生活',
+    kind: 'post',
+    title: 'Japanese school lunch culture — 25 minutes of mindful eating',
+    desc: 'Students serve each other, eat together, and never waste. The "kyushoku" system teaches more than nutrition — it teaches community.',
+    stats: { like: 201, comment: 34, coin: 41, share: 19 },
+    liked: false,
+    tint: '#4a3320',
+  },
+  {
+    id: 8,
+    author: 'Global Post',
+    handle: '@globalpost',
+    level: 'L4',
+    time: '2 天前',
+    domain: '新闻稿',
+    kind: 'post',
+    title: 'Tourism rebound: the quiet villages welcoming slow travellers',
+    desc: 'As visa policies ease, small towns across Europe are betting on "slow travel" — longer stays, fewer tourists, richer culture.',
+    media: { gradient: 'linear-gradient(135deg, #37546e, #6e96b4)', label: '🗺️ TRAVEL' },
+    stats: { like: 468, comment: 55, coin: 63, share: 27 },
+    liked: false,
+    tint: '#37546e',
   },
 ])
 
+const visibleFeed = computed(() =>
+  activeTab.value === '推荐' ? feed.value : feed.value.filter((f) => f.domain === activeTab.value),
+)
+
+function fmt(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
+}
+
 function toggleLike(item: FeedItem) {
   item.liked = !item.liked
-  item.like += item.liked ? 1 : -1
+  item.stats.like += item.liked ? 1 : -1
 }
 </script>
 
 <template>
   <div class="u-phone">
     <div class="u-comm">
-      <!-- 身份：问候 + 头像 -->
+      <!-- 身份：社区 + 问候 + 头像 -->
       <header class="u-comm__head">
         <div>
           <h1 class="u-comm__title">社区</h1>
-          <p class="u-comm__sub">{{ greeting() }}，{{ displayName }}</p>
+          <p class="u-comm__sub">{{ greeting() }}，{{ displayName }} · 英语同好正在分享</p>
         </div>
         <span class="u-comm__avatar" aria-label="头像">{{ avatarLetter }}</span>
       </header>
 
-      <!-- 核心闭环入口：今日练习（组长拍板：社区页保留醒目练习入口，防被社交淹没） -->
+      <!-- 核心闭环入口（组长护栏：社交不埋训练入口） -->
       <section class="u-comm__cta" aria-label="今日练习">
         <div class="u-comm__cta-body">
           <h2 class="u-comm__cta-title">今日练习</h2>
@@ -152,31 +213,55 @@ function toggleLike(item: FeedItem) {
         </RouterLink>
       </section>
 
-      <!-- 打卡动态流 -->
-      <h2 class="u-comm__sec">大家今天</h2>
-      <section v-for="item in feed" :key="item.id" class="u-comm-item" :aria-label="`${item.name} 的动态`">
+      <!-- 领域 Tab（X 式：推荐 = 全量混排） -->
+      <div class="u-comm-tabs" role="tablist" aria-label="社区领域">
+        <button
+          v-for="t in tabs"
+          :key="t"
+          class="u-comm-tab"
+          :class="{ active: activeTab === t }"
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === t"
+          @click="activeTab = t"
+        >
+          {{ t }}
+        </button>
+      </div>
+
+      <!-- 信息流：帖子图文卡 / 视频封面卡（参考 X） -->
+      <section v-for="item in visibleFeed" :key="item.id" class="u-comm-item" :aria-label="`${item.author} 的动态`">
         <header class="u-comm-item__head">
-          <span class="u-comm-item__ava" :style="{ background: item.tint }">{{ item.name.slice(0, 1) }}</span>
+          <span class="u-comm-item__ava" :style="{ background: item.tint }">{{ item.author.slice(0, 1) }}</span>
           <span class="u-comm-item__who">
-            <span class="u-comm-item__name">{{ item.name }}</span>
-            <span class="u-comm-item__meta">{{ item.level }} · {{ item.time }}</span>
+            <span class="u-comm-item__name">{{ item.author }} <span class="u-comm-item__domain">{{ item.domain }}</span></span>
+            <span class="u-comm-item__meta">{{ item.handle }} · {{ item.level }} · {{ item.time }}</span>
           </span>
         </header>
-        <div class="u-comm-item__body">
-          <span class="u-comm-item__kind">{{ item.kind }}</span>
-          <span class="u-comm-item__title">{{ item.title }}</span>
-          <span class="u-comm-item__score">
-            <template v-if="item.score != null">{{ item.score }}</template>
-            <template v-else>—</template>
-          </span>
+
+        <h3 class="u-comm-item__title">{{ item.title }}</h3>
+        <p v-if="item.desc" class="u-comm-item__desc">{{ item.desc }}</p>
+
+        <!-- 配图 / 视频封面 -->
+        <div
+          v-if="item.media"
+          class="u-comm-media"
+          :class="{ 'u-comm-media--video': item.kind === 'video' }"
+          :style="{ background: item.media.gradient }"
+        >
+          <span v-if="item.kind === 'video'" class="u-comm-media__play"><MobileIcon name="play" :size="22" /></span>
+          <span v-if="item.duration" class="u-comm-media__dur">{{ item.duration }}</span>
+          <span class="u-comm-media__label">{{ item.media.label }}</span>
         </div>
-        <p class="u-comm-item__meta-line">
-          {{ item.meta }}
-          <span class="u-chip u-chip--green" :class="`u-comm-badge--${item.badge.variant}`">{{ item.badge.text }}</span>
-        </p>
+
+        <!-- 互动行：评论 / 点赞 / 投币 / 分享（X 式） -->
         <footer class="u-comm-item__foot">
+          <span class="u-comm-action">
+            <MobileIcon name="chat" :size="15" />
+            {{ fmt(item.stats.comment) }}
+          </span>
           <button
-            class="u-comm-item__act"
+            class="u-comm-action"
             :class="{ 'is-liked': item.liked }"
             type="button"
             :aria-pressed="item.liked"
@@ -184,16 +269,20 @@ function toggleLike(item: FeedItem) {
             @click="toggleLike(item)"
           >
             <MobileIcon name="heart" :size="15" />
-            {{ item.like }}
+            {{ fmt(item.stats.like) }}
           </button>
-          <span class="u-comm-item__act">
-            <MobileIcon name="chart" :size="15" />
-            {{ item.comments }}
+          <span class="u-comm-action">
+            <MobileIcon name="coin" :size="15" />
+            {{ fmt(item.stats.coin) }}
+          </span>
+          <span class="u-comm-action">
+            <MobileIcon name="share" :size="15" />
+            {{ fmt(item.stats.share) }}
           </span>
         </footer>
       </section>
 
-      <p class="u-comm__note">动态为演示数据，M3 接入真实打卡流（docs/10 注记：sessions/attempts 派生）。</p>
+      <p class="u-comm__note">内容为演示数据，仅展示；互动与真实流的接口按 docs/10 注记排期 M3。</p>
     </div>
 
     <MobileTabBar />
