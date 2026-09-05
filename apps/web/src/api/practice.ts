@@ -51,6 +51,27 @@ export async function fetchScenarios(): Promise<ScenarioItem[]> {
   return resp.data
 }
 
+/** 自由对话消息（客户端携带的滚动历史，MVP 无状态，docs/14 §12） */
+export interface FreeChatMsg {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+/** 自由对话回合：multipart（audio / text / history JSON）→ SSE 子集事件（docs/14 §12） */
+export function streamFreeChat(
+  form: FormData,
+  onEvent: (e: SseStreamEvent) => void,
+  onError: (err: unknown) => void,
+  signal?: AbortSignal,
+): void {
+  openSseFetch(
+    '/api/v1/free-chat/turn',
+    { method: 'POST', body: form, headers: authHeaders() },
+    { onEvent, onError, onClose: () => undefined },
+    signal,
+  )
+}
+
 export async function createSession(payload: {
   kind: 'dialog' | 'defense'
   scenario_id?: number

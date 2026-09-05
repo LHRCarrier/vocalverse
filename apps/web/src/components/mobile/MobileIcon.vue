@@ -89,6 +89,12 @@ const props = withDefaults(
       <path d="M9 5l7 7-7 7" />
     </template>
 
+    <!-- 发送（右箭头 · 2026-09-05 补：联合类型已声明但缺模板 → 发送按钮渲染成空圆圈） -->
+    <template v-else-if="props.name === 'arrow'">
+      <path d="M5 12h14" />
+      <path d="M13 5.5l6.5 6.5-6.5 6.5" />
+    </template>
+
     <!-- 时钟（回合） -->
     <template v-else-if="props.name === 'clock'">
       <circle cx="12" cy="12" r="8.5" />

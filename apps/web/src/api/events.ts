@@ -14,6 +14,8 @@ export type EventName =
   | 'corpus_hit'
   | 'practice_complete'
   | 'fun_action'
+  | 'free_chat_open'
+  | 'free_chat_turn'
 
 export interface TrackOptions {
   page?: string
