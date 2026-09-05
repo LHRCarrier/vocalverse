@@ -405,8 +405,8 @@ function onSseEvent(e: SseStreamEvent) {
       role="status"
       :aria-label="lineStatus === 'busy' ? 'AI 处理中' : lineStatus === 'error' ? '出错了' : '空闲'"
     />
-    <!-- 统一顶栏（全局头像 / 口语 / 场景选择；返回已由练习组底栏 🏠 取代） -->
-    <MobileTopBar title="口语">
+    <!-- 统一顶栏（← 回学习主页 + 全局头像 / 口语 / 场景选择；回社区 = 底栏 🏠 出口） -->
+    <MobileTopBar title="口语" back @back="router.push('/m/learn')">
       <template #actions>
         <button class="u-topbar__act" type="button" title="选择场景" aria-label="选择场景" @click="sheetOpen = true">
           <IconCoffee />

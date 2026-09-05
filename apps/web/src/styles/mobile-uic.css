@@ -2991,6 +2991,13 @@ body {
   transition: color 150ms ease-out, transform 60ms ease-out;
 }
 
+/* 离开图标：tabler logout 镜像 → 箭头朝左（离开语义）；尺寸与头像同级（组长反馈 2026-09-05） */
+.u-topbar__back svg {
+  width: 34px;
+  height: 34px;
+  transform: scaleX(-1);
+}
+
 .u-topbar__back:hover {
   color: var(--u-ink);
 }

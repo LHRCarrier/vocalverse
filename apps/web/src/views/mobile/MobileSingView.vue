@@ -6,6 +6,7 @@
  * 视觉：深青精选卡（同色系 chip + 幽灵按钮 + 大音符线稿锚点）→ 56px 分段 → 点线时间轴歌单。
  */
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import IconShare from '~icons/tabler/share'
 
@@ -17,6 +18,7 @@ import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import '@/styles/mobile-uic.css'
 
+const router = useRouter()
 const ui = useUiStore()
 
 type Tab = 'all' | 'hot' | 'fav'
@@ -120,8 +122,8 @@ async function shareSong() {
 
 <template>
   <div class="u-phone">
-    <!-- 统一顶栏（全局头像 / 唱吧 / 分享歌曲） -->
-    <MobileTopBar title="唱吧">
+    <!-- 统一顶栏（← 回学习主页 + 全局头像 / 唱吧 / 分享歌曲） -->
+    <MobileTopBar title="唱吧" back @back="router.push('/m/learn')">
       <template #actions>
         <button class="u-topbar__act" type="button" title="分享歌曲（演示）" aria-label="分享歌曲" @click="shareSong">
           <IconShare />

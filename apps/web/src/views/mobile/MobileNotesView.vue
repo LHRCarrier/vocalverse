@@ -6,6 +6,7 @@
  * M3 接真实词汇本（划词采集 + 复习调度）。
  */
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import IconPlus from '~icons/tabler/plus'
 
@@ -14,6 +15,7 @@ import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
+const router = useRouter()
 const ui = useUiStore()
 
 type NoteCat = '口语' | '阅读' | '文化'
@@ -54,7 +56,7 @@ function addNote() {
 
 <template>
   <div class="u-phone">
-    <MobileTopBar title="笔记">
+    <MobileTopBar title="笔记" back @back="router.push('/m/learn')">
       <template #actions>
         <button class="u-topbar__act" type="button" title="添加笔记（演示）" aria-label="添加笔记" @click="addNote">
           <IconPlus />

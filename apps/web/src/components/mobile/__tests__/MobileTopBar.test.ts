@@ -16,9 +16,9 @@ describe('MobileTopBar', () => {
     expect(useUiStore().drawerOpen).toBe(true)
   })
 
-  it('back=true 时返回钮触发 back 事件', async () => {
+  it('back=true 时离开钮（门图标）触发 back 事件', async () => {
     const wrapper = mount(MobileTopBar, { props: { title: '评分报告', back: true } })
-    await wrapper.get('button[aria-label="返回"]').trigger('click')
+    await wrapper.get('button[aria-label="离开"]').trigger('click')
     expect(wrapper.emitted('back')).toHaveLength(1)
   })
 
