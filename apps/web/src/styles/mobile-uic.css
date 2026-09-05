@@ -90,12 +90,12 @@ body {
 }
 
 /* 场景对话页：底部 dock 固定容器（标签/录音钮/功能行自然堆叠，杜绝 fixed 坐标重叠；2026-09-05）
- * 2026-09-05 晚：口语并入练习 Hub 后 /m/chat 为二级页（无 tab），dock 贴底 */
+ * 2026-09-05 晚 2：练习组 tab 常驻，dock 上移 56px 避让 */
 .u-chat-dock {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 0;
+  bottom: 56px;
   width: 100%;
   max-width: 480px;
   display: flex;
@@ -2294,13 +2294,20 @@ body {
 /* ============================================================
  * 自由对话页（docs/14 §12；2026-09-05）
  * ============================================================ */
-/* 固定视口高度 + 内部滚动（2026-09-05：原 min-height:100vh 不约束 flex 子项 → 整页滚动、输入栏被顶出） */
-.u-fc-page {
+/* 固定视口高度容器（顶栏 + 内容区各归其位；2026-09-05 晚 2 修：
+ * 原 u-fc-page 自带 100dvh 且是顶栏之后的流元素 → 页面总高超视口 66px、输入条落入 tab 区 */
+.u-fc-root {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  height: 100vh;
   height: 100dvh;
+}
+
+/* 固定视口高度 + 内部滚动（2026-09-05：原 min-height:100vh 不约束 flex 子项 → 整页滚动、输入栏被顶出） */
+.u-fc-page {
+  flex: 1 1 auto;
+  min-height: 0; /* flex 溢出约束 → box 内部滚动 */
+  display: flex;
+  flex-direction: column;
   padding-bottom: 0; /* 本页无浮动 Tab 栏：覆盖 .u-content 的 140px 底部留白 */
   overflow: hidden;
 }
@@ -2361,9 +2368,9 @@ body {
   text-overflow: ellipsis;
 }
 
-/* 输入栏 */
+/* 输入栏（2026-09-05 晚：练习组 tab 常驻后上移 56px 避免遮挡；「新对话」已并入输入条首钮） */
 .u-fc-bar-wrap {
-  padding: 10px 4px calc(14px + env(safe-area-inset-bottom));
+  padding: 10px 4px calc(70px + env(safe-area-inset-bottom)); /* 14 + 全局 tab 56 */
   background: transparent; /* 点格背景透出（2026-09-05 组员 dot-grid 方案） */
 }
 
@@ -2858,7 +2865,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  padding: 10px 12px calc(66px + env(safe-area-inset-bottom)); /* 10 + 全局 tab 56（2026-09-05 晚 2：会话页归社区组常驻 tab） */
   border-top: 1px solid var(--u-paper-grid);
   background: var(--u-paper);
 }

@@ -72,12 +72,6 @@ watch(
   },
 )
 
-function goScene() {
-  // 功能行（2026-09-05 组长拍板：自由对话不做场景选择——切回场景对话页，由该页的「先选场景」流程处理）
-  void track('free_chat_switch', { payload: { to: 'scene' } })
-  router.push('/m/chat')
-}
-
 /** 新对话：清空当前自由对话记忆（无状态 MVP：仅本地，无服务端会话可放弃） */
 function resetChat() {
   abort.abort()
@@ -244,7 +238,7 @@ function replay(index: number, text: string) {
 </script>
 
 <template>
-  <div class="u-phone">
+  <div class="u-phone u-fc-root">
     <!-- AI 状态线（静默纯黑 / 处理中彩色流光 / 出错纯红） -->
     <div
       class="v-line"
@@ -295,28 +289,20 @@ function replay(index: number, text: string) {
       </div>
 
       <div class="u-fc-bar-wrap">
-        <!-- 功能行（2026-09-05：切回场景对话 + 新对话；场景选择归场景对话页的选场景流程） -->
-        <div class="u-tb" role="toolbar" aria-label="口语功能">
-          <button class="u-tb-item" type="button" title="切换到场景对话（固定题卡跟练）" @click="goScene()">
-            <MobileIcon name="coffee" :size="22" />
-            <span class="u-tb-item__label">场景对话</span>
-          </button>
-          <button
-            class="u-tb-item"
-            type="button"
-            :disabled="!bubbles.length"
-            title="清空当前对话，重新开始"
-            @click="resetChat"
-          >
-            <MobileIcon name="refresh" :size="22" />
-            <span class="u-tb-item__label">新对话</span>
-          </button>
-        </div>
-
         <div v-if="recording" class="u-fc-state">
           聆听中… 点击 ■ 停止并发送
         </div>
         <div class="u-fc-bar">
+          <button
+            class="u-fc-send"
+            type="button"
+            title="新对话（清空当前对话，重新开始）"
+            aria-label="新对话"
+            :disabled="!bubbles.length"
+            @click="resetChat"
+          >
+            <MobileIcon name="refresh" :size="20" />
+          </button>
           <input
             v-model="inputText"
             class="u-fc-input"
