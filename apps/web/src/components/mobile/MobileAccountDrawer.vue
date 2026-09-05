@@ -5,8 +5,11 @@
  * 菜单项 emit navigate(path)，退出 emit logout——由挂载页接（路由跳转 + auth 清理）。
  */
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
+import { useProgressStore } from '@/stores/progress'
 
 import type { MeView } from '@/stores/auth'
+
+const progress = useProgressStore()
 
 const props = defineProps<{
   open: boolean
@@ -37,7 +40,7 @@ const items = [
             <span class="u-drawer__who">
               <strong class="u-drawer__name">{{ props.me?.nickname ?? props.me?.username ?? '同学' }}</strong>
               <span class="u-drawer__sub">
-                {{ props.me ? `@${props.me.username} · 水平 ${props.me.level}` : '未登录' }}
+                {{ props.me ? `@${props.me.username} · ${progress.lvLabel}` : '未登录' }}
               </span>
             </span>
           </header>

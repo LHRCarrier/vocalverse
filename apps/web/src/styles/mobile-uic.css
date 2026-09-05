@@ -2794,6 +2794,19 @@ body {
   color: var(--u-weak);
 }
 
+/* 对方 LV 徽章（社交联动 · 2026-09-05） */
+.u-msg__lv {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: var(--u-r-chip);
+  background: var(--u-track);
+  color: var(--u-ink);
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+
 .u-msg__last {
   font-size: 12px;
   color: var(--u-sub);
@@ -3267,6 +3280,142 @@ body {
 
 .u-notes__star.is-starred {
   color: var(--u-star);
+}
+
+/* ============================================================
+ * 学习页（Duolingo 式画像：LV 徽章 + 经验条 + 速览/趋势 · 2026-09-05 组长拍板）
+ * ============================================================ */
+.u-learn {
+  padding: 6px 16px 120px;
+}
+
+.u-learn-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: var(--u-card);
+  border-radius: var(--u-r-card);
+  box-shadow: var(--u-shadow-float);
+  margin-bottom: 16px;
+}
+
+.u-learn-hero__badge {
+  flex: none;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--u-ink);
+  color: var(--u-star);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.u-learn-hero__lv {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.u-learn-hero__rank {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--u-paper);
+}
+
+.u-learn-hero__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.u-learn-hero__bar {
+  width: 100%;
+  height: 12px;
+  border-radius: var(--u-r-pill);
+  background: var(--u-track);
+  overflow: hidden;
+}
+
+.u-learn-hero__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--u-r-pill);
+  background: var(--u-star);
+  transition: width 300ms ease-out;
+}
+
+.u-learn-hero__xp {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--u-sub);
+  font-variant-numeric: tabular-nums;
+}
+
+.u-learn-hero__stats {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.u-learn-hero__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--u-ink);
+}
+
+.u-learn-card {
+  padding: 16px 20px;
+  background: var(--u-card);
+  border-radius: var(--u-r-inner);
+  box-shadow: var(--u-shadow-float);
+  margin-bottom: 12px;
+}
+
+.u-learn-card__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.u-learn-card__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--u-sub);
+  min-width: 64px;
+}
+
+.u-learn-trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 88px;
+}
+
+.u-learn-trend__bar {
+  flex: 1;
+  min-width: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--u-track);
+}
+
+.u-learn-trend__bar:last-child {
+  background: var(--u-accent);
+}
+
+.u-learn-trend__scale {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--u-weak);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ============================================================

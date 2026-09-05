@@ -13,6 +13,7 @@ import IconShare from '~icons/tabler/share'
 
 import { shareDemoLink } from '@/composables/share'
 import { useAuthStore } from '@/stores/auth'
+import { useProgressStore } from '@/stores/progress'
 import { useUiStore } from '@/stores/ui'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
@@ -25,7 +26,11 @@ const ui = useUiStore()
 
 const displayName = computed(() => auth.me?.nickname ?? auth.me?.username ?? '同学')
 const avatarLetter = computed(() => displayName.value.slice(0, 1).toUpperCase())
-const level = computed(() => auth.me?.level ?? 'L1')
+const progress = useProgressStore()
+/** 距下一级 XP 文案（满级 = 已满级） */
+const levelHint = computed(() =>
+  progress.nextXp == null ? '已达最高等级' : `距 LV${progress.info.level + 1} 还差 ${progress.nextXp - progress.xp} XP`,
+)
 
 /* ---------- 学习目标（【占位·M3】目标标签用于个性化推荐，P1） ---------- */
 const goals = ['日常交流', '职场英语', '面试表达'] as const
@@ -81,9 +86,9 @@ function logout() {
         <div style="flex: 1; min-width: 0">
           <div class="u-profile__name">
             {{ displayName }}
-            <span class="u-chip u-chip--ink">水平 {{ level }}</span>
+            <span class="u-chip u-chip--ink">{{ progress.lvLabel }} · {{ progress.info.title }}</span>
           </div>
-          <div class="u-profile__sub">加入 128 天 · 累计练习 38 轮</div>
+          <div class="u-profile__sub">加入 128 天 · 累计练习 38 轮 · {{ levelHint }}</div>
         </div>
       </section>
 

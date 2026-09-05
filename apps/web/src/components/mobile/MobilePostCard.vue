@@ -32,7 +32,7 @@ const emit = defineEmits<{
           {{ props.post.author }}
           <span class="u-comm-item__domain">{{ props.post.domain }}</span>
         </span>
-        <span class="u-comm-item__meta">{{ props.post.handle }} · {{ props.post.level }} · {{ props.post.time }}</span>
+        <span class="u-comm-item__meta">{{ props.post.handle }} · LV{{ props.post.level.slice(1) }} · {{ props.post.time }}</span>
       </span>
     </header>
 

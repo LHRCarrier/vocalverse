@@ -22,6 +22,7 @@ import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import ScenePickerSheet from '@/components/mobile/ScenePickerSheet.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useProgressStore } from '@/stores/progress'
 import '@/styles/mobile-uic.css'
 
 interface Bubble {
@@ -36,6 +37,7 @@ const route = useRoute()
 const router = useRouter()
 
 const auth = useAuthStore()
+const progress = useProgressStore()
 const avatarLetter = computed(() => (auth.me?.nickname ?? auth.me?.username ?? '我').slice(0, 1).toUpperCase())
 
 const scenario = ref<ScenarioItem | null>(null)
@@ -369,6 +371,7 @@ function onSseEvent(e: SseStreamEvent) {
       lastScore.value = { pron: e.pronunciation, flu: e.fluency, gram: e.grammar }
       scoreStatus.value = 'ok'
       void track('score_event', { sceneId: scenario.value?.id, payload: { pron: e.pronunciation, flu: e.fluency } })
+      progress.addXp(15) // 完成一次回合练习 +15 XP（演示规则；M3 后端加权）
       break
     case 'turn_end':
       scoreStatus.value = e.score_status === 'ok' ? scoreStatus.value : e.score_status

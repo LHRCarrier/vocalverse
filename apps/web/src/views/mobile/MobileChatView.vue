@@ -65,7 +65,7 @@ onUnmounted(() => clearTimeout(replyTimer))
       <button class="u-topbar__ava" type="button" title="账户菜单" aria-label="账户菜单" @click="ui.openDrawer()">
         {{ avatarLetter }}
       </button>
-      <strong class="u-chat__name">{{ title }}</strong>
+      <strong class="u-chat__name">{{ title }}<span v-if="conv" class="u-msg__lv">LV{{ conv.level.slice(1) }}</span></strong>
       <button
         class="u-topbar__act"
         type="button"

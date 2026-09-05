@@ -12,6 +12,8 @@ export interface DemoConversation {
   id: number
   name: string
   handle: string
+  /** 对方等级（'L3' → 展示 LV3；社交联动，2026-09-05） */
+  level: string
   tint: string
   lastMsg: string
   time: string
@@ -27,6 +29,7 @@ export function createDemoConversations(): DemoConversation[] {
       id: 1,
       name: 'Kai',
       handle: '@kai_learns',
+      level: 'L3',
       tint: '#16303a',
       lastMsg: 'Great point! I will check it out tonight.',
       time: '10:42',
@@ -46,6 +49,7 @@ export function createDemoConversations(): DemoConversation[] {
       id: 2,
       name: 'Momo',
       handle: '@momo_english',
+      level: 'L2',
       tint: '#3a2440',
       lastMsg: 'The 6-minute episode was so good 🎧',
       time: '昨天',
@@ -60,6 +64,7 @@ export function createDemoConversations(): DemoConversation[] {
       id: 3,
       name: 'Teacher Lee',
       handle: '@leeenglish',
+      level: 'L4',
       tint: '#232044',
       lastMsg: 'Try 10 minutes shadowing before breakfast.',
       time: '周三',
@@ -74,6 +79,7 @@ export function createDemoConversations(): DemoConversation[] {
       id: 4,
       name: 'BBC Learning English',
       handle: '@bbcle',
+      level: 'L3',
       tint: '#2b4a3a',
       lastMsg: 'New episode: Why do we procrastinate?',
       time: '周二',

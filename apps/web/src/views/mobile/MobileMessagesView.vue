@@ -50,7 +50,7 @@ function messageSettings() {
         <span class="u-msg__ava" :style="{ background: c.tint }">{{ c.name.slice(0, 1) }}</span>
         <span class="u-msg__body">
           <span class="u-msg__who">
-            <strong>{{ c.name }}</strong>
+            <strong>{{ c.name }}<span class="u-msg__lv">LV{{ c.level.slice(1) }}</span></strong>
             <time class="u-msg__time">{{ c.time }}</time>
           </span>
           <span class="u-msg__last">{{ c.lastMsg }}</span>

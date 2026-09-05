@@ -14,8 +14,10 @@ import { streamFreeChat, tts, type FreeChatMsg } from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 import { useAuthStore } from '@/stores/auth'
+import { useProgressStore } from '@/stores/progress'
 
 const auth = useAuthStore()
+const progress = useProgressStore()
 
 /** 用户头像字母（与 AI 声波头像对称位 · X/Grok 式） */
 const avatarLetter = computed(() => (auth.me?.nickname ?? auth.me?.username ?? '我').slice(0, 1).toUpperCase())
@@ -172,6 +174,7 @@ function onSseEvent(e: SseStreamEvent) {
       break
     case 'turn_end': {
       sending.value = false
+      progress.addXp(5) // 完成一次自由对话回合 +5 XP（演示规则；M3 后端加权）
       const reply = currentAssistant.value?.text ?? ''
       if (reply) {
         history.value.push({ role: 'assistant', content: reply })
