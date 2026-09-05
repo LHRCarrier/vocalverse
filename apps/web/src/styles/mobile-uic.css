@@ -1030,6 +1030,17 @@ body {
   color: var(--u-ink);
 }
 
+/* 垂直居中的空态（场景对话「先选场景」：按钮落在视觉中点下方一点；2026-09-05） */
+.u-empty--center {
+  min-height: calc(100dvh - 72px - 210px); /* 视口 - 顶栏 - 底部 dock */
+  justify-content: center;
+  padding-bottom: 24px;
+}
+
+.u-empty--center .u-done__actions {
+  margin-top: 32px; /* 组整体居中后，按钮再下移 → 位于视觉中点下方 */
+}
+
 .u-empty__art {
   width: 120px;
   color: var(--u-ink);

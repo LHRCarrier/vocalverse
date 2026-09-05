@@ -382,8 +382,8 @@ function onSseEvent(e: SseStreamEvent) {
         <MobileIcon name="back" />
       </button>
 
-      <!-- 开始流程第 1 步：先选场景（组长拍板 2026-09-05：进页不再自动开题；文字说明全部删掉，只留图 + 按钮） -->
-      <section v-if="stage === 'choose'" class="u-empty">
+      <!-- 开始流程第 1 步：先选场景（只留图 + 按钮；按钮仅此一个，底部功能行的重复入口在 choose 态隐藏） -->
+      <section v-if="stage === 'choose'" class="u-empty u-empty--center">
         <div class="u-empty__art"><MobileArt name="mic" :size="96" /></div>
         <div class="u-done__actions" style="width: 100%; max-width: 280px">
           <button class="u-btn u-btn--primary u-btn--block" type="button" @click="sheetOpen = true">
@@ -501,7 +501,13 @@ function onSseEvent(e: SseStreamEvent) {
           <MobileIcon name="wave" :size="22" />
           <span class="u-tb-item__label">自由对话</span>
         </button>
-        <button class="u-tb-item" type="button" title="切换预置场景" @click="sheetOpen = true">
+        <button
+          v-if="stage !== 'choose'"
+          class="u-tb-item"
+          type="button"
+          title="切换预置场景"
+          @click="sheetOpen = true"
+        >
           <MobileIcon name="chevron" :size="22" />
           <span class="u-tb-item__label">场景选择</span>
         </button>
