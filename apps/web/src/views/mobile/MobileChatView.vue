@@ -60,7 +60,7 @@ onUnmounted(() => clearTimeout(replyTimer))
 </script>
 
 <template>
-  <div class="u-phone u-chat">
+  <div class="u-phone u-chat-page">
     <header class="u-chat__top">
       <button class="u-topbar__ava" type="button" title="账户菜单" aria-label="账户菜单" @click="ui.openDrawer()">
         {{ avatarLetter }}

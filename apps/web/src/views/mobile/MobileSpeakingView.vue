@@ -21,6 +21,7 @@ import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import ScenePickerSheet from '@/components/mobile/ScenePickerSheet.vue'
+import { useAuthStore } from '@/stores/auth'
 import '@/styles/mobile-uic.css'
 
 interface Bubble {
@@ -33,6 +34,9 @@ interface Bubble {
 
 const route = useRoute()
 const router = useRouter()
+
+const auth = useAuthStore()
+const avatarLetter = computed(() => (auth.me?.nickname ?? auth.me?.username ?? '我').slice(0, 1).toUpperCase())
 
 const scenario = ref<ScenarioItem | null>(null)
 const sessionId = ref<number | null>(null)
@@ -445,6 +449,8 @@ function onSseEvent(e: SseStreamEvent) {
               <MobileIcon v-else name="volume" :size="20" />
             </button>
           </div>
+          <!-- 用户头像（X/Grok 式：气泡右侧对称位） -->
+          <span v-if="m.role === 'user'" class="u-ava u-ava--me" aria-hidden="true">{{ avatarLetter }}</span>
         </div>
         <div v-if="m.chips?.length" class="u-tips">
           <span v-for="(c, j) in m.chips" :key="j" class="u-chip u-chip--accent">

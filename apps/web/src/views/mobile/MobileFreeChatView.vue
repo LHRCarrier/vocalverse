@@ -13,6 +13,12 @@ import { track } from '@/api/events'
 import { streamFreeChat, tts, type FreeChatMsg } from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+
+/** 用户头像字母（与 AI 声波头像对称位 · X/Grok 式） */
+const avatarLetter = computed(() => (auth.me?.nickname ?? auth.me?.username ?? '我').slice(0, 1).toUpperCase())
 
 import IconSettings from '~icons/tabler/settings'
 
@@ -282,6 +288,8 @@ function replay(index: number, text: string) {
                 <MobileIcon v-else name="volume" :size="20" />
               </button>
             </div>
+            <!-- 用户头像（X/Grok 式：气泡右侧对称位） -->
+            <span v-if="m.role === 'user'" class="u-ava u-ava--me" aria-hidden="true">{{ avatarLetter }}</span>
           </div>
         </template>
 

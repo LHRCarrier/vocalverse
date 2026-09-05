@@ -848,6 +848,17 @@ body {
   height: 18px;
 }
 
+/* 用户头像（气泡右侧对称位 · X/Grok 式；2026-09-05 晚 3 补） */
+.u-ava--me {
+  background: var(--u-track);
+  color: var(--u-ink);
+  font-size: 15px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .u-bubble {
   flex: 1;
   min-width: 0;
@@ -2787,7 +2798,9 @@ body {
 }
 
 /* ---------- 私信会话 ---------- */
-.u-chat {
+/* 容器类名 = u-chat-page（2026-09-05 晚 3 根因：与「气泡行 .u-chat（823 行）」类名冲突——
+ * 本容器 height:100dvh 后定义覆盖了气泡行容器 → 会话气泡被撑成整页高，类名拆分修复） */
+.u-chat-page {
   display: flex;
   flex-direction: column;
   height: 100dvh;
