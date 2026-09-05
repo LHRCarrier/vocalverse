@@ -242,10 +242,8 @@ function replay(index: number, text: string) {
       </button>
 
       <div ref="chatBox" class="u-fc-box">
-        <div v-if="!bubbles.length" class="u-empty">
+        <div v-if="!bubbles.length" class="u-empty u-empty--center">
           <div class="u-empty__art"><MobileArt name="wave" :size="96" /></div>
-          <div class="u-empty__title">自由对话</div>
-          <div class="u-empty__sub">想聊什么就聊什么：点麦克风说，或直接打字。</div>
         </div>
 
         <template v-for="(m, i) in bubbles" :key="i">
