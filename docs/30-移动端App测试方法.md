@@ -1,6 +1,6 @@
 # 30 · 移动端 App 测试方法（VocalVerse 手机壳）
 
-> 对象：`apps/mobile`（Capacitor 8 远程 URL 型壳，2026-09-04 交付）+ `apps/web` 移动端真形态页面（`/m/home` `/m/chat/:sceneId` `/m/report`）。
+> 对象：`apps/mobile`（Capacitor 8 远程 URL 型壳，2026-09-04 交付）+ `apps/web` 移动端真形态页面（`/m/home` `/m/speaking` `/m/chat/:sceneId` `/m/free-chat` `/m/report`）。
 > 依据：docs/06 §6 测试策略、docs/27 §8 真机实测表、docs/singing/22-轴线E Q6 八约束、AGENTS.md（门禁/联调页/红线）。
 > 核心思想（与 docs/29 §4.2 MobileGym 调研一致）：**功能测试尽量读结构化状态断言（URL/接口响应/DOM 数据），避免截图目测**；视觉验收用「原型基线并排比对」。
 
@@ -76,6 +76,8 @@ pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
 | W8 | token 过期 | 停留 15min 后操作 | 静默 refresh 或回登录页；不出现裸 401 页 |
 | W9 | 服务不可达 | `docker compose stop web python-api` | 页面给可操作错误提示（ApiError 文案），不白屏 |
 | W10 | PWA | 手机 Chrome 菜单「添加到主屏幕」 | 图标/名称正确，standalone 全屏 |
+| W11 | 口语 Hub（2026-09-05） | `/m/speaking` | 「场景对话」「自由对话」两模式卡 + 预置场景列表；Tab 口语/中央 + 均进入本页 |
+| W12 | 自由对话（2026-09-05） | `/m/free-chat` | 打字「Hi」→ 流式回复 + TTS 播报 + 喇叭可重听；点麦克风说话 → 用户转写气泡 → 回复；「新对话」清空记忆 |
 
 **结构化断言辅助**（推荐）：F12 Console 执行
 `document.querySelectorAll('.u-task').length` / `document.body.innerText` 核对渲染，替代目测。

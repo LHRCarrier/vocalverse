@@ -3,6 +3,43 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-05 口语界面 3 项：气泡尾巴修复 + 进页自动播修复 + 口语 Hub 与自由对话（最小可用版）
+
+- 触发（用户截图 + 拍板）：① AI 气泡尾巴长在气泡**左下角**（`.u-bubble--ai::before` bottom:10px），头像在行首——参照微信应从**头像垂直中心**发出；② 进 `/m/chat` 页 `boot()` 对开场白自动 `playTts()`，**进页必响**；③ 用户认为「口语」Tab 定义不清——口语应 = **场景对话（固定出题）+ 自由对话（LLM + TTS）**；
+- 真相澄清：自由对话此前**只有 LLM 框架 + Agent Lab 测试台**（2026-09-03：dev-only、默认关闭、文本输入、不建会话不入库），并非产品页；会话 kind 也只有 `dialog | defense`；
+- 拍板（组长）：按**最小可用版**落地；自由对话输入 = **语音 + 打字都要**，输出 = LLM 流式文本 + 回合后 TTS 自动播报（喇叭可重听）；MVP 不做评分/报告/入库（刷新即失忆，二期见 docs/14 §12.4）；
+- 产出：
+  1. **气泡尾巴**：`bottom:10px` → `top:18px`（头像 44px + 2px 顶距 → 中心 24px；菱形 12px 中心对齐），圆角 `16px 16px 16px 4px` → 全 `16px`；`played` 语义改名 `speakable`（喇叭出现条件）；
+  2. **自动播**：开场白删自动播放（喇叭立即可点）；录音提交后的回合语音仍自动播放（跟读流程需要，用户边界确认）；
+  3. **后端** `routes/free_chat.py`：`POST /api/v1/free-chat/turn`（multipart `audio`/`text` + `history` JSON，至少其一）→ SSE 子集 `user_transcript→text_delta*→turn_end`；无状态 LLM 转发器（TurnRunner 复用、system 全静态人设、无 corpus）；限流 asr+llm；**进 OpenAPI 契约**（快照 + gen:api 已同步）；
+  4. **前端**：`/m/speaking` 口语 Hub（场景对话/自由对话两模式卡 + 预置场景列表）· `/m/free-chat`（气泡同款 + 文本输入 + 麦克风 ≤15s + 「新对话」重置）；TabBar 口语与中央 + → `/m/speaking`；埋点 `free_chat_open`/`free_chat_turn{audio}`（EventTypes + **迁移 0005** 扩 `events.event_type` CHECK 10→12 类；docs/06 §9.1 登记）；
+  5. **文档**：docs/14 §12（定义/接口/前端/分期）+ §6.3 埋点、docs/06 §9.1、docs/10 注记、docs/30 W11/W12；
+- 验证：后端 ruff+format+全量 pytest 绿（新增 `test_free_chat` 6 用例；12 类事件逐类落库）；前端 lint 0 warning / typecheck / vitest 19 / build 绿；**CI 同款契约对账**（app.openapi() vs 快照）一致；alembic 单头 0005 且已应用到本地 PG；**真机链路实测**：Java 登录取 JWT → 自由对话打字轮（真实 DeepSeek 流式 + turn_end）→ 第二轮带 history（turn_index=2、上下文连续）→ 空输入 422；
+- 踩坑：① uvicorn `--reload` 多轮重载后子进程僵在 lifespan → 杀掉重启 dev-up 恢复；② `refresh-openapi.ps1` 导出的 Java 快照与库内差异只有 `servers` 字段 + 格式化（本地 springdoc 与 CI 生成路径不同）→ **回滚 Java 快照**，只提交 Python 快照 + 生成类型；③ 埋点事件是 **DB CHECK** 白名单：只改前端 `EventName` 会静默丢事件，后端 `EventTypes` + 迁移缺一不可（本次一并登记 docs/06-09.1、docs/10）；
+- **组员反馈修正（同日晚，截图验收）**：① 自由对话页左上「自由对话」标题与返回钮重叠 → 删除标题（保留返回钮 + 右上角浮动「新对话」）；② 输入栏发送钮渲染成空圆圈——`MobileIcon` 联合类型早声明了 `'arrow'` 但**从未实现模板** → 补模板（code 审查盲区：类型允许 ≠ 可渲染）；③ 口语 Hub 无返回导航 → 补 `.u-back--float` 返回钮（与其它移动页一致）。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
+## 2026-09-05 移动端场景对话 2 个 UI 修：气泡尾巴位置 + 进页自动播开场白
+
+- 触发（用户截图反馈）：① AI 气泡尾巴长在气泡**左下角**（`.u-bubble--ai::before` bottom:10px），而头像在行首——参照微信，小尾巴应从**头像垂直中心**发出；② 进 `/m/chat` 页 `boot()` 对开场白自动 `playTts()`，**进页必响**，像微信应点喇叭才出声；
+- 修复：`apps/web/src/styles/mobile-uic.css`——尾巴 `bottom:10px` → `top:18px`（头像 44px+2px 顶距 → 头像中心=距气泡顶 24px；菱形高 12px 中心对齐 24px），气泡圆角由 `16px 16px 16px 4px` 改全 `16px`（4px 小角是配旧左下尾巴的切角，尾巴上移后残留显得像缺口）；`MobileSpeakingView.vue`——开场白删除自动播放、气泡直接 `speakable:true`（喇叭立即可点）；`played` 语义改名 `speakable`（「该气泡有可播语音 / 喇叭出现条件」，原语义是「首次完整播过才有重听按钮」）；
+- 边界（按用户意图保留）：**录音提交后 AI 回合语音仍自动播放**（跟读流程需要：先听后说）；若也要改成全手动点播，一行 `playChunk` 可再调；
+- 验证：`pnpm lint` / `pnpm typecheck` / `pnpm test:run` / `pnpm build` 全绿。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
+## 2026-09-05 dev-up.ps1 自动拉起 DB 容器（修「电脑重启后 Java 起不来」的坑）
+
+- 触发：重启电脑后跑 `pwsh -File scripts/dev-up.ps1 start`，健康等待后 `java(8080): False`；`local/dev-logs/java-8080.out.log`：`HikariPool-1 - Starting...` → `Connection to localhost:5432 refused` → `Unable to determine Dialect without JDBC metadata` → 上下文中止，mvn BUILD FAILURE（5.8s，非 30-60s 慢启动）；
+- 排除「数据库密码改过」疑点：**Connection refused 发生在 TCP 建连阶段**（密码错应是监听端口存在时的 `password authentication failed`），且核验三处一致——PG 容器 init 环境（docker inspect）＝根 `.env`＝`services/java/application.yml` 默认回退均为 `vocalverse-dev`；
+- 根因：主机睡眠/重启后 Docker 引擎恢复时杀掉容器——`docker ps -a`：`vocalverse-postgres-1` / `vocalverse-redis-1` 均 `Exited (255)` 且**同一秒同死**、容器日志无正常 shutdown 记录（止于 checkpoint）、exit=255 非 postgres 自身崩溃；而 `dev-up.ps1` 原文写明「脚本不负责数据库容器」，DB 死了无人拉起；
+- 修复：`scripts/dev-up.ps1` start 新增 `Wait-DockerBase`——5432/6379 已监听则跳过；否则检查 Docker 引擎（未就绪尝试启动 Docker Desktop，等待 ≤90s）→ `docker compose up -d postgres redis` → 轮询 `docker compose ps` 至 postgres/redis 均 healthy（≤90s，Exited/unhealthy 提前退出并给排查命令）；
+- 验证：`docker compose stop postgres redis` 制造复现 → `dev-up.ps1 start` 自动拉起两容器并 healthy → `python(8000)/vite(5173)/java(8080)` 全 True；`status` 复核 8000/8080/5173 全 LISTENING、health 全 True；
+- 踩坑：① `docker compose ps` 默认只列**运行中**容器，判 healthy 要 `--format "{{.Service}}:{{.Status}}"` 按 service 名匹配（容器名带项目前缀）；② 端口健康用 `Get-NetTCPConnection -State Listen`，Docker Desktop 的 docker-proxy 仍在监听即视为容器可服务，无需连库探测。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
 ## 2026-09-08 UI 相关记录迁移说明
 
 > 组长指正：**App 端 UI/设计相关的记录归属 `worklog/安卓开发日志.md`**（本日志只留 Web/后端/全局事项）。
