@@ -382,11 +382,9 @@ function onSseEvent(e: SseStreamEvent) {
         <MobileIcon name="back" />
       </button>
 
-      <!-- 开始流程第 1 步：先选场景（组长拍板 2026-09-05：进页不再自动开题） -->
+      <!-- 开始流程第 1 步：先选场景（组长拍板 2026-09-05：进页不再自动开题；文字说明全部删掉，只留图 + 按钮） -->
       <section v-if="stage === 'choose'" class="u-empty">
         <div class="u-empty__art"><MobileArt name="mic" :size="96" /></div>
-        <div class="u-empty__title">先选一个场景开始</div>
-        <div class="u-empty__sub">场景对话基于预置题目卡（8 轮引导 + 三维评分）；自由对话可在底部随时切换。</div>
         <div class="u-done__actions" style="width: 100%; max-width: 280px">
           <button class="u-btn u-btn--primary u-btn--block" type="button" @click="sheetOpen = true">
             选择场景

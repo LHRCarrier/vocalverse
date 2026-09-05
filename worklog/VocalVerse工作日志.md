@@ -14,6 +14,7 @@
 - 埋点：不加新事件（开场播放复用既有气泡喇叭交互，不进指标口径）；
 - 验证：前端 lint 0 warning / typecheck / vitest / build 全绿；后端零改动。
 - **BUG 修复（同日，组员复测）**：home 点口语 Tab 未选场景直接出题（机场·值机开场白）——根因：**vue-router 可选参数 `:sceneId?` 无值时 params.sceneId = `''`（空串）而非 undefined**（node 实测 `r.resolve('/m/chat').params → {"sceneId":""}`），旧判定 `!== undefined` 放行 → `boot()` → `Number('')=0` 找不到 → `?? scenes[0]` 落默认场景；修复：判定补 `&& !== ''`，且 watch 补 `:id → 无 id` 回退到「先选场景」态（resetToChoose）。
+- **组员反馈（同日）**：「先选一个场景开始」空态文字说明太多 → 标题 + 副文案全部删除，只留线稿锚点 + 「选择场景」按钮。
 
 —— 执行人：组长 LHRCarrier（AI 代工整理）
 
