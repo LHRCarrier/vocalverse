@@ -4,7 +4,7 @@
  * 底部 sheet：遮罩 + 场景列表；选择后 emit select(sceneId)，由调用方决定去向。
  * 场景列表懒加载（首次打开才 fetch；失败静默，空态提示 seed）。
  */
-import { onMounted, ref } from 'vue'
+import { ref, watch } from 'vue'
 
 import { fetchScenarios, type ScenarioItem } from '@/api/practice'
 
@@ -22,9 +22,15 @@ const loadError = ref(false)
 
 const DIFF_LABEL: Record<number, string> = { 1: 'L1', 2: 'L2', 3: 'L3', 4: 'L4' }
 
-onMounted(() => {
-  if (props.open) void load()
-})
+/* 懒加载真源（2026-09-05 修：原 onMounted+open 判断只在「挂载时已打开」才加载 →
+ * 弹层平时挂载着 open=false，之后打开从不 fetch → 永远显示「暂无场景」） */
+watch(
+  () => props.open,
+  (v) => {
+    if (v) void load()
+  },
+  { immediate: true },
+)
 
 async function load() {
   if (loading.value) return
