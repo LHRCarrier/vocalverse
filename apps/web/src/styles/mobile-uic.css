@@ -1122,122 +1122,99 @@ body {
 }
 
 /* ============================================================
- * 社区主页（组长拍板 2026-09-05：主页 = 社区 + 今日练习入口；uic 纸面语言）
+ * 社区主页（组长拍板 2026-09-05：英语社区；X 式顶栏 + 文字标签 + 帖子/视频混合流）
  * ============================================================ */
 .u-comm {
-  padding: 20px 16px 140px; /* 底部留白给浮动 TabBar */
+  padding: 0 16px 140px; /* 底部留白给浮动 TabBar */
 }
 
-.u-comm__head {
+/* X 式顶栏（左头像 / 中 Logo / 右发布；随滚动移出屏幕，非 sticky） */
+.u-x-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  padding: 14px 0 10px;
 }
 
-.u-comm__title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--u-ink);
-}
-
-.u-comm__sub {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--u-sub);
-}
-
-.u-comm__avatar {
-  width: 40px;
-  height: 40px;
+.u-x-avatar {
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: var(--u-ink);
-  color: #fff;
+  background: var(--u-track);
+  color: var(--u-ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
 }
 
-/* 今日练习 CTA（核心闭环入口） */
-.u-comm__cta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: var(--u-card);
-  border-radius: var(--u-r-card);
-  box-shadow: var(--u-shadow-float);
-  padding: 16px 18px;
-  margin-bottom: 22px;
-}
-
-.u-comm__cta-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
+.u-x-logo {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 1px;
   color: var(--u-ink);
 }
 
-.u-comm__cta-sub {
-  margin: 3px 0 0;
-  font-size: 12px;
-  color: var(--u-sub);
-}
-
-.u-comm__cta-btn {
-  flex: none;
+.u-x-act {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: var(--u-track);
+  color: var(--u-ink);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
-  border-radius: var(--u-r-pill);
-  background: var(--u-ink);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
+  justify-content: center;
+  cursor: pointer;
   transition: background-color 150ms ease-out, transform 60ms ease-out;
 }
 
-.u-comm__cta-btn:hover {
-  background: var(--u-ink-hover);
+.u-x-act:hover {
+  background: var(--u-track-hover);
 }
 
-.u-comm__cta-btn:active {
-  transform: scale(0.96);
+.u-x-act:active {
+  transform: scale(0.94);
 }
 
-/* 领域 Tab（X 式） */
-.u-comm-tabs {
+/* 领域标签行（X 式文字标签，激活 = 加粗墨色；无 pill 底） */
+.u-x-tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 14px;
+  align-items: baseline;
+  gap: 22px;
+  padding: 0 0 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--u-paper-grid);
   overflow-x: auto;
   scrollbar-width: none;
 }
 
-.u-comm-tabs::-webkit-scrollbar {
+.u-x-tabs::-webkit-scrollbar {
   display: none;
 }
 
-.u-comm-tab {
+.u-x-tab {
   flex: none;
-  padding: 7px 14px;
   border: none;
-  border-radius: var(--u-r-pill);
-  background: var(--u-track);
-  color: var(--u-ink);
-  font: 600 12px var(--u-font);
+  background: none;
+  padding: 0;
+  font: 600 13px var(--u-font);
+  color: var(--u-sub);
   cursor: pointer;
-  transition: background-color 150ms ease-out, color 150ms ease-out;
+  white-space: nowrap;
+  transition: color 150ms ease-out;
 }
 
-.u-comm-tab.active {
-  background: var(--u-ink);
-  color: #fff;
+.u-x-tab.active {
+  color: var(--u-ink);
+  font-weight: 800;
+}
+
+.u-x-caret {
+  font-size: 10px;
+  margin-left: 3px;
+  color: var(--u-ink);
 }
 
 /* 动态卡片（帖子/视频混合） */

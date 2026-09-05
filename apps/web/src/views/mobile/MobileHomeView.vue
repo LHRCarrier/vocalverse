@@ -17,20 +17,25 @@ import '@/styles/mobile-uic.css'
 
 const auth = useAuthStore()
 
-function greeting(): string {
-  const h = new Date().getHours()
-  if (h < 12) return '早上好'
-  if (h < 18) return '下午好'
-  return '晚上好'
-}
-
 const displayName = ref(auth.me?.nickname ?? auth.me?.username ?? '同学')
 const avatarLetter = ref(displayName.value.slice(0, 1).toUpperCase())
 
-/* ---------- 领域 Tab（推荐 = 全量混排） ---------- */
+/* ---------- 领域标签（X 式：为你推荐 = 全量混排） ---------- */
 type Domain = '新闻稿' | '教学分享' | '海外生活'
-const tabs = ['推荐', '新闻稿', '教学分享', '海外生活'] as const
-const activeTab = ref<(typeof tabs)[number]>('推荐')
+const tabs = ['为你推荐', '新闻稿', '教学分享', '海外生活'] as const
+const activeTab = ref<(typeof tabs)[number]>('为你推荐')
+
+/* 发布演示 toast（仅数据展示 · M3 接真实发布流） */
+const toastText = ref('')
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+
+function demoPublish() {
+  toastText.value = '发布动态演示 · M3 上线'
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastText.value = ''
+  }, 2200)
+}
 
 /* ---------- 动态流（【演示帧】仅数据展示；M3 接真实 JOIN 流） ---------- */
 interface FeedItem {
@@ -176,7 +181,7 @@ const feed = ref<FeedItem[]>([
 ])
 
 const visibleFeed = computed(() =>
-  activeTab.value === '推荐' ? feed.value : feed.value.filter((f) => f.domain === activeTab.value),
+  activeTab.value === '为你推荐' ? feed.value : feed.value.filter((f) => f.domain === activeTab.value),
 )
 
 function fmt(n: number): string {
@@ -192,42 +197,30 @@ function toggleLike(item: FeedItem) {
 <template>
   <div class="u-phone">
     <div class="u-comm">
-      <!-- 身份：社区 + 问候 + 头像 -->
-      <header class="u-comm__head">
-        <div>
-          <h1 class="u-comm__title">社区</h1>
-          <p class="u-comm__sub">{{ greeting() }}，{{ displayName }} · 英语同好正在分享</p>
-        </div>
-        <span class="u-comm__avatar" aria-label="头像">{{ avatarLetter }}</span>
+      <!-- X 式顶栏（左头像 / 中 Logo / 右发布；随滚动移出屏幕，非 sticky） -->
+      <header class="u-x-top">
+        <span class="u-x-avatar" aria-label="头像">{{ avatarLetter }}</span>
+        <span class="u-x-logo">社区</span>
+        <button class="u-x-act" type="button" title="发布动态（演示）" aria-label="发布动态" @click="demoPublish">
+          <MobileIcon name="plus" :size="18" />
+        </button>
       </header>
 
-      <!-- 核心闭环入口（组长护栏：社交不埋训练入口） -->
-      <section class="u-comm__cta" aria-label="今日练习">
-        <div class="u-comm__cta-body">
-          <h2 class="u-comm__cta-title">今日练习</h2>
-          <p class="u-comm__cta-sub">连续打卡 12 天 · 练完再领 1 次连胜</p>
-        </div>
-        <RouterLink to="/m/chat" class="u-comm__cta-btn">
-          <MobileIcon name="mic" :size="16" />
-          开始练习
-        </RouterLink>
-      </section>
-
-      <!-- 领域 Tab（X 式：推荐 = 全量混排） -->
-      <div class="u-comm-tabs" role="tablist" aria-label="社区领域">
+      <!-- 领域标签行（X 式文字标签：为你推荐▾ + 三个领域） -->
+      <nav class="u-x-tabs" aria-label="社区领域">
         <button
           v-for="t in tabs"
           :key="t"
-          class="u-comm-tab"
+          class="u-x-tab"
           :class="{ active: activeTab === t }"
           type="button"
-          role="tab"
           :aria-selected="activeTab === t"
           @click="activeTab = t"
         >
           {{ t }}
+          <span v-if="t === '为你推荐'" class="u-x-caret" aria-hidden="true">▾</span>
         </button>
-      </div>
+      </nav>
 
       <!-- 信息流：帖子图文卡 / 视频封面卡（参考 X） -->
       <section v-for="item in visibleFeed" :key="item.id" class="u-comm-item" :aria-label="`${item.author} 的动态`">
@@ -284,6 +277,9 @@ function toggleLike(item: FeedItem) {
 
       <p class="u-comm__note">内容为演示数据，仅展示；互动与真实流的接口按 docs/10 注记排期 M3。</p>
     </div>
+
+    <!-- 发布演示 toast（X 式蓝药丸 → 我们白卡 + 圆点） -->
+    <div v-if="toastText" class="u-toast show"><span class="dot" aria-hidden="true" />{{ toastText }}</div>
 
     <MobileTabBar />
   </div>
