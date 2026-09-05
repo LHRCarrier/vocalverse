@@ -863,18 +863,19 @@ body {
   position: relative;
 }
 
-/* AI 气泡：左下角尾巴 = 从图标右下角"长"出来 */
+/* AI 气泡：尾巴指向头像垂直中心（微信式；2026-09-05 修：原 bottom:10px 尾巴在气泡底部、离头像远） */
 .u-bubble--ai {
   background: var(--u-track);
   color: var(--u-ink);
-  border-radius: 16px 16px 16px 4px;
+  border-radius: 16px;
 }
 
+/* 尾巴：头像 44px + margin-top 2px → 头像中心距气泡顶 24px；菱形高 12px → top = 24-6 = 18px */
 .u-bubble--ai::before {
   content: '';
   position: absolute;
   left: -5px;
-  bottom: 10px;
+  top: 18px;
   width: 12px;
   height: 12px;
   background: var(--u-track);
