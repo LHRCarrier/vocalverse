@@ -69,7 +69,10 @@ services:
     env_file:
       - path: .env
         required: false
-    command: ["sh", "-c", "alembic upgrade head && python -m app.db.seed"]
+    command: ["sh", "-c", "uv run alembic upgrade head && uv run python -m app.db.seed"]
+    volumes:
+      # seed 数据在仓库根 data/seed（构建上下文仅 services/python，镜像内无）——挂载供容器内播种
+      - ./data/seed:/app/data/seed
     environment:
       APP_ENV: development
       APP_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vocalverse}:${POSTGRES_PASSWORD:-vocalverse-dev}@postgres:5432/${POSTGRES_DB:-vocalverse}
