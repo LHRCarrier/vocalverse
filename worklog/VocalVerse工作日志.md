@@ -15,7 +15,7 @@
 
 **门禁**：Python ruff/format ✓ · pytest **271 passed**（含 3 个 alembic 单头/离线渲染用例，修前 268+3fail）· `alembic heads` 单头 0007 ✓；前端 lint/typecheck ✓ · test:run **19 passed** ✓ · build ✓（pnpm install 补 unplugin-icons 等上游新依赖）。
 
-**状态**：分支已含全部整合，**推送/PR 被网络阻断**（github.com:443 不可连；api.github.com 正常）。网络恢复后：`git push -u origin feat/recommend-landing` → 开 PR（base main，承接 PR#25 之后的 09-03+WIP+整合；描述需说明 5 项待组长确认：C 类取舍、序号待定号、RecTestView 生产路由违例、imageio-ffmpeg 补缺、gitignore）。
+**状态（已闭环）**：网络恢复后一次推送成功（`07fcfc8..22a5903`），已开 **PR #29**（base main ← feat/recommend-landing，23 commits / 60 文件，MERGEABLE）；PR 描述含 5 项待组长确认（C 类取舍、序号待定号、RecTestView 生产路由违例、imageio-ffmpeg 补缺、gitignore）。
 
 **环境提醒**：本机 dev 库已重建（旧账号/测试 attempt 数据随 schema 重建清空，demo 数据已 seed 恢复）；8000/8080 旧服务进程建议重启（连接的是旧库状态）。
 
