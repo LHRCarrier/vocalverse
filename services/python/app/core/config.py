@@ -7,6 +7,7 @@
 
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +17,20 @@ class Settings(BaseSettings):
         env_file=(".env", ".env.local"),
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def _reject_default_secrets_in_production(self) -> "Settings":
+        """P0-1：production 下拒绝使用已知默认密钥/短密钥（docs/20:185 fail-fast）。"""
+        if self.app_env != "production":
+            return self
+        if (
+            self.jwt_secret in ("", "vocalverse-dev-jwt-secret-0123456789abcdef")
+            or len(self.jwt_secret) < 32
+        ):
+            raise ValueError("production requires a strong non-default APP_JWT_SECRET")
+        if self.service_token in ("", "change-me-internal-service-token"):
+            raise ValueError("production requires a non-default APP_SERVICE_TOKEN")
+        return self
 
     # 运行模式
     app_env: str = "development"  # development | test | production
@@ -68,6 +83,23 @@ class Settings(BaseSettings):
     # 音频保留（合规：默认 24h 清理）
     audio_ttl_hours: int = 24
     audio_dir: str = "./data/audio"  # 本地卷存储（docs/06 §8）
+
+    # =========================================================================
+    # 考试域评分口径（C1：两维对齐推荐系统统一尺度 local/24 v4 §2.1 · local/26 §2）
+    # S = score_w_accuracy·A + score_w_fluency·F
+    # F = score_f_fluency·mean(flu) + score_f_integrity·mean(completeness)
+    # 档界 level_threshold_*（85/70/55）；placement_min_read_items（C5，2 题迷你版=1）。
+    # =========================================================================
+    score_w_accuracy: float = 0.6  # 发音/准确度权重（local/26 §2 统一尺度）
+    score_w_fluency: float = 0.4  # 流利度权重
+    score_f_fluency: float = 0.7  # F 内 fluency 权重（local/24 v4 §2.1）
+    score_f_integrity: float = 0.3  # F 内 completeness/integrity 权重
+    level_threshold_l4: float = 85.0  # S≥85→L4
+    level_threshold_l3: float = 70.0  # 70~84→L3
+    level_threshold_l2: float = 55.0  # 55~69→L2；<55→L1
+    placement_min_read_items: int = 1  # C5：可跳过 + 2 题迷你版（1 朗读 + 1 QA）
+    placement_retest_cooldown_days: int = 1  # C3t：复测冷却（距上次 completed 定档；42902）
+    placement_lab_enabled: bool = False  # Placement Lab 联调测试台（test-only；生产禁止开启）
 
     # =========================================================================
     # 推荐系统（local/31 §4.4 配置汇总 + local/32 六维拷问修订；依据 local/26~32）

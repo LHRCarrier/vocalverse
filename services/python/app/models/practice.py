@@ -132,6 +132,11 @@ class Attempt(TimestampMixin, Base):
     scenario_message_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("scenario_messages.id", ondelete="SET NULL")
     )
+    # 入学测试 run 关联（阶段 B1/B3：attempt 从属于一个 in_progress 的 placements run；
+    # 消费标记——已用过的 attempt 不再被其他 placement 复用；run 不复用 sessions，见 docs/10 §6 B-2）
+    placement_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("placements.id", ondelete="SET NULL")
+    )
     kind: Mapped[str] = mapped_column(
         String(24), nullable=False, server_default=text(f"'{AttemptKinds.DIALOG_SPEECH}'")
     )
@@ -162,6 +167,7 @@ class Attempt(TimestampMixin, Base):
         Index("ix_attempts_user_created", "user_id", "created_at"),
         Index("ix_attempts_session_id", "session_id"),
         Index("ix_attempts_scenario_message_id", "scenario_message_id"),
+        Index("ix_attempts_placement_id", "placement_id"),
     )
 
 

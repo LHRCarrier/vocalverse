@@ -127,4 +127,10 @@ if get_settings().shadow_preview_enabled:
     from app.api.routes import shadow_preview
 
     app.include_router(shadow_preview.router)
+# Placement Lab（入学测试联调测试台；test-only；默认关闭，开启才注册 → 404；删除无影响，
+# 见 placement_lab.py 删除清单）
+if get_settings().placement_lab_enabled:
+    from app.api.routes import placement_lab
+
+    app.include_router(placement_lab.router)
 app.add_middleware(RequestIdMiddleware)  # X-Request-Id 透传（docs/06 §11）

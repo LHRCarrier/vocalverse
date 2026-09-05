@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from app.practice.corpus import match_rule, parse_corpus
 from app.practice.meta import extract_meta, render_meta
 from app.practice.orchestrator import save_audio_bytes
@@ -168,7 +169,32 @@ def test_bank_validation_requires_three_tiers():
 # ---------------------------------------------------------------------------
 # 全链路（Fake clients，经由 API）
 # ---------------------------------------------------------------------------
+def _seed_completed_placement(user_id: int) -> None:
+    """D1：给测试用户补一条 completed 定档（否则 /sessions 40303 拦截）。"""
+    from datetime import UTC, datetime
+
+    from app.db import get_session_factory
+    from app.models import Placement
+
+    db = get_session_factory()()
+    try:
+        db.add(
+            Placement(
+                user_id=user_id,
+                status="completed",
+                completed_at=datetime.now(UTC),
+                level="L2",
+                exam_revision=1,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+
 def test_full_dialog_turn_sse_flow(client, auth_headers):
+    # D1：先完成一次定档，否则 /sessions 40303 拦截（见 _seed_completed_placement）
+    _seed_completed_placement(1)
     # 预置场景（直接走 DB 建一条 Published 场景）
     from app.db import get_session_factory
     from app.models import Scenario
@@ -225,6 +251,7 @@ def test_full_dialog_turn_sse_flow(client, auth_headers):
 
 
 def test_turn_stale_expected_turn_rejected(client, auth_headers):
+    _seed_completed_placement(1)  # D1
     from app.db import get_session_factory
     from app.models import Scenario
 
@@ -256,12 +283,40 @@ def test_turn_stale_expected_turn_rejected(client, auth_headers):
     assert resp.status_code == 409
 
 
+def test_dialog_session_requires_placement(client, auth_headers):
+    """D1：未完成定档（无 completed placement）→ POST /sessions 403 + 40303。"""
+    from app.db import get_session_factory
+    from app.models import Scenario
+
+    db = get_session_factory()()
+    scenario = Scenario(
+        title="T-no-placement",
+        scene_type="cafe",
+        difficulty=1,
+        system_prompt="x",
+        opening_line="hi",
+        target_corpus="a|A",
+        interest_tags=[],
+        status="published",
+    )
+    db.add(scenario)
+    db.commit()
+    sid = scenario.id
+    db.close()
+    resp = client.post(
+        "/api/v1/sessions", json={"kind": "dialog", "scenario_id": sid}, headers=auth_headers
+    )
+    assert resp.status_code == 403, resp.text
+    assert resp.json()["code"] == 40303
+
+
 def test_fluency_features_flow_into_attempt_and_report(client, auth_headers):
     """集成：对话回合（Fake ASR 词级时间戳）→ attempts.wpm/details.fluency → 报告透出。
 
     修复前 wpm 列从未写入（attempts.wpm 恒 NULL），流利度时间戳特征无处呈现。
     Fake 词表含 1.05s 停顿：wpm=145.83 / pause_count=1 / long_pause_count=1。
     """
+    _seed_completed_placement(1)  # D1：40303 门禁要求先定档
     from app.db import get_session_factory
     from app.models import Attempt, Scenario
     from sqlalchemy import select
@@ -501,12 +556,87 @@ def test_turn_rejects_empty_audio(client, auth_headers):
     assert resp.json()["code"] == 40002
 
 
-def test_stub_pipeline_endpoints_keep_no_lower_bound(client):
-    """/asr /score 是无状态管线端点，不消耗可耗尽资源 → 保持 min_bytes=0 的历史行为。"""
+def test_stub_pipeline_endpoints_keep_no_lower_bound(client, auth_headers):
+    """/asr /score 保持 min_bytes=0 的历史行为（P0-6 起需鉴权+限流，但不下界拦截小音频）。"""
     resp = client.post(
         "/api/v1/asr",
         files={"audio": ("tiny.wav", b"RIFF__tiny__", "audio/wav")},
         data={"language": "en"},
+        headers=auth_headers,
     )
     assert resp.status_code == 200, resp.text
     assert resp.json()["code"] == 0
+
+
+def test_pipeline_endpoints_require_auth(client):
+    """P0-6：/asr /score /tts /llm/chat 无 token → 401（修复前 200，修复后 401）。"""
+    for path in ("/api/v1/asr", "/api/v1/score", "/api/v1/tts", "/api/v1/llm/chat"):
+        resp = client.post(path)
+        assert resp.status_code == 401, f"{path} 应 401，实际 {resp.status_code}"
+
+
+def test_idor_cross_user_session_ops(client, auth_headers):
+    """P0-3/P0-4/P0-5：跨用户对会话发回合/收尾/读报告 → 403（修复前 200）。"""
+    _seed_completed_placement(1)  # user 1 定档（40303 门禁）
+    from app.db import get_session_factory
+    from app.models import Scenario
+
+    db = get_session_factory()()
+    scenario = Scenario(
+        title="IDOR",
+        scene_type="cafe",
+        difficulty=1,
+        system_prompt="x",
+        opening_line="hi",
+        target_corpus="a|A",
+        interest_tags=[],
+        status="published",
+    )
+    db.add(scenario)
+    db.commit()
+    sid = scenario.id
+    db.close()
+    h1 = {"X-Test-User-Id": "1"}
+    h2 = {"X-Test-User-Id": "2"}
+    session_id = client.post(
+        "/api/v1/sessions", json={"kind": "dialog", "scenario_id": sid}, headers=h1
+    ).json()["data"]["id"]
+
+    # user 2 发回合 → 403
+    turn = client.post(
+        f"/api/v1/sessions/{session_id}/turns",
+        data={"action": "normal"},
+        files={"audio": ("a.webm", b"\x1aE\xdf\xa3\xa3" + b"\x00" * 4096, "audio/webm")},
+        headers=h2,
+    )
+    assert turn.status_code == 403, turn.text
+
+    # user 2 收尾 → 403
+    c2 = client.post(f"/api/v1/sessions/{session_id}/complete", headers=h2)
+    assert c2.status_code == 403, c2.text
+
+    # user 1 收尾 → 200（拿到 report_id）
+    c1 = client.post(f"/api/v1/sessions/{session_id}/complete", headers=h1)
+    assert c1.status_code == 200, c1.text
+    report_id = c1.json()["data"]["report_id"]
+
+    # user 2 读报告 → 403；user 1 读 → 200
+    gr2 = client.get(f"/api/v1/reports/{report_id}", headers=h2)
+    assert gr2.status_code == 403, gr2.text
+    gr1 = client.get(f"/api/v1/reports/{report_id}", headers=h1)
+    assert gr1.status_code == 200, gr1.text
+
+
+def test_production_config_rejects_default_secrets():
+    """P0-1：app_env=production + 默认密钥 → Settings() 抛 ValueError（修复前不抛）。
+
+    用 init 参数（pydantic-settings 最高优先级）绕过本地 .env/环境优先级，确定性触发 validator。
+    """
+    from app.core.config import Settings
+
+    with pytest.raises(ValueError):
+        Settings(
+            app_env="production",
+            jwt_secret="vocalverse-dev-jwt-secret-0123456789abcdef",
+            service_token="change-me-internal-service-token",
+        )

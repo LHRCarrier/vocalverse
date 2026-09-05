@@ -107,6 +107,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/LoginView.vue'),
     meta: { title: '登录' },
   },
+  // ⚠️ 临时测试页（用完即删）：推荐引擎自测，独立路由。还原：删掉本块 + 删 RecTestView.vue
+  {
+    path: '/rec-test',
+    component: () => import('@/views/RecTestView.vue'),
+    meta: { title: '推荐自测' },
+  },
   {
     path: '/admin',
     component: () => import('@/layouts/AdminLayout.vue'),

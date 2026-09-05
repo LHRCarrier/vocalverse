@@ -23,6 +23,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -34,9 +35,7 @@ class UserSkillState(TimestampMixin, Base):
     __tablename__ = "user_skill_state"
 
     id: Mapped[int] = bigint_pk()
-    user_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("users.id"), nullable=False, unique=True
-    )
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
     pron_est: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)  # 发音能力估计 0-100
     flu_est: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)  # 流利度能力估计 0-100
     est_score: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)  # 0.6·pron+0.4·flu
@@ -54,6 +53,9 @@ class UserSkillState(TimestampMixin, Base):
     )
 
     __table_args__ = (
+        # 与 0003 迁移一致（DB 名为 uq_user_skill_state_user）；模型曾用 column unique=True
+        # 生成 uq_user_skill_state_user_id 致 alembic check 漂移（2026-09-03 修复）。
+        UniqueConstraint("user_id", name="uq_user_skill_state_user"),
         CheckConstraint(
             f"est_level IN ('{Levels.L1}', '{Levels.L2}', '{Levels.L3}', '{Levels.L4}')",
             name="est_level",

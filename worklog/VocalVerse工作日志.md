@@ -3,43 +3,25 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
-## 2026-09-05 README 重写：定位从「口语训练平台」演进为「学英语」App（组长定调）
+## 2026-09-04 feat/recommend-landing 整合 origin/main（组长为主 · 迁移撞号处置）
 
-- 组长定调：项目定位是**学英语**——各功能都往学英语上使劲：场景练习（开口说）、AI 自由说（先聊起来）、社区帖子新闻英文氛围（阅读与语感 + 文化习俗）、英文歌（高强度跟读）；**定位不是一成不变的，而是慢慢演进的**（演进方向写成规划，不做承诺式描述；该句不入 README，仅团队内部口径）；
-- README 更新：① 开头定位与「练/浸/唱」三线功能矩阵重写；② 新增「演进方向（规划中）」：**词汇速记**（划词即查 → 个人词汇本，形态以设计为准）、**学习画像**（讯飞测评数据红利：弱音素/高频错词/流利度趋势）、**社区偏好画像独立系统**（点赞/投币/浏览行为与学习画像解耦）；③ 「当前能测」对齐现状（社区演示帧、先选场景流程、AI 自由说、15 类埋点、救援提示卡已下线）；④ 里程碑补 M2.5 移动端真形态；⑤ 工作日志行补安卓开发日志；
-- 提交：docs(README) 单独 commit，直推 main（管理员直推，无 PR）。
+**背景**：推荐 WIP 与组长 09-05~09-09 推进（99 commits：移动端 UI/口语 Hub/自由对话/社区页/README 重写）整合；组员决定 **C 类冲突以组长版为准**。
 
-—— 执行人：组长 LHRCarrier（AI 代工整理）
+**处置**：
+1. **WIP 规范提交**（快照保底 `wip/recommend-landing-snapshot`）：6 个 commit——fix(py) 音频守卫（has_min_words 40002 + ASR 静音前置过滤 + imageio-ffmpeg 依赖声明）/ test(py) / feat(web) / chore(infra) gitignore / docs / chore(poc)。`data/models` 组长版 gitignore 已覆盖（486MB 模型缓存，红线不入库）；
+2. **C 类**：docker-compose.yml、seed.py 以组长版为准（WIP 保留在快照分支）；
+3. **迁移撞号（关键）**：两侧各有一个 `revision=0005`（组长 `0005_events_free_chat` vs 本支 `0005_placement_run_state`，均 down=0004）→ alembic 双头 +「Revision 0005 present more than once」。处置：本支迁移**重排为 0007**（组长 0005/0006 已被多处应用不可改），链 0004→0005(events)→0006(tools)→**0007(placement_run_state)**；本地 dev 库重建（schema 重建 + upgrade head + seed，27 表 @ 0007）；
+4. **worklog 双日志并集**：脚本按标题去重、日期倒序拼接（75 条）；契约快照按合并后代码重新导出 + `pnpm gen:api` 重生成类型（8001 实跑，CI 语义比对格式无关）。
 
-## 2026-09-05 【迁移】App 端 UI 记录迁入安卓开发日志（组长指正 · 2026-09-08 已定规）
+**门禁**：Python ruff/format ✓ · pytest **271 passed**（含 3 个 alembic 单头/离线渲染用例，修前 268+3fail）· `alembic heads` 单头 0007 ✓；前端 lint/typecheck ✓ · test:run **19 passed** ✓ · build ✓（pnpm install 补 unplugin-icons 等上游新依赖）。
 
-> 组长指正：**App 端 UI/设计相关记录归属 `worklog/安卓开发日志.md`**（本日志只留 Web/后端/全局事项）。
-> 今日以下 App 端 UI 记录已全部迁往安卓开发日志（含后续组员反馈修正痕线，未改动内容）：
-> 场景对话「先选场景再开工」开始流程 · 口语 Hub 收敛删除 · 自由对话页 Grok 式改造（3 子代理评审）·
-> 口语界面 3 项（气泡尾巴/自动播/Hub 与自由对话最小可用版）· 移动端场景对话 2 个 UI 修（气泡尾巴+开场白自动播）。
-> 其中涉及后端/迁移/契约的部分在主线下条留存，UI 与前端交互细节以安卓开发日志为准。
+**状态（已闭环）**：网络恢复后一次推送成功（`07fcfc8..22a5903`），已开 **PR #29**（base main ← feat/recommend-landing，23 commits / 60 文件，MERGEABLE）；PR 描述含 5 项待组长确认（C 类取舍、序号待定号、RecTestView 生产路由违例、imageio-ffmpeg 补缺、gitignore）。
 
-—— 执行人：组长 LHRCarrier（AI 代工整理）
+**环境提醒**：本机 dev 库已重建（旧账号/测试 attempt 数据随 schema 重建清空，demo 数据已 seed 恢复）；8000/8080 旧服务进程建议重启（连接的是旧库状态）。
 
-## 2026-09-05 自由对话后端与埋点（非 UI 主线留存：接口 / 迁移 / 契约 / 登记）
+—— 执行人：Faust-sudo
 
-- **接口**：`routes/free_chat.py` `POST /api/v1/free-chat/turn`（multipart `audio`/`text` + `history` JSON，至少其一 → 422 404 码 42203/42204）→ SSE 子集 `user_transcript→text_delta*→turn_end`（`score_status=unavailable`）；无状态 LLM 转发器（TurnRunner 复用、system 全静态人设、无 corpus）；限流 asr+llm；**进 OpenAPI 契约**（快照 + gen:api 同步，frontend-ci 对账一致）；
-- **埋点白名单扩值（迁移 0005/0006）**：`events.event_type` CHECK 10→12→15 类（`free_chat_open`/`free_chat_turn`/`free_chat_switch`/`free_chat_reset`/`free_chat_rate`；reset 随功能行改版恢复触发、rate 为预留）；alembic 单头 0006，本地 PG 已应用；docs/06 §9.1、docs/10 注记、docs/14 §6.3 登记；
-- **测试**：`tests/test_free_chat.py` 6 用例（流式/校验/多轮 turn_index）+ `test_m2_core.py` 埋点 12→15 类逐类落库断言；后端 ruff+format+全量 pytest 绿；
-- **坑**：① uvicorn `--reload` 多轮重载后子进程僵在 lifespan → 杀进程重启 dev-up；② `refresh-openapi.ps1` 导出的 Java 快照与库内差异仅 `servers` 字段 + 格式化（本地 springdoc 与 CI 生成路径不同）→ 回滚 Java 快照只提交 Python 快照；③ 埋点事件是 **DB CHECK** 白名单：改前端 `EventName` 之外必须同步 `EventTypes` + 迁移，缺一不可；④ `EventTypes` 注释超 100 列触发 E501。
-
-—— 执行人：组长 LHRCarrier（AI 代工整理）
-
-## 2026-09-05 dev-up.ps1 自动拉起 DB 容器（修「电脑重启后 Java 起不来」的坑）
-
-- 触发：重启电脑后跑 `pwsh -File scripts/dev-up.ps1 start`，健康等待后 `java(8080): False`；`local/dev-logs/java-8080.out.log`：`HikariPool-1 - Starting...` → `Connection to localhost:5432 refused` → `Unable to determine Dialect without JDBC metadata` → 上下文中止，mvn BUILD FAILURE（5.8s，非 30-60s 慢启动）；
-- 排除「数据库密码改过」疑点：**Connection refused 发生在 TCP 建连阶段**（密码错应是监听端口存在时的 `password authentication failed`），且核验三处一致——PG 容器 init 环境（docker inspect）＝根 `.env`＝`services/java/application.yml` 默认回退均为 `vocalverse-dev`；
-- 根因：主机睡眠/重启后 Docker 引擎恢复时杀掉容器——`docker ps -a`：`vocalverse-postgres-1` / `vocalverse-redis-1` 均 `Exited (255)` 且**同一秒同死**、容器日志无正常 shutdown 记录（止于 checkpoint）、exit=255 非 postgres 自身崩溃；而 `dev-up.ps1` 原文写明「脚本不负责数据库容器」，DB 死了无人拉起；
-- 修复：`scripts/dev-up.ps1` start 新增 `Wait-DockerBase`——5432/6379 已监听则跳过；否则检查 Docker 引擎（未就绪尝试启动 Docker Desktop，等待 ≤90s）→ `docker compose up -d postgres redis` → 轮询 `docker compose ps` 至 postgres/redis 均 healthy（≤90s，Exited/unhealthy 提前退出并给排查命令）；
-- 验证：`docker compose stop postgres redis` 制造复现 → `dev-up.ps1 start` 自动拉起两容器并 healthy → `python(8000)/vite(5173)/java(8080)` 全 True；`status` 复核 8000/8080/5173 全 LISTENING、health 全 True；
-- 踩坑：① `docker compose ps` 默认只列**运行中**容器，判 healthy 要 `--format "{{.Service}}:{{.Status}}"` 按 service 名匹配（容器名带项目前缀）；② 端口健康用 `Get-NetTCPConnection -State Listen`，Docker Desktop 的 docker-proxy 仍在监听即视为容器可服务，无需连库探测。
-
-—— 执行人：组长 LHRCarrier（AI 代工整理）
+## 2026-09-09 PR#25 推荐系统落地 · 复审整改与合入（模型同步 / 契约快照 / CI 兜底）
 
 ## 2026-09-08 UI 相关记录迁移说明
 
@@ -50,6 +32,7 @@
 
 —— 执行人：组长 LHRCarrier（AI 代工整理）
 
+
 ## 2026-09-08 fix(apps/web): 整页刷新/App 冷启后会话不恢复（bootstrapAuth 时序 bug · 实测命中）
 - 现象（app 端电脑测试验证时暴露）：登录后一切正常，但 **F5/重启 WebView 后所有 `/api/v1` 请求 401「missing bearer token」**（token 明明还在 localStorage，手动带头上请求 = 200）；
 - 根因：`main.ts` 里 `void bootstrapAuth()` 写在 `createApp(App).use(createPinia())` **之前**——`useAuthStore()` 此刻无 active pinia 直接抛错，被 `.catch(() => undefined)` 静默吞掉 → `setAuthToken` 从未执行，client.ts 全局 token 恒 null。SPA 内跳转不受影响（登录时 persist 已设置），所以此前 W1-W6 联调没暴露；
@@ -58,6 +41,79 @@
 - 影响面：APK 冷启动（WebView 每次加载都是整页刷新）同样受益——之前每次冷启都必须重新登录，修复后自动恢复会话。
 
 —— 执行人：组长 LHRCarrier（AI 代工整理）
+
+
+## 2026-09-07 Java 启动日志两坑修复（安全密码 WARN + spring-boot:run 中文乱码）
+
+用户实测暴露两个启动问题（commit `5ad2c8c` + `16a4e6b`）：
+
+1. **「Using generated security password」WARN**：项目是自定义 JWT 过滤器 + BCrypt（AuthController 自己校验），从不创建 `UserDetailsService` bean → Boot 的 `UserDetailsServiceAutoConfiguration` 兜底生成随机密码并打误导性 WARN。已 `exclude UserDetailsServiceAutoConfiguration` 消噪（测试证明 SecurityConfig 一直生效：链路失效则 /auth/** 被默认 basic auth 拦截，AuthFlowTest 必挂）。
+2. **DemoSeeder 中文乱码（verify 正常、spring-boot:run 乱码）**：logback sett UTF-8 字节后，**mvn spring-boot:run 的 fork 子进程 stdout 经管道由 Maven 主进程按平台编码（GBK）解码** → UTF-8 字节被读错乱码；surefire 转发路径无此环节所以 verify 正常。修复三层对齐：`logback-spring.xml charset=UTF-8` + `.mvn/jvm.config -Dfile.encoding=UTF-8`（Maven 主 JVM）+ `spring-boot-maven-plugin jvmArguments -Dstdout.encoding/-Dstderr.encoding=UTF-8`（fork 子 JVM）。Linux/容器无影响（本然 UTF-8）。
+3. 门禁：`mvn clean verify` 全绿（15 tests + spotless + 契约对账）。
+
+**踩坑（并入 32 待登记）**：Windows 中文编码是「字节流向 × 每层的解码器」问题——logback 只管字节（charset），Maven 管道转发按自己编码解码；修编码先分清「哪层转码」再动手，单改一层必然残留（第一轮只加 logback charset 时 verify 好了 run 没好的原因）。
+
+
+## 2026-09-07 Java 包结构按 Package-by-Feature 规范重整（专家子代理审计 + 实施）
+
+**触发**：组长检查发现上轮「Controller 统一收 controller/」后分层不明确（Controller 按层、Entity/Repository 按域 = 混合分层）。派专家子代理审计（35 主 + 9 测文件全量清单为输入，结论可复现）：
+
+- **诊断**：① 混合分层割裂——同域端点被拆到无归属层包（工单 = controller/TicketController + ticket/ 两地）；② ContentAdmin/QuestionAdmin 同属 content、InternalLevelController 实属 user，包名表达不了域归属；③ SecurityConfig/JwtService/JwtAuthFilter 是全局安全编织却塞在 auth 域；④ 测试主/镜像不一致（PingController 主在 controller/、测试在 health/）；⑤ AbstractAdminApiTest 跨域共享却放层包。
+- **方案（唯一推荐）**：Package by Feature——域内自包含（`域/controller/` 子包 + 域根 entity/repository），跨域安全/种子上移 `config/`、健康探针归 `health/`、共享视图 DTO 归 `ticket/dto/`；测试镜像到 `域/controller/` + `support/` 基座。豁免项：薄端无 service 层（唯 AuthController 的密码/refresh 逻辑越界已标记，后续可选抽 AuthService）、controller 内嵌 record DTO（跨端点复用的仅 TicketView 例外）。
+- **实施**：`117beef`（主代码 13 移 + 测试 4 移，git 识别 rename 90~100%）+ `28b5448`（测试镜像 import 同步）。**外部可见性零变化**：@RequestMapping 与内嵌 record 字段未动，`ContractSnapshotTest` 逐字通过（springdoc tag/operationId 不依赖包路径），前端契约/类型无需刷新。
+- **门禁**：`mvn clean verify` 全绿（15 tests + spotless + 契约对账）。
+
+**踩坑 31（实施自伤，已恢复）**：第一轮用 PowerShell `[regex]::Replace(..., "package $pkg;")` 替换 package 行——`.NET 正则替换的 replacement 中 `$pkg` 被解释为命名组引用`，导致整个文件被静默置换破坏（实测表现为源码字符错乱）→ 全量 `git checkout` 回滚后改用 `git mv` + **字面 `.Replace`（无 `$` 语法）** + 每步 `Contains` 校验，一次通过。教训：**批量改文本用字面替换 + 校验；正则 replacement 的 `$` 是陷阱**；另 `git mv` 会立刻 staged，别再用 `git add` 分批攒 commit（本次导致测试 rename 混入主代码 commit，无功能影响但分类不纯）。
+
+
+## 2026-09-07 系统设计 Day1：架构设计说明书 + 接口设计说明书（docs/20、docs/21）
+
+### 任务与产出
+
+按分工（09/07，A 全天）：系统架构设计（分层、服务边界、写方唯一性约束、数据流图）+ 接口契约梳理（OpenAPI）。产出《系统设计说明书》两份分册（09/09 设计评审交付）：
+
+| 交付物 | 文件 | 要点 |
+|---|---|---|
+| 架构分册 | `docs/20-系统架构设计说明书.md` | 系统上下文 DFD（mermaid）+ 五层划分 + 应用内三层端分层（route/service/port/adapter + 禁止规则 R1~R6）+ 服务职责边界表（含「新功能落位判据」）+ **表级单写方矩阵**（19 表 × 写方 × 现状代码）+ **守护机制设计 M-1~M-4**（DB 双角色 vv_python/vv_java/vv_seed、CI 静态探针、seed 只增不改 + slug 键、评审打回）+ 回合目标态时序图 + 报表流 + 写方边界图 + **D1~D14 设计决策/现状差异/排期表** |
+| 接口分册 | `docs/21-接口设计说明书.md` | 双快照对账：Python 20 ops / Java 6 ops 端点总清单（方法/路径/鉴权/限流/备注）+ SSE 回合契约（事件序列）+ **内部 REST 契约正式登记**（`POST /internal/level`：userId 键名/3s/幂等/调用方义务/双侧契约测试）+ 整改项 **R-1~R-16** 登记表 + 错误码对账 + 契约变更流程 |
+| 错误码补登记 | `docs/api/error-codes.md` | 补 40902/40903/41001/42202（代码已用未登记）+ 40901 预留 + 40301 语义扩注（越权统一按不存在处理） |
+
+### 现状盘点结论（先答「有没有做过类似工作」）
+
+- **分层/服务边界**：docs/06 §1、§2 已有文档级拓扑与职责表，但无设计说明书成文；docs/19 §1.1 是评审口径的现状速写（非设计）。
+- **写方唯一性**：docs/10 §3 矩阵 + §5 细则已相当完整，但 **P0-7 实锤只有文档没有机制**：`seed.py` 直接写 Java 独占表（scenarios/placement_questions）、两服务共用同一 DB 账号、无任何守护。
+- **数据流图**：此前**从未做过**正式 DFD（全仓无 mermaid/drawio），今天补齐 4 张（上下文/回合时序/报表流/写方边界）。
+- **OpenAPI 契约**：基础设施此前已远超小组水平（双快照 + openapi-typescript 生成 + CI 三关卡 + refresh-openapi.ps1 + docs/06 §7），本次补的是「设计先行」的接口清单、内部 REST 契约与对账落地。
+
+### 对账发现（2026-09-07 代码实测，全部登记进 R-1~R-16 / D1~D14）
+
+1. **Python OpenAPI 快照中没有任何 operation 带 `security`**：practice/placement/defense/events 的 `Depends(get_current_user_id)` 因用 `Depends` 而非 `Security` 未进 OpenAPI；`/asr /score /tts /llm/chat` 四端点是真的裸奔（与 docs/19 P0-4 一致，未修）。
+2. **docs/19 的 9 个 P0 经复核全部仍在**（2026-09-07 重查代码：进程内状态、同步 Session 跨 SSE、三处越权、裸接口、串行 TTS、`user_id` vs `userId`、seed 违例、reports 非 upsert、默认密钥/网关可达）——排期见 docs/20 §6 表（9/10~9/11 集中返工承接）。
+3. **三处文档与代码不符（新发现）**：① docs/06 §7 写 `/api/auth/refresh`，实际网关路径 `/manage/auth/refresh`（R-15）；② docs/06 §7「评分 30/h」，代码 `ise_rate_per_hour=60`（R-16）；③ 错误码表落后代码 4 个码（本次已补）。
+4. **快照口径修正**：Java 快照是服务原生路径，**对外契约以网关 `/manage/` 前缀为准**（docs/21 §2.2 已加说明）。
+
+### 踩坑记录（追加第 29 条）
+
+29. **「文档声称」必须与「代码事实」三方对账，不能拿 docs/06 当事实**：本次盘点靠逐条提取快照（PowerShell ConvertFrom-Json 列 paths + security）+ 关键行 grep 复核，发现 3 处 docs/06/docs/api 与代码不符（refresh 路径、ise 桶、错误码缺失）——这些差异如果只读文档永远不会暴露，而它们恰恰是接口设计说明书的「对账结论」最有价值的部分。做法：快照为唯一基准列端点，代码为唯一基准列鉴权/限流/字段名，docs 为第三列对比。
+
+### 同日补记：Java 薄端管理端提前落地（超出分工计划）
+
+把盘点出的 Java 缺口（admin 角色链路 / 用户管理 / 内容库 CRUD / 工单）全部实现，从 9/14~9/15 计划提前到设计日完成：
+
+| 提交 | 内容 |
+|---|---|
+| `c8cbba2` | feat(java)：管理端最小集 —— JWT 加 role claim + `/api/v1/admin/**` hasRole(ADMIN)；用户管理（列表/详情/禁用启用/档案，改档 source=manual）；scenarios/songs/lrc/listening_materials/placement_questions 实体+CRUD（DELETE=归档；LRC 整首重写 → seq 重排 + pitch_ref_status→missing 触发 Python 重提取；题库 exam_revision 版本化 + 重复题 409）；工单（用户提交/我的 + 管理侧前向状态机 open→processing→resolved→closed，回复即认领）；Controller 按 Spring Boot 分层规范统一收 `controller/` 包，entity/repository 按域 |
+| `b684e44` | test(java)：AdminUser/Content/Ticket 三组 API 测试（15 tests 全绿含既有） |
+| `07a28a4` | chore(contract)：Java 快照 6→33 ops + `pnpm gen:api` 前端类型（现有调用零改动） |
+
+门禁：`mvn verify` 全绿（15 tests + spotless + ContractSnapshotTest 对账新快照）；`pnpm typecheck` 通过（前端类型无破坏）。
+
+### 踩坑记录（追加第 30 条）
+
+30. **MockMvc `content(String)` 不是 UTF-8；Java 文本块里的 `\"` 是转义不是字面反斜杠**：单测两连坑——① 请求体含中文时 `content(String)` 按平台编码（ISO-8859-1）传输 → Jackson `JSON parse error` 400，必须 `content(body.getBytes(StandardCharsets.UTF_8))`；② 文本块（`"""`）中想表达 JSON 的 `\"` 实际是 `"`（转义生效），导致 `"interestTags":"["daily"]"` 这类 JSON 断裂——测试用 `[]` 或 `\\\"`。另：`git commit --amend` 会改 HEAD（上次 commit）不是任意 commit，错点后要用 `reset --soft` 重排队列。
+
+---
+
 
 ## 2026-09-07 UI Concept Design skill 返工 v2：诊断规则漏洞 + 原型页对照参考帧重做
 
@@ -69,6 +125,7 @@
 - 入口不变：`/preview/uic-home`、`/preview/uic-speaking`、`/preview/uic-singing`（v2 已热更新，Ctrl+F5 强制刷新查看）。
 
 —— 执行人：LHRCarrier
+
 
 ## 2026-09-07 UI Concept Design skill 原型验证 · 3 个概念页（dev-only 预览画廊）
 
@@ -84,6 +141,142 @@
 
 —— 执行人：LHRCarrier
 
+
+## 2026-09-05 README 重写：定位从「口语训练平台」演进为「学英语」App（组长定调）
+
+- 组长定调：项目定位是**学英语**——各功能都往学英语上使劲：场景练习（开口说）、AI 自由说（先聊起来）、社区帖子新闻英文氛围（阅读与语感 + 文化习俗）、英文歌（高强度跟读）；**定位不是一成不变的，而是慢慢演进的**（演进方向写成规划，不做承诺式描述；该句不入 README，仅团队内部口径）；
+- README 更新：① 开头定位与「练/浸/唱」三线功能矩阵重写；② 新增「演进方向（规划中）」：**词汇速记**（划词即查 → 个人词汇本，形态以设计为准）、**学习画像**（讯飞测评数据红利：弱音素/高频错词/流利度趋势）、**社区偏好画像独立系统**（点赞/投币/浏览行为与学习画像解耦）；③ 「当前能测」对齐现状（社区演示帧、先选场景流程、AI 自由说、15 类埋点、救援提示卡已下线）；④ 里程碑补 M2.5 移动端真形态；⑤ 工作日志行补安卓开发日志；
+- 提交：docs(README) 单独 commit，直推 main（管理员直推，无 PR）。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
+
+## 2026-09-05 【迁移】App 端 UI 记录迁入安卓开发日志（组长指正 · 2026-09-08 已定规）
+
+> 组长指正：**App 端 UI/设计相关记录归属 `worklog/安卓开发日志.md`**（本日志只留 Web/后端/全局事项）。
+> 今日以下 App 端 UI 记录已全部迁往安卓开发日志（含后续组员反馈修正痕线，未改动内容）：
+> 场景对话「先选场景再开工」开始流程 · 口语 Hub 收敛删除 · 自由对话页 Grok 式改造（3 子代理评审）·
+> 口语界面 3 项（气泡尾巴/自动播/Hub 与自由对话最小可用版）· 移动端场景对话 2 个 UI 修（气泡尾巴+开场白自动播）。
+> 其中涉及后端/迁移/契约的部分在主线下条留存，UI 与前端交互细节以安卓开发日志为准。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
+
+## 2026-09-05 自由对话后端与埋点（非 UI 主线留存：接口 / 迁移 / 契约 / 登记）
+
+- **接口**：`routes/free_chat.py` `POST /api/v1/free-chat/turn`（multipart `audio`/`text` + `history` JSON，至少其一 → 422 404 码 42203/42204）→ SSE 子集 `user_transcript→text_delta*→turn_end`（`score_status=unavailable`）；无状态 LLM 转发器（TurnRunner 复用、system 全静态人设、无 corpus）；限流 asr+llm；**进 OpenAPI 契约**（快照 + gen:api 同步，frontend-ci 对账一致）；
+- **埋点白名单扩值（迁移 0005/0006）**：`events.event_type` CHECK 10→12→15 类（`free_chat_open`/`free_chat_turn`/`free_chat_switch`/`free_chat_reset`/`free_chat_rate`；reset 随功能行改版恢复触发、rate 为预留）；alembic 单头 0006，本地 PG 已应用；docs/06 §9.1、docs/10 注记、docs/14 §6.3 登记；
+- **测试**：`tests/test_free_chat.py` 6 用例（流式/校验/多轮 turn_index）+ `test_m2_core.py` 埋点 12→15 类逐类落库断言；后端 ruff+format+全量 pytest 绿；
+- **坑**：① uvicorn `--reload` 多轮重载后子进程僵在 lifespan → 杀进程重启 dev-up；② `refresh-openapi.ps1` 导出的 Java 快照与库内差异仅 `servers` 字段 + 格式化（本地 springdoc 与 CI 生成路径不同）→ 回滚 Java 快照只提交 Python 快照；③ 埋点事件是 **DB CHECK** 白名单：改前端 `EventName` 之外必须同步 `EventTypes` + 迁移，缺一不可；④ `EventTypes` 注释超 100 列触发 E501。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
+
+## 2026-09-05 dev-up.ps1 自动拉起 DB 容器（修「电脑重启后 Java 起不来」的坑）
+
+- 触发：重启电脑后跑 `pwsh -File scripts/dev-up.ps1 start`，健康等待后 `java(8080): False`；`local/dev-logs/java-8080.out.log`：`HikariPool-1 - Starting...` → `Connection to localhost:5432 refused` → `Unable to determine Dialect without JDBC metadata` → 上下文中止，mvn BUILD FAILURE（5.8s，非 30-60s 慢启动）；
+- 排除「数据库密码改过」疑点：**Connection refused 发生在 TCP 建连阶段**（密码错应是监听端口存在时的 `password authentication failed`），且核验三处一致——PG 容器 init 环境（docker inspect）＝根 `.env`＝`services/java/application.yml` 默认回退均为 `vocalverse-dev`；
+- 根因：主机睡眠/重启后 Docker 引擎恢复时杀掉容器——`docker ps -a`：`vocalverse-postgres-1` / `vocalverse-redis-1` 均 `Exited (255)` 且**同一秒同死**、容器日志无正常 shutdown 记录（止于 checkpoint）、exit=255 非 postgres 自身崩溃；而 `dev-up.ps1` 原文写明「脚本不负责数据库容器」，DB 死了无人拉起；
+- 修复：`scripts/dev-up.ps1` start 新增 `Wait-DockerBase`——5432/6379 已监听则跳过；否则检查 Docker 引擎（未就绪尝试启动 Docker Desktop，等待 ≤90s）→ `docker compose up -d postgres redis` → 轮询 `docker compose ps` 至 postgres/redis 均 healthy（≤90s，Exited/unhealthy 提前退出并给排查命令）；
+- 验证：`docker compose stop postgres redis` 制造复现 → `dev-up.ps1 start` 自动拉起两容器并 healthy → `python(8000)/vite(5173)/java(8080)` 全 True；`status` 复核 8000/8080/5173 全 LISTENING、health 全 True；
+- 踩坑：① `docker compose ps` 默认只列**运行中**容器，判 healthy 要 `--format "{{.Service}}:{{.Status}}"` 按 service 名匹配（容器名带项目前缀）；② 端口健康用 `Get-NetTCPConnection -State Listen`，Docker Desktop 的 docker-proxy 仍在监听即视为容器可服务，无需连库探测。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
+
+## 2026-09-04 影子跟读联调台：录音完成 → 试听自己读的 → 确认提交/重录
+
+- 需求（组员复测反馈「方便测试」）：录完先听自己的跟读再提交，避免闭眼提交后才发现录歪；
+- 实现：`ShadowPreview.vue` 录音停止**不再自动提交**——本地 ObjectURL 试听条（原生 audio 控件）+「提交评分 / 重录」按钮；换句/换素材/卸载时 revoke 防泄漏；VoiceRecorder 的 cancel 路径不触发 onStop，仅真实停止才生成试听；
+- 验证：lint（0 warning）/typecheck/vitest 19/build 全绿；dev 模块 transform 200。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+
+## 2026-09-04 评分 DoD ③：META content/vocab 语义子分（LLM 判定 · 进展示不进总分）
+
+打分「链路完成」DoD 剩余三项之③（④ 之后收尾）：
+
+- **契约增量（docs/14 §3.4 + docs/26 同步）**：`[-META-]` 增 `content:{score,note}`（内容相关度/充实度）与 `vocab:{score,note}`（词汇多样性）——**口径 docs/07 Q38 拍板 C 落地**：LLM 判定、进报告展示、**不进量化总分**（S=0.4·发音+0.3·语法+0.3·流利度 不变），避免「语义对错混入口语技能分」；
+- **改动面**：`meta.py`（properties content/vocab + render_meta 扩展，默认 None 不破坏既有调用；**防御：模型输出裸数字/字符串 → None 不伪造**）；`context_builder` system 契约行加字段描述（**system 仍逐字静态**——字段说明属契约正文，docs/26 ⑤ 不变）；`meta_executor` 补偿 prompt（_COMPENSATE_SYSTEM + user 注记）同步；`events.MetaBlock` + SSE 手写类型（sse-types.ts）加 content/vocab；orchestrator（MetaBlock 透出 + assistant 消息 meta 落 content/vocab）；`service.complete_session` 新增 `metrics.semantic`（聚合均分+轮次）；`stubs.FakeLLM` 的 META 带 88/84 子分（全链路可断言）；
+- **前端**：ReportView 评分卡下方加「内容相关度 / 词汇多样性」两卡（标注不含总分；无数据隐藏）；
+- **验证**：pytest **180 passed**（+3：META 解析与防御、补偿 prompt 形状、补偿透传；全链路测试断言 SSE meta_block 带 content/vocab + 报告 semantic={content:88.0/1轮, vocab:84.0/1轮}）+ ruff 全绿；前端 lint/typecheck/vitest 19/build 全绿；
+- **踩坑**：① docs/14 契约行与 system 契约行是我在一天内第三次改「契约文本」——每次都要同时对照 docs/14、docs/26、meta.py 文档字符串与 _STATIC_TEMPLATE 四处，改一处漏一处（本次已四同步）；② 复用了"改 worklog 用标题行做锚点"的老毛病，两次吞掉下一条目标题——本次已逐处核对。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+
+## 2026-09-04 评分 DoD ④：影子跟读/朗读编排分支（ISE 主场 · 三维评分 + 联调测试台）
+
+打分「链路完成」DoD 剩余三项之④（顺序：④→③）：
+
+- **素材基础盘点**：`shadow_materials` 表/迁移 0003/SessionCheck kind=shadow/`AttemptKinds.SHADOW_SPEECH`/推荐链路（type=shadow）**均已存在**，缺的只是生产编排；`seed_recommend` 补了 L2/L3/L4 三条演示素材（text_content/wpm 120/145/165，全仓此前无素材时 recommend_shadow 恒空——本次执行 seed 后验证 count=3）；
+- **评分口径定版（docs/06 §9.3）**：三维 = `0.4·发音(ISE accuracy) + 0.3·语速匹配 + 0.3·停顿密度`；语速匹配（用户 wpm vs 素材原声 wpm）分段 ≤10%→95/≤20%→85/≤35%→70/≤50%→55/其余 40；停顿密度（pause_ratio）≤5%→95/≤10%→85/≤20%→70/≤35%→55/其余 40；素材缺 wpm → 该维缺省按剩余权重归一；**重音落点/连读识别留待 M3 前端韵律引擎（docs/24 ①），登记 P2 不伪造**；
+- **新模块** `app/practice/shadow.py`（分句/分段打分/加权归一/规则教练笔记——LLM 不参与，无 META 泄漏面）；`_shadow_turn` 编排：start（出句+TTS 示范 AudioChunk，不推进）→ normal（ASR 特征 + ISE 题卡参考 → 三维分 → attempt(kind=shadow_speech, details.shadow) → 逐句推进 → 末句 complete_session）；
+- **接入**：`create_session` kind=shadow + `shadow_material_id`（SessionCreate 契约 + 快照刷新，diff 仅该字段）；**顺带修一个潜伏 bug**：`create_session` 的 assembled 引用未初始化 `scenario`（defense 建会话同样踩 UnboundLocalError，只是此前无测试覆盖——本次 shadow 测试立刻抓出）；
+- **联调测试页** `/preview/shadow`（ShadowPreview.vue + registry/router；后端 test-only `shadow_preview.py`：materials/tts（原始字节示范）/analyze，`include_in_schema=False`、默认关闭 `APP_SHADOW_PREVIEW_ENABLED`（本地已开，生产禁止）、删除清单文件尾）；
+- **验证**：pytest **177 passed**（+24：纯函数分段/权重归一/教练档位、start→评分→收尾→报告全链路（fake 数值：wpm=145.83→speed 95、pause 0.3646→40、pron 90→overall 76）、素材 404/缺音频 422、测试台 404+openapi 零路径、analyze Fake 三维）；ruff 全绿；前端 lint/typecheck/vitest 19/build 绿（dist 无 Shadow chunk）；真链路（经 Vite 代理）：materials=3、analyze（ref-3 音频 × 面试题卡句——故意不相配 → pron 7.9/speed 85/pause 70/overall 50，coach "Slow down..."，**口径合理**：错题卡低发音分）；
+- **踩坑**：① PowerShell `$PID` 是保留自动变量，`dev-up.ps1` stop 循环变量撞名 → 服务杀不掉（已改 `$procId`）；② 测试里 SSE JSON 断言别忘了冒号后有空格（`"conclude": false`），与旧代码无空格格式不同。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+
+## 2026-09-04 联调台实测英文歌：链路扛住 + ISE 口语口径守卫（超长降级原因）
+
+- **组员传整曲《阿云嘎 HOY-MIX-Regression.ogg》（3:56 / 236.71s / 9580KB）实测**：试听/转写 179 词/特征全出无崩溃——但数字对唱歌无语义（41.3s「停顿」= 器乐段、2.72s「词」= DTW 拉长，whisper 词级时间戳是口语标定）；ISE 因整篇歌词超长被拒/失败，页面却显示「未评分」，误导；
+- **修复**：`analyze` 增口语口径守卫 —— 音频 >60s（`max_speech_seconds`）→ `audio_too_long`；参考 >300 字符（`MAX_ISE_REF_CHARS`）→ `reference_too_long`；ISE 异常 → `ise_failed`；`score_ref` 保留以表明「已触发评分」；测试台不盲等 ISE；
+- **页面**：ISE 卡黄色提示降级原因；停顿标注对 ≥3s 超长间隙改「可能为器乐段/无词段，非口语停顿」；
+- **口径记录**：唱歌长音频的评分走 M3 音准/节奏链路（sing_attempts/pyin/LRC DTW，docs/singing 22），本测试台只服务口语；这正好实证 docs/19 P0-5「流利度/发音口径不适配唱歌」的一面；
+- **验证**：pytest **153 passed** + ruff 全绿（+2 守卫测试：reference_too_long / 236.7s audio_too_long）；前端 lint/typecheck/vitest 19/build 全绿；真链路：419 字符参考 → `reference_too_long(419 > 300 字符...)`，ref-3 正常路径 overall=90.82 无 error。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+
+## 2026-09-04 联调台加「选中文件即试听」（本地回放，不上传）
+
+- 需求（组员反馈「方便测试」）：选完音频立刻能听，再决定是否分析；
+- 实现：`FluencyPreview.vue` 选择后 `URL.createObjectURL` 生成预览地址 + 原生 `<audio controls>`（显示文件名·大小；更换/卸载时 revoke 防泄漏）——纯浏览器本地回放，不经过后端；
+- 验证：lint/typecheck/vitest 19/build 全绿；dev 模块 transform 200。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+
+## 2026-09-04 测试台 ISE 口径修正（转写对转写开关）+ 开发服务脱离终端起停
+
+- **缘由（组长提问「为什么流利度要有参考文本」）**：区分两种「流利度」——① 时间戳特征（wpm/停顿，纯音频+转写，**无需参考**）；② ISE 流利度分（评测引擎按「音频 vs 给定文本」对齐，**必须有参考**；生产对话口径 = ASR 转写当参考「转写对转写」，朗读/影子跟读才有题卡原文）。
+- **修正**：测试台加「用 ASR 转写作为参考（转写对转写）」勾选**默认开**；后端 `/analyze` 增 `use_transcript_ref` 表单参数（手动 reference 优先），响应增 `score_ref`（manual/transcript/null）供页面标注；不填参考也不再是空评分——实测 ref-3.wav：score_ref=transcript / **overall=90.82 / flu=95.02 / pron=89.39**；未勾选时 score_ref=null（页面提示如何开启）。测试 +2 条（转写对转写、手动参考优先），pytest **151 passed** + ruff 全绿；前端 lint/typecheck/vitest 19/build 全绿。
+- **开发服务起停重构**：uvicorn/mvn/pnpm 作为终端批次任务跑时，关终端弹「Terminate batch job (Y/N)?」且服务随会话死（断网重启后三端全掉）。新增 `scripts/dev-up.ps1`（start/status/stop，**Start-Process 独立进程** + 日志 `local/dev-logs/`；pwsh 7 执行），README 方式 B 增一键起停说明；已验证三端健康（python readyz / java ping / vite 200）。
+- **踩坑**：vite 默认绑 `localhost`（::1），脚本健康探测用 `127.0.0.1` 会 false——已改 localhost（与之前的 5173 访问同坑）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+
+## 2026-09-04 ② 联调发现 BUG：ASR 词级时间戳恒空（生成器二次迭代）已修 + 归档
+
+- **现象**：`/preview/fluency` 上传 ref-2.wav（6.12s）→ 转写文本正确但 words=0、wpm/停顿全零；直接 `WhisperModel.transcribe(word_timestamps=True)` × 同文件却出 11 词——矩阵锁定封装层；
+- **根因**：faster-whisper `transcribe()` 返回**生成器**；`transcribe_sync` 先「拉平文本」（`''.join` 消费殆尽）再「遍历取词」→ 第二次迭代恒空；**旧代码 `ASRResult.segments` 亦恒空**（无消费方、无断言，自 M2 静默存在；直调测试因恰好 `list()` 物化而正常，极具迷惑性）；
+- **修复**：解包后 `segments = list(segments)` 物化一次 + 注释生成器契约（`app/audio/asr.py`）；回归测试 `tests/test_asr_words.py`（假模型返回生成器、断言 word_timestamps 透传+三处消费一致）——**删掉物化行必红（实测 1 failed）→ 恢复绿**；全量 **149 passed** + ruff 全绿；
+- **真链路复验**（重启 :8000）：words=**11** / wpm=**124.06** / pause=**2** / max_pause=**0.96s** / ISE overall=**84.94** flu=89.66 pron=82.01；
+- 归档：`worklog/BUG实测/asr词级时间戳空.md`（复现/根因/修复/验证/踩坑——**faster-whisper 生成器契约：要迭代两次必须先 list()**）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+
+## 2026-09-04 评分 DoD ②：流利度时间戳特征（ASR 词级时间戳 → wpm/停顿 → 落库/报告/联调测试台）
+
+打分「链路完成」DoD 剩余三项之②（2026-09-03 工作日志登记）：
+
+- **特征模块**：`app/audio/fluency.py` 纯函数 `compute_fluency_features`（**恒定键集、坏数据全零兜底、永不抛异常**）——`wpm`（词数/有效说话段分钟，**排除录音首尾静默**）、`articulation_rate`（去停顿纯发音速率）、停顿统计（**相邻词间隙 ≥0.5s 计一次**、≥1.0s 长停顿；仅词间不记首尾静默）、`pause_ratio`；口径 docs/07 Q30（ISE fluency 仍为权威流利度分，本模块只出辅助）；
+- **数据源**：faster-whisper `transcribe(..., word_timestamps=True)` → `ASRResult` 增 `words[{word,start,end,probability}]` + `duration`（契约变更 → `scripts/refresh-openapi.ps1` 刷新 python-openapi.json + `pnpm gen:api` 生成类型，diff 仅 ASRResult 两字段）；`FakeASRClient` 补同构词表（含 1.05s 停顿，测试可断言精确值）；
+- **接入**：对话链路（orchestrator `_dialog_turn`：attempt 写 `wpm` + `details.fluency` + user 消息 meta 带 wpm/pause_count）与入学测试链路（placement `score_item`：同写 + 响应补 wpm）——**修复前 `attempts.wpm` 列恒 NULL**（列自 0001 迁移就存在但从未写入）；
+- **报告**：`service.py` report `metrics.attempts[]` 增 `wpm` + `fluency_features`（前端 `ReportView` 流利度卡下显示「语速 ≈ N 词/分 · 停顿 ≈ M 次/轮」，仅无数据时隐藏）；
+- **联调测试页（新功能固件规范 · 预览机制）**：前端 `views/preview/FluencyPreview.vue`（/preview/fluency，dev-only 生产零体积，已验 dist 无 chunk）+ registry/router 登记；后端 test-only `routes/fluency_preview.py`（POST /api/v1/fluency-preview/analyze：真 ASR→特征→可选真 ISE→与 attempts/report 同构演示载荷），`include_in_schema=False`（契约快照零 diff）、无表无迁移、默认关闭（`APP_FLUENCY_PREVIEW_ENABLED`，本地 .env 已开，生产禁止开启）、删除清单见文件尾注释；页内报告样张按 **lieflat-charts 报告模式 R09 × PORCELAIN** 色值呈现（与 `assets/lieflat/vv-learning-report.html` 同 token）；
+- **验证**：pytest **148 passed**（新增 test_fluency 10 条纯函数 / fluency-preview 3 条（默认 404 + openapi 无该路径）/ asr 契约词表 1 条 / 对话→attempt→complete→report 全链路 1 条：wpm=145.83、pause=1、long=1）+ ruff check/format 全绿；前端 lint/typecheck/vitest 19 passed/build 绿；真链路冒烟（重启 :8000 后 `analyze` + 合成正弦 WAV）code=0 —— 正弦波 whisper 出 0 词级时间戳时特征全零兜底不崩；
+- **踩坑**：① `refresh-openapi.ps1` 被 Windows PowerShell 5.1 以 ANSI 解析报语法错 → 必须用 pwsh 7 执行；② 执行刷新会把 Java 快照重写成压缩单行（live springdoc 未开 pretty-print，契约语义相同但 2343 行噪音 diff）→ 本次 Java 零改动，已 `git checkout` 恢复入库 pretty 版；③ `zip() strict` ruff B905、`import.meta` 等老坑之外，本次 vue-tsc build 门禁抓住 `w.gap` 可能 null（lint/typecheck 不报，build 报——与踩坑③同型「门禁分工」）。
+
+—— 执行人：LHRCarrier（AI 代工整理）
+
+
 ## 2026-09-04 方式 A `migrate` 一次性服务修复（uv run 前缀 + seed 容器路径/挂载）
 
 **背景**：PR#27 方式 A 容器实测时发现 `docker compose up -d migrate` 从基线起就不可用（此前被「容器能起」掩盖）：① 命令裸 `alembic`（镜像内依赖在 `.venv/bin`，缺 `uv run` 前缀）→ `alembic: not found`；② 补前缀后 `seed.py:25` `parents[4]` 在容器布局（`/app/app/db/seed.py` 仅 4 级父目录）越界 → `IndexError: 4`（**与 PR#27 复审 P0 的 `main.py parents[3]` 同类容器路径假设**）；③ 种子数据 `data/seed/scenarios.json` 在仓库根，镜像构建上下文仅 `services/python`，容器内无该文件。
@@ -96,6 +289,7 @@
 **验证**：`docker compose config --quiet` ✓；`docker compose build migrate` ✓；`docker compose up -d migrate` → `Context impl PostgresqlImpl` + `[seed]…（跳过已存在）`，退出码 0，幂等 ✓；`ruff` / `pytest（test_seed + test_seed_recommend 6 passed）` ✓。完整复现/根因/踩坑见 `worklog/BUG实测/方式A-migrate一次性服务无法执行.md`（踩坑 3 条：migrate 失败不阻塞 compose、容器路径假设第三次踩坑、compose 命令需与镜像运行时同前缀）。
 
 —— 执行人：LHRCarrier
+
 
 ## 2026-09-04 PR#27 复审整改：容器布局 `parents[3]` 越界 P0 + 「compose 注入 HF 三件套」失实表述更正
 
@@ -111,6 +305,7 @@
 **验证**：`ruff check` / `format --check` 绿；`pytest -m "not gpu"` 全量绿；容器布局模拟导入（`<tmp>/app/main.py` 两级深度 = `/app/app/main.py` 等价布局）`import app.main` 成功——修复前同一模拟抛 `IndexError: 3`；方式 A 容器实测待 Docker Desktop 就绪后补（docker-build CI 不覆盖运行期导入）。
 
 —— 执行人：LHRCarrier
+
 
 
 ## 2026-09-04 方式 B 三连排障 · 代码改动全过程记录（diff 级，供审 PR 回溯）
@@ -231,6 +426,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 —— 执行人：Faust-sudo
 
 
+
 ## 2026-09-04 入学测试评分恒为 90/86 → 密钥填错文件（根 .env vs services/python/.env）
 
 **现象**：密钥已填、三端重启后入学测试仍恒 发音90/流利86/语法—（Fake 桩常数；`stubs.py L43` 硬编码 `ScoreResult(pron=90.0, flu=86.0)`，`FakeLLM` 输出非 JSON → grammar fail-open None）。
@@ -242,6 +438,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 **教训**：① .env 按「哪个进程读它」分账——compose 读根 .env、方式 B 读 services/{py,java}/.env，填错位置 = 配置不生效且无任何日志；② `--reload` 只管 .py，.env 变更必须硬重启；③ 「恒定评分」先验桩/真（`FakeScorerClient` 常数即 90/86），再谈算法——README FAQ「语音接口返回固定文本」已写此约定。
 
 —— 执行人：Faust-sudo
+
 
 
 ## 2026-09-04 入学测试录音 500 排障 · 方式 B 缺 HF 缓存约定（whisper 模型加载失败）
@@ -258,6 +455,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 **验证**（无 HF 环境变量冷起 :8001 隔离实例）：readyz OK → edge-tts 合成语音提交 → `code=0`，转写逐词正确、pron 90/flu 86/wpm 203.7；测试 attempt 已清理。复审后补：容器布局模拟导入 ✓（修复前 IndexError: 3）。详见 `worklog/BUG实测/方式B-Python-ASR-HF缓存失配.md`（踩坑 5 条：httpx 栈分同步/异步定位第三方库、报错文案反查 site-packages、预热吞异常、容器/本地环境变量契约缺口应落代码默认值、ASR 无 fail-open）。
 
 —— 执行人：Faust-sudo
+
 
 
 ## 2026-09-04 方式 B（`mvn spring-boot:run`）Java 启动失败排障 · 三端 DB 密码对齐
@@ -277,90 +475,264 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 
 —— 执行人：Faust-sudo
 
-## 2026-09-04 影子跟读联调台：录音完成 → 试听自己读的 → 确认提交/重录
 
-- 需求（组员复测反馈「方便测试」）：录完先听自己的跟读再提交，避免闭眼提交后才发现录歪；
-- 实现：`ShadowPreview.vue` 录音停止**不再自动提交**——本地 ObjectURL 试听条（原生 audio 控件）+「提交评分 / 重录」按钮；换句/换素材/卸载时 revoke 防泄漏；VoiceRecorder 的 cancel 路径不触发 onStop，仅真实停止才生成试听；
-- 验证：lint（0 warning）/typecheck/vitest 19/build 全绿；dev 模块 transform 200。
+## 2026-09-03 本轮总结 · 入学测试 A~E 落地 + 整合 + P0 安全加固（M2）
 
-—— 执行人：LHRCarrier（AI 代工整理）
+**一句话**：在 `feat/recommend-landing` 上完成了入学测试从需求澄清(A~E 分阶段)到前后端落地、与 origin/main(38 commits) 整合、按 AGENTS.md rule 3 补联调测试页、遍历完善，以及 M2 六路拷问后的 **P0 安全修复**；全部门禁绿，已推送。
 
-## 2026-09-04 评分 DoD ③：META content/vocab 语义子分（LLM 判定 · 进展示不进总分）
+**提交链**（从早到晚）：`c3ae906`(feat 两维/run/复测/回写/前端) → `46c5a60`(test) → `9c86c8e`(docs) → `7be241e`(merge origin/main) → `b345167`(联调测试台) → `1009358`(docs 整合) → `1bc6c93`(fix 遍历) → `ad5206b`(test 联调) → `65a6a39`(docs 遍历) → `7e9058b`(P0 fix) → `23f3784`(P0 test) → `604c1bb`(docs P0)。
 
-打分「链路完成」DoD 剩余三项之③（④ 之后收尾）：
+**功能要点（入学测试）**：两维 S=0.6·发音+0.4·流利度（对齐推荐系统统一尺度）、LLM 语法仅诊断、run 状态机(40910)、finalize 幂等、复测(40302/42902)、跳过(provisional L2)、回写断点修复(Java /internal/level 幂等 + JwtAuthFilter 跳过 /internal/**)、前端双模式(试音/示范/重录/跳过/QA参考) + errorCopy + 场景按档过滤 + 未定档引导。迁移 `0005_placement_run_state`（对齐 0004 agent_summary）。
 
-- **契约增量（docs/14 §3.4 + docs/26 同步）**：`[-META-]` 增 `content:{score,note}`（内容相关度/充实度）与 `vocab:{score,note}`（词汇多样性）——**口径 docs/07 Q38 拍板 C 落地**：LLM 判定、进报告展示、**不进量化总分**（S=0.4·发音+0.3·语法+0.3·流利度 不变），避免「语义对错混入口语技能分」；
-- **改动面**：`meta.py`（properties content/vocab + render_meta 扩展，默认 None 不破坏既有调用；**防御：模型输出裸数字/字符串 → None 不伪造**）；`context_builder` system 契约行加字段描述（**system 仍逐字静态**——字段说明属契约正文，docs/26 ⑤ 不变）；`meta_executor` 补偿 prompt（_COMPENSATE_SYSTEM + user 注记）同步；`events.MetaBlock` + SSE 手写类型（sse-types.ts）加 content/vocab；orchestrator（MetaBlock 透出 + assistant 消息 meta 落 content/vocab）；`service.complete_session` 新增 `metrics.semantic`（聚合均分+轮次）；`stubs.FakeLLM` 的 META 带 88/84 子分（全链路可断言）；
-- **前端**：ReportView 评分卡下方加「内容相关度 / 词汇多样性」两卡（标注不含总分；无数据隐藏）；
-- **验证**：pytest **180 passed**（+3：META 解析与防御、补偿 prompt 形状、补偿透传；全链路测试断言 SSE meta_block 带 content/vocab + 报告 semantic={content:88.0/1轮, vocab:84.0/1轮}）+ ruff 全绿；前端 lint/typecheck/vitest 19/build 全绿；
-- **踩坑**：① docs/14 契约行与 system 契约行是我在一天内第三次改「契约文本」——每次都要同时对照 docs/14、docs/26、meta.py 文档字符串与 _STATIC_TEMPLATE 四处，改一处漏一处（本次已四同步）；② 复用了"改 worklog 用标题行做锚点"的老毛病，两次吞掉下一条目标题——本次已逐处核对。
+**P0 安全加固（六路拷问）**：密钥 production fail-fast(Python config + Java SecretGuard)、nginx 阻断 `/manage/internal/`、三处 IDOR 归属校验(complete/report/turns)、`/asr /score /tts /llm/chat` 加鉴权+限流。
 
-—— 执行人：LHRCarrier（AI 代工整理）
+**门禁**：Python 全量 **256 passed**；ruff 全绿；Java 目标测试 **6 passed**；python 契约快照 MATCH；前端 lint/typecheck/test:run/build 全绿；alembic 单头。
 
-## 2026-09-04 评分 DoD ④：影子跟读/朗读编排分支（ISE 主场 · 三维评分 + 联调测试台）
+**队友工作保留**：`router/index.ts`、`rec/service.py`、`test_mastery.py`、`RecTestView.vue`、推荐文档/测试、`recommend_smoke.py` 等未提交工作保留在工作区（未混入本轮）。
 
-打分「链路完成」DoD 剩余三项之④（顺序：④→③）：
+**P1 待修（拷问报告，按优先级）**：`/status.can_retest` 与 C5 口径不一致、`complete_session` 幂等、`finalize` 乐观锁、ISE 全故障 fail-closed 降级、前端 `bootstrapAuth` 补 `fetchMe`、SSE error 复位、`errorCopy` 全覆盖、skill 回写契约断链。
 
-- **素材基础盘点**：`shadow_materials` 表/迁移 0003/SessionCheck kind=shadow/`AttemptKinds.SHADOW_SPEECH`/推荐链路（type=shadow）**均已存在**，缺的只是生产编排；`seed_recommend` 补了 L2/L3/L4 三条演示素材（text_content/wpm 120/145/165，全仓此前无素材时 recommend_shadow 恒空——本次执行 seed 后验证 count=3）；
-- **评分口径定版（docs/06 §9.3）**：三维 = `0.4·发音(ISE accuracy) + 0.3·语速匹配 + 0.3·停顿密度`；语速匹配（用户 wpm vs 素材原声 wpm）分段 ≤10%→95/≤20%→85/≤35%→70/≤50%→55/其余 40；停顿密度（pause_ratio）≤5%→95/≤10%→85/≤20%→70/≤35%→55/其余 40；素材缺 wpm → 该维缺省按剩余权重归一；**重音落点/连读识别留待 M3 前端韵律引擎（docs/24 ①），登记 P2 不伪造**；
-- **新模块** `app/practice/shadow.py`（分句/分段打分/加权归一/规则教练笔记——LLM 不参与，无 META 泄漏面）；`_shadow_turn` 编排：start（出句+TTS 示范 AudioChunk，不推进）→ normal（ASR 特征 + ISE 题卡参考 → 三维分 → attempt(kind=shadow_speech, details.shadow) → 逐句推进 → 末句 complete_session）；
-- **接入**：`create_session` kind=shadow + `shadow_material_id`（SessionCreate 契约 + 快照刷新，diff 仅该字段）；**顺带修一个潜伏 bug**：`create_session` 的 assembled 引用未初始化 `scenario`（defense 建会话同样踩 UnboundLocalError，只是此前无测试覆盖——本次 shadow 测试立刻抓出）；
-- **联调测试页** `/preview/shadow`（ShadowPreview.vue + registry/router；后端 test-only `shadow_preview.py`：materials/tts（原始字节示范）/analyze，`include_in_schema=False`、默认关闭 `APP_SHADOW_PREVIEW_ENABLED`（本地已开，生产禁止）、删除清单文件尾）；
-- **验证**：pytest **177 passed**（+24：纯函数分段/权重归一/教练档位、start→评分→收尾→报告全链路（fake 数值：wpm=145.83→speed 95、pause 0.3646→40、pron 90→overall 76）、素材 404/缺音频 422、测试台 404+openapi 零路径、analyze Fake 三维）；ruff 全绿；前端 lint/typecheck/vitest 19/build 绿（dist 无 Shadow chunk）；真链路（经 Vite 代理）：materials=3、analyze（ref-3 音频 × 面试题卡句——故意不相配 → pron 7.9/speed 85/pause 70/overall 50，coach "Slow down..."，**口径合理**：错题卡低发音分）；
-- **踩坑**：① PowerShell `$PID` 是保留自动变量，`dev-up.ps1` stop 循环变量撞名 → 服务杀不掉（已改 `$procId`）；② 测试里 SSE JSON 断言别忘了冒号后有空格（`"conclude": false`），与旧代码无空格格式不同。
+—— 执行人：Faust-sudo
 
-—— 执行人：LHRCarrier（AI 代工整理）
 
-## 2026-09-04 联调台实测英文歌：链路扛住 + ISE 口语口径守卫（超长降级原因）
+## 2026-09-03 修复 P0 安全缺陷（M2 六路拷问 · 高优先级）
 
-- **组员传整曲《阿云嘎 HOY-MIX-Regression.ogg》（3:56 / 236.71s / 9580KB）实测**：试听/转写 179 词/特征全出无崩溃——但数字对唱歌无语义（41.3s「停顿」= 器乐段、2.72s「词」= DTW 拉长，whisper 词级时间戳是口语标定）；ISE 因整篇歌词超长被拒/失败，页面却显示「未评分」，误导；
-- **修复**：`analyze` 增口语口径守卫 —— 音频 >60s（`max_speech_seconds`）→ `audio_too_long`；参考 >300 字符（`MAX_ISE_REF_CHARS`）→ `reference_too_long`；ISE 异常 → `ise_failed`；`score_ref` 保留以表明「已触发评分」；测试台不盲等 ISE；
-- **页面**：ISE 卡黄色提示降级原因；停顿标注对 ≥3s 超长间隙改「可能为器乐段/无词段，非口语停顿」；
-- **口径记录**：唱歌长音频的评分走 M3 音准/节奏链路（sing_attempts/pyin/LRC DTW，docs/singing 22），本测试台只服务口语；这正好实证 docs/19 P0-5「流利度/发音口径不适配唱歌」的一面；
-- **验证**：pytest **153 passed** + ruff 全绿（+2 守卫测试：reference_too_long / 236.7s audio_too_long）；前端 lint/typecheck/vitest 19/build 全绿；真链路：419 字符参考 → `reference_too_long(419 > 300 字符...)`，ref-3 正常路径 overall=90.82 无 error。
+| P0 | 问题 | 修复 |
+|---|---|---|
+| P0-1 | 密钥默认值入库无 fail-fast | Python `config.py`：`app_env=='production'` 且默认/短密钥 → `ValueError`；Java 增 `SecretGuard`（`app-env==production` 校验）+ `application.yml` 加 `app-env` |
+| P0-2 | `/internal/level` 经网关可达 | `nginx.conf` 增 `location /manage/internal/ { return 404 }`（docs/20 §3.3 目标态；直连 8080 属部署 ops 项） |
+| P0-3 | IDOR `POST /sessions/{id}/complete` 可收尾他人会话 | `practice.py` 增 `_require_session_owner` 归属校验 |
+| P0-4 | IDOR `GET /reports/{report_id}` 读他人报告(PII) | `get_report` 按 `scope` 归属校验(session/user) |
+| P0-5 | IDOR `POST /sessions/{id}/turns` 可注入他人会话 | `post_turn` 归属校验 |
+| P0-6 | `/asr /score /tts /llm/chat` 无鉴权无限流(付费裸接口) | `audio.py` 加 `get_current_user_id` + 对应桶限流(asr/ise/tts/llm) |
 
-—— 执行人：LHRCarrier（AI 代工整理）
+**回归测试（修前必失败）**：`test_pipeline_endpoints_require_auth`（无 token 401）、`test_idor_cross_user_session_ops`（跨用户 turns/complete/report 403）、`test_production_config_rejects_default_secrets`、`test_audio_stub` 五个用例补 auth_headers。
+**门禁**：Python 全量 `pytest -q` **256 passed**；`ruff` 全绿；Java `InternalLevelControllerTest+AuthFlowTest` **6 passed**；Python 契约快照 **MATCH**（audio 端点新增头参数后重生成）；前端 `typecheck`/`lint` 全绿。
 
-## 2026-09-04 联调台加「选中文件即试听」（本地回放，不上传）
+—— 执行人：Faust-sudo
 
-- 需求（组员反馈「方便测试」）：选完音频立刻能听，再决定是否分析；
-- 实现：`FluencyPreview.vue` 选择后 `URL.createObjectURL` 生成预览地址 + 原生 `<audio controls>`（显示文件名·大小；更换/卸载时 revoke 防泄漏）——纯浏览器本地回放，不经过后端；
-- 验证：lint/typecheck/vitest 19/build 全绿；dev 模块 transform 200。
 
-—— 执行人：LHRCarrier（AI 代工整理）
+## 2026-09-03 遍历完善 · 入学测试域巡检修复
 
-## 2026-09-04 测试台 ISE 口径修正（转写对转写开关）+ 开发服务脱离终端起停
+**巡检点**：旧三维公式(0.4/0.3/0.3)/`_level_for`/`QA_REF` 残留、`compute_s` None 兜底、前端交互状态、`placement_lab` 语法均值。
+**结论**：无旧公式/`_level_for`/`QA_REF` 残留（`_level_for` 在 difficulty/skill 属推荐域）；`compute_s` 的 `(a or 0.0)` 已被 finalize/lab 的 None 守卫覆盖。
+**修复**：
+1. `PlacementView.vue`：「🔁 重录一次」由直调 `recorder.start` 改为调用 `startRecord()`（修录音态/停止键/埋点失效）；补 `onUnmounted` 释放 `demoUrl`/`testUrl`/记停止。
+2. `placement_lab.py`：`gram_score`/返回 `gram` 改为**过滤 None 后取均值**（原 `sum(gram_vals)` 在 Fake LLM 语法恒 None 时报 `int+NoneType`）。
+3. 新增 `tests/test_placement_lab.py`（/run 两维档位 + /status 档位/冷却）——校验联调测试台按 AGENTS.md rule 3 可用且可删无影响。
 
-- **缘由（组长提问「为什么流利度要有参考文本」）**：区分两种「流利度」——① 时间戳特征（wpm/停顿，纯音频+转写，**无需参考**）；② ISE 流利度分（评测引擎按「音频 vs 给定文本」对齐，**必须有参考**；生产对话口径 = ASR 转写当参考「转写对转写」，朗读/影子跟读才有题卡原文）。
-- **修正**：测试台加「用 ASR 转写作为参考（转写对转写）」勾选**默认开**；后端 `/analyze` 增 `use_transcript_ref` 表单参数（手动 reference 优先），响应增 `score_ref`（manual/transcript/null）供页面标注；不填参考也不再是空评分——实测 ref-3.wav：score_ref=transcript / **overall=90.82 / flu=95.02 / pron=89.39**；未勾选时 score_ref=null（页面提示如何开启）。测试 +2 条（转写对转写、手动参考优先），pytest **151 passed** + ruff 全绿；前端 lint/typecheck/vitest 19/build 全绿。
-- **开发服务起停重构**：uvicorn/mvn/pnpm 作为终端批次任务跑时，关终端弹「Terminate batch job (Y/N)?」且服务随会话死（断网重启后三端全掉）。新增 `scripts/dev-up.ps1`（start/status/stop，**Start-Process 独立进程** + 日志 `local/dev-logs/`；pwsh 7 执行），README 方式 B 增一键起停说明；已验证三端健康（python readyz / java ping / vite 200）。
-- **踩坑**：vite 默认绑 `localhost`（::1），脚本健康探测用 `127.0.0.1` 会 false——已改 localhost（与之前的 5173 访问同坑）。
+**门禁**：`pytest tests/placement/ + tests/test_placement_lab.py` 34 passed；整仓 `ruff check`+`format --check` 全绿；前端 `lint`/`typecheck`/`test:run`/`build` 全绿。
 
-—— 执行人：LHRCarrier（AI 代工整理）
+—— 执行人：Faust-sudo
 
-## 2026-09-04 ② 联调发现 BUG：ASR 词级时间戳恒空（生成器二次迭代）已修 + 归档
 
-- **现象**：`/preview/fluency` 上传 ref-2.wav（6.12s）→ 转写文本正确但 words=0、wpm/停顿全零；直接 `WhisperModel.transcribe(word_timestamps=True)` × 同文件却出 11 词——矩阵锁定封装层；
-- **根因**：faster-whisper `transcribe()` 返回**生成器**；`transcribe_sync` 先「拉平文本」（`''.join` 消费殆尽）再「遍历取词」→ 第二次迭代恒空；**旧代码 `ASRResult.segments` 亦恒空**（无消费方、无断言，自 M2 静默存在；直调测试因恰好 `list()` 物化而正常，极具迷惑性）；
-- **修复**：解包后 `segments = list(segments)` 物化一次 + 注释生成器契约（`app/audio/asr.py`）；回归测试 `tests/test_asr_words.py`（假模型返回生成器、断言 word_timestamps 透传+三处消费一致）——**删掉物化行必红（实测 1 failed）→ 恢复绿**；全量 **149 passed** + ruff 全绿；
-- **真链路复验**（重启 :8000）：words=**11** / wpm=**124.06** / pause=**2** / max_pause=**0.96s** / ISE overall=**84.94** flu=89.66 pron=82.01；
-- 归档：`worklog/BUG实测/asr词级时间戳空.md`（复现/根因/修复/验证/踩坑——**faster-whisper 生成器契约：要迭代两次必须先 list()**）。
+## 2026-09-03 入学测试联调测试页（AGENTS.md rule 3 前后端联动强制项）
 
-—— 执行人：LHRCarrier（AI 代工整理）
+**背景**：AGENTS.md 2026-09-03 新增「前后端联动新功能须提供联调测试页」强制项；入学测试属此类，补做。
 
-## 2026-09-04 评分 DoD ②：流利度时间戳特征（ASR 词级时间戳 → wpm/停顿 → 落库/报告/联调测试台）
+| 落点 | 说明 |
+|---|---|
+| 后端 `app/api/routes/placement_lab.py` | test-only：`include_in_schema=False`、无表/无迁移、不碰既有路由；`placement_lab_enabled=False` 默认不注册 → 404；`POST /run`（Fake 客户端跑完整入学测试复现两维公式+落库）+ `GET /status`（档位/复测冷却）；文件尾**删除清单** |
+| 配置 | `config.py` 新增 `placement_lab_enabled: bool = False`（生产禁止开启） |
+| 注册 | `main.py` 条件注册（`placement_lab_enabled` 为真才 include_router） |
+| 前端 | `views/preview/PlacementPreview.vue` + `registry.ts` 一行 + `router/preview.ts` 一行（dev-only，生产构建零体积） |
 
-打分「链路完成」DoD 剩余三项之②（2026-09-03 工作日志登记）：
+**验证**：Python 契约快照 **MATCH**（`include_in_schema=False` → 零 schema 变化）；全量 `pytest -q` **251 passed / 1 skipped**；`ruff check`+`format --check` 全绿；前端 `lint`/`typecheck`/`build` 全绿。
 
-- **特征模块**：`app/audio/fluency.py` 纯函数 `compute_fluency_features`（**恒定键集、坏数据全零兜底、永不抛异常**）——`wpm`（词数/有效说话段分钟，**排除录音首尾静默**）、`articulation_rate`（去停顿纯发音速率）、停顿统计（**相邻词间隙 ≥0.5s 计一次**、≥1.0s 长停顿；仅词间不记首尾静默）、`pause_ratio`；口径 docs/07 Q30（ISE fluency 仍为权威流利度分，本模块只出辅助）；
-- **数据源**：faster-whisper `transcribe(..., word_timestamps=True)` → `ASRResult` 增 `words[{word,start,end,probability}]` + `duration`（契约变更 → `scripts/refresh-openapi.ps1` 刷新 python-openapi.json + `pnpm gen:api` 生成类型，diff 仅 ASRResult 两字段）；`FakeASRClient` 补同构词表（含 1.05s 停顿，测试可断言精确值）；
-- **接入**：对话链路（orchestrator `_dialog_turn`：attempt 写 `wpm` + `details.fluency` + user 消息 meta 带 wpm/pause_count）与入学测试链路（placement `score_item`：同写 + 响应补 wpm）——**修复前 `attempts.wpm` 列恒 NULL**（列自 0001 迁移就存在但从未写入）；
-- **报告**：`service.py` report `metrics.attempts[]` 增 `wpm` + `fluency_features`（前端 `ReportView` 流利度卡下显示「语速 ≈ N 词/分 · 停顿 ≈ M 次/轮」，仅无数据时隐藏）；
-- **联调测试页（新功能固件规范 · 预览机制）**：前端 `views/preview/FluencyPreview.vue`（/preview/fluency，dev-only 生产零体积，已验 dist 无 chunk）+ registry/router 登记；后端 test-only `routes/fluency_preview.py`（POST /api/v1/fluency-preview/analyze：真 ASR→特征→可选真 ISE→与 attempts/report 同构演示载荷），`include_in_schema=False`（契约快照零 diff）、无表无迁移、默认关闭（`APP_FLUENCY_PREVIEW_ENABLED`，本地 .env 已开，生产禁止开启）、删除清单见文件尾注释；页内报告样张按 **lieflat-charts 报告模式 R09 × PORCELAIN** 色值呈现（与 `assets/lieflat/vv-learning-report.html` 同 token）；
-- **验证**：pytest **148 passed**（新增 test_fluency 10 条纯函数 / fluency-preview 3 条（默认 404 + openapi 无该路径）/ asr 契约词表 1 条 / 对话→attempt→complete→report 全链路 1 条：wpm=145.83、pause=1、long=1）+ ruff check/format 全绿；前端 lint/typecheck/vitest 19 passed/build 绿；真链路冒烟（重启 :8000 后 `analyze` + 合成正弦 WAV）code=0 —— 正弦波 whisper 出 0 词级时间戳时特征全零兜底不崩；
-- **踩坑**：① `refresh-openapi.ps1` 被 Windows PowerShell 5.1 以 ANSI 解析报语法错 → 必须用 pwsh 7 执行；② 执行刷新会把 Java 快照重写成压缩单行（live springdoc 未开 pretty-print，契约语义相同但 2343 行噪音 diff）→ 本次 Java 零改动，已 `git checkout` 恢复入库 pretty 版；③ `zip() strict` ruff B905、`import.meta` 等老坑之外，本次 vue-tsc build 门禁抓住 `w.gap` 可能 null（lint/typecheck 不报，build 报——与踩坑③同型「门禁分工」）。
+—— 执行人：Faust-sudo
 
-—— 执行人：LHRCarrier（AI 代工整理）
+
+## 2026-09-03 整合 origin/main(38 commits) + 提交入学测试改动（A~E 落地）
+
+**背景**：本地在 `feat/recommend-landing` 上完成了入学测试改（A~E），`git fetch` 发现 `origin/main` 前进 38 commits，与我的改动重叠且未提交。
+
+**动作**：
+1. **先提交**：把「入学测试」改动拆成 3 条 commit（code `c3ae906` / test `46c5a60` / docs `9c86c8e`），与队友未提交的推荐工作（rec/service.py、test_mastery.py、RecTestView.vue、推荐文档/测试等）隔离。
+2. **合并** origin/main：`git merge`。核心代码（config/models/practice/agent 等）自动合并；**手动解决 4 个冲突**：
+   - `placement.py`：保留两维评分/run状态机/grammar诊断，并**并入 origin/main 的 wpm/流利度时间戳特征**（`compute_fluency_features` + `asr_res.words/duration` + `attempts.wpm`/`details.fluency`）；
+   - `test_m2_core.py`：保留双方测试（我的 40303 + origin/main 的 wpm 透出，并给后者补定档 seed 以过 40303 门禁）；
+   - `worklog`：保留双方置顶记录；
+   - `python-openapi.json`：从合并代码重生成。
+3. **迁移重编号**：我方 `0004_placement_run_state` 与 origin/main 的 `0004_agent_summary_usage` 撞 revision id → 改为 `0005_placement_run_state`（down=0004），alembic 单头恢复。
+4. **保留队友工作**：`rec/service.py`、`test_mastery.py`、`router/index.ts`、推荐文档/测试等**未提交工作不动**（不入合并提交）。
+
+**验证**：Python 全量 `pytest -q` **251 passed / 1 skipped**；`ruff check`+`format --check` 全绿；python 契约快照 MATCH；前端 `lint`/`typecheck`/`test:run`/`build` 全绿。合并提交 `7be241e`。
+
+**⚠️ 合规（AGENTS.md 2026-09-03 新增「前后端联动新功能须提供联调测试页」强制项）**：入学测试是前后端联动新功能，按 rule 3 需补 `AgentLab` 式 **联调测试页**（`views/preview/PlacementPreview.vue` + `registry.ts` 一行 + `router/preview.ts` 一行 + 后端 test-only 接口 `include_in_schema=False` + 删除清单）——待补，否则 PR 评审会被 comment 要求补。
+
+—— 执行人：Faust-sudo
+
+
+## 2026-09-03 整合完善 · 修复 alembic 漂移 + C4/C6 建档→场景难度过滤
+
+### schema 一致性（alembic check 零 diff）
+- `app/models/skill.py`：`user_skill_state.user_id` 由 `unique=True`（生成 `uq_user_skill_state_user_id`）改为显式
+  `UniqueConstraint("user_id", name="uq_user_skill_state_user")`，与 **0003 迁移**实际名对齐（DB 名
+  `uq_user_skill_state_user`）→ 消除 `alembic check` 的"remove_constraint/add_constraint"漂移。
+- 验证：`alembic check` → **No new upgrade operations detected**（此前仍报 `user_skill_state` 漂移）。
+
+### C4/C6 建档→难度衔接
+- `PracticeHubView.vue`：新增 `visibleScenes`（仅显示 `[L, L+1]` 档场景，L=入学档 `cefr_level`→难度映射）；
+  无档则全部展示（顶部 NAlert 引导去入学测试）。把"入学档位"真正接入场景卡过滤（此前只当装饰）。
+
+### 门禁
+- Python 全量 `pytest -q` **155 passed**；`ruff check` + `ruff format --check` 全绿。
+- 前端 `lint` / `typecheck` / `test:run`(18) / `build` 全绿。
+
+—— 执行人：Faust-sudo
+
+
+## 2026-09-03 阶段E落地 · 入学测试前端 UX（双模式 / 试音示范重录跳过 / 等级条 / 未定档引导 / 错误文案）
+
+### 前端（apps/web）
+| 项 | 落点 | 依据 |
+|---|---|---|
+| API 模块 | 新增 `src/api/placement.ts`：status/retest/skip/questions/scoreItem/finalize 封装（本地 interface 声明响应） | docs/06 §9.2；C1/C5/C8 |
+| 错误文案映射 | 新增 `src/api/errorCopy.ts`：`ApiError.code → 中文`（40002/40302/40303/40910/42901/42902/42203…），未登记回退 `message(code N)` | docs/api/error-codes.md；docs/19 P0-6/P1-11 |
+| PlacementView 双模式 | 重写：intro（试音 🎙+回听）/ 答题（🔊 听示范 TTS + 🎙 录音 + 重录一次 + 下一题 + QA 参考提示 + 跳过）/ 结果（两维 S + L1~L4 + 去练习/再测）；retest 模式经 `startRetest()` 触发 40302/42902 gate | C1/C5/C8；docs/19 §3.5 敢开口包 |
+| 等级条 + 复测入口 + 未定档引导 | `PracticeHubView`：无 level → NAlert「去入学测试（可跳过）」CTA；有 level → 水平 NTag + 「重新测试」入口（status.can_retest）；用 `errorCopy` 消裸错误码 | docs/19 P1-1；C8 |
+
+### 后端（skip 支撑 C5 跳过）
+- 新增 `POST /api/v1/placement/skip`：无 completed → 建 **provisional** completed placement（level=L2、`details.skipped=True`）→ 使 `/sessions` 40303 门禁通过；幂等（已有 completed 返回现有）。
+- `_latest_real_completed`（冷却 gate 用，**忽略 skipped**）——跳过后可立即实测定级（否则 skip 会触发 42902冷却）。
+
+### 契约同步
+- Python OpenAPI 快照重导出（新增 /skip）+ `pnpm gen:api` 前端类型；python-ci 校验 MATCH。
+
+### 门禁
+- Python 全量 `pytest -q` **155 passed**（placement 32，含 skip 3 用例）；`ruff check`+`format --check` 全绿。
+- 前端 `lint` / `typecheck` / `test:run`(18 passed) / `build` 全绿（build 仅 chunk>500kB 告警，非错误）。
+
+—— 执行人：Faust-sudo
+
+
+## 2026-09-03 阶段D落地 · 入学测试断点修复（Java /internal/level 回写 + 前置 40303）
+
+**最重要断点：定档回写链路（P0-6/C2/C9）真正跑通。**
+
+| 项 | 落点 | 依据 |
+|---|---|---|
+| **D3 回调 payload 修复** | `placement.py:_callback_level`：键改 `userId`（原 `user_id` 致 400 被吞）+ `source='placement'` + `levelAt`；`raise_for_status()` + 失败**记日志告警**（不再静默）；不阻塞入学测试 | docs/19 P0-6；local/34 D-3；C2 |
+| **D2 Java 幂等 PUT** | `InternalLevelController.LevelRequest` 加 `source/levelAt`；仅当 `levelAt` 不早于 `cefrLevelAt` 才落（旧数据不覆盖）；`source` 缺省 `placement` | local/34 D-2；C9 |
+| **🔴 JwtAuthFilter 关键修复** | `/internal/**` 跳过 JWT 解析——否则 `Authorization: Bearer <service-token>` 被当 JWT 解析失败 → `clearContext()` 清掉 ServiceTokenFilter 的 ROLE_SERVICE → 403。这是回调不通的**深层根因**（非仅字段名） | SecurityConfig 过滤器链 |
+| **D1 前置 40303** | `create_session`：`kind=DIALOG` 需已有 completed placement，否则 40303（C5 跳过会建 provisional 档，故凡有档位即可） | local/34 D-1 |
+
+**契约同步（E-5，因变更了 Java LevelRequest 与 Python 端点而必须）**：重导出 `apps/web/src/api/specs/{python,java}-openapi.json` + `pnpm gen:api` 前端类型；`python-ci` 快照校验 MATCH、`ContractSnapshotTest` 通过、前端 `typecheck` 通过。
+**错误码登记**：40302（复测未获准）、40303（未定档）、40910（并发 run）、42203（read 不足）→ `docs/api/error-codes.md`。
+**新增测试**：`tests/placement/test_callback.py`（payload 键名 userId）、`InternalLevelControllerTest`（回写更新 + 幂等忽略旧数据 + 无 token 401）、`test_m2_core::test_dialog_session_requires_placement`（40303）。
+
+**门禁**：Python 全量 `pytest -q` **152 passed**；`ruff check` + `ruff format --check` 全绿；Java `mvn test` **18 passed**（含新 InternalLevelControllerTest 3/3，ContractSnapshotTest 已对账）；前端 `typecheck` 通过。
+
+—— 执行人：Faust-sudo
+
+
+## 2026-09-03 阶段C落地 · 入学测试复测=重考（eligible 预检 / 冷却 / 幂等）
+
+按冻结清单 C3t + C8（精简复测、无 XP 经验制）实现：
+
+| 项 | 落点 | 依据 |
+|---|---|---|
+| 冷却 gate(42902) | `_get_or_create_run` 新建 run 前：若已有 completed 定档且距其 < `placement_retest_cooldown_days` → 42902 | local/34 C-3；防频繁刷分 |
+| eligible 预检(40302) | `POST /api/v1/placement/retest`：无已完成基线 → 40302 | local/34 C-3 |
+| 复测入口 | `POST /api/v1/placement/retest`：40302/42902 通过后建立 in_progress run + 返回题型快照+`exam_revision`（取当前发布版本） | C5/C11 |
+| 资格预检 | `GET /api/v1/placement/status`：has_completed / completed_count / current_level / last_completed_at / can_retest / cooldown_remaining_days | local/34 C-5（精简） |
+| 配置 | `placement_retest_cooldown_days=1`（config.py） | — |
+| 语义 | latest completed placement 的 level = 当前档（`/status` 与回写按此）；复测生成新 completed 记录，`finalize` 幂等（B3）已复用 | C8 |
+
+**错误码登记**：`40302`（复测未获准：尚无已完成测试）、`42902`（复测冷却中）→ `docs/api/error-codes.md`。
+**门禁**：`pytest tests/placement/` 27 passed（+4 复测用例）；全量 `pytest -q` **149 passed**；`ruff check` + `ruff format --check` 全绿。
+**待办（E-5 契约同步，需起服务）**：新增 `GET /placement/status`、`POST /placement/retest` 两端点 → 需 `scripts/refresh-openapi.ps1` 刷新 `apps/web/src/api/specs/python-openapi.json` 并 `pnpm gen:api`（本阶段未做，避免无服务跑出错误快照）。
+
+—— 执行人：Faust-sudo
+
+
+## 2026-09-03 阶段A完善 + 阶段B落地 · 入学测试 run 状态机 / QA 标签 / 幂等
+
+### 阶段 A 完善
+- 新增 `tests/placement/test_grammar.py`（8 用例）：`judge_grammar` / `judge_qa_answer` 快路径（合法 JSON→{grammar,relevance}）、fail-open（非 JSON/空转写→None）、score 钳制、relevance 白名单、`_extract_json` 边界；用 stub LLM + `asyncio.run`（不依赖 anyio 插件）。
+- `placement.py:finalize` 加防御：`compute_s` 前校验 A/F 非空，缺任一 → 42203（不静默用部分数据判档）。
+
+### 阶段 B
+| 子任务 | 落点 | 依据 |
+|---|---|---|
+| B1 run 状态机 + 并发 | `_get_or_create_run`：评分首题惰性创建该用户 `in_progress` run（placements 行），后续题续用；`(user_id) WHERE status='in_progress'` 部分唯一索引兜底并发 → 40910 | local/34 B-1；docs/10 §6 B-2 |
+| B2 QA 相关度标签 | `grammar.py` 新增 `judge_qa_answer`（一次 LLM 调用返 `{grammar, relevance}`）；qa 分支落 `details.qa.relevance`；删除旧 `QA_REF` | local/34 B-2；C1 语法仅诊断；local/16 控次数 |
+| B3 finalize 幂等 | run 已 `completed` 直接返回缓存结果（不重复落库）；attempt 经 `placement_id` 作**消费标记**（不可被其他 placement 复用） | local/34 B-3；C9 |
+
+### schema / 迁移
+- `attempts.placement_id`（FK placements.id SET NULL）+ `ix_attempts_placement_id`（models/practice.py）。
+- `placements` 部分唯一索引 `uq_placements_user_inprogress`（models/user.py）。
+- 新增 `alembic/versions/0004_placement_run_state.py`（SQLite batch + PG partial index）。
+- 错误码：登记 `40910`（已有进行中的考试）。
+
+### 门禁
+- `pytest tests/placement/` 23 passed；全量 `pytest -q` **145 passed**；`ruff check` + `ruff format --check` 全绿。
+- 迁移：`alembic heads` 单头 `0004`；`alembic upgrade head --sql`（PG 离线编译）正确；**真 PG `alembic upgrade head` 已应用 0004**。
+- ⚠️ `alembic check` 仍报一处**既有无关漂移**：`user_skill_state` 唯一约束名 DB=`uq_user_skill_state_user` vs 模型=`uq_user_skill_state_user_id`（来自 0003 推荐迁移），非本阶段引入，建议另开 PR 修复（不在 A/B 范围）。本阶段涉及的 `attempts.placement_id`、`placements` 部分索引**无漂移**。
+
+—— 执行人：Faust-sudo
+
+
+## 2026-09-03 阶段A落地 · 考试域两维评分与 gram 修复（C1/C5/C11）
+
+按冻结任务清单（见下一条）实现阶段 A（P0）：两维综合分 + LLM 语法判定诊断 + config 单源。
+
+| 子任务 | 落点 | 依据 |
+|---|---|---|
+| A1 可复用 LLM 语法判定 | 新增 `app/placement/grammar.py`（`judge_grammar(transcript, reference)` → `{score, errors[]}`；fail-open） | local/34 A-1；C1；docs/06 §9.3 |
+| A2 评分通道分离 + gram 化 | `placement.py:score_item` — `kind='qa'` 只 ASR 不 ISE（不耗 ISE 桶）；read 走 ISE；read/qa 均补调 LLM 语法；`gram_score=None` 化 | C1；A2；docs/10 §4.3 不伪造分 |
+| A3 finalize 两维公式 | `placement.py:finalize` — `S=0.6·A+0.4·F`，`A=mean(read pron)`、`F=0.7·mean(flu)+0.3·mean(completeness)`；`min_read_items=1` 齐句校验（不足→42203）；`placements.exam_revision` 从所考题库版本写入 | C1/C5/C11；local/24 v4 §2.1、local/26 §2 |
+| A5 配置单源 | 新增 `Settings`：`score_w_accuracy/score_w_fluency/score_f_fluency/score_f_integrity/level_threshold_l4~l2/placement_min_read_items`；废弃硬编码 `_level_for` 常量 | C1；A5；C10 |
+| 错误码 | 登记 `42203`（入学测试已评分 read 题不足）到 `docs/api/error-codes.md` | AGENTS.md 先登记后使用 |
+| 模型 docstring | `models/user.py` Placement 注释改两维口径 | C1 |
+
+**新增文件**：`app/placement/__init__.py`、`app/placement/scoring.py`（纯函数：`compute_accuracy/compute_fluency/compute_s/level_for`）、`app/placement/grammar.py`。
+**新增测试**：`tests/placement/test_scoring.py`（公式/边界/completeness 缺失→仅 flu）、`tests/placement/test_placement_api.py`（qa 只 ASR、finalize 两维、42203、exam_revision 记录）。
+
+**门禁**：`pytest tests/placement/` 13 passed；全量 `pytest -q` 135 passed；`ruff check` + `ruff format --check` 全绿。
+（注：全量首跑 `test_save_audio_and_ownership` 偶发 410 vs 403，为该用例**顺序依赖 flake**（`./data/audio-test` 跨测试残留）、与本次改动无关，单跑与重跑均绿。）
+
+**A4 阈值标定** 未含在本次代码（需 ≥3 人 × 每档数据 + σ 实测，= F2 交付物，算法/组长）。
+
+—— 执行人：Faust-sudo
+
+
+## 2026-09-03 入学测试功能 · 需求分歧澄清与任务清单冻结（C1~C11 决策合流）
+
+**背景**：按「信息压缩 → 冲突澄清 → 任务拆解」推进入学测试功能。依据 docs/06 §9.2、docs/07、docs/10、docs/18、docs/20/21、docs/13/14/19，并核对 local/04~06 三份（需求规格/产品功能/成员分工 .docx）与推荐系统代码（`app/rec/service.py`、`app/rec/*`、local/26~31）。产出：开发词典、技术栈、冲突清单 → 逐项拍板 → 任务拆解表 + 分支命名 + ER 图。
+
+**已固化的拍板决策**：
+
+| 项 | 结论 |
+|---|---|
+| C1 | 考试域改**两维**，对齐推荐系统统一尺度：`S = 0.6·A + 0.4·F`，`A=mean(read pron)`、`F=0.7·mean(flu)+0.3·mean(integrity)`，档界 85/70/55；`kind='qa'` 只 ASR 不 ISE，**额外调 DeepSeek 判语法** → `gram_score`+错误类型进报告/教练反馈，**不进 S 权重**；DeepSeek 失效 → `gram_score=None`（禁静默 0）、QA fail-open、S 不变；权重/阈值进 `scoring_config` 单源 |
+| C2 | 修 `_callback_level`：`user_id→userId` + `raise_for_status`+log + 双侧契约测试（Java `@SpringBootTest` + Python `respx`） |
+| C3 | 推荐冷启动不落 `placement_level`，与水平预测目标错峰避循环（属 M3） |
+| C4 | 难度衔接：场景筛选读 `cefr_level`（入学档）；`preferred_difficulty` 仅覆盖难度映射、不动 `cefr_level` |
+| C5 | 入学测试「**可跳过 + 2 题迷你版**」：默认跳过发 L2 入门套；想定级的做 1 read + 1 QA，每题 🔊 示范 + 重录；QA 必须下发 `reference_answer`；`min_read_items=1` 齐句校验，A/F 对 read 题取均值 |
+| C6 | 档位快照产物 = `placements`(completed) + `user_profiles.cefr_level`；难度衔接在 `/practice` 按档读卡 |
+| C7 | DB 角色权限化（vv_python/vv_java/vv_seed）+ CI 静态探针，把单写方从约定变约束 |
+| C8 | 定期复测=**精简版**：可重做入学测试（新 `placements(kind=upgrade)` → latest completed 回写 `cefr_level`，配 eligible 预检/冷却/幂等）；**不做** XP 经济 / `level_progress` / `xp_ledger`（与 `user_skill_state` 动态水平重复、控范围） |
+| C9 | 档位对账：`cefr_level_source/cefr_level_at` + 幂等 PUT（level_at≤现值忽略）+ 读前对账 |
+| C11 | `placements.exam_revision` 在 finalize 从所考题库版本写入，可追溯 |
+
+（C10 公式/阈值集中 `scoring_config` 单源；C12 ISE 桶 60/h vs ADR 30/h 待评分子任务确认。）
+
+**冻结任务清单**（阶段 A→F，按依赖）：
+
+| 阶段 | 任务 | 端 | 决策 |
+|---|---|---|---|
+| A | A1 可复用 LLM 语法判定模块；A2 `score_item`（qa 只 ASR + 补调 LLM 语法，gram=None 化）；A3 `finalize` 两维公式 + `min_read_items=1`；A4 阈值标定；A5 配置单源 | Py/算法 | C1/C5/C10/C11 |
+| B | B1 run 状态机 + 并发 40910；B2 QA 端点 ASR+LLM 标签；B3 `finalize` 幂等 + 乐观锁 + 消费标记 | Py | C1/C9 |
+| C | C3t 复测=重考（预检 40302 / 冷却 42902 / latest completed 回写） | Py | C8 |
+| D | D1 `POST /sessions` 未定档 40303；D2 Java `/internal/level` 修 `user_id→userId` + 幂等 PUT | Py+Java | C2/C9 |
+| E | E1 `PlacementView` 双模式（试音/示范/重录/跳过/QA 参考）；E2 复测入口+等级条；E3 未定档强制跳+错误文案映射；E4 建档→/practice 难度衔接 | 前端 | C5/C8/C4/C6 |
+| F | F1 pytest（两维公式/落位/幂等/QA fail-open/对账）；F2 阈值标定报告；F3 文档同步+worklog | 组长/算法 | C1/C9/C10/C12 |
+
+**分支命名**：`feat/placement-scoring-2d`、`chore/placement-score-calibration`、`feat/placement-run-state-machine`、`feat/placement-qa-answer`、`feat/placement-retest`、`fix/placement-level-callback`、`feat/placement-gate`、`feat/placement-view-redesign`、`feat/placement-handoff`、`test/placement-e2e`、`chore/docs-sync`。
+
+—— 执行人：Faust-sudo
+
 
 ## 2026-09-03 ISE 批量对照实证：SpeechOcean762 人工标注 vs ISE（r=0.81，分档单调）
 
@@ -373,6 +745,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 
 —— 执行人：LHRCarrier（AI 代工整理）
 
+
 ## 2026-09-03 讯飞 ISE 真链路接入：旧 HTTP 接口已下线 → 流式版重写（真调用全通）
 
 组长提供 ISE 密钥（APPID/APIKey/APISecret，已写入 gitignored `services/python/.env` 与根 `.env`，不入库）。接入过程（真调用逐级排障）：
@@ -384,6 +757,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 - **边界说明**：当前对话场景以 ASR 转写作为 reference（"转写对转写"，近似发音对齐）；ISE 的真正价值在**有题卡场景**（影子跟读/朗读/M3 唱歌，`category=read_sentence` 已支持，自由题 `category=topic` 可扩展）。
 
 —— 执行人：LHRCarrier（AI 代工整理）
+
 
 ## 2026-09-03 预览测试页机制统一修复：Agent Lab 404 根因 + Demo↔预览画廊双向通道
 
@@ -399,6 +773,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 
 —— 执行人：LHRCarrier（AI 代工整理）
 
+
 ## 2026-09-03 PR#26 管理员直推合入 main（组内无人审 PR，组长行政决定）
 
 组长决定：团队成员不参与 PR 评审，**管理员方式直推 main**（`gh pr merge --admin --squash --delete-branch`，合并 commit `ee8e7ae`，PR#26 = feat(agent): LLM 框架 P0 内核（ai4u 对齐分层切片））。
@@ -408,6 +783,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 - **直推后流程说明**：后续新 PR 仍按规范开（留痕/可追溯），合入由组长按本次模式 admin squash（CI 全绿为前提）。
 
 —— 执行人：LHRCarrier（AI 代工整理）
+
 
 ## 2026-09-03 补齐遗漏：orchestrator × META 补偿接线（未提交缺口，红→绿验证）
 
@@ -421,6 +797,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 
 —— 执行人：LHRCarrier（AI 代工整理）
 
+
 ## 2026-09-03 缺口补齐：摘要双轨落库 + usage_log 用量记账（迁移 0004）+ Agent Lab 指标化
 
 按 docs/26 §10.3 两个缺口实施（组长拍板「缺口补上」）：
@@ -432,6 +809,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 - **踩坑**：① `may_be_summarize` 首版用 `len(recent)<=RECENT_N` 判定导致永远早退（recent 被 LIMIT 截断）→ 改总消息数判定；② `op.create_table` 用 `*_pki()` 展开 + 无显式 PK → offline `--sql` 渲染 `getitem` NotImplementedError → 对齐 0003 样式（显式 PrimaryKeyConstraint + `length=` 形参）后通过。
 
 —— 执行人：LHRCarrier（AI 代工整理）
+
 
 ## 2026-09-03 协作流程固化：新功能必须带联调测试页（AGENTS.md 第 3 条）
 
@@ -445,6 +823,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 
 —— 执行人：LHRCarrier（AI 代工整理）
 
+
 ## 2026-09-03 Agent Lab · LLM 框架测试台（团队测试用，整删无影响）
 
 按组长要求「做一个前端测试页，专供团队测试、不影响其它代码、删除无影响」，落地 **Agent Lab**：
@@ -455,6 +834,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 - **删除清单**（已写入 agent_lab.py 文件尾注释）：删 vue 文件 + registry/路由各 1 行 + 后端路由文件 + main.py 2 行 + config 1 行 —— 无迁移/无契约影响。
 
 —— 执行人：LHRCarrier（AI 代工整理）
+
 
 ## 2026-09-03 LLM 框架 P0 · 真 Key POC 实证与 META 契约 v2.2 定案（PR#26）
 
@@ -471,6 +851,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 
 —— 执行人：LHRCarrier（AI 代工整理）
 
+
 ## 2026-09-03 LLM 框架对齐 ai4u · 评估与实施计划（docs/26）
 
 组长拍板方向：LLM 部分不做小改，做成组内自研 ai4u 那样的分层框架（ai4u = 组长自研 Electron+Vue3+NestJS 桌面 AI 伴侣，`F:\WorkingL\ai4u`，Agent 运行时自研分层架构）。通读 ai4u 源码与 `docs/agent/` 后输出评估：
@@ -482,6 +863,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 - **RAG 无自有知识库**：VocalVerse 语料走场景绑定，不迁知识库/RAG。
 
 —— 执行人：LHRCarrier（AI 代工整理）
+
 
 ## 2026-09-03 InternalBeyond 对比调研 · 结果核验与落地计划（docs/24）
 组员在 `local/InternalBeyond对比与借鉴分析.md` 提交对 Sui-IB/InternalBeyond（单文件离线个人网站，V2.6.2 @ 2026-09-01）的对比调研；组长要求核验可行性与制定落地计划：
@@ -500,6 +882,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 —— 执行人：LHRCarrier（AI 代工整理）
 
 
+
 ## 2026-09-03 修复：lieflat 学习报表雷达图点击重播后空白（BUG 实测入库）
 
 用户报告 `vv-learning-report.html` 雷达图点击重播后消失、其余图正常。根因是本文件把两条正本
@@ -514,6 +897,7 @@ SVG 图在各自 fn 开头自清空），与看板文件路径一致。
 
 —— 执行人：LHRCarrier（AI 代工整理）
 
+
 ## 2026-09-02 唱歌相关文档归档 `docs/singing/`（组长要求整理）
 
 组长要求把唱歌相关文档统一收纳：新建模块目录 `docs/singing/`，迁入 7 份文件（原 `docs/22-*` 6 份 + 原 `docs/audit/英文歌打分-…轴线D…` 1 份；文件名与内容除路径引用外零改动）：
@@ -524,6 +908,7 @@ SVG 图在各自 fn 开头自清空），与看板文件路径一致。
 同步更新交叉引用：主报告/轴文件内互相引用路径、README 文档索引 7 行、docs/23 与 worklog 中的路径提及（已 grep 全仓验证 **0 处残留** `docs/22` / `docs/audit/英文歌` 旧路径）。唱歌文档均属 `docs/singing/` 子模块，编号 22 保留原样以便追溯；docs/23（前端重构调研）留在 `docs/` 根（其余系列文档与其并列，非唱歌模块）。
 
 —— 执行人：LHRCarrier
+
 
 ## 2026-09-02 前端重构 · 市场同类设计调研（docs/23 · M3/M4 前置）
 
@@ -536,6 +921,7 @@ SVG 图在各自 fn 开头自清空），与看板文件路径一致。
 - **联动**：唱歌页设计依赖 docs/singing/22-英文歌打分系统集成拷问报告 已列 P0 未决项（逐帧 F0 是否落库等），前端 /sing 先静态高保真，等拍板。
 
 —— 执行人：LHRCarrier
+
 
 ## 2026-09-02 英文歌打分模块 · 系统集成拷问（M3 预热）—— 前端架构调研员（AI 代笔）
 
@@ -550,6 +936,7 @@ SVG 图在各自 fn 开头自清空），与看板文件路径一致。
 
 —— 执行人：前端架构调研员（AI 代笔；**正式署名待组长确认**，勿以本条目作为个人署名依据）
 
+
 ## 2026-09-02 PR#25 推荐系统落地 · 复审整改与合入（模型同步 / 契约快照 / CI 兜底）
 
 复审发现并修复 3 个阻断项（评审结论见 PR#25 review，2026-09-02）：
@@ -559,74 +946,6 @@ SVG 图在各自 fn 开头自清空），与看板文件路径一致。
 
 —— 执行人：LHRCarrier
 
-## 2026-09-07 Java 启动日志两坑修复（安全密码 WARN + spring-boot:run 中文乱码）
-
-用户实测暴露两个启动问题（commit `5ad2c8c` + `16a4e6b`）：
-
-1. **「Using generated security password」WARN**：项目是自定义 JWT 过滤器 + BCrypt（AuthController 自己校验），从不创建 `UserDetailsService` bean → Boot 的 `UserDetailsServiceAutoConfiguration` 兜底生成随机密码并打误导性 WARN。已 `exclude UserDetailsServiceAutoConfiguration` 消噪（测试证明 SecurityConfig 一直生效：链路失效则 /auth/** 被默认 basic auth 拦截，AuthFlowTest 必挂）。
-2. **DemoSeeder 中文乱码（verify 正常、spring-boot:run 乱码）**：logback sett UTF-8 字节后，**mvn spring-boot:run 的 fork 子进程 stdout 经管道由 Maven 主进程按平台编码（GBK）解码** → UTF-8 字节被读错乱码；surefire 转发路径无此环节所以 verify 正常。修复三层对齐：`logback-spring.xml charset=UTF-8` + `.mvn/jvm.config -Dfile.encoding=UTF-8`（Maven 主 JVM）+ `spring-boot-maven-plugin jvmArguments -Dstdout.encoding/-Dstderr.encoding=UTF-8`（fork 子 JVM）。Linux/容器无影响（本然 UTF-8）。
-3. 门禁：`mvn clean verify` 全绿（15 tests + spotless + 契约对账）。
-
-**踩坑（并入 32 待登记）**：Windows 中文编码是「字节流向 × 每层的解码器」问题——logback 只管字节（charset），Maven 管道转发按自己编码解码；修编码先分清「哪层转码」再动手，单改一层必然残留（第一轮只加 logback charset 时 verify 好了 run 没好的原因）。
-
-## 2026-09-07 Java 包结构按 Package-by-Feature 规范重整（专家子代理审计 + 实施）
-
-**触发**：组长检查发现上轮「Controller 统一收 controller/」后分层不明确（Controller 按层、Entity/Repository 按域 = 混合分层）。派专家子代理审计（35 主 + 9 测文件全量清单为输入，结论可复现）：
-
-- **诊断**：① 混合分层割裂——同域端点被拆到无归属层包（工单 = controller/TicketController + ticket/ 两地）；② ContentAdmin/QuestionAdmin 同属 content、InternalLevelController 实属 user，包名表达不了域归属；③ SecurityConfig/JwtService/JwtAuthFilter 是全局安全编织却塞在 auth 域；④ 测试主/镜像不一致（PingController 主在 controller/、测试在 health/）；⑤ AbstractAdminApiTest 跨域共享却放层包。
-- **方案（唯一推荐）**：Package by Feature——域内自包含（`域/controller/` 子包 + 域根 entity/repository），跨域安全/种子上移 `config/`、健康探针归 `health/`、共享视图 DTO 归 `ticket/dto/`；测试镜像到 `域/controller/` + `support/` 基座。豁免项：薄端无 service 层（唯 AuthController 的密码/refresh 逻辑越界已标记，后续可选抽 AuthService）、controller 内嵌 record DTO（跨端点复用的仅 TicketView 例外）。
-- **实施**：`117beef`（主代码 13 移 + 测试 4 移，git 识别 rename 90~100%）+ `28b5448`（测试镜像 import 同步）。**外部可见性零变化**：@RequestMapping 与内嵌 record 字段未动，`ContractSnapshotTest` 逐字通过（springdoc tag/operationId 不依赖包路径），前端契约/类型无需刷新。
-- **门禁**：`mvn clean verify` 全绿（15 tests + spotless + 契约对账）。
-
-**踩坑 31（实施自伤，已恢复）**：第一轮用 PowerShell `[regex]::Replace(..., "package $pkg;")` 替换 package 行——`.NET 正则替换的 replacement 中 `$pkg` 被解释为命名组引用`，导致整个文件被静默置换破坏（实测表现为源码字符错乱）→ 全量 `git checkout` 回滚后改用 `git mv` + **字面 `.Replace`（无 `$` 语法）** + 每步 `Contains` 校验，一次通过。教训：**批量改文本用字面替换 + 校验；正则 replacement 的 `$` 是陷阱**；另 `git mv` 会立刻 staged，别再用 `git add` 分批攒 commit（本次导致测试 rename 混入主代码 commit，无功能影响但分类不纯）。
-
-## 2026-09-07 系统设计 Day1：架构设计说明书 + 接口设计说明书（docs/20、docs/21）
-
-### 任务与产出
-
-按分工（09/07，A 全天）：系统架构设计（分层、服务边界、写方唯一性约束、数据流图）+ 接口契约梳理（OpenAPI）。产出《系统设计说明书》两份分册（09/09 设计评审交付）：
-
-| 交付物 | 文件 | 要点 |
-|---|---|---|
-| 架构分册 | `docs/20-系统架构设计说明书.md` | 系统上下文 DFD（mermaid）+ 五层划分 + 应用内三层端分层（route/service/port/adapter + 禁止规则 R1~R6）+ 服务职责边界表（含「新功能落位判据」）+ **表级单写方矩阵**（19 表 × 写方 × 现状代码）+ **守护机制设计 M-1~M-4**（DB 双角色 vv_python/vv_java/vv_seed、CI 静态探针、seed 只增不改 + slug 键、评审打回）+ 回合目标态时序图 + 报表流 + 写方边界图 + **D1~D14 设计决策/现状差异/排期表** |
-| 接口分册 | `docs/21-接口设计说明书.md` | 双快照对账：Python 20 ops / Java 6 ops 端点总清单（方法/路径/鉴权/限流/备注）+ SSE 回合契约（事件序列）+ **内部 REST 契约正式登记**（`POST /internal/level`：userId 键名/3s/幂等/调用方义务/双侧契约测试）+ 整改项 **R-1~R-16** 登记表 + 错误码对账 + 契约变更流程 |
-| 错误码补登记 | `docs/api/error-codes.md` | 补 40902/40903/41001/42202（代码已用未登记）+ 40901 预留 + 40301 语义扩注（越权统一按不存在处理） |
-
-### 现状盘点结论（先答「有没有做过类似工作」）
-
-- **分层/服务边界**：docs/06 §1、§2 已有文档级拓扑与职责表，但无设计说明书成文；docs/19 §1.1 是评审口径的现状速写（非设计）。
-- **写方唯一性**：docs/10 §3 矩阵 + §5 细则已相当完整，但 **P0-7 实锤只有文档没有机制**：`seed.py` 直接写 Java 独占表（scenarios/placement_questions）、两服务共用同一 DB 账号、无任何守护。
-- **数据流图**：此前**从未做过**正式 DFD（全仓无 mermaid/drawio），今天补齐 4 张（上下文/回合时序/报表流/写方边界）。
-- **OpenAPI 契约**：基础设施此前已远超小组水平（双快照 + openapi-typescript 生成 + CI 三关卡 + refresh-openapi.ps1 + docs/06 §7），本次补的是「设计先行」的接口清单、内部 REST 契约与对账落地。
-
-### 对账发现（2026-09-07 代码实测，全部登记进 R-1~R-16 / D1~D14）
-
-1. **Python OpenAPI 快照中没有任何 operation 带 `security`**：practice/placement/defense/events 的 `Depends(get_current_user_id)` 因用 `Depends` 而非 `Security` 未进 OpenAPI；`/asr /score /tts /llm/chat` 四端点是真的裸奔（与 docs/19 P0-4 一致，未修）。
-2. **docs/19 的 9 个 P0 经复核全部仍在**（2026-09-07 重查代码：进程内状态、同步 Session 跨 SSE、三处越权、裸接口、串行 TTS、`user_id` vs `userId`、seed 违例、reports 非 upsert、默认密钥/网关可达）——排期见 docs/20 §6 表（9/10~9/11 集中返工承接）。
-3. **三处文档与代码不符（新发现）**：① docs/06 §7 写 `/api/auth/refresh`，实际网关路径 `/manage/auth/refresh`（R-15）；② docs/06 §7「评分 30/h」，代码 `ise_rate_per_hour=60`（R-16）；③ 错误码表落后代码 4 个码（本次已补）。
-4. **快照口径修正**：Java 快照是服务原生路径，**对外契约以网关 `/manage/` 前缀为准**（docs/21 §2.2 已加说明）。
-
-### 踩坑记录（追加第 29 条）
-
-29. **「文档声称」必须与「代码事实」三方对账，不能拿 docs/06 当事实**：本次盘点靠逐条提取快照（PowerShell ConvertFrom-Json 列 paths + security）+ 关键行 grep 复核，发现 3 处 docs/06/docs/api 与代码不符（refresh 路径、ise 桶、错误码缺失）——这些差异如果只读文档永远不会暴露，而它们恰恰是接口设计说明书的「对账结论」最有价值的部分。做法：快照为唯一基准列端点，代码为唯一基准列鉴权/限流/字段名，docs 为第三列对比。
-
-### 同日补记：Java 薄端管理端提前落地（超出分工计划）
-
-把盘点出的 Java 缺口（admin 角色链路 / 用户管理 / 内容库 CRUD / 工单）全部实现，从 9/14~9/15 计划提前到设计日完成：
-
-| 提交 | 内容 |
-|---|---|
-| `c8cbba2` | feat(java)：管理端最小集 —— JWT 加 role claim + `/api/v1/admin/**` hasRole(ADMIN)；用户管理（列表/详情/禁用启用/档案，改档 source=manual）；scenarios/songs/lrc/listening_materials/placement_questions 实体+CRUD（DELETE=归档；LRC 整首重写 → seq 重排 + pitch_ref_status→missing 触发 Python 重提取；题库 exam_revision 版本化 + 重复题 409）；工单（用户提交/我的 + 管理侧前向状态机 open→processing→resolved→closed，回复即认领）；Controller 按 Spring Boot 分层规范统一收 `controller/` 包，entity/repository 按域 |
-| `b684e44` | test(java)：AdminUser/Content/Ticket 三组 API 测试（15 tests 全绿含既有） |
-| `07a28a4` | chore(contract)：Java 快照 6→33 ops + `pnpm gen:api` 前端类型（现有调用零改动） |
-
-门禁：`mvn verify` 全绿（15 tests + spotless + ContractSnapshotTest 对账新快照）；`pnpm typecheck` 通过（前端类型无破坏）。
-
-### 踩坑记录（追加第 30 条）
-
-30. **MockMvc `content(String)` 不是 UTF-8；Java 文本块里的 `\"` 是转义不是字面反斜杠**：单测两连坑——① 请求体含中文时 `content(String)` 按平台编码（ISO-8859-1）传输 → Jackson `JSON parse error` 400，必须 `content(body.getBytes(StandardCharsets.UTF_8))`；② 文本块（`"""`）中想表达 JSON 的 `\"` 实际是 `"`（转义生效），导致 `"interestTags":"["daily"]"` 这类 JSON 断裂——测试用 `[]` 或 `\\\"`。另：`git commit --amend` 会改 HEAD（上次 commit）不是任意 commit，错点后要用 `reset --soft` 重排队列。
-
----
 
 ## 2026-09-02 推荐系统落地实现 · 阶段 5（演示数据播种 + 链路冒烟）——推荐系统主体完成
 
@@ -672,6 +991,7 @@ SVG 图在各自 fn 开头自清空），与看板文件路径一致。
 **待办（后续）**：① 前端推荐位联调（impression/click 上报）；② Java UserProfileEntity 补 interest_tags 映射 + InternalLevelController 幂等 PUT（A-2.2）；③ 迁移 0003 在真 PG 上 `alembic upgrade` + `alembic check` 零 diff；④ docs/10 写权矩阵补 shadow_materials（A-2.3）；⑤ 3 张新表演示账号/难度标签的契约（C10/D7）待 M3 排期。
 
 —— 执行人：Faust-sudo
+
 ## 2026-09-02 推荐系统落地实现 · 阶段 4（规则推荐引擎 + 路由）
 
 > 阶段 3（掌握度 + 收尾挂钩）已交付。本阶段落地**体系三匹配**：`app/rec` 的 recommend_scenes/recommend_shadow + 路由 `GET /api/v1/recommendations`。**可按评审后进入阶段 5（演示数据播种 + 端到端联调）。**
@@ -720,6 +1040,7 @@ L2 无 L4（C1/C8）/ 已掌握垫底（C9）/ 冷启动零档案返回默认（
 阶段 5：演示数据播种 + 端到端联调（`batch_calculate_difficulty --db` 预置 8 场景先验、3 个水平演示账号 L2/L3/L4 预置 user_skill_state、前端推荐位联调），并对齐 local/32 A-5.1~A-5.5 的演示前置。
 
 —— 执行人：Faust-sudo
+
 ## 2026-09-02 推荐系统落地实现 · 阶段 3（掌握度写入 + 会话收尾挂钩）
 
 > 阶段 2（素材难度专家规则）已交付。本阶段落地**体系三**：`app/mastery` 写 user_mastery（场景级）+ user_corpus_mastery（句级），并把 `update_user_level` + `update_session_mastery` 挂进 `complete_session` 收尾（A-3.3/A-6.5 完成）。**可按评审后进入阶段 4（推荐引擎 recommend_*）。**
@@ -761,6 +1082,7 @@ L2 无 L4（C1/C8）/ 已掌握垫底（C9）/ 冷启动零档案返回默认（
 阶段 4：推荐引擎 `app/rec`（`recommend_scenes`/`recommend_shadow`，主查询 SQL + 扩档 + L4 复习席 + 曝光埋点 + Redis 缓存/主动失效 + 路由 `GET /api/v1/recommendations`）。前置于此：跑 `batch_calculate_difficulty --db` 把 8 场景先验写进 material_difficulty（推荐 SQL 靠它）。
 
 —— 执行人：Faust-sudo
+
 ## 2026-09-02 推荐系统落地实现 · 阶段 2（素材难度专家规则）
 
 > 阶段 1（update_user_level）已交付。本阶段落地**体系二**专家规则：三维度（词汇/句法/发音）+ CEFR 语义锚定 + 批量脚本。**可按评审后进入阶段 3（掌握度写入）。**
@@ -814,6 +1136,7 @@ dim_to_100 / 词汇 CEFR 白名单修正（easy<3 且 hard>3）/ 句法嵌套 / 
 阶段 3：掌握度写入（`app/mastery`，user_mastery + user_corpus_mastery 会话收尾按 corpus_hit/attempts 聚合写入）。在此之前先补一个**演示前置**：`batch_calculate_difficulty --db` 要把 8 场景先验写进 material_difficulty（推荐 SQL 靠它，A-5.3）。
 
 —— 执行人：Faust-sudo
+
 ## 2026-09-02 推荐系统落地实现 · 阶段 1（`update_user_level` 核心函数）
 
 > 阶段 0（配置+5 表模型+迁移 0003）已交付并验证。本阶段落地**体系一核心** `app/skill/service.py`，含冷启动/滞回/低谷保护/难度归一化(符号修正)/幂等/事务。**可按评审后进入阶段 2（素材难度脚本）。**
@@ -870,6 +1193,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 阶段 2：素材难度专家规则脚本（`app/difficulty/rules.py` + `batch_calculate_difficulty`，含 CEFR 锚定表 + 句法维度补全 local/32 A-1.2/A-1.3）。
 
 —— 执行人：Faust-sudo
+
 ## 2026-09-02 推荐系统落地实现 · 阶段 0（地基：配置 + 数据模型 + 迁移 0003）
 
 > 依据 local/31 §2（5 表 DDL）+ local/32 六维拷问修订（config 零落地/滞回/低谷保护等）。**可按评审通过后进入阶段 1（update_user_level）。** 每步均已验证。
@@ -918,6 +1242,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 阶段 1：`app/skill/service.py` 的 `update_user_level(user_id)`（含冷启动/滞回/低谷保护/事务/幂等）。请先审本阶段，**确认 OK 再开下一阶段**。
 
 —— 执行人：Faust-sudo
+
 ## 2026-09-02 推荐系统六维火力拷问（算法侧交付物，归档 local/32）
 
 派 6 个子代理对 local/26~31 推荐系统设计做对抗式拷问（20 问 × 6 维度：数据冷启动/算法严谨/工程集成/边缘降级/验收演示/排期资源），全部实读代码+文档，产出 `local/32-语音链路现状与风险清单·推荐系统六维拷问.md`（正文 20 问逐项答辩 + 附录 A 六维度证据级增补）。**未改代码、未动现有文档。**
@@ -929,6 +1254,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 待拍板（汇总）：① 验收口径修订（docs/06 §9.5 换 scope 还是扩候选）；② 推荐做多深（保底规则版 1~1.5 人日 vs 全量 P1 5~8）；③ 影子跟读身份（二期扩展 vs 主玩法）；④ 难度秒变入口归属（Python internal 接口）；⑤ 复习席 mastery>80% 触发；⑥ 通用化滞回 + 低谷保护列。建议开工前补 docs/20-M3 实施计划。
 
 —— 执行人：Faust-sudo
+
 ## 2026-09-02 推荐系统详细设计说明书（汇总定稿，归档 local/31）
 
 整合 local/26~30 全部讨论为一份可交付设计说明书（`local/31-推荐系统详细设计说明书.md`），作为 M3 实现与答辩的统一依据。结构：设计目标与约束（技术栈/写方唯一性矩阵/统一尺度/四水平消歧）→ 三套评价体系（5 张新表 DDL：user_skill_state / material_difficulty / user_mastery / user_corpus_mastery / shadow_materials）→ 联动数据流图 + 端到端旅程（甲 t0~t3 复算表）→ 核心算法伪代码（update_user_level 含滞回与幂等、batch_calibrate 含触发阈值、recommend_scenes/shadow 主查询 SQL）→ 冷启动与降级 7 层 → 验收标准（6 组 40+ 单测用例含 I1~I5 不变量与 local/30 修订回归）。
@@ -936,6 +1262,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 **本文为准的三处修订**（相对 local/26~29）：① confidence 统一 `min(1, n/window)`（修 0.8→0.5 跳变）；② est_level 滞回带 [67,70)（skill_band_hysteresis=3，升即时/降滞后）；③ 空池兜底宁缺毋滥（限 L−1 档 + fallback 标记，<3 返回空态）。配置项汇总 18 项 + 待拍板 6 项集中到 §7.2。
 
 —— 执行人：Faust-sudo
+
 ## 2026-09-02 三套体系联动端到端数值模拟（算法侧交付物，归档 local/30）
 
 把 local/26/27/28/29 串成完整用户旅程并做数值验证（`local/30-三套体系联动·端到端数值模拟.md`），**全部数字脚本复算**（venv python）。
@@ -947,6 +1274,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 - 不变量 I1~I5 全部成立（正常路径无"L3 用户被推 L1"）。待拍板 3 项：滞回设计、confidence 修订随 0003、宁缺毋滥兜底。
 
 —— 执行人：Faust-sudo
+
 ## 2026-09-02 规则推荐引擎详细实现（算法侧交付物，归档 local/29）
 
 承接 local/26~28，落地规则推荐引擎（`local/29-规则推荐引擎·详细实现.md`）。先实读核实：**user_corpus_mastery 不存在**（0001/0002 共 20 表），一并设计；user_mastery/user_skill_state/material_difficulty/shadow_materials 均为设计稿（迁移 0003+ 待落地）。
@@ -956,6 +1284,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 交付：`user_corpus_mastery` DDL（句级明细，与 user_mastery 场景级快照分工：推荐直读 user_mastery，句级喂聚合/报告/复习调度）；`recommend_scenes(user_id, limit=6)` + `recommend_shadow(user_id, limit=3)` 完整 SQLAlchemy 实现（主查询+扩档+复习席+曝光埋点，只写 events）。待拍板 3 项：复习席比例/间隔窗口进配置、scenario_id 归档语义、L1~L3 是否也开复习席。
 
 —— 执行人：Faust-sudo
+
 ## 2026-09-02 素材难度评价分阶段实施策略（算法侧交付物，归档 local/28）
 
 承接 local/26 §4 + local/27 §1/§3/§7，产出素材难度两阶段实施策略（`local/28-素材难度评价·分阶段实施策略.md`）。先核实依赖：numpy 是直接依赖（pyproject.toml L24），但脚本刻意用纯 Python stdlib（40 条量级阈值映射无向量化收益，CI/单测零额外依赖）。
@@ -967,6 +1296,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 - 待拍板 3 项：CEFR 词表白名单 vs 标定兜底、校准频率、source 三态展示口径。
 
 —— 执行人：Faust-sudo
+
 ## 2026-09-02 用户水平动态评价实现细节深化（算法侧交付物，归档 local/27）
 
 承接 local/26，深化动态水平体系为可落地实现（`local/27-用户水平动态评价·实现细节深化.md`）。先实读代码核实：练习轮 ISE 以 ASR 转写为参考（自参照评分，`orchestrator.py:161/454`）；`complete_session` 是会话收尾唯一咽喉（orchestrator 三处 + practice.py 路由）；回调先例 `placement.py::_callback_level`（httpx + service-token）；Java `InternalLevelController` 现为无条件覆盖（需扩 level_at 幂等 PUT，`user_profiles.cefr_level_at` 列已存在）。
@@ -976,6 +1306,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 交付：完整 `update_user_level(user_id)`（SQLAlchemy，含冷启动分支、事务回滚、三层幂等：收敛重算/行锁/唯一约束）、`notify_java_level` httpx 回调（level_at 幂等 PUT，默认关、考试专属）、集成点 diff（complete_session 末尾 + placement finalize）、单测清单 7 条。事务回滚与幂等性已主动内建（预期追问项，未漏）。
 
 —— 执行人：Faust-sudo
+
 ## 2026-09-02 推荐系统整体框架设计（算法侧交付物，归档 local/26）
 
 算法负责人产出推荐系统整体框架设计稿，先实读代码核实约束再成稿：40 条场景语料 = `data/seed/scenarios.json` 8 场景 × 5 句（已逐条核对）；影子跟读素材尚无内容表。交付物（`local/26-推荐系统整体框架设计·三套评价体系与统一尺度映射.md`）：
@@ -987,6 +1318,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 
 待组长拍板：§9.3 开放项 4 条（场景难度聚合系数、0.75 锚点参数化、影子跟读是否进 sessions.kind、难度缺行兜底）。
 —— 执行人：Faust-sudo
+
 
 ## 2026-09-02 lieflat-charts 表盘美化（预览高保真）：按技能选型规则出图，不"接入"库
 
@@ -1021,6 +1353,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
    逗号语法错误（改 `'Inter, Noto Sans SC'`）。
 
 ---
+
 
 ## 2026-09-01 实训作业四件套 + 六路拷问：从"能不能跑"到"该不该这么做"的补课
 
@@ -1153,6 +1486,7 @@ BUG-001 踩坑记录 3 已标注这两页同模式。本轮统一：
 
 ---
 
+
 ## 2026-09-01 VocalVerse · M2 实施落地——双子拷问收敛 → 全链路实现 → 真环境联调（DoD 全绿）
 
 ### 背景
@@ -1205,6 +1539,7 @@ BUG-001 踩坑记录 3 已标注这两页同模式。本轮统一：
 
 ---
 
+
 ## 2026-08-31 VocalVerse · 同构 Monorepo 参照对比评审——双子拷问官交叉拷问 + 拍板（不照搬、补 .dockerignore、契约生成化）
 
 ### 背景
@@ -1256,6 +1591,7 @@ BUG-001 踩坑记录 3 已标注这两页同模式。本轮统一：
 - [ ] 动作 D：/manage 一致性 CI 冒烟断言。
 - [ ] 动作 E：docs/04 为 `/admin` 管理台路由排期。
 
+
 ## 2026-08-31 VocalVerse · 数据库表设计落地（19 表）+ 双子代理拷问 42 问收敛
 
 ### 背景
@@ -1301,6 +1637,7 @@ BUG-001 踩坑记录 3 已标注这两页同模式。本轮统一：
 
 ---
 
+
 ## 2026-08-31 VocalVerse · 框架评审（docs/09）审阅与整改落地
 
 - 收到另会话产出的 `docs/09-技术框架评审.md`（总评 A-，不主张替换技术栈）；逐条核验证据后**大部分采纳**，3 处修正评审意见（P0-#2 延迟预算按场景分层而非一刀切；P1-#7 无 Redis 不拒绝启动、改为 degraded 模式；P2-#13 探针修复后已非空转）。
@@ -1308,6 +1645,7 @@ BUG-001 踩坑记录 3 已标注这两页同模式。本轮统一：
 - 过程教训：自己写的 CI 断言差点引入「0 头迁移=失败」的误伤——**断言场景要考虑空态**（0 头允许、多头拒绝）。
 
 ---
+
 
 ## 2026-08-31 VocalVerse · 补录：docker-build CI 三连坑修复（cache 驱动 / ghcr 小写 / YAML 块标量注释）
 
@@ -1342,6 +1680,7 @@ BUG-001 踩坑记录 3 已标注这两页同模式。本轮统一：
 - 附带发现：runner 警告 Node.js 20 弃用（checkout@v4 等被强制跑 24），记录待后续升级 action 版本时处理。
 
 ---
+
 
 ## 2026-08-31 VocalVerse · M1 框架从零搭建——双子代理拷问收敛 123 问 + 三端骨架落地 + 全链路验证通过
 

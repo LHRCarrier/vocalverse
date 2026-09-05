@@ -313,6 +313,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/placement/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Placement Status
+         * @description 复测资格预检（C3t / C-5 精简版）：当前档位 + 是否可复测 + 冷却剩余天数。
+         */
+        get: operations["placement_status_api_v1_placement_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/placement/retest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retest
+         * @description 开始复测（C3t）：eligible 40302（无已完基线）+ 冷却 42902（_get_or_create_run 内），
+         *     通过后创建/续用 run 并返回题型快照。首次测试不经此端点（走 score_item 惰性建 run）。
+         */
+        post: operations["retest_api_v1_placement_retest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/placement/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Skip
+         * @description C5 跳过入学测试：创建 provisional completed placement（level=L2，details.skipped=True），
+         *     使 ``POST /sessions`` 的 40303 门禁通过、可直接进入练习；skip **不计**复测冷却（可立即实测）。
+         *     若已有 completed 定档则幂等返回现有（不覆盖更高档）。
+         */
+        post: operations["skip_api_v1_placement_skip_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/placement/items/{item_id}/audio": {
         parameters: {
             query?: never;
@@ -322,7 +385,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Score Item */
+        /**
+         * Score Item
+         * @description 单题录音评分。A2：qa 只 ASR（不 ISE）；read 走 ISE（pron/flu/completeness）。
+         *
+         *     顺序（保持既有 40002/404 语义：先校验再扣额，见 test_m2_core）：
+         *         校验音频(40002) → 题目查找(404) → 创建/续用 run(B1) → 扣 asr(+ise 仅 read) →
+         *         ASR → ISE(仅 read) → LLM 语法(+qa 相关度 B2) → 落 Attempt（placement_id=run.id）。
+         */
         post: operations["score_item_api_v1_placement_items__item_id__audio_post"];
         delete?: never;
         options?: never;
@@ -341,7 +411,12 @@ export interface paths {
         put?: never;
         /**
          * Finalize
-         * @description 综合分 S = 0.4·发音 + 0.3·语法 + 0.3·流利度（docs/06 §9.2）。
+         * @description 两维综合分 S → 水平档（C1）。完成该用户的 in_progress run（B3 幂等）。
+         *
+         *     - 校验：attempt 归该用户且已评分 read 题 ≥ ``placement_min_read_items``（C5，默认 1），否则
+         *       42203；
+         *     - 幂等：run 已 completed → 直接返回已结算结果（不再重算/重复落库）；
+         *     - code 42201（无 attempt）/40401（run 不存在）；S 公式/阈值由配置单源计算（A5），禁用硬编码。
          */
         post: operations["finalize_api_v1_placement_finalize_post"];
         delete?: never;
@@ -730,7 +805,10 @@ export interface operations {
     asr_api_v1_asr_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -763,7 +841,10 @@ export interface operations {
     score_api_v1_score_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -796,7 +877,10 @@ export interface operations {
     tts_api_v1_tts_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -829,7 +913,10 @@ export interface operations {
     llm_chat_api_v1_llm_chat_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1242,6 +1329,102 @@ export interface operations {
         };
     };
     questions_api_v1_placement_questions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    placement_status_api_v1_placement_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retest_api_v1_placement_retest_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    skip_api_v1_placement_skip_post: {
         parameters: {
             query?: never;
             header?: {
