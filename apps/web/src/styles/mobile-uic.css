@@ -1751,11 +1751,11 @@ body {
   color: var(--u-ink);
 }
 
-/* 中央主钮：略上浮的圆角方块（降低圆润感，与内容卡线条呼应） */
+/* 中央主钮：与图标行平齐（组长反馈 2026-09-05：上浮负边距造成错位 → 改为行内居中） */
 .u-tab--main {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   background: var(--u-ink);
   color: #fff;
   border: none;
@@ -1763,8 +1763,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: -22px;
-  box-shadow: 0 6px 16px rgba(28, 28, 26, 0.18);
+  box-shadow: 0 2px 8px rgba(28, 28, 26, 0.18);
   transition:
     background-color 150ms ease-out,
     transform 150ms ease-out;
@@ -1779,8 +1778,8 @@ body {
 }
 
 .u-tab--main svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
 
 /* ============================================================
