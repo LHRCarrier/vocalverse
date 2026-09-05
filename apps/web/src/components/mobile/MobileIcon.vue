@@ -36,6 +36,8 @@ const props = withDefaults(
       | 'user-plus'
       | 'stop'
       | 'volume'
+      | 'mail'
+      | 'settings'
     size?: number
   }>(),
   { size: 20 },
@@ -219,6 +221,18 @@ const props = withDefaults(
       <path d="M4.5 9.7v4.6h3.2l4.6 3.9V5.8l-4.6 3.9H4.5Z" fill="currentColor" stroke="none" />
       <path d="M15.6 9.2a4.3 4.3 0 0 1 0 5.6" stroke-width="2.4" />
       <path d="M18.3 6.6a8.2 8.2 0 0 1 0 10.8" stroke-width="2.4" />
+    </template>
+
+    <!-- 信封（私信 · 2026-09-05） -->
+    <template v-else-if="props.name === 'mail'">
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
+      <path d="M4.5 7.5l7.5 5.5 7.5-5.5" />
+    </template>
+
+    <!-- 齿轮（设置 · 2026-09-05） -->
+    <template v-else-if="props.name === 'settings'">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 4v2M12 18v2M4 12h2M18 12h2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4" />
     </template>
   </svg>
 </template>

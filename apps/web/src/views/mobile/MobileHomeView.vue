@@ -10,7 +10,9 @@
  * 后端真流 = docs/10 注记（sessions/attempts JOIN 派生 + post_likes）；M3 排期。
  */
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
+import MobileAccountDrawer from '@/components/mobile/MobileAccountDrawer.vue'
 import MobileCommentsSheet from '@/components/mobile/MobileCommentsSheet.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobilePostCard from '@/components/mobile/MobilePostCard.vue'
@@ -22,6 +24,7 @@ import '@/styles/mobile-uic.css'
 import type { CommunityPost, CommunityTab } from '@/types/community'
 
 const auth = useAuthStore()
+const router = useRouter()
 
 const displayName = ref(auth.me?.nickname ?? auth.me?.username ?? '同学')
 const avatarLetter = ref(displayName.value.slice(0, 1).toUpperCase())
@@ -81,6 +84,20 @@ function handleAddComment(text: string) {
   if (openCommentsPost.value) addComment(openCommentsPost.value, text)
 }
 
+/* ---------- 账户抽屉（组长拍板：底部「我的」→ 顶栏头像，X 式） ---------- */
+const drawerOpen = ref(false)
+
+function onDrawerNavigate(path: string) {
+  drawerOpen.value = false
+  void router.push(path)
+}
+
+function onLogout() {
+  drawerOpen.value = false
+  auth.clear()
+  window.location.href = '/login'
+}
+
 /* ---------- 动态流（【演示帧】仅数据展示；M3 接真实 JOIN 流，只换数据源——docs/34 §7） ---------- */
 /** 深拷贝演示数据（点赞/投币/评论会改 item，不能直接引用模块级常量） */
 function clonePost(p: CommunityPost): CommunityPost {
@@ -108,9 +125,17 @@ function reloadFeed() {
 <template>
   <div class="u-phone">
     <div class="u-comm">
-      <!-- X 式顶栏（左头像 / 中 Logo / 右加好友；随滚动移出屏幕，非 sticky） -->
+      <!-- X 式顶栏（左头像 → 账户抽屉 / 中 Logo / 右加好友；随滚动移出屏幕，非 sticky） -->
       <header class="u-x-top">
-        <span class="u-x-avatar" aria-label="头像">{{ avatarLetter }}</span>
+        <button
+          class="u-x-avatar u-x-avatar--btn"
+          type="button"
+          title="账户菜单"
+          aria-label="账户菜单"
+          @click="drawerOpen = true"
+        >
+          {{ avatarLetter }}
+        </button>
         <span class="u-x-logo">社区</span>
         <button class="u-x-act" type="button" title="加好友（演示）" aria-label="加好友" @click="demoAddFriend">
           <MobileIcon name="user-plus" :size="18" />
@@ -182,6 +207,15 @@ function reloadFeed() {
       :comments="openCommentsPost?.comments ?? []"
       @update:open="openCommentsId = null"
       @add-comment="handleAddComment"
+    />
+
+    <!-- 账户抽屉（X 式：你的资料/消息/设置与隐私/退出） -->
+    <MobileAccountDrawer
+      :open="drawerOpen"
+      :me="auth.me"
+      @update:open="drawerOpen = $event"
+      @navigate="onDrawerNavigate"
+      @logout="onLogout"
     />
 
     <MobileTabBar />

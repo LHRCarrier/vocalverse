@@ -14,7 +14,7 @@ interface TokenResponse {
   userId: number
 }
 
-interface MeView {
+export interface MeView {
   userId: number
   username: string
   nickname: string

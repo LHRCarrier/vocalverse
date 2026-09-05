@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 移动端底部悬浮 Tab 栏（2026-09-05 组长拍板：换用口语同款 uic 新样式——浮卡圆角 + 炭黑中央主钮）
- * 功能不变：首页（社区）/ 口语 / 中央主按钮(+ 新建 / 进口语) / 唱吧 / 我的。
+ * 2026-09-05 下午 2：底部「我的」tab 改为「私信」（我的入口移至首页顶栏头像抽屉，见 MobileAccountDrawer）。
  * 图标：Tabler（unplugin-icons 编译期内联，docs/32）。
  */
 import { useRoute } from 'vue-router'
@@ -10,7 +10,7 @@ import IconHome from '~icons/tabler/home'
 import IconMicrophone from '~icons/tabler/microphone'
 import IconMusic from '~icons/tabler/music'
 import IconPlus from '~icons/tabler/plus'
-import IconUser from '~icons/tabler/user'
+import IconMail from '~icons/tabler/mail'
 import '@/styles/mobile-uic.css'
 
 const route = useRoute()
@@ -36,8 +36,14 @@ const route = useRoute()
     <RouterLink to="/m/sing" class="u-tab" :class="{ active: route.path === '/m/sing' }" title="唱吧" aria-label="唱吧">
       <IconMusic />
     </RouterLink>
-    <RouterLink to="/m/me" class="u-tab" :class="{ active: route.path === '/m/me' }" title="我的" aria-label="我的">
-      <IconUser />
+    <RouterLink
+      to="/m/messages"
+      class="u-tab"
+      :class="{ active: route.path.startsWith('/m/messages') }"
+      title="私信"
+      aria-label="私信"
+    >
+      <IconMail />
     </RouterLink>
   </nav>
 </template>

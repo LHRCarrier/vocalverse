@@ -40,6 +40,16 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/mobile/MobileMeView.vue'),
     meta: { title: '我的', requiresAuth: true },
   },
+  {
+    path: '/m/messages',
+    component: () => import('@/views/mobile/MobileMessagesView.vue'),
+    meta: { title: '私信', requiresAuth: true },
+  },
+  {
+    path: '/m/messages/:id',
+    component: () => import('@/views/mobile/MobileChatView.vue'),
+    meta: { title: '私信', requiresAuth: true },
+  },
 
   {
     path: '/',
