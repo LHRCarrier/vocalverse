@@ -77,7 +77,7 @@ pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
 | W9 | 服务不可达 | `docker compose stop web python-api` | 页面给可操作错误提示（ApiError 文案），不白屏 |
 | W10 | PWA | 手机 Chrome 菜单「添加到主屏幕」 | 图标/名称正确，standalone 全屏 |
 | W11 | 口语 Hub（2026-09-05） | `/m/speaking` | 「场景对话」「自由对话」两模式卡 + 预置场景列表；Tab 口语/中央 + 均进入本页 |
-| W12 | 自由对话（2026-09-05） | `/m/free-chat` | 打字「Hi」→ 流式回复 + TTS 播报 + 喇叭可重听；点麦克风说话 → 用户转写气泡 → 回复；「新对话」清空记忆 |
+| W12 | 自由对话（2026-09-05） | `/m/free-chat` | 打字「Hi」→ 流式回复 + TTS 播报 + 喇叭可重听；点麦克风说话 → 用户转写气泡 → 回复；底部功能行：场景对话（跳 Hub）/新对话（有气泡后可用，清空记忆）/语速（循环 正常→稍快→稍慢）三钮可用 |
 
 **结构化断言辅助**（推荐）：F12 Console 执行
 `document.querySelectorAll('.u-task').length` / `document.body.innerText` 核对渲染，替代目测。
