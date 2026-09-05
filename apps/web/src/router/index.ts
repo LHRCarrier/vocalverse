@@ -61,9 +61,9 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '发帖', requiresAuth: true },
   },
   {
-    path: '/m/practice',
-    component: () => import('@/views/mobile/MobilePracticeView.vue'),
-    meta: { title: '练习', requiresAuth: true },
+    path: '/m/learn',
+    component: () => import('@/views/mobile/MobileLearnView.vue'),
+    meta: { title: '学习', requiresAuth: true },
   },
   {
     path: '/m/notes',

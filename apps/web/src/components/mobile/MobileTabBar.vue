@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
  * 移动端底部 Tab 栏（2026-09-05 组长拍板 7：**双场景分组，全局挂载 App.vue**）
- * 社区场景一组 tab、练习场景一组 tab；各场景功能直接上底栏，彼此以出口图标互切：
- * - 社区组（/m/home 等）：🏠 社区 / 🔍 搜索 / ＋发帖(中央) / 🎤 练习(出口) / ✉️ 私信
- * - 练习组（/m/practice 等）：🏠 Home(出口) / ☕ 场景对话 / 🎤 开始练习(中央) / 🎵 唱吧 / 💬 自由对话
- * 场景归属：社区 = home/search/messages(含会话)/me/report；练习 = practice/chat(含场景)/free-chat/sing；
- * 沉浸页 compose 无底部栏。
+ * 社区场景一组 tab、学习场景一组 tab；各场景功能直接上底栏，彼此以出口图标互切：
+ * - 社区组（/m/home 等）：🏠 社区 / 🔍 搜索 / ＋发帖(中央) / 📚 学习(出口) / ✉️ 私信
+ * - 学习组（/m/learn 等）：🏠 Home(出口) / ☕ 场景对话 / 📖 笔记(中央) / 🎵 唱吧 / 💬 自由对话
+ * 场景归属：社区 = home/search/messages(含会话)/me/report；学习 = learn/notes/chat(含场景)/free-chat/sing；
+ * 沉浸页 compose 无底部栏。2026-09-05 晚 8：练习 → 学习更名（路由 /m/learn）。
  */
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
@@ -23,19 +23,19 @@ import '@/styles/mobile-uic.css'
 
 const route = useRoute()
 
-const group = computed<null | 'community' | 'practice'>(() => {
+const group = computed<null | 'community' | 'learn'>(() => {
   const p = route.path
   if (p === '/m/home' || p === '/m/search' || p === '/m/me' || p === '/m/report' || p.startsWith('/m/messages')) {
     return 'community'
   }
   if (
-    p === '/m/practice' ||
+    p === '/m/learn' ||
     p === '/m/notes' ||
     p.startsWith('/m/chat') ||
     p === '/m/free-chat' ||
     p === '/m/sing'
   ) {
-    return 'practice'
+    return 'learn'
   }
   return null // /m/compose 沉浸页
 })
@@ -60,11 +60,11 @@ const group = computed<null | 'community' | 'practice'>(() => {
       <IconPlus />
     </RouterLink>
     <RouterLink
-      to="/m/practice"
+      to="/m/learn"
       class="u-tab"
       :class="{ active: false }"
-      title="练习"
-      aria-label="练习"
+      title="学习"
+      aria-label="学习"
     >
       <IconMicrophone />
     </RouterLink>
@@ -79,8 +79,8 @@ const group = computed<null | 'community' | 'practice'>(() => {
     </RouterLink>
   </nav>
 
-  <!-- 练习场景组 -->
-  <nav v-else-if="group === 'practice'" class="u-tabbar" aria-label="练习底部导航">
+  <!-- 学习场景组 -->
+  <nav v-else-if="group === 'learn'" class="u-tabbar" aria-label="学习底部导航">
     <RouterLink to="/m/home" class="u-tab" :class="{ active: false }" title="返回社区" aria-label="返回社区">
       <IconHome />
     </RouterLink>
