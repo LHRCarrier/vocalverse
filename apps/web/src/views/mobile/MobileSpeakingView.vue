@@ -327,9 +327,9 @@ function onSseEvent(e: SseStreamEvent) {
 
 <template>
   <div class="u-phone">
-    <div class="u-content" style="padding-top: 72px">
-      <!-- 顶部只留返回按钮（文字全部去掉） -->
-      <button class="u-back u-back--float" type="button" title="返回" @click="router.back()">
+    <div class="u-content u-content--dock" style="padding-top: 72px">
+      <!-- 顶部只留返回按钮（文字全部去掉）；返回 = 口语模式入口不再依赖 history（2026-09-05：router.back() 会撞 /demo） -->
+      <button class="u-back u-back--float" type="button" title="返回" @click="router.push('/m/home')">
         <MobileIcon name="back" />
       </button>
 
@@ -412,7 +412,7 @@ function onSseEvent(e: SseStreamEvent) {
     </div>
 
     <!-- 录音大按钮（ink 圆形 + 波纹 / 忙碌旋转弧） -->
-    <div class="u-tb" role="toolbar" aria-label="口语功能">
+    <div class="u-tb u-tb--dock" role="toolbar" aria-label="口语功能">
       <button
         class="u-tb-item"
         type="button"

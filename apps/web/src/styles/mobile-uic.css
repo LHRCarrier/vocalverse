@@ -81,6 +81,24 @@ body {
   padding-bottom: 48px;
 }
 
+/* 场景对话页：底部 dock 加大留白（自由对话行 64px + 录音标签 + 录音钮，2026-09-05） */
+.u-content--dock {
+  padding-bottom: 252px;
+}
+
+/* 场景对话页功能行：与录音钮/标签同 dock（fixed 居中，位于录音标签上方） */
+.u-tb--dock {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 172px;
+  width: 100%;
+  max-width: 480px;
+  padding: 0 20px;
+  margin: 0; /* 覆盖 .u-tb 的 margin-bottom（fixed 下会干扰 bottom 定位） */
+  z-index: 5;
+}
+
 /* ============================================================
  * 通用基础
  * ============================================================ */

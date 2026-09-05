@@ -226,7 +226,8 @@ function replay(index: number, text: string) {
 <template>
   <div class="u-phone">
     <div class="u-content u-fc-page">
-      <button class="u-back u-back--float" type="button" title="返回" @click="router.back()">
+      <!-- 返回 = 口语模式入口（2026-09-05：router.back() 依赖 history，直进 /m/free-chat 会撞 /demo） -->
+      <button class="u-back u-back--float" type="button" title="返回" @click="router.push('/m/chat')">
         <MobileIcon name="back" />
       </button>
 
