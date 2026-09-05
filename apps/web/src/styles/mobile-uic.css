@@ -1125,7 +1125,7 @@ body {
  * 社区主页（组长拍板 2026-09-05：英语社区；X 式顶栏 + 文字标签 + 帖子/视频混合流）
  * ============================================================ */
 .u-comm {
-  padding: 0 16px 140px; /* 底部留白给浮动 TabBar */
+  padding: 0 16px 96px; /* 底部留白给贴底主导航（2026-09-05 改扁平后 92px 足够） */
 }
 
 /* X 式顶栏（左头像 / 中 Logo / 右发布；随滚动移出屏幕，非 sticky） */
@@ -1706,56 +1706,56 @@ body {
 /* ============================================================
  * 底部浮动 Tab 栏（白卡 pill + 居中主按钮）
  * ============================================================ */
+/* 底部主导航（2026-09-05 组长反馈：与社区卡格格不入/太圆润/带字 → 扁平贴底、图标 only、细分割线） */
 .u-tabbar {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 20px;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-around;
-  width: calc(100% - 32px);
-  max-width: 448px;
-  height: 72px;
-  padding: 0 8px;
+  width: 100%;
+  max-width: 480px;
+  height: 56px;
+  padding: 0 12px calc(6px + env(safe-area-inset-bottom));
   background: var(--u-card);
-  border-radius: 28px;
-  box-shadow: var(--u-shadow-tabbar);
+  border-top: 1px solid var(--u-paper-grid);
   z-index: 6;
 }
 
 .u-tab {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 3px;
-  width: 56px;
+  justify-content: center;
+  width: 48px;
+  height: 40px;
   border: none;
   background: transparent;
   cursor: pointer;
-  color: var(--u-weak);
-  font: 600 11px var(--u-font);
+  color: var(--u-sub);
   text-decoration: none;
   transition: color 150ms ease-out;
 }
 
 .u-tab svg {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
 }
 
 .u-tab:hover {
-  color: var(--u-sub);
+  color: var(--u-ink);
 }
 
 .u-tab.active {
   color: var(--u-ink);
 }
 
+/* 中央主钮：略上浮的圆角方块（降低圆润感，与内容卡线条呼应） */
 .u-tab--main {
-  width: 56px;
-  height: 56px;
-  border-radius: 19px;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
   background: var(--u-ink);
   color: #fff;
   border: none;
@@ -1764,7 +1764,7 @@ body {
   align-items: center;
   justify-content: center;
   margin-top: -22px;
-  box-shadow: 0 8px 20px rgba(28, 28, 26, 0.25);
+  box-shadow: 0 6px 16px rgba(28, 28, 26, 0.18);
   transition:
     background-color 150ms ease-out,
     transform 150ms ease-out;
@@ -1779,8 +1779,8 @@ body {
 }
 
 .u-tab--main svg {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
 }
 
 /* ============================================================
