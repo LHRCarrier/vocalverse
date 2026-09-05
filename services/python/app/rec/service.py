@@ -312,6 +312,8 @@ def _recommend(user_id: int, ctype: str, limit: int, db: Session | None) -> list
         if lvl in REVIEW_LEVEL and len(items) < limit:  # 复习席
             got = _review_slots(session, user_id, lvl, ctype, max(1, limit // 3))
             seen = {it["id"] for it in items}
+            # 复习席刻意豁免 scene_type≤2（local/31 §4.3 的「top-6 互异」只约束主窗/扩档的新荐）：
+            # 复习目标是「别忘旧材」，允许对已满类型追加，否则会压掉应复习的陈旧内容。
             items += [it for it in got if it["id"] not in seen]
         items = items[:limit]
         out = _clean(items, ctype)
