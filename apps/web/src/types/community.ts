@@ -19,6 +19,13 @@ export interface PostStats {
   share: number
 }
 
+/** 评论（演示本地追加；M3 接评论接口对齐字段） */
+export interface PostComment {
+  author: string
+  text: string
+  time: string
+}
+
 export interface CommunityPost {
   id: number
   author: string
@@ -32,6 +39,9 @@ export interface CommunityPost {
   media?: PostMedia
   duration?: string
   stats: PostStats
+  /** 演示评论列表（本地追加；M3 换接口） */
+  comments: PostComment[]
   liked: boolean
+  coined: boolean
   tint: string
 }

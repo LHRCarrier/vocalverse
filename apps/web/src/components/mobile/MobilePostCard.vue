@@ -2,7 +2,7 @@
 /**
  * 社区卡片 · 帖子容器（docs/34 §4：tweet.dart 粒度对照）
  * 头部作者行 + 标题 + 摘要 + 媒体（MobilePostMedia）+ 互动行（MobilePostActions）。
- * 点赞状态由父级维护（演示帧本地；M3 走后端，见 docs/34 §7.2）。
+ * 互动状态由父级维护（演示帧本地；M3 走后端，见 docs/34 §7.2）。
  */
 import MobilePostActions from '@/components/mobile/MobilePostActions.vue'
 import MobilePostMedia from '@/components/mobile/MobilePostMedia.vue'
@@ -15,6 +15,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'toggle-like': []
+  'toggle-coin': []
+  share: []
+  'open-comments': []
 }>()
 </script>
 
@@ -46,7 +49,11 @@ const emit = defineEmits<{
     <MobilePostActions
       :stats="props.post.stats"
       :liked="props.post.liked"
+      :coined="props.post.coined"
       @toggle-like="emit('toggle-like')"
+      @toggle-coin="emit('toggle-coin')"
+      @share="emit('share')"
+      @open-comments="emit('open-comments')"
     />
   </section>
 </template>

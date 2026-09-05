@@ -11,6 +11,7 @@
  */
 import { computed, ref } from 'vue'
 
+import MobileCommentsSheet from '@/components/mobile/MobileCommentsSheet.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobilePostCard from '@/components/mobile/MobilePostCard.vue'
 import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
@@ -33,18 +34,57 @@ const activeTab = ref<CommunityTab>('为你推荐')
 const toastText = ref('')
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
-function demoAddFriend() {
-  toastText.value = '好友请求已发送 · M3 上线'
+function showToast(msg: string) {
+  toastText.value = msg
   if (toastTimer) clearTimeout(toastTimer)
   toastTimer = setTimeout(() => {
     toastText.value = ''
   }, 2200)
 }
 
+function demoAddFriend() {
+  showToast('好友请求已发送 · M3 上线')
+}
+
+/* ---------- 互动（组长 2026-09-05 升级拍板：评论/投币/分享全交互 · 演示帧本地，不落库） ---------- */
+const openCommentsId = ref<number | null>(null)
+const openCommentsPost = computed(() => items.value.find((p) => p.id === openCommentsId.value) ?? null)
+
+function toggleCoin(item: CommunityPost) {
+  item.coined = !item.coined
+  item.stats.coin += item.coined ? 1 : -1
+}
+
+/** 分享：系统分享面板可用则打开；否则复制演示链接（分享计数=转发数语义，点击不加计） */
+function sharePost(item: CommunityPost) {
+  const link = `https://vocalverse.demo/post/${item.id}`
+  if (navigator.share) {
+    navigator
+      .share({ title: item.title, text: item.desc ?? '', url: link })
+      .then(() => showToast('已分享'))
+      .catch(() => undefined) // 用户取消分享面板
+  } else {
+    void navigator.clipboard
+      ?.writeText(link)
+      .then(() => showToast('链接已复制（演示链接）'))
+      .catch(() => showToast('复制失败，请手动复制'))
+  }
+}
+
+function addComment(item: CommunityPost, text: string) {
+  const author = auth.me?.nickname ?? auth.me?.username ?? '你'
+  item.comments.push({ author, text, time: '刚刚' })
+  item.stats.comment += 1
+}
+
+function handleAddComment(text: string) {
+  if (openCommentsPost.value) addComment(openCommentsPost.value, text)
+}
+
 /* ---------- 动态流（【演示帧】仅数据展示；M3 接真实 JOIN 流，只换数据源——docs/34 §7） ---------- */
-/** 深拷贝演示数据（点赞会改 item，不能直接引用模块级常量） */
+/** 深拷贝演示数据（点赞/投币/评论会改 item，不能直接引用模块级常量） */
 function clonePost(p: CommunityPost): CommunityPost {
-  return { ...p, stats: { ...p.stats } }
+  return { ...p, stats: { ...p.stats }, comments: p.comments.slice() }
 }
 
 const items = ref<CommunityPost[]>(DEMO_FEED.map(clonePost))
@@ -123,6 +163,9 @@ function reloadFeed() {
           :key="item.id"
           :post="item"
           @toggle-like="toggleLike(item)"
+          @toggle-coin="toggleCoin(item)"
+          @share="sharePost(item)"
+          @open-comments="openCommentsId = item.id"
         />
       </template>
 
@@ -131,6 +174,15 @@ function reloadFeed() {
 
     <!-- 发布演示 toast（X 式蓝药丸 → 我们白卡 + 圆点） -->
     <div v-if="toastText" class="u-toast show"><span class="dot" aria-hidden="true" />{{ toastText }}</div>
+
+    <!-- 评论面板（演示级：列表 + 发表；嵌套楼 M3） -->
+    <MobileCommentsSheet
+      :open="openCommentsId !== null"
+      :title="openCommentsPost?.title ?? ''"
+      :comments="openCommentsPost?.comments ?? []"
+      @update:open="openCommentsId = null"
+      @add-comment="handleAddComment"
+    />
 
     <MobileTabBar />
   </div>

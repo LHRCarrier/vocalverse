@@ -24,7 +24,12 @@ export const DEMO_FEED: CommunityPost[] = [
     desc: 'Education experts say AI partners are changing how students practice speaking, but human teachers remain the gold standard for feedback.',
     media: { gradient: 'linear-gradient(135deg, #16303a, #2b5566)', label: '📰 NEWS' },
     stats: { like: 328, comment: 46, coin: 37, share: 15 },
+    comments: [
+      { author: 'Kai', time: '5 分钟前', text: 'Real question is whether the human teacher part stays or becomes a luxury option.' },
+      { author: 'Momo', time: '9 分钟前', text: 'Worth reading the full article — classrooms there are moving fast.' },
+    ],
     liked: false,
+    coined: false,
     tint: '#16303a',
   },
   {
@@ -40,7 +45,11 @@ export const DEMO_FEED: CommunityPost[] = [
     media: { gradient: 'linear-gradient(135deg, #3a2440, #6b3f78)', label: '🎬 VIDEO' },
     duration: '6:23',
     stats: { like: 1240, comment: 189, coin: 210, share: 96 },
+    comments: [
+      { author: 'Nina', time: '21 分钟前', text: 'Procrastination is my favorite topic. Tried the 5-minute start tip this morning!' },
+    ],
     liked: false,
+    coined: false,
     tint: '#3a2440',
   },
   {
@@ -55,7 +64,12 @@ export const DEMO_FEED: CommunityPost[] = [
     desc: '1) pick up 2) sit down 3) pour out 4) hand over 5) run out of — with example dialogues for each. Save this before your next role-play!',
     media: { gradient: 'linear-gradient(135deg, #1e2b26, #3d5648)', label: '✍️ STUDY' },
     stats: { like: 86, comment: 12, coin: 25, share: 8 },
+    comments: [
+      { author: 'Yuqi', time: '46 分钟前', text: '"run out of" at the coffee shop is so real. Adding these to my phrase book.' },
+      { author: 'Ben', time: '1 小时前', text: 'Number 2 is gold: sit down, order, pour out, hand over. Saved!' },
+    ],
     liked: false,
+    coined: false,
     tint: '#1e2b26',
   },
   {
@@ -71,7 +85,11 @@ export const DEMO_FEED: CommunityPost[] = [
     media: { gradient: 'linear-gradient(135deg, #232044, #4a4396)', label: '🎬 VIDEO' },
     duration: '8:12',
     stats: { like: 512, comment: 77, coin: 130, share: 41 },
+    comments: [
+      { author: 'Sofia', time: '1 小时前', text: 'The compare step is what makes shadowing work. Thanks for sharing the routine!' },
+    ],
     liked: false,
+    coined: false,
     tint: '#232044',
   },
   {
@@ -85,7 +103,9 @@ export const DEMO_FEED: CommunityPost[] = [
     title: 'My first Bonfire Night — why Brits burn effigies on 5th November',
     desc: 'Guy Fawkes Night explained in 3 sentences: a failed plot, a bonfire tradition, and my first "penny for the guy". Tonight we watched sparks over the Thames.',
     stats: { like: 150, comment: 23, coin: 18, share: 12 },
+    comments: [],
     liked: false,
+    coined: false,
     tint: '#0f3a44',
   },
   {
@@ -101,7 +121,9 @@ export const DEMO_FEED: CommunityPost[] = [
     media: { gradient: 'linear-gradient(135deg, #2b4a3a, #5c8a6a)', label: '🎬 VIDEO' },
     duration: '1:02',
     stats: { like: 73, comment: 9, coin: 22, share: 5 },
+    comments: [],
     liked: false,
+    coined: false,
     tint: '#2b4a3a',
   },
   {
@@ -115,7 +137,9 @@ export const DEMO_FEED: CommunityPost[] = [
     title: 'Japanese school lunch culture — 25 minutes of mindful eating',
     desc: 'Students serve each other, eat together, and never waste. The "kyushoku" system teaches more than nutrition — it teaches community.',
     stats: { like: 201, comment: 34, coin: 41, share: 19 },
+    comments: [],
     liked: false,
+    coined: false,
     tint: '#4a3320',
   },
   {
@@ -130,7 +154,9 @@ export const DEMO_FEED: CommunityPost[] = [
     desc: 'As visa policies ease, small towns across Europe are betting on "slow travel" — longer stays, fewer tourists, richer culture.',
     media: { gradient: 'linear-gradient(135deg, #37546e, #6e96b4)', label: '🗺️ TRAVEL' },
     stats: { like: 468, comment: 55, coin: 63, share: 27 },
+    comments: [],
     liked: false,
+    coined: false,
     tint: '#37546e',
   },
 ]
