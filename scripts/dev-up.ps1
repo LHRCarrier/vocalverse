@@ -11,8 +11,10 @@
 #   pwsh -File scripts/dev-up.ps1 status   # 查看监听与健康
 #   pwsh -File scripts/dev-up.ps1 stop     # 按端口杀三端
 #
-# 前置：Docker Desktop 已起且 `docker compose up -d postgres redis`
-#       已 healthy（脚本不负责数据库容器）。
+# 数据库/缓存：start 里自动拉起——5432/6379 未监听时执行
+# `docker compose up -d postgres redis` 并等待 healthy（2026-09-05，
+# 修「电脑睡眠/重启后容器被引擎杀掉 → Java 起不来」的坑）；
+# Docker Desktop 未运行会尝试自动启动（找不到引擎则提示后继续）。
 # ============================================================
 param(
     [ValidateSet("start", "stop", "status")]
@@ -46,6 +48,58 @@ function Test-Health($Name, [string]$Url, [string]$Kind = "json") {
     } catch { return $false }
 }
 
+function Test-DockerEngine {
+    & docker info *> $null
+    return ($LASTEXITCODE -eq 0)
+}
+
+# 自动拉起数据库/缓存（2026-09-05：主机睡眠/重启后 Docker 引擎恢复时
+# 常把容器杀掉 → 5432/6379 无监听 → Java HikariPool 建连失败，见工作日志）
+function Wait-DockerBase {
+    if ((Get-PortPid 5432).Count -gt 0 -and (Get-PortPid 6379).Count -gt 0) {
+        Write-Host "  [docker] postgres/redis 已在运行，跳过。"
+        return
+    }
+
+    if (-not (Test-DockerEngine)) {
+        $dd = "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe"
+        if (Test-Path $dd) {
+            Write-Host "  [docker] Docker 引擎未就绪，正在启动 Docker Desktop..."
+            Start-Process $dd
+            $dl = (Get-Date).AddSeconds(90)
+            while ((Get-Date) -lt $dl -and -not (Test-DockerEngine)) { Start-Sleep -Seconds 3 }
+        }
+        if (-not (Test-DockerEngine)) {
+            Write-Host "  [docker] ⚠️ Docker 引擎仍不可用：请先手动启动 Docker Desktop 后再重跑 start。"
+            Write-Host "      （继续：三端照启，Java 可能因连不上 DB 而失败）"
+            return
+        }
+    }
+
+    Push-Location $Root
+    try {
+        Write-Host "  [docker] 容器未就绪，docker compose up -d postgres redis ..."
+        & docker compose up -d postgres redis | ForEach-Object { Write-Host "    $_" }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  [docker] ⚠️ docker compose up 失败（exit=$LASTEXITCODE）。"
+            Write-Host "      排查：docker compose ps / docker compose logs postgres"
+            return
+        }
+        $dl = (Get-Date).AddSeconds(90)
+        do {
+            Start-Sleep -Seconds 3
+            $t = (& docker compose ps --format "{{.Service}}:{{.Status}}" postgres redis 2>$null) -join "`n"
+        } until (($t -match "postgres:.*healthy" -and $t -match "redis:.*healthy") -or $t -match "Exited|unhealthy" -or (Get-Date) -gt $dl)
+        if ($t -match "postgres:.*healthy" -and $t -match "redis:.*healthy") {
+            Write-Host "  [docker] postgres/redis healthy。"
+        } else {
+            Write-Host "  [docker] ⚠️ 容器未恢复 healthy（90s 超时/异常）：$($t -replace "`n", "  ")"
+            Write-Host "      排查：docker compose ps / docker logs vocalverse-postgres-1"
+        }
+    }
+    finally { Pop-Location }
+}
+
 switch ($Action) {
     "status" {
         foreach ($p in 8000, 8080, 5173) {
@@ -70,6 +124,9 @@ switch ($Action) {
         break
     }
     default {
+        Write-Host "== 数据库/缓存（Docker，自动拉起）=="
+        Wait-DockerBase
+
         Write-Host "== 启动 Python :8000（uvicorn --reload）=="
         if ((Get-PortPid 8000).Count -eq 0) {
             Start-Detached "python-8000" "Set-Location '$Root\services\python'; uv run uvicorn app.main:app --reload --port 8000" "$Root\services\python"
@@ -96,7 +153,7 @@ switch ($Action) {
         }
         Write-Host ("  python(8000): {0}  vite(5173): {1}  java(8080): {2}" -f $py, $vt, $jv)
         if (-not ($py -and $vt -and $jv)) {
-            Write-Host "  ⚠️ 有服务未就绪，看日志：local/dev-logs/*.err.log（Docker Desktop 起了吗？）"
+            Write-Host "  ⚠️ 有服务未就绪，看日志：local/dev-logs/*.err.log（数据库容器看上方 [docker] 提示 / docker compose ps）"
         }
         Write-Host "  完成。服务与终端已解耦：关终端不再提示 Terminate batch job。"
         break
