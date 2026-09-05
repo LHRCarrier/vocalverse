@@ -6,7 +6,7 @@
  * 输入 = 麦克风（ASR）或打字，输出 = 流式文本 + 回合结束后 TTS 自动播报（可点喇叭重听）。
  * 不做评分/报告/入库（分期见 docs/14 §12）。
  */
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { track } from '@/api/events'
@@ -36,6 +36,13 @@ const errorMsg = ref<string | null>(null)
 const currentAssistant = ref<Bubble | null>(null)
 const playingBubble = ref<number | null>(null)
 const chatBox = ref<HTMLElement | null>(null)
+
+/** AI 状态线：sending（等待回复）→ 流光；errorMsg → 纯红；其余纯黑（2026-09-05 组长拍板） */
+const lineStatus = computed<'idle' | 'busy' | 'error'>(() => {
+  if (errorMsg.value) return 'error'
+  if (sending.value) return 'busy'
+  return 'idle'
+})
 
 let replayAudio: HTMLAudioElement | null = null
 let autoPlayToken = 0 // 回合自增：mounted 时递增，旧回合的播放回调失效
@@ -235,6 +242,13 @@ function replay(index: number, text: string) {
 
 <template>
   <div class="u-phone">
+    <!-- AI 状态线（静默纯黑 / 处理中彩色流光 / 出错纯红） -->
+    <div
+      class="v-line"
+      :class="`v-line--${lineStatus}`"
+      role="status"
+      :aria-label="lineStatus === 'busy' ? 'AI 处理中' : lineStatus === 'error' ? '出错了' : '空闲'"
+    />
     <div class="u-content u-fc-page">
       <!-- 返回 = 口语模式入口（2026-09-05：router.back() 依赖 history，直进 /m/free-chat 会撞 /demo） -->
       <button class="u-back u-back--float" type="button" title="返回" @click="router.push('/m/chat')">
@@ -293,9 +307,8 @@ function replay(index: number, text: string) {
           </button>
         </div>
 
-        <div v-if="recording || sending" class="u-fc-state">
-          <div v-if="recording" class="u-fc-state__text">聆听中… 点击 ■ 停止并发送</div>
-          <div v-else class="u-load u-load--bar" aria-hidden="true"><div class="u-load__rain" /></div>
+        <div v-if="recording" class="u-fc-state">
+          聆听中… 点击 ■ 停止并发送
         </div>
         <div class="u-fc-bar">
           <input

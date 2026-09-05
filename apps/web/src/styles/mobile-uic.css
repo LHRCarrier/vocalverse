@@ -1072,8 +1072,54 @@ body {
 }
 
 /* ============================================================
+ * AI 状态线（组员拍板 2026-09-05：彩色流光一条线替代大加载面板）
+ * 静默 = 纯黑；AI 处理中 = 彩色流光；出错 = 纯红；整宽 3px 贴容器顶部
+ * ============================================================ */
+.v-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--u-ink);
+  z-index: 30;
+}
+
+.v-line--busy {
+  background-image: repeating-linear-gradient(
+    90deg,
+    #2f6bff 0 24px,
+    #a8e05f 24px 48px,
+    #ffc83d 48px 72px,
+    #ff7a50 72px 96px
+  );
+  background-size: 96px 100%;
+  animation: v-line-flow 1.2s linear infinite;
+}
+
+.v-line--error {
+  background: var(--u-error);
+}
+
+@keyframes v-line-flow {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 96px 0; /* 平移一个周期 → 无缝循环 */
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v-line--busy {
+    animation: none;
+  }
+}
+
+/* ============================================================
  * 墨水流动加载动画（组员提供的 css-rain-bg 方案，2026-09-05 适配纸面主题）
- * 面板底 = 纸面，墨滴 #272257（保留组员原配色）；150s 循环；reduced-motion 关闭
+ * 注：当前未被页面引用——预留给「APP 启动页 / 页面切换」类整幅加载（组长原意），
+ * 后续需要时直接套 .u-load + .u-load__rain
  * ============================================================ */
 .u-load {
   position: relative;

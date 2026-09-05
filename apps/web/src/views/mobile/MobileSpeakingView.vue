@@ -48,6 +48,12 @@ const lastScore = ref<{ pron?: number | null; flu?: number | null; gram?: number
 const scoreStatus = ref<'ok' | 'pending' | 'unavailable' | null>(null)
 const corpusDone = ref<string[]>([])
 const hitCount = computed(() => corpusDone.value.length)
+/** AI 状态线：loading（进场景）/busy（评分中）→ 流光；errorMsg → 纯红；其余纯黑（2026-09-05 组长拍板） */
+const lineStatus = computed<'idle' | 'busy' | 'error'>(() => {
+  if (errorMsg.value) return 'error'
+  if (phase.value === 'loading' || phase.value === 'busy') return 'busy'
+  return 'idle'
+})
 const summaryText = ref<string | null>(null)
 const errorMsg = ref<string | null>(null)
 const reportId = ref<number | null>(null)
@@ -376,6 +382,13 @@ function onSseEvent(e: SseStreamEvent) {
 
 <template>
   <div class="u-phone">
+    <!-- AI 状态线（静默纯黑 / 处理中彩色流光 / 出错纯红） -->
+    <div
+      class="v-line"
+      :class="`v-line--${lineStatus}`"
+      role="status"
+      :aria-label="lineStatus === 'busy' ? 'AI 处理中' : lineStatus === 'error' ? '出错了' : '空闲'"
+    />
     <div class="u-content u-content--dock" style="padding-top: 72px">
       <!-- 顶部只留返回按钮（文字全部去掉）；返回 = 口语模式入口不再依赖 history（2026-09-05：router.back() 会撞 /demo） -->
       <button class="u-back u-back--float" type="button" title="返回" @click="router.push('/m/home')">
@@ -392,9 +405,9 @@ function onSseEvent(e: SseStreamEvent) {
         </div>
       </section>
 
-      <!-- 加载态：墨水流动动画（组员 css-rain 方案，2026-09-05；纯视觉，无需文案） -->
-      <div v-else-if="!bubbles.length && phase === 'loading'" class="u-empty" role="status" aria-label="正在进入场景">
-        <div class="u-load" aria-hidden="true"><div class="u-load__rain" /></div>
+      <!-- 加载态：状态线已表达”处理中“，这里只留居中线稿锚点（无文案；2026-09-05） -->
+      <div v-else-if="!bubbles.length && phase === 'loading'" class="u-empty u-empty--center" role="status" aria-label="正在进入场景">
+        <div class="u-empty__art"><MobileArt name="wave" :size="96" /></div>
       </div>
 
       <!-- 对话流：AI track 气泡 + 用户炭黑气泡 -->
