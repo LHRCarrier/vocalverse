@@ -84,7 +84,7 @@ cd apps/web; pnpm install; pnpm dev        # http://localhost:5173（代理已�
 cd services/python
 uv sync
 Copy-Item .env.example .env                # 填 DeepSeek/讯飞密钥（M2 真实管线需要；不填则走 Fake）
-uv run alembic upgrade head                # 建表（schema 真源=Alembic；M2 迁移 0001+0002）
+uv run alembic upgrade head                # 建表（schema 真源=Alembic；合并后需升到最新 revision）
 uv run python -m app.db.seed               # 幂等 seed：8 套场景内容 + 入学测试题库
 uv run uvicorn app.main:app --reload --port 8000   # 注意：uv 前缀不能省（Windows 下 venv 不在 PATH）
 
@@ -136,6 +136,7 @@ cd apps/mobile/android; .\gradlew.bat assembleDebug
 |---|---|
 | `docker compose` 报 `failed to connect to the docker API` | **Docker Desktop 没启动**：先启动 Docker Desktop 并等引擎就绪（任务栏鲸鱼图标转绿），再执行 compose |
 | `mvn spring-boot:run` 报 Hibernate `JdbcEnvironmentInitiator` / 数据库连接失败 | 方式 B 漏了起依赖：先 `docker compose up -d postgres redis` 且 `docker compose ps` 显示 healthy；若 Java 配置连的不是容器库，检查 `DB_HOST` 环境变量（默认 localhost:5432，见 `services/java` 的 `application.yml`） |
+| 启动日志含 `FATAL: password authentication failed for user "vocalverse"`（随后 `Unable to determine Dialect without JDBC metadata` 退出码 1） | **DB 密码失配**：Java 默认 `DB_PASSWORD=vocalverse-dev`，本机库实际密码必须与 compose 回退值一致——根 `.env` / `services/python/.env` / 本机 DB 三处同步（2026-09-04 实测处置：`ALTER USER ... PASSWORD 'vocalverse-dev'` 后三端恢复，见 `worklog/BUG实测/方式B-Java启动-DB密码失配.md`） |
 | 端口 8088/8000/8080 被占用 | `Get-NetTCPConnection -LocalPort <port> -State Listen` 找 PID 释放；或改 compose 的 ports 映射 |
 | Java 启动日志结尾报 `APPLICATION FAILED TO START ... Port 8080 was already in use` | **机器上已有 Java 实例在跑，别开第二个**（第一个是活的，不是服务挂了；2026-09-01 实测踩坑：第二个实例失败、第一个一直正常服务）。`Get-NetTCPConnection -LocalPort 8080 -State Listen` 找 PID 确认；要换新版本就 `taskkill /PID <pid> /F` 后再起 |
 | Java 启动日志显示 `using Java 24.x` / IDE 直接跑但端口被自己占 | **`JAVA_HOME` 设错**：项目钉死 JDK 21（docs/06 §3），以 Temurin 21 为准：`[Environment]::SetEnvironmentVariable('JAVA_HOME','C:\Program Files\Eclipse Adoptium\jdk-21.0.8.9-hotspot','User')` 后**重开终端**；`mvn -version` 显示 Java 21.0.x 即对齐。Java 24 跑 Spring Boot 3.3 当前能起但有一串 native-access 警告（未来版本会直接拦截）且与 CI 环境不一致 |
@@ -143,6 +144,7 @@ cd apps/mobile/android; .\gradlew.bat assembleDebug
 | Docker 卡顿/服务起不来（WSL2 默认内存 2GB） | 按 `infra/dev/.wslconfig` 示例设 `memory=8GB,processors=4`，执行 `wsl --shutdown` 后重启 Docker |
 | 首次 `dev.ps1` 很慢 | 正常：基础镜像 + Python 依赖（含 CPU torch ≈200MB）；网络差可给 Docker 配镜像加速 |
 | 语音接口返回固定文本 | 预期行为：M1 全部为 Fake 实现（`services/python/app/audio/stubs.py`），M2 替换为 faster-whisper / edge-tts / 讯飞 ISE |
+| 本地 ASR 请求 500，uvicorn 日志含 `LocalEntryNotFoundError` / `Please check your internet connection` / httpx 连接错误（httpcore `_sync`） | **whisper 模型缓存未指向仓库 `data/models`**（huggingface 被墙无法在线下载）：方式 B 本地应用启动默认注入 `HF_HOME=<仓库>\data\models` + `HF_HUB_OFFLINE=1`（docs/06 §8「被墙一律本地缓存」约定；`scripts/dev-up.ps1` 同样注入；**容器侧是另一套口径**：hf-cache 卷承载 HF 默认缓存路径，compose 当前未注入 HF 变量——K03 未闭合项，另立整改）。若手工覆盖过 `HF_HOME` 或更换 ASR 模型，确保模型完整在 `data/models/hub/`（2026-09-04 实测处置见 `worklog/BUG实测/方式B-Python-ASR-HF缓存失配.md`） |
 | Windows 长路径/编码问题 | `git config --global core.longpaths true`；`.gitattributes` 已强制 LF（.ps1/.bat 用 CRLF） |
 | Java 日志中文乱码（如「演示账号就绪」变「婕旂ず璐」） | 双重错位：① 编译期 pom 未声明编码（已钉 `project.build.sourceEncoding=UTF-8`，改 pom 后重新编译生效）；② 运行期终端码页——VSCode 终端先 `chcp 65001` 再起 Java，或 `mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"`（Java 18+ 生效）；Python/edge-tts 脚本同理：`$env:PYTHONIOENCODING='utf-8'` |
 | `.env` 忘记填密钥 | M1 不阻塞（占位符可起）；M2 起 DeepSeek/讯飞必须填，且严禁提交 `.env` |

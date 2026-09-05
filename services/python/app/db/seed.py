@@ -22,7 +22,13 @@ from sqlalchemy import select
 from app.db import get_session_factory
 from app.models import PlacementQuestion, Scenario
 
-REPO_ROOT = Path(__file__).resolve().parents[4]  # services/python/app/db/seed.py → 仓库根
+try:
+    REPO_ROOT = Path(__file__).resolve().parents[4]  # 本地：services/python/app/db/seed.py → 仓库根
+except IndexError:
+    # 容器（WORKDIR /app + COPY . . → /app/app/db/seed.py，仅 4 级父目录，无「仓库根」）：
+    # seed 数据由 compose migrate 挂载 ./data/seed:/app/data/seed（2026-09-04 方式A 实测：
+    # parents[4] 越界抛 IndexError —— 与 PR#27 main.py 同类容器路径假设，一并修复）
+    REPO_ROOT = Path("/app")
 
 SCENARIOS_SEED = REPO_ROOT / "data" / "seed" / "scenarios.json"
 
