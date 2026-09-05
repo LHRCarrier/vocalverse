@@ -33,6 +33,7 @@ const props = withDefaults(
       | 'chat'
       | 'coin'
       | 'share'
+      | 'user-plus'
       | 'stop'
       | 'volume'
     size?: number
@@ -120,6 +121,13 @@ const props = withDefaults(
     <template v-else-if="props.name === 'share'">
       <path d="M14 6.5L20 12l-6 5.5" />
       <path d="M20 12H9a6 6 0 0 0-5 6" />
+    </template>
+
+    <!-- 加好友（X 顶栏同款：人形 + 加号 · 2026-09-05） -->
+    <template v-else-if="props.name === 'user-plus'">
+      <circle cx="9" cy="8.5" r="3.5" />
+      <path d="M3 19a6 6 0 0 1 11.2-2" />
+      <path d="M18.5 8v7M15 11.5h7" />
     </template>
 
     <!-- 时钟（回合） -->

@@ -25,12 +25,12 @@ type Domain = '新闻稿' | '教学分享' | '海外生活'
 const tabs = ['为你推荐', '新闻稿', '教学分享', '海外生活'] as const
 const activeTab = ref<(typeof tabs)[number]>('为你推荐')
 
-/* 发布演示 toast（仅数据展示 · M3 接真实发布流） */
+/* 加好友演示 toast（仅数据展示 · M3 接真实好友/关注流） */
 const toastText = ref('')
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
-function demoPublish() {
-  toastText.value = '发布动态演示 · M3 上线'
+function demoAddFriend() {
+  toastText.value = '好友请求已发送 · M3 上线'
   if (toastTimer) clearTimeout(toastTimer)
   toastTimer = setTimeout(() => {
     toastText.value = ''
@@ -197,12 +197,12 @@ function toggleLike(item: FeedItem) {
 <template>
   <div class="u-phone">
     <div class="u-comm">
-      <!-- X 式顶栏（左头像 / 中 Logo / 右发布；随滚动移出屏幕，非 sticky） -->
+      <!-- X 式顶栏（左头像 / 中 Logo / 右加好友；随滚动移出屏幕，非 sticky） -->
       <header class="u-x-top">
         <span class="u-x-avatar" aria-label="头像">{{ avatarLetter }}</span>
         <span class="u-x-logo">社区</span>
-        <button class="u-x-act" type="button" title="发布动态（演示）" aria-label="发布动态" @click="demoPublish">
-          <MobileIcon name="plus" :size="18" />
+        <button class="u-x-act" type="button" title="加好友（演示）" aria-label="加好友" @click="demoAddFriend">
+          <MobileIcon name="user-plus" :size="18" />
         </button>
       </header>
 
