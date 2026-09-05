@@ -29,11 +29,12 @@ function makePost(overrides: Partial<CommunityPost> = {}): CommunityPost {
 }
 
 describe('MobilePostCard', () => {
-  it('渲染作者 / 标题 / 摘要 / 媒体标签 / 互动计数（千位缩写 1.2k）', () => {
+  it('渲染作者 / 标题 / 摘要 / 媒体标签 / 互动计数（千位缩写 1.2k / LV 展示）', () => {
     const wrapper = mount(MobilePostCard, { props: { post: makePost() } })
     const text = wrapper.text()
     expect(text).toContain('Global Post')
     expect(text).toContain('@globalpost')
+    expect(text).toContain('LV4') // level 'L4' → LV4（社交联动，2026-09-05）
     expect(text).toContain('AI learning')
     expect(text).toContain('📰 NEWS')
     expect(text).toContain('1.2k') // like 1240

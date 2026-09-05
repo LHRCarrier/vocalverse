@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
 import MobileAccountDrawer from '@/components/mobile/MobileAccountDrawer.vue'
+
+beforeEach(() => {
+  localStorage.clear()
+  setActivePinia(createPinia())
+})
 
 const me = { userId: 1, username: 'demoadult', nickname: '演示用户', level: 'L3' }
 

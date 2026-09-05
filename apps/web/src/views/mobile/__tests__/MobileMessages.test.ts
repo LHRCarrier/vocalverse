@@ -17,12 +17,14 @@ const router = createRouter({
 beforeEach(() => setActivePinia(createPinia()))
 
 describe('MobileMessagesView', () => {
-  it('渲染会话列表：名字 / 最后消息 / 未读点（仅 Kai）', async () => {
+  it('渲染会话列表：名字 / LV 徽章 / 最后消息 / 未读点（仅 Kai）', async () => {
     await router.push('/m/messages')
     await router.isReady()
     const wrapper = mount(MobileMessagesView, { global: { plugins: [router] } })
     const text = wrapper.text()
     expect(text).toContain('Kai')
+    expect(text).toContain('LV3') // Kai L3
+    expect(text).toContain('LV4') // Teacher Lee L4
     expect(text).toContain('Momo')
     expect(text).toContain('Teacher Lee')
     expect(text).toContain('Great point! I will check it out tonight.')

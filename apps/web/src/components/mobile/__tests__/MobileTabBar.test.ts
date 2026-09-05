@@ -77,16 +77,20 @@ describe('MobileTabBar（双场景分组）', () => {
   })
 })
 
-describe('MobileLearnView（学习 · 画像占位）', () => {
-  it('渲染学习页占位：画像建设中提示（内容已清空，待组长画像方案）', async () => {
+describe('MobileLearnView（学习 · Duolingo 式画像）', () => {
+  it('渲染画像主卡：LV 徽章 / 等级名 / 经验条 / 速览与趋势', async () => {
     await router.push('/m/learn')
     await router.isReady()
     const wrapper = mount(MobileLearnView, { global: { plugins: [router] } })
-    expect(wrapper.text()).toContain('学习画像 · 建设中')
-    expect(wrapper.text()).toContain('音素')
-    // 旧练习首页内容不应保留
-    expect(wrapper.text()).not.toContain('今日目标')
-    expect(wrapper.text()).not.toContain('本周精选')
+    const text = wrapper.text()
+    expect(text).toContain('LV3')
+    expect(text).toContain('对话能手')
+    expect(text).toContain('XP')
+    expect(text).toContain('薄弱音素')
+    expect(text).toContain('流利度趋势')
+    // 旧占位/旧练习内容不应保留
+    expect(text).not.toContain('建设中')
+    expect(text).not.toContain('今日目标')
   })
 })
 
