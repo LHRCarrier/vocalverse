@@ -41,7 +41,7 @@ let replayAudio: HTMLAudioElement | null = null
 let autoPlayToken = 0 // 回合自增：mounted 时递增，旧回合的播放回调失效
 
 const recorder = new VoiceRecorder()
-const abort = new AbortController()
+let abort = new AbortController() // let：新对话后重建（abort 过的 signal 不能复用，2026-09-05）
 
 onMounted(() => {
   void track('free_chat_open', {})
@@ -66,6 +66,22 @@ function goScene() {
   // 功能行（2026-09-05 组长拍板：自由对话不做场景选择——切回场景对话页，由该页的「先选场景」流程处理）
   void track('free_chat_switch', { payload: { to: 'scene' } })
   router.push('/m/chat')
+}
+
+/** 新对话：清空当前自由对话记忆（无状态 MVP：仅本地，无服务端会话可放弃） */
+function resetChat() {
+  abort.abort()
+  abort = new AbortController()
+  bubbles.value = []
+  history.value = []
+  errorMsg.value = null
+  sending.value = false
+  currentAssistant.value = null
+  autoPlayToken += 1
+  replayAudio?.pause()
+  replayAudio = null
+  playingBubble.value = null
+  void track('free_chat_reset', {})
 }
 
 function pushUser(text: string) {
@@ -261,11 +277,21 @@ function replay(index: number, text: string) {
       </div>
 
       <div class="u-fc-bar-wrap">
-        <!-- 功能行（2026-09-05：自由对话只保留「切回场景对话」；场景选择归场景对话页的选场景流程） -->
+        <!-- 功能行（2026-09-05：切回场景对话 + 新对话；场景选择归场景对话页的选场景流程） -->
         <div class="u-tb" role="toolbar" aria-label="口语功能">
           <button class="u-tb-item" type="button" title="切换到场景对话（固定题卡跟练）" @click="goScene()">
             <MobileIcon name="coffee" :size="22" />
             <span class="u-tb-item__label">场景对话</span>
+          </button>
+          <button
+            class="u-tb-item"
+            type="button"
+            :disabled="!bubbles.length"
+            title="清空当前对话，重新开始"
+            @click="resetChat"
+          >
+            <MobileIcon name="refresh" :size="22" />
+            <span class="u-tb-item__label">新对话</span>
           </button>
         </div>
 
