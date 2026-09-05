@@ -29,6 +29,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from app.audio.audio_quality import has_min_words
 from app.audio.base import get_asr_client, get_scorer_client
 from app.audio.fluency import compute_fluency_features
 from app.audio.upload import validate_audio_bytes
@@ -304,6 +305,12 @@ async def score_item(
         asr = get_asr_client()
         asr_res = await asr.transcribe(data)
         text = asr_res.text
+        # docs/19 §2：转写词数 < 5 → 无有效语音，不送 ISE 评测/不落 Attempt
+        # （兜底防 whisper 对纯音/噪声幻听短词仍被 ISE 打高分）
+        if not has_min_words(text):
+            raise BizError(
+                http_status=400, code=40002, message="transcript has insufficient speech"
+            )
         # 流利度时间戳特征（docs/06 §9.3 辅助口径；与对话链路同源，origin/main 1fa86af 并入）
         fluency = compute_fluency_features(asr_res.words or [], float(asr_res.duration or 0.0))
 

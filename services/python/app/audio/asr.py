@@ -7,13 +7,33 @@
 
 from __future__ import annotations
 
+import logging
 import subprocess
 import tempfile
 from pathlib import Path
 
+from app.audio.audio_quality import has_speech, load_audio_16k_mono
 from app.audio.base import ASRClient, ASRResult
+from app.core.response import BizError
+
+logger = logging.getLogger("vocalverse")
 
 _FFMPEG = "ffmpeg"
+
+
+def _reject_if_silent(wav_path: str) -> None:
+    """有效性前置过滤（docs/19-M2 §2）：空录音/纯静音 → 40002 硬拒绝，不送 whisper + ISE。
+
+    读取音频失败只告警不阻断（fail-open），避免误拒正常音频导致题目卡死。
+    """
+    try:
+        pcm = load_audio_16k_mono(wav_path)
+        if not has_speech(pcm):
+            raise BizError(http_status=400, code=40002, message="audio has no speech")
+    except BizError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - 读取异常不误拒，仅记录
+        logger.warning("speech check failed for %s: %s", wav_path, exc)
 
 
 def _ffmpeg_bin() -> str:
@@ -95,6 +115,8 @@ class FasterWhisperClient(ASRClient):
                 check=True,
                 capture_output=True,
             )
+            # 有效性前置过滤（docs/19 §2）：空录音/纯静音 → 40002 硬拒绝，不送 whisper + ISE
+            _reject_if_silent(wav)
             return await asyncio.to_thread(self.transcribe_sync, wav, language)
         finally:
             for p in (src, src + ".wav"):
