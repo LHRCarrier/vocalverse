@@ -65,7 +65,15 @@ body {
   max-width: 480px;
   margin: 0 auto;
   min-height: 100vh;
-  background: var(--u-paper);
+  background-color: var(--u-paper);
+  /* 点格背景（组员提供的 dot-grid 方案，2026-09-05：双 radial-gradient 交错点阵；点色 = 墨色 5%，网格 48px） */
+  background-image:
+    radial-gradient(rgba(28, 28, 26, 0.05) 5%, transparent 6%),
+    radial-gradient(rgba(28, 28, 26, 0.05) 5%, transparent 6%);
+  background-position:
+    0 0,
+    24px 24px;
+  background-size: 48px 48px;
   position: relative;
   overflow-x: hidden;
   font-family: var(--u-font);
@@ -1678,7 +1686,7 @@ body {
 /* 输入栏 */
 .u-fc-bar-wrap {
   padding: 10px 4px calc(14px + env(safe-area-inset-bottom));
-  background: var(--u-paper);
+  background: transparent; /* 点格背景透出（2026-09-05 组员 dot-grid 方案） */
 }
 
 .u-fc-state {
