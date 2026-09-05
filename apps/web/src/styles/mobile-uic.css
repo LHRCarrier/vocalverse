@@ -1086,15 +1086,20 @@ body {
 }
 
 .v-line--busy {
-  background-image: repeating-linear-gradient(
+  animation: v-line-flow 2.2s linear infinite;
+  /* 平滑彩虹渐变（浅→深、无硬边；头尾同色 → 流动无缝；2026-09-05 组员反馈：参考墨雨的自然过渡） */
+  background-image: linear-gradient(
     90deg,
-    #2f6bff 0 24px,
-    #a8e05f 24px 48px,
-    #ffc83d 48px 72px,
-    #ff7a50 72px 96px
+    #cdd7fe 0%,
+    #93c5fd 14%,
+    #67e8f9 28%,
+    #86efac 42%,
+    #fcd34d 56%,
+    #fda4af 70%,
+    #f0abfc 84%,
+    #cdd7fe 100%
   );
-  background-size: 96px 100%;
-  animation: v-line-flow 1.2s linear infinite;
+  background-size: 200% 100%;
 }
 
 .v-line--error {
@@ -1103,10 +1108,10 @@ body {
 
 @keyframes v-line-flow {
   from {
-    background-position: 0 0;
+    background-position: 0% 0;
   }
   to {
-    background-position: 96px 0; /* 平移一个周期 → 无缝循环 */
+    background-position: 200% 0; /* 平移整幅渲染图（2 倍宽）→ 无缝循环 */
   }
 }
 
