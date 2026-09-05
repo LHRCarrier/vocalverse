@@ -1,25 +1,36 @@
 # VocalVerse 声语界
 
-> AI 英语口语训练 + 英文歌练唱评分平台 —— 以"说得好、唱得准"为目标的智能发音教练
+> 一个**学英语**的 App：AI 陪你说、英文社区陪你浸润、英文歌陪你唱——听说读唱都在这个统一的学英语场景里。
 
-VocalVerse 面向不同年龄段英语学习者，基于大模型场景扮演（AI 数字人对话）+ 语音识别/合成/评分技术，提供：
+VocalVerse 面向不同年龄段英语学习者，产品形态 = **「练」+「浸」+「唱」三线**：
 
-- **口语陪练**：生活/工作/学习场景模拟对话，AI 数字人实时互动，发音、语法、流利度多维度评分
-- **英文歌练唱**：英文歌曲跟唱，音准、节奏、发音逐句评分（本项目特色扩展）
-- **个性化学习**：入学测试 + 学习画像 + 推荐算法，自动生成学习路径
-- **可视化报表**：口语/唱歌成绩多维度分析与趋势展示
+- **口语 · 场景练习（练）**：8 套生活/工作/学习预置场景固定题卡，AI 数字人实时互动，发音、流利度、语法三维评分 + 语言点覆盖度 + 教练笔记 + 评分报告；
+- **口语 · AI 自由说（说）**：想聊就聊——麦克风或打字，DeepSeek LLM 实时对聊 + TTS 语音播报，无题卡也有反馈；
+- **英语社区（浸）**：英文氛围沉浸——英语新闻稿 / 英文教学与学习分享 / 海外学习生活与风俗习惯，帖子 + 视频双形态（排版参考 X），点赞/评论/投币/分享互动；
+- **英文歌练唱（唱）**：英文歌曲跟唱，音准、节奏、发音逐句评分（特色扩展，M3 深化中）；
+- **个性化与测评**：入学测试定级、学习画像、推荐（M3 深化中）；答辩导师（粘贴论文 → AI 评委英文提问 → 等级反馈）作为高校场景特色功能。
+
+「学英语」不只落在一个功能上：场景练习管**开口说**，自由说话语环境差一点也能**先聊起来**，社区帖子新闻补**阅读与语感**，海外生活风俗维度的内容让语言**带着文化**，唱英文歌则是**高强度跟读训练**——各功能都往学英语这件事上使劲。
 
 ## 技术栈
 
 | 层 | 技术 |
 |---|---|
-| 前端 | **Vue 3 + TypeScript(strict) + Vite 6 + pnpm**（Web 端；移动端以 PWA/响应式覆盖，原生 App 列为扩展） |
-| Python 服务 | **FastAPI**：ASR（faster-whisper small/int8/CPU）、TTS（edge-tts，Azure 备胎）、讯飞评测（发音评分基线）+ wav2vec2 微调（门禁化自研加分项）、唱歌评分（pyin + DTW）、DeepSeek LLM 场景扮演 Agent、推荐（sklearn） |
+| 前端 | **Vue 3 + TypeScript(strict) + Vite 6 + pnpm**；移动端真形态页面 + Capacitor 手机壳（Android 首发） |
+| Python 服务 | **FastAPI**：ASR（faster-whisper small/int8/CPU）、TTS（edge-tts，Azure 备胎）、讯飞评测（发音评分基线）+ wav2vec2 微调（门禁化自研加分项）、唱歌评分（pyin + DTW）、DeepSeek LLM 对话 Agent（TTS 播报）、推荐；社区流由既有会话/尝试数据派生（docs/10 注记） |
 | Java 服务 | **Spring Boot 3.3 / Java 21**（薄管理端）：用户管理、场景/歌曲库 CRUD、工单、JWT 签发 |
-| 大模型 | DeepSeek API（场景扮演、语法判定、评分报告生成） |
+| 大模型 | DeepSeek API（场景扮演、自由对话、语法判定、评分报告生成、答辩） |
 | 模型训练 | **PyTorch**（CPU 推理；云 GPU 训练隔离环境）+ **Scikit-learn**（推荐、水平预测） |
 | 数据 | PostgreSQL（Alembic 唯一 schema 真源）· Redis（会话/缓存/限流） |
 | 部署 | Docker Compose（python 8000 / java 8080 / web 8088 / pg 5432 / redis 6379） |
+
+## 演进方向（规划中，非承诺）
+
+在「学英语」这条主线上持续长出能力（落地顺序随评审与排期演进，以 docs/06 + 工作日志为准）：
+
+- **词汇速记**：阅读/社区内容中的**划词即查**（手势/长按划选），一键收进**个人词汇本**做速记复习（形态以最终设计为准）；
+- **学习画像（讯飞数据红利）**：讯飞语音测评返回的发音/流利度/词级错误等数据，沉淀为**个人学习画像**——薄弱音素、高频错误词、流利度趋势都做成可看可用的画像与练习建议；
+- **社区偏好画像（独立系统）**：用户对帖子/视频领域的点赞、投币、浏览行为，独立成**社区偏好画像系统**——推荐引擎与内容排序共用，与学习画像解耦。
 
 ## 启动指南（团队测试用）
 
@@ -35,11 +46,11 @@ VocalVerse 面向不同年龄段英语学习者，基于大模型场景扮演（
 
 > ⚠️ 本地 `pnpm dev` 开着 5173 是**正常的**；8088 只在方式 A 容器启动后才有。方式 B 不要两种入口混用（代理分别配好，见 `apps/web/vite.config.ts`）。
 
-### 0. 先明确当前阶段能测什么（M2 MVP 已落地）
+### 0. 先明确当前阶段能测什么
 
-- ✅ **能测（M2）**：注册/登录（Java JWT，演示账号 `demoadult`/`demoteen`/`demosenior`，密码 `demo123456`）→ 场景对话（录音 ≤15s → ASR 转写 → 三维评分 + 教练笔记 + 语言点覆盖度 + 救援提示卡 → 8 轮收尾）→ 评分报告（总分/覆盖度三栏/建议/再练）；自定义答辩导师（粘贴论文 → AI 评委英文提问 → 等级反馈）；埋点 10 类事件；SSE 流式（音频为时间轴权威、文本字幕）。
+- ✅ **能测**：注册/登录（Java JWT，演示账号 `demoadult`/`demoteen`/`demosenior`，密码 `demo123456`）→ 移动端全流程：**社区首页**（英语动态流·演示帧，点赞可点）→ **口语**（先选场景 → 播放开场白 → 录音 ≤15s → 三维评分 + 语言点覆盖 + 教练笔记 → 8 轮收尾 → 评分报告）→ **AI 自由说**（麦克风或打字 → DeepSeek 流式 + TTS 播报）→ **我的**；自定义答辩导师（粘贴论文 → AI 评委英文提问 → 等级反馈）；埋点 15 类事件；SSE 流式（音频为时间轴权威、文本字幕）。
 - ⏳ 真实语音链路需 `.env` 密钥（DeepSeek/讯飞）+ ffmpeg + whisper 模型；缺省时全链路走 Fake（`APP_TESTING=true`），联调冒烟脚本：`python scripts/poc/demo_smoke.py`。
-- ⏳ M3（唱歌/推荐/报表/社区）仍为占位页。
+- ⏳ 唱吧/推荐/报表与**社区真实流**（sessions/attempts JOIN 派生 + post_likes）仍按 M3 排期推进；社区页当前为演示帧（仅展示）。
 
 ### 1. 一次性准备（工具链）
 
@@ -62,7 +73,7 @@ Copy-Item .env.example .env    # 可选；不填也能起（占位符），但 A
 
 | 入口 | 地址 | 验证点 |
 |---|---|---|
-| 前端演示页（容器入口） | http://localhost:8088 | 显示「VocalVerse 框架骨架」，Python/Java 状态为 ✓；点「开始录音」→ 允许麦克风 → 6 秒后显示 stub 转写 |
+| 前端演示页（容器入口） | http://localhost:8088 | 登录后进入**社区首页**，三端连通（录音→ASR / 对话→LLM / 评分→讯飞）；未配置密钥时走 Fake 桩仍可完整走通流程 |
 | Python API 文档 | http://localhost:8000/docs | 可试 `POST /api/v1/asr`、`/tts`、`/score`、`/llm/chat`（返回 stub 结果） |
 | Python 健康检查 | http://localhost:8000/healthz 、/readyz | 返回 `{"status":"alive"}` / `code=0` |
 | Java API 文档 | http://localhost:8080/swagger-ui.html | `/actuator/health` 返回 UP |
@@ -80,12 +91,11 @@ docker compose ps                          #    确认 postgres、redis 均为 h
 
 # 2. 前端（终端 1）——注意：本地 dev 端口是 5173（不是 8088）
 cd apps/web; pnpm install; pnpm dev        # http://localhost:5173（代理已配 8000/8080）
-
 # 3. Python（终端 2）——首次 uv sync 会下载 CPU 版 torch，较慢
 cd services/python
 uv sync
 Copy-Item .env.example .env                # 填 DeepSeek/讯飞密钥（M2 真实管线需要；不填则走 Fake）
-uv run alembic upgrade head                # 建表（schema 真源=Alembic；M2 迁移 0001+0002）
+uv run alembic upgrade head                # 建表（schema 真源=Alembic；合并后需升到最新 revision）
 uv run python -m app.db.seed               # 幂等 seed：8 套场景内容 + 入学测试题库
 uv run uvicorn app.main:app --reload --port 8000   # 注意：uv 前缀不能省（Windows 下 venv 不在 PATH）
 
@@ -97,13 +107,31 @@ mvn spring-boot:run
 > ⚠️ 方式 B 与方式 A 端口相同（8000/8080），**不要同时起**；各服务更多细节见 `services/*/README.md`。
 >
 > 💡 **一键起停（推荐，2026-09-04 起）**：三端用**独立进程**启动（日志 `local/dev-logs/`，gitignored），
-> 关终端不会再弹「Terminate batch job」：
+> 关终端不会再弹「Terminate batch job」；`start` 会**自动拉起 Docker 里的 postgres/redis**
+> （5432/6379 未监听时执行 `docker compose up -d postgres redis` 并等待 healthy，Docker Desktop
+> 未运行则尝试自动启动），电脑重启/断网后重跑一次即可：
 > ```powershell
-> pwsh -File scripts/dev-up.ps1 start    # 启动三端 + 健康等待（电脑重启/断网后重跑一次即可）
+> pwsh -File scripts/dev-up.ps1 start    # DB 容器 + 三端 + 健康等待（默认动作）
 > pwsh -File scripts/dev-up.ps1 status   # 查看监听与健康
 > pwsh -File scripts/dev-up.ps1 stop     # 按端口杀三端
 > ```
 > 注意：Windows PowerShell 5.1 会因 UTF-8 解析报错，必须用 `pwsh`（7）执行。
+
+### 3.5 手机端（Android APK · 今日交付形态）
+
+方式 A 全栈起好后（8088 可用），手机壳 = Capacitor 8 远程 URL 型：Android WebView 直接加载
+`http://<局域网IP>:8088`（nginx 同源反代，后端零改动）。
+
+```powershell
+# 构建 APK（已预置 server.url=http://192.168.1.3:8088；换环境改 apps/mobile/capacitor.config.json 后 npx cap sync）
+cd apps/mobile/android; .\gradlew.bat assembleDebug
+# 产物：apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk（≈4MB）
+# 安装：adb install -r <apk>（手机开 USB 调试），或传 APK 到手机直接安装
+```
+
+- 演示账号：`demoadult` / `demoteen` / `demosenior`，密码 `demo123456`；
+- 手机与后端起在**同一局域网**；Web 体验入口同源（PWA：`/manifest.webmanifest`，安卓可"添加到主屏幕"）；
+- 详细说明/删除清单见 `apps/mobile/README.md`，产品与技术决策见 `docs/27`~`docs/29`。
 
 ### 4. 启动成功判定（验收清单）
 
@@ -119,6 +147,7 @@ mvn spring-boot:run
 |---|---|
 | `docker compose` 报 `failed to connect to the docker API` | **Docker Desktop 没启动**：先启动 Docker Desktop 并等引擎就绪（任务栏鲸鱼图标转绿），再执行 compose |
 | `mvn spring-boot:run` 报 Hibernate `JdbcEnvironmentInitiator` / 数据库连接失败 | 方式 B 漏了起依赖：先 `docker compose up -d postgres redis` 且 `docker compose ps` 显示 healthy；若 Java 配置连的不是容器库，检查 `DB_HOST` 环境变量（默认 localhost:5432，见 `services/java` 的 `application.yml`） |
+| 启动日志含 `FATAL: password authentication failed for user "vocalverse"`（随后 `Unable to determine Dialect without JDBC metadata` 退出码 1） | **DB 密码失配**：Java 默认 `DB_PASSWORD=vocalverse-dev`，本机库实际密码必须与 compose 回退值一致——根 `.env` / `services/python/.env` / 本机 DB 三处同步（2026-09-04 实测处置：`ALTER USER ... PASSWORD 'vocalverse-dev'` 后三端恢复，见 `worklog/BUG实测/方式B-Java启动-DB密码失配.md`） |
 | 端口 8088/8000/8080 被占用 | `Get-NetTCPConnection -LocalPort <port> -State Listen` 找 PID 释放；或改 compose 的 ports 映射 |
 | Java 启动日志结尾报 `APPLICATION FAILED TO START ... Port 8080 was already in use` | **机器上已有 Java 实例在跑，别开第二个**（第一个是活的，不是服务挂了；2026-09-01 实测踩坑：第二个实例失败、第一个一直正常服务）。`Get-NetTCPConnection -LocalPort 8080 -State Listen` 找 PID 确认；要换新版本就 `taskkill /PID <pid> /F` 后再起 |
 | Java 启动日志显示 `using Java 24.x` / IDE 直接跑但端口被自己占 | **`JAVA_HOME` 设错**：项目钉死 JDK 21（docs/06 §3），以 Temurin 21 为准：`[Environment]::SetEnvironmentVariable('JAVA_HOME','C:\Program Files\Eclipse Adoptium\jdk-21.0.8.9-hotspot','User')` 后**重开终端**；`mvn -version` 显示 Java 21.0.x 即对齐。Java 24 跑 Spring Boot 3.3 当前能起但有一串 native-access 警告（未来版本会直接拦截）且与 CI 环境不一致 |
@@ -126,6 +155,7 @@ mvn spring-boot:run
 | Docker 卡顿/服务起不来（WSL2 默认内存 2GB） | 按 `infra/dev/.wslconfig` 示例设 `memory=8GB,processors=4`，执行 `wsl --shutdown` 后重启 Docker |
 | 首次 `dev.ps1` 很慢 | 正常：基础镜像 + Python 依赖（含 CPU torch ≈200MB）；网络差可给 Docker 配镜像加速 |
 | 语音接口返回固定文本 | 预期行为：M1 全部为 Fake 实现（`services/python/app/audio/stubs.py`），M2 替换为 faster-whisper / edge-tts / 讯飞 ISE |
+| 本地 ASR 请求 500，uvicorn 日志含 `LocalEntryNotFoundError` / `Please check your internet connection` / httpx 连接错误（httpcore `_sync`） | **whisper 模型缓存未指向仓库 `data/models`**（huggingface 被墙无法在线下载）：方式 B 本地应用启动默认注入 `HF_HOME=<仓库>\data\models` + `HF_HUB_OFFLINE=1`（docs/06 §8「被墙一律本地缓存」约定；`scripts/dev-up.ps1` 同样注入；**容器侧是另一套口径**：hf-cache 卷承载 HF 默认缓存路径，compose 当前未注入 HF 变量——K03 未闭合项，另立整改）。若手工覆盖过 `HF_HOME` 或更换 ASR 模型，确保模型完整在 `data/models/hub/`（2026-09-04 实测处置见 `worklog/BUG实测/方式B-Python-ASR-HF缓存失配.md`） |
 | Windows 长路径/编码问题 | `git config --global core.longpaths true`；`.gitattributes` 已强制 LF（.ps1/.bat 用 CRLF） |
 | Java 日志中文乱码（如「演示账号就绪」变「婕旂ず璐」） | 双重错位：① 编译期 pom 未声明编码（已钉 `project.build.sourceEncoding=UTF-8`，改 pom 后重新编译生效）；② 运行期终端码页——VSCode 终端先 `chcp 65001` 再起 Java，或 `mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"`（Java 18+ 生效）；Python/edge-tts 脚本同理：`$env:PYTHONIOENCODING='utf-8'` |
 | `.env` 忘记填密钥 | M1 不阻塞（占位符可起）；M2 起 DeepSeek/讯飞必须填，且严禁提交 `.env` |
@@ -138,13 +168,14 @@ mvn spring-boot:run
 ## 仓库结构
 
 ```
-apps/web/         前端（Vue3+TS+Vite6；录音 / SSE / 埋点）
+apps/web/         前端（Vue3+TS+Vite6；录音 / SSE / 埋点 / PWA manifest）
+apps/mobile/      Capacitor 手机壳（Android 首发；server.url 型加载线上全栈，详见 apps/mobile/README.md）
 services/python/  语音管线 + LLM Agent + 推荐（FastAPI；Alembic 唯一 schema 真源）
 services/java/    薄管理端（Spring Boot；JWT 签发）
 infra/            部署与 nginx 配置
 scripts/          dev.ps1 / bootstrap.ps1（Windows 一键）
 docs/             00~05 规划文档 + 06 技术框架决策（ADR 唯一权威）+ 07/08 拷问报告 + 09 框架评审 + 10/11 数据库 + 12 同构Monorepo对比裁决 + 13 前端设计系统 + 14 功能规格（v2 拍板）+ 15/16 双子拷问报告 + 17 合流与拍板记录 + 18 实施计划 + 19 六路拷问报告 + 20/21 系统设计说明书（架构/接口）+ api/ 契约
-worklog/          团队工作日志（VocalVerse工作日志.md，按日追加）
+worklog/          团队工作日志（主线 VocalVerse工作日志.md + App 线 安卓开发日志.md，按日追加）
 ```
 
 ## 文档索引
@@ -184,13 +215,22 @@ worklog/          团队工作日志（VocalVerse工作日志.md，按日追加�
 | `docs/24-InternalBeyond借鉴落地计划.md` | **IB 借鉴落地计划 v3（三官拷问修订定稿）**：范围裁定（⑤前缀缓存⑥画像注入①韵律引擎；④/⑦/②③不做或后置）+ 详细设计（`build_llm_context` 静态/动态**重写**（保留 conclude 指令与 `(none)` 兜底）、`learner.py` 画像注入（Python 侧聚合+白名单+TTL 缓存+收尾失效挂钩）、`prosody.ts` 纯函数韵律引擎（线性域 VAD+f0 最小滞后拾取）、`llm_cache_hit.py` POC）+ 测试用例（修复前必失败）+ 单人时间块（A 硬底线+B 骨架）/PR 拆分（今日就绪待审不合并）/风险回退/答辩口径；许可红线（只借思路不拷代码素材） |
 | `docs/25-InternalBeyond落地计划拷问报告.md` | **IB 落地计划三官火力拷问报告**：技术（A 系列 P0×2：删 conclude 指令/锚点自相矛盾）、算法（B 系列 P0×3：VAD 单位域/特征作用域/f0 平局错频）、范围排期（全量 6.5h 不可行裁决：A 硬底线+B 骨架）、P1×12/P2×15 整改全部落地 docs/24 v3 + 事实核查修正（日期误标/.env/章节号） |
 | `docs/26-LLM框架对齐ai4u评估与实施计划.md` | **LLM 框架对齐 ai4u 评估与实施计划**：ai4u（组内自研桌面 AI 伴侣）Agent 运行时解剖（scenes/runtime/domains/hooks/core）+ 映射表（→ `app/agent/` 分层：ContextBuilder/TurnRunner/MetaExecutor/MessageSink/学习者记忆域/persona）+ 不迁移清单（proactive/IM/TRPG/journal/RAG）+ 分期（P0 内核 2.5~3.5 人日 → P1 memory 双轨 → P2 persona）+ 风险回退 + 答辩口径；docs/24 A 系列并入 P0 内核；仅迁移架构模式不拷贝代码（ai4u 无 LICENSE、含外部素材） |
+| `docs/27-移动端方案.md` | **移动端方案（待评审稿）**：真实产品化定位 → Capacitor 8 壳（远程 URL 型，Android 首发 iOS 跟后）复用现有 Vue 应用零后端改动；MVP 只做「口语对话闭环」；调研借鉴（道法术器：Freemium 定价/三问/渠道/合规工具）+ 周计划 W0~W4 + 真机实测表 + ADR 修订申请（§13，拍板后执行）+ 开源调研（ETOS §4.1 / MobileGym §4.2 / 22 候选采纳清单 §4.3） |
+| `docs/28-开源语音音频能力借鉴落地计划.md` | **开源语音/音频能力借鉴落地计划（待评审稿）**：语言学习类+音频处理类开源项目调研（10 候选，node 抓 GitHub + npm 许可证核验）→ 转译落地；P0 三切片（A 前端音频底座 = wavesurfer.js BSD-3 + recorder polyfill MIT；B 服务端 ASR 降级 = sherpa-onnx Apache-2.0 第二引擎；C 跟读交互增强 = 借鉴 SpeechShadowing 出句→录音→对照 + 静音切句）+ 红线表（pitchfinder GPL/peaks.js LGPL/AGPL 两项目一律只借思路）+ ADR 修订申请（§6）+ 答辩口径；浏览器 WASM 离线 ASR 结论「服务端降级 + 移动端原生性价比更高（P1）」 + 正确包名警示（`wavesurfer.js@7.12.11`，勿装占位包 `wavesurfer@1.3.4`） |
+| `docs/29-移动端与音频底座实施详细设计.md` | **移动端与音频底座实施详细设计（四路拷问合流·待评审稿）**：79 问拷问（前端/音频/后端/排期）→ 五条交叉共振发现（P0 归属错配·排期矛盾·存量三红旗·降级语义空洞·许可细化）+ 裁决建议表（A 组先决 G1~G3 / B 组实施 G4~G11 / C 组文档修正）+ 切片重排（S1 波形组件随 M3 落 / S2 ASR 降级+信号量前置 / S3 跟读后置 / S4 手机壳加分项）+ 文件级详细设计（S1~S2 含 TDD 用例）+ W 计划修订（6 周弹性+提审并行）+ 合规清单 + PR 拆分与门禁 |
+| `docs/design-system/vocalverse/*.md` | **设计系统分层检索副本**（ui-ux-pro-max skill 维护，供 AI 构建页面时分级读取）：MASTER.md（色彩/圆角阴影/字体/交互反馈/触控/反模式）+ pages/home.md + pages/login.md（页面级覆盖，优先于 MASTER） |
+| `docs/30-移动端App测试方法.md` | **移动端 App 测试方法**：L0 门禁 / L1 Web 功能联调（W1~W10 用例表）/ L2 壳专项（A1~A7）/ L3+L4 真机八约束+蓝牙麦专项（B1~B12，docs/27 §8 实测表口径）/ L5 商店预检 + 回归 DoD + 已知缺口（自记「勿当通过」）；核心思想：功能测结构化状态断言、视觉测原型基线并排比对 |
+| `docs/31-移动端UI重设计（Soft UI Evolution）.md` | **移动端 app UI 重设计（app 端唯一真相源，样板阶段）**：拍板方向 Soft UI Evolution + Voice-First 元素层 + Micro-interactions（排除夜店深色/程序员极简/少儿低幼）；四条硬规则（UI 即信息 / 排版呼吸感 / 交互必有反馈 / app 丝滑）+ token 表 + 组件规范 + 页面落地顺序（首页/登录样板已完成）+ 验收清单；机器副本 `docs/design-system/vocalverse/`（MASTER + pages/home + pages/login） |
+| `docs/32-图标库与UI库调研与选型.md` | **图标库/UI 库选型（双原子代理全网调研）**：17 家图标库对照（主选 Tabler MIT / 深色卡大图形用 Phosphor fill-duotone 经 `@iconify-json/ph` / 对比 Lucide **ISC**；接入走 unplugin-icons 编译期按需内联）；组件基座 = reka-ui(unstyled) + cva + 自研三层 token（只抄 shadcn-vue 模式不抄 Tailwind 堆栈）；Naive 只留管理端；动效 VueUse + Motion for Vue，排除 GSAP；许可合规 + 素材库 `docs/assets/ui-lib-reference/`（48 样本 SVG + 许可原文） |
+| `docs/33-UI修改SOP.md` | **App 端 UI 修改标准作业流程**：参考源优先（B 站视频/带注释参考图/uiverse 元素）→ 反馈分类（删/改/增/不动）→ 设计决策先写 → 实现 → 截图自检（真实后端链路 + focus 态）→ 门禁 → 文档与日志归位（UI 记录进 `worklog/安卓开发日志.md`）→ 分离 commit；含踩坑清单（色板普查/@iconify-json/ph 包名/Lucide ISC/中文负字距等） |
 
-## 里程碑（详见 docs/04、docs/06）
+## 里程碑（详见 docs/04、docs/06；状态随工作日志滚动更新）
 
-1. **M1 骨架**（第 1 周）：本仓库脚手架 + 三端 CI + 语音三件套 stub 联调
-2. **M2 MVP**（第 2-3 周）：口语闭环（注册→入学测试→场景对话→录音→评分→建议→报告）
-3. **M3 特色**（第 4-5 周）：唱歌评分做深（音准/节奏/发音）+ 推荐/报表演示化 + 四指标看板；（门禁）wav2vec2 微调
-4. **M4 联调**（第 6 周）：性能 p95 达标、演示脚本、答辩材料
+1. **M1 骨架**（第 1 周）✅：本仓库脚手架 + 三端 CI + 语音三件套 stub 联调
+2. **M2 MVP**（第 2-3 周）✅：口语闭环（注册→入学测试→场景对话→录音→评分→建议→报告）+ 答辩导师
+3. **M2.5 移动端真形态** ✅：移动端五页重构 + **口语收敛**（场景对话「先选场景再开工」+ AI 自由说）+ **英语社区主页**（演示帧）+ 自由对话后端无状态接口（docs/14 §12）
+4. **M3 特色**（进行中）：唱歌评分做深（音准/节奏/发音）+ 推荐/报表演示化 + **社区真实流/学习画像/词汇速记（见上方演进方向）** + 四指标看板；（门禁）wav2vec2 微调
+5. **M4 联调**（第 6 周）：性能 p95 达标、演示脚本、答辩材料
 
 ## 红线（公开仓库）
 

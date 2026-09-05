@@ -210,6 +210,11 @@ class EventTypes:
     PRACTICE_COMPLETE = "practice_complete"
     FUN_ACTION = "fun_action"
     CORPUS_HIT = "corpus_hit"  # 语言点覆盖度命中（docs/14 §6.3，2026-09 拍板）
+    FREE_CHAT_OPEN = "free_chat_open"  # 自由对话进页（docs/14 §12.3，2026-09-05）
+    FREE_CHAT_TURN = "free_chat_turn"  # 自由对话每回合（payload audio: bool；docs/14 §12.3）
+    FREE_CHAT_SWITCH = "free_chat_switch"  # 功能行切场景（payload to: scene；docs/14 §12.3）
+    FREE_CHAT_RESET = "free_chat_reset"  # 自由对话功能行：新对话（docs/14 §12.3）
+    FREE_CHAT_RATE = "free_chat_rate"  # 自由对话功能行：语速切换（payload rate；docs/14 §12.3）
 
 
 class TicketStatuses:
