@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 
+import MobileCommentsSheet from '@/components/mobile/MobileCommentsSheet.vue'
 import MobilePostActions from '@/components/mobile/MobilePostActions.vue'
 import MobilePostCard from '@/components/mobile/MobilePostCard.vue'
 
@@ -19,7 +20,9 @@ function makePost(overrides: Partial<CommunityPost> = {}): CommunityPost {
     desc: 'Education experts say AI partners are changing how students practice speaking.',
     media: { gradient: 'linear-gradient(135deg, #16303a, #2b5566)', label: '📰 NEWS' },
     stats: { like: 1240, comment: 46, coin: 37, share: 15 },
+    comments: [{ author: 'Kai', text: 'Nice one.', time: '5 分钟前' }],
     liked: false,
+    coined: false,
     tint: '#16303a',
     ...overrides,
   }
@@ -39,7 +42,7 @@ describe('MobilePostCard', () => {
     expect(text).toContain('15') // share
   })
 
-  it('点赞按钮：click 触发 toggle-like，组件透传；liked 态带 is-liked 与 aria-pressed', async () => {
+  it('点赞按钮：click 触发 toggle-like；liked 态带 is-liked 与 aria-pressed', async () => {
     const wrapper = mount(MobilePostCard, { props: { post: makePost() } })
     const button = wrapper.get('button[aria-label="点赞"]')
     expect(button.attributes('aria-pressed')).toBe('false')
@@ -51,6 +54,16 @@ describe('MobilePostCard', () => {
     const likedButton = wrapper.get('button.u-comm-action.is-liked')
     expect(likedButton.attributes('aria-pressed')).toBe('true')
     expect(likedButton.attributes('aria-label')).toBe('取消点赞')
+  })
+
+  it('投币 / 分享 / 评论按钮透传事件', async () => {
+    const wrapper = mount(MobilePostCard, { props: { post: makePost() } })
+    await wrapper.get('button[aria-label="投币"]').trigger('click')
+    await wrapper.get('button[aria-label="分享"]').trigger('click')
+    await wrapper.get('button[aria-label="评论"]').trigger('click')
+    expect(wrapper.emitted('toggle-coin')).toHaveLength(1)
+    expect(wrapper.emitted('share')).toHaveLength(1)
+    expect(wrapper.emitted('open-comments')).toHaveLength(1)
   })
 
   it('视频帖：渲染视频封面样式与时长角标', () => {
@@ -70,12 +83,72 @@ describe('MobilePostCard', () => {
 })
 
 describe('MobilePostActions', () => {
-  it('非点赞项为展示（span），仅点赞为可点 button', () => {
+  it('四个操作均为 button（评论/点赞/投币/分享全交互）', () => {
     const wrapper = mount(MobilePostActions, {
-      props: { stats: makePost().stats, liked: false },
+      props: { stats: makePost().stats, liked: false, coined: false },
     })
-    const buttons = wrapper.findAll('button')
-    expect(buttons).toHaveLength(1)
-    expect(wrapper.findAll('.u-comm-action')).toHaveLength(4)
+    expect(wrapper.findAll('button')).toHaveLength(4)
+  })
+
+  it('投币：click 触发 toggle-coin；coined 态带 is-coined 与 aria-pressed', async () => {
+    const wrapper = mount(MobilePostActions, {
+      props: { stats: makePost().stats, liked: false, coined: false },
+    })
+    const button = wrapper.get('button[aria-label="投币"]')
+    await button.trigger('click')
+    expect(wrapper.emitted('toggle-coin')).toHaveLength(1)
+
+    await wrapper.setProps({ coined: true })
+    expect(wrapper.get('button.u-comm-action.is-coined').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('button.u-comm-action.is-coined').attributes('aria-label')).toBe('取消投币')
+  })
+
+  it('评论与分享 click 各自触发事件', async () => {
+    const wrapper = mount(MobilePostActions, {
+      props: { stats: makePost().stats, liked: false, coined: false },
+    })
+    await wrapper.get('button[aria-label="评论"]').trigger('click')
+    await wrapper.get('button[aria-label="分享"]').trigger('click')
+    expect(wrapper.emitted('open-comments')).toHaveLength(1)
+    expect(wrapper.emitted('share')).toHaveLength(1)
+  })
+})
+
+describe('MobileCommentsSheet', () => {
+  const mountSheet = (comments: CommunityPost['comments']) =>
+    mount(MobileCommentsSheet, {
+      props: { open: true, title: 'Title', comments },
+      global: { stubs: { teleport: true } },
+    })
+
+  it('渲染标题与评论列表', () => {
+    const wrapper = mountSheet([{ author: 'Kai', text: 'Nice one.', time: '5 分钟前' }])
+    expect(wrapper.text()).toContain('Title')
+    expect(wrapper.text()).toContain('Kai')
+    expect(wrapper.text()).toContain('Nice one.')
+  })
+
+  it('空评论：显示空态文案', () => {
+    const wrapper = mountSheet([])
+    expect(wrapper.text()).toContain('还没有评论')
+  })
+
+  it('输入后发送：触发 add-comment 并清空输入；空输入禁发', async () => {
+    const wrapper = mountSheet([])
+    const send = wrapper.get('button[aria-label="发表评论"]')
+    expect(send.attributes('disabled')).toBeDefined()
+
+    await wrapper.get('input').setValue('  Great post!  ')
+    expect(send.attributes('disabled')).toBeUndefined()
+    await send.trigger('click')
+
+    expect(wrapper.emitted('add-comment')).toEqual([['Great post!']])
+    expect((wrapper.get('input').element as HTMLInputElement).value).toBe('')
+  })
+
+  it('关闭按钮触发 update:open false', async () => {
+    const wrapper = mountSheet([])
+    await wrapper.get('button[aria-label="关闭评论"]').trigger('click')
+    expect(wrapper.emitted('update:open')).toEqual([[false]])
   })
 })
