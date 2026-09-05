@@ -411,39 +411,41 @@ function onSseEvent(e: SseStreamEvent) {
       </section>
     </div>
 
-    <!-- 录音大按钮（ink 圆形 + 波纹 / 忙碌旋转弧） -->
-    <div class="u-tb u-tb--dock" role="toolbar" aria-label="口语功能">
+    <!-- 底部 dock（2026-09-05 重构：单一固定容器内标签/录音钮/功能行自然堆叠，杜绝 fixed 坐标重叠） -->
+    <div class="u-chat-dock">
+      <div v-if="phase !== 'done'" class="u-rec-label">
+        {{ recording ? '录音中，点击 ■ 停止并提交' : phase === 'busy' ? '评分中，请稍候…' : '点击录音（≤15s）' }}
+      </div>
       <button
-        class="u-tb-item"
+        class="u-rec"
+        :class="{ 'u-rec--recording': recording, 'u-rec--busy': phase === 'busy' }"
+        :disabled="phase !== 'ready' && !recording"
         type="button"
-        title="切换到自由对话（AI 对聊，无固定题卡）"
-        @click="router.push('/m/free-chat')"
+        :title="recording ? '停止录音' : '开始录音'"
+        @click="startRecording"
       >
-        <MobileIcon name="wave" :size="22" />
-        <span class="u-tb-item__label">自由对话</span>
+        <span v-if="phase !== 'busy'" class="ring" />
+        <span v-if="phase === 'busy'" class="arc" />
+        <MobileIcon v-else-if="recording" name="stop" :size="26" />
+        <MobileIcon v-else name="mic" :size="30" />
       </button>
-      <button class="u-tb-item" type="button" title="切换预置场景" @click="sheetOpen = true">
-        <MobileIcon name="chevron" :size="22" />
-        <span class="u-tb-item__label">场景选择</span>
-      </button>
-    </div>
 
-    <div v-if="phase !== 'done'" class="u-rec-label">
-      {{ recording ? '录音中，点击 ■ 停止并提交' : phase === 'busy' ? '评分中，请稍候…' : '点击录音（≤15s）' }}
+      <div class="u-tb u-tb--dock" role="toolbar" aria-label="口语功能">
+        <button
+          class="u-tb-item"
+          type="button"
+          title="切换到自由对话（AI 对聊，无固定题卡）"
+          @click="router.push('/m/free-chat')"
+        >
+          <MobileIcon name="wave" :size="22" />
+          <span class="u-tb-item__label">自由对话</span>
+        </button>
+        <button class="u-tb-item" type="button" title="切换预置场景" @click="sheetOpen = true">
+          <MobileIcon name="chevron" :size="22" />
+          <span class="u-tb-item__label">场景选择</span>
+        </button>
+      </div>
     </div>
-    <button
-      class="u-rec"
-      :class="{ 'u-rec--recording': recording, 'u-rec--busy': phase === 'busy' }"
-      :disabled="phase !== 'ready' && !recording"
-      type="button"
-      :title="recording ? '停止录音' : '开始录音'"
-      @click="startRecording"
-    >
-      <span v-if="phase !== 'busy'" class="ring" />
-      <span v-if="phase === 'busy'" class="arc" />
-      <MobileIcon v-else-if="recording" name="stop" :size="26" />
-      <MobileIcon v-else name="mic" :size="30" />
-    </button>
 
     <ScenePickerSheet :open="sheetOpen" @update:open="sheetOpen = $event" @select="onScenePicked" />
   </div>

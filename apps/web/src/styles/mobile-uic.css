@@ -81,22 +81,36 @@ body {
   padding-bottom: 48px;
 }
 
-/* 场景对话页：底部 dock 加大留白（自由对话行 64px + 录音标签 + 录音钮，2026-09-05） */
-.u-content--dock {
-  padding-bottom: 252px;
-}
-
-/* 场景对话页功能行：与录音钮/标签同 dock（fixed 居中，位于录音标签上方） */
-.u-tb--dock {
+/* 场景对话页：底部 dock 固定容器（标签/录音钮/功能行自然堆叠，杜绝 fixed 坐标重叠；2026-09-05） */
+.u-chat-dock {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 172px;
+  bottom: 0;
   width: 100%;
   max-width: 480px;
-  padding: 0 20px;
-  margin: 0; /* 覆盖 .u-tb 的 margin-bottom（fixed 下会干扰 bottom 定位） */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px calc(12px + env(safe-area-inset-bottom));
   z-index: 5;
+  pointer-events: none; /* 容器不拦截；子元素单独恢复 */
+}
+
+.u-chat-dock > * {
+  pointer-events: auto;
+}
+
+/* 场景对话页：底部 dock 加大留白（新版 dock 高 ≈200px） */
+.u-content--dock {
+  padding-bottom: 216px;
+}
+
+/* 场景对话页功能行：dock 内最底一行（组长反馈 2026-09-05：录音按钮要"到上面去"） */
+.u-tb--dock {
+  width: 100%;
+  margin: 0; /* 覆盖 .u-tb 的 margin-bottom */
 }
 
 /* ============================================================
@@ -1092,10 +1106,7 @@ body {
  * 录音大按钮（ink 实心圆形 + 外圈波纹；忙碌=旋转弧）
  * ============================================================ */
 .u-rec {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 48px;
+  position: relative; /* ring 的定位锚（原 fixed：现由 u-chat-dock 承载） */
   width: 76px;
   height: 76px;
   border-radius: 50%;
@@ -1110,7 +1121,6 @@ body {
   transition:
     background-color 150ms ease-out,
     transform 150ms ease-out;
-  z-index: 5;
 }
 
 .u-rec:hover {
@@ -1118,7 +1128,7 @@ body {
 }
 
 .u-rec:active {
-  transform: translateX(-50%) scale(0.96);
+  transform: scale(0.96);
 }
 
 .u-rec svg {
@@ -1160,16 +1170,10 @@ body {
 }
 
 .u-rec-label {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 142px;
+  width: 100%;
   font-size: 13px;
   color: var(--u-weak);
-  z-index: 5;
   text-align: center;
-  width: 100%;
-  max-width: 480px;
   pointer-events: none;
 }
 

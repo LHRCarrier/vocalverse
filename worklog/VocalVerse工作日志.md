@@ -11,7 +11,7 @@
 - 埋点：`free_chat_switch{to:scene, scene_id?}` 保留触发；`free_chat_reset`/`free_chat_rate` 因功能改版**暂不触发**，白名单（CHECK 15 类）与 docs/06 §9.1 预留登记（避免再造迁移回退）；
 - 验证：前端 lint 0 warning / typecheck / vitest / build 绿；后端未动（0 变更，无迁移）；本改动无 OpenAPI 影响；
 - 注：上一轮「语速三档 + 新对话收编」的 code 已随本轮提交历史保留在仓库（git 历史可回溯），但 UI 不再暴露。
-- **组员反馈修正（同日）**：① `/m/free-chat` 返回键用 `router.back()` 会撞 `/demo`（history 依赖，直进 URL 场景可复现）→ 改为确定性导航：自由对话返回 → `/m/chat`、场景对话返回 → `/m/home`；② `/m/chat` 排版错乱——录音钮/录音标签为 `position:fixed`，功能行却是文档流元素排到页面中部 → 功能行改 `.u-tb--dock`（`fixed` 居中于录音标签上方）＋ 内容区 `.u-content--dock`（padding-bottom 252px）防气泡被 dock 遮挡。
+- **组员反馈修正（同日）**：① `/m/free-chat` 返回键用 `router.back()` 会撞 `/demo`（history 依赖，直进 URL 场景可复现）→ 改为确定性导航：自由对话返回 → `/m/chat`、场景对话返回 → `/m/home`；② `/m/chat` 排版错乱——录音钮/录音标签为 `position:fixed`，功能行却是文档流元素排到页面中部 → 功能行改 `.u-tb--dock`；③ 组长再反馈：录音按钮要"到上面去" → 初版调 fixed 坐标（功能行贴底/钮上移），**但标签仍被按钮遮挡**（多 fixed 元素各自定位难保不叠）→ **彻底重构为单一固定容器 `.u-chat-dock`**（标签→录音钮→功能行 flex 自然堆叠，指针穿透容器、子元素恢复），内容区留白 216px；再调坐标的教训：fixed 元素多了以后坐标对表不可靠，改用容器布局。
 
 —— 执行人：组长 LHRCarrier（AI 代工整理）
 
