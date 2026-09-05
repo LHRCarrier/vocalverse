@@ -6,8 +6,6 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
 import MobilePracticeView from '@/views/mobile/MobilePracticeView.vue'
 
-beforeEach(() => setActivePinia(createPinia()))
-
 const routes = [
   { path: '/m/home', component: { template: '<div/>' } },
   { path: '/m/search', component: { template: '<div/>' } },
@@ -20,9 +18,12 @@ const routes = [
   { path: '/m/messages/:id', component: { template: '<div/>' } },
   { path: '/m/me', component: { template: '<div/>' } },
   { path: '/m/report', component: { template: '<div/>' } },
+  { path: '/m/compose', component: { template: '<div/>' } },
 ]
 
 const router = createRouter({ history: createMemoryHistory(), routes })
+
+beforeEach(() => setActivePinia(createPinia()))
 
 async function mountAt(path: string) {
   await router.push(path)
@@ -30,24 +31,47 @@ async function mountAt(path: string) {
   return mount(MobileTabBar, { global: { plugins: [router] } })
 }
 
-describe('MobileTabBar（全局显隐 · 5 位对称）', () => {
-  it('tab 级页面显示：5 个入口，＋ 发帖在中央', async () => {
+describe('MobileTabBar（双场景分组）', () => {
+  it('社区组：5 位（社区/搜索/＋发帖/练习出口/私信）', async () => {
     const wrapper = await mountAt('/m/home')
     expect(wrapper.find('.u-tabbar').exists()).toBe(true)
     const links = wrapper.findAll('a')
     expect(links).toHaveLength(5)
     expect(wrapper.find('a[aria-label="搜索"]').exists()).toBe(true)
     expect(wrapper.find('a[aria-label="发帖"]').exists()).toBe(true)
-    expect(wrapper.find('a[aria-label="练习"]').exists()).toBe(true)
-    // 中央按钮位于第 3 位（左右各 2）→ 对称
-    expect(links[2].attributes('aria-label')).toBe('发帖')
+    expect(wrapper.find('a[aria-label="练习"]').exists()).toBe(true) // 出口
+    expect(wrapper.find('a[aria-label="私信"]').exists()).toBe(true)
+    expect(links[2].attributes('aria-label')).toBe('发帖') // 中央对称
   })
 
-  it('二级页隐藏（会话/报告/我的/自由对话/口语场景/唱吧）', async () => {
-    for (const p of ['/m/messages/1', '/m/report', '/m/me', '/m/free-chat', '/m/chat', '/m/chat/3', '/m/sing']) {
+  it('练习组：5 位（Home 出口/场景对话/开始练习中央/唱吧/自由对话）', async () => {
+    const wrapper = await mountAt('/m/practice')
+    expect(wrapper.find('.u-tabbar').exists()).toBe(true)
+    const links = wrapper.findAll('a')
+    expect(links).toHaveLength(5)
+    expect(wrapper.find('a[aria-label="返回社区"]').exists()).toBe(true) // Home 出口
+    expect(wrapper.find('a[aria-label="场景对话"]').exists()).toBe(true)
+    expect(wrapper.find('a[aria-label="唱吧"]').exists()).toBe(true)
+    expect(wrapper.find('a[aria-label="自由对话"]').exists()).toBe(true)
+    expect(links[2].attributes('aria-label')).toBe('开始练习') // 中央对称
+  })
+
+  it('练习场景内全部显示练习组（chat/场景直入/free-chat/sing）', async () => {
+    for (const p of ['/m/chat', '/m/chat/3', '/m/free-chat', '/m/sing']) {
       const wrapper = await mountAt(p)
-      expect(wrapper.find('.u-tabbar').exists(), p).toBe(false)
+      expect(wrapper.find('.u-tabbar').exists(), p).toBe(true)
+      expect(wrapper.find('a[aria-label="返回社区"]').exists(), p).toBe(true)
     }
+  })
+
+  it('社区场景内（会话/我的/报告）显示社区组；发帖沉浸页隐藏', async () => {
+    for (const p of ['/m/messages/1', '/m/me', '/m/report']) {
+      const wrapper = await mountAt(p)
+      expect(wrapper.find('.u-tabbar').exists(), p).toBe(true)
+      expect(wrapper.find('a[aria-label="搜索"]').exists(), p).toBe(true)
+    }
+    const compose = await mountAt('/m/compose')
+    expect(compose.find('.u-tabbar').exists()).toBe(false)
   })
 })
 
