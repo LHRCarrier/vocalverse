@@ -294,7 +294,8 @@ function replay(index: number, text: string) {
         </div>
 
         <div v-if="recording || sending" class="u-fc-state">
-          {{ recording ? '聆听中… 点击 ■ 停止并发送' : 'AI 思考中…' }}
+          <div v-if="recording" class="u-fc-state__text">聆听中… 点击 ■ 停止并发送</div>
+          <div v-else class="u-load u-load--bar" aria-hidden="true"><div class="u-load__rain" /></div>
         </div>
         <div class="u-fc-bar">
           <input

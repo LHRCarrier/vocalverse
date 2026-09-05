@@ -392,11 +392,9 @@ function onSseEvent(e: SseStreamEvent) {
         </div>
       </section>
 
-      <!-- 加载态：声波线稿锚点 -->
-      <div v-else-if="!bubbles.length && phase === 'loading'" class="u-empty">
-        <div class="u-empty__art"><MobileArt name="wave" :size="104" /></div>
-        <div class="u-empty__title">正在进入场景…</div>
-        <div class="u-empty__sub">数字人正在准备开场白，稍等片刻。</div>
+      <!-- 加载态：墨水流动动画（组员 css-rain 方案，2026-09-05；纯视觉，无需文案） -->
+      <div v-else-if="!bubbles.length && phase === 'loading'" class="u-empty" role="status" aria-label="正在进入场景">
+        <div class="u-load" aria-hidden="true"><div class="u-load__rain" /></div>
       </div>
 
       <!-- 对话流：AI track 气泡 + 用户炭黑气泡 -->
