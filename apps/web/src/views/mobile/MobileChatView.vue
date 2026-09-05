@@ -3,19 +3,24 @@
  * 移动端 · 私信会话（演示帧：气泡 + 本地收发；发送 1.2s 后对方演示自动回复）
  * M3 接真实消息流（只换数据源，组件层不返工）。
  */
-import { nextTick, onUnmounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, nextTick, onUnmounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import { createDemoConversations, type DemoMessage } from '@/data/messages-demo'
+import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
 const route = useRoute()
+const router = useRouter()
+const ui = useUiStore()
+const auth = useAuthStore()
 const convId = Number(route.params.id)
 const conv = createDemoConversations().find((c) => c.id === convId)
 
 const title = conv?.name ?? '私信'
-const tint = conv?.tint ?? '#1c1c1a'
+const avatarLetter = computed(() => (auth.me?.nickname ?? auth.me?.username ?? '同').slice(0, 1).toUpperCase())
 const messages = ref<DemoMessage[]>(conv ? conv.history.map((m) => ({ ...m })) : [])
 const draft = ref('')
 const listEl = ref<HTMLElement | null>(null)
@@ -56,11 +61,22 @@ onUnmounted(() => clearTimeout(replyTimer))
 <template>
   <div class="u-phone u-chat">
     <header class="u-chat__top">
-      <RouterLink to="/m/messages" class="u-back" title="返回私信" aria-label="返回私信">
+      <button class="u-topbar__back" type="button" title="返回私信" aria-label="返回私信" @click="router.push('/m/messages')">
         <MobileIcon name="back" :size="18" />
-      </RouterLink>
-      <span class="u-chat__ava" :style="{ background: tint }">{{ title.slice(0, 1) }}</span>
+      </button>
+      <button class="u-topbar__ava" type="button" title="账户菜单" aria-label="账户菜单" @click="ui.openDrawer()">
+        {{ avatarLetter }}
+      </button>
       <strong class="u-chat__name">{{ title }}</strong>
+      <button
+        class="u-topbar__act"
+        type="button"
+        title="会话信息（演示）"
+        aria-label="会话信息"
+        @click="ui.showToast('会话信息 · M3 上线')"
+      >
+        <MobileIcon name="info" :size="18" />
+      </button>
     </header>
 
     <div ref="listEl" class="u-chat__list" aria-label="消息记录">

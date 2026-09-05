@@ -12,41 +12,35 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import MobileAccountDrawer from '@/components/mobile/MobileAccountDrawer.vue'
 import MobileCommentsSheet from '@/components/mobile/MobileCommentsSheet.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobilePostCard from '@/components/mobile/MobilePostCard.vue'
 import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
+import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import { shareDemoLink } from '@/composables/share'
 import { COMMUNITY_TABS, DEMO_FEED } from '@/data/community-demo'
 import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
 import type { CommunityPost, CommunityTab } from '@/types/community'
 
 const auth = useAuthStore()
 const router = useRouter()
-
-const displayName = ref(auth.me?.nickname ?? auth.me?.username ?? '同学')
-const avatarLetter = ref(displayName.value.slice(0, 1).toUpperCase())
+const ui = useUiStore()
 
 /* ---------- 领域标签（X 式：为你推荐 = 全量混排） ---------- */
 const tabs = COMMUNITY_TABS
 const activeTab = ref<CommunityTab>('为你推荐')
 
-/* 加好友演示 toast（仅数据展示 · M3 接真实好友/关注流） */
-const toastText = ref('')
-let toastTimer: ReturnType<typeof setTimeout> | null = null
-
-function showToast(msg: string) {
-  toastText.value = msg
-  if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => {
-    toastText.value = ''
-  }, 2200)
+/* 加好友演示（仅数据展示 · M3 接真实好友/关注流） */
+function demoAddFriend() {
+  ui.showToast('好友请求已发送 · M3 上线')
 }
 
-function demoAddFriend() {
-  showToast('好友请求已发送 · M3 上线')
+/* 写消息（X 顶栏同款：私信入口） */
+function openMessages() {
+  void router.push('/m/messages')
 }
 
 /* ---------- 互动（组长 2026-09-05 升级拍板：评论/投币/分享全交互 · 演示帧本地，不落库） ---------- */
@@ -59,19 +53,15 @@ function toggleCoin(item: CommunityPost) {
 }
 
 /** 分享：系统分享面板可用则打开；否则复制演示链接（分享计数=转发数语义，点击不加计） */
-function sharePost(item: CommunityPost) {
-  const link = `https://vocalverse.demo/post/${item.id}`
-  if (navigator.share) {
-    navigator
-      .share({ title: item.title, text: item.desc ?? '', url: link })
-      .then(() => showToast('已分享'))
-      .catch(() => undefined) // 用户取消分享面板
-  } else {
-    void navigator.clipboard
-      ?.writeText(link)
-      .then(() => showToast('链接已复制（演示链接）'))
-      .catch(() => showToast('复制失败，请手动复制'))
-  }
+async function sharePost(item: CommunityPost) {
+  const result = await shareDemoLink({
+    title: item.title,
+    text: item.desc ?? '',
+    url: `https://vocalverse.demo/post/${item.id}`,
+  })
+  if (result === 'shared') ui.showToast('已分享')
+  else if (result === 'copied') ui.showToast('链接已复制（演示链接）')
+  else if (result === 'failed') ui.showToast('复制失败，请手动复制')
 }
 
 function addComment(item: CommunityPost, text: string) {
@@ -82,20 +72,6 @@ function addComment(item: CommunityPost, text: string) {
 
 function handleAddComment(text: string) {
   if (openCommentsPost.value) addComment(openCommentsPost.value, text)
-}
-
-/* ---------- 账户抽屉（组长拍板：底部「我的」→ 顶栏头像，X 式） ---------- */
-const drawerOpen = ref(false)
-
-function onDrawerNavigate(path: string) {
-  drawerOpen.value = false
-  void router.push(path)
-}
-
-function onLogout() {
-  drawerOpen.value = false
-  auth.clear()
-  window.location.href = '/login'
 }
 
 /* ---------- 动态流（【演示帧】仅数据展示；M3 接真实 JOIN 流，只换数据源——docs/34 §7） ---------- */
@@ -124,24 +100,19 @@ function reloadFeed() {
 
 <template>
   <div class="u-phone">
-    <div class="u-comm">
-      <!-- X 式顶栏（左头像 → 账户抽屉 / 中 Logo / 右加好友；随滚动移出屏幕，非 sticky） -->
-      <header class="u-x-top">
-        <button
-          class="u-x-avatar u-x-avatar--btn"
-          type="button"
-          title="账户菜单"
-          aria-label="账户菜单"
-          @click="drawerOpen = true"
-        >
-          {{ avatarLetter }}
-        </button>
-        <span class="u-x-logo">社区</span>
-        <button class="u-x-act" type="button" title="加好友（演示）" aria-label="加好友" @click="demoAddFriend">
+    <!-- 统一顶栏（全局头像 → 账户抽屉 / 标题「社区」/ 右侧：加好友 + 写消息） -->
+    <MobileTopBar title="社区">
+      <template #actions>
+        <button class="u-topbar__act" type="button" title="加好友（演示）" aria-label="加好友" @click="demoAddFriend">
           <MobileIcon name="user-plus" :size="18" />
         </button>
-      </header>
+        <button class="u-topbar__act" type="button" title="写消息" aria-label="写消息" @click="openMessages">
+          <MobileIcon name="mail" :size="18" />
+        </button>
+      </template>
+    </MobileTopBar>
 
+    <div class="u-comm">
       <!-- 领域标签行（X 式文字标签：为你推荐▾ + 三个领域） -->
       <nav class="u-x-tabs" aria-label="社区领域">
         <button
@@ -197,9 +168,6 @@ function reloadFeed() {
       <p class="u-comm__note">内容为演示数据，仅展示；互动与真实流的接口按 docs/10 注记排期 M3。</p>
     </div>
 
-    <!-- 发布演示 toast（X 式蓝药丸 → 我们白卡 + 圆点） -->
-    <div v-if="toastText" class="u-toast show"><span class="dot" aria-hidden="true" />{{ toastText }}</div>
-
     <!-- 评论面板（演示级：列表 + 发表；嵌套楼 M3） -->
     <MobileCommentsSheet
       :open="openCommentsId !== null"
@@ -207,15 +175,6 @@ function reloadFeed() {
       :comments="openCommentsPost?.comments ?? []"
       @update:open="openCommentsId = null"
       @add-comment="handleAddComment"
-    />
-
-    <!-- 账户抽屉（X 式：你的资料/消息/设置与隐私/退出） -->
-    <MobileAccountDrawer
-      :open="drawerOpen"
-      :me="auth.me"
-      @update:open="drawerOpen = $event"
-      @navigate="onDrawerNavigate"
-      @logout="onLogout"
     />
 
     <MobileTabBar />

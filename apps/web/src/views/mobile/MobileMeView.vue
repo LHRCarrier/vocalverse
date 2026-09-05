@@ -6,16 +6,20 @@
  * 数据：真实账户（auth.me）；统计/目标为【占位·M3】演示帧（M3 埋点聚合后替换）。
  * 视觉：档案卡（四角星线稿锚点）+ 目标 chips + Stat 32px 统计行 + 设置列表卡 + 危险操作（白底红字）。
  */
-import { computed, onUnmounted, ref } from 'vue'
+import { computed } from 'vue'
 
+import { shareDemoLink } from '@/composables/share'
 import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
+import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import '@/styles/mobile-uic.css'
 
 const auth = useAuthStore()
+const ui = useUiStore()
 
 const displayName = computed(() => auth.me?.nickname ?? auth.me?.username ?? '同学')
 const avatarLetter = computed(() => displayName.value.slice(0, 1).toUpperCase())
@@ -24,21 +28,26 @@ const level = computed(() => auth.me?.level ?? 'L1')
 /* ---------- 学习目标（【占位·M3】目标标签用于个性化推荐，P1） ---------- */
 const goals = ['日常交流', '职场英语', '面试表达'] as const
 
-/* ---------- 演示交互 toast ---------- */
-const toastMsg = ref('')
-const toastShown = ref(false)
-let toastTimer: ReturnType<typeof setTimeout> | undefined
-
 function comingSoon(feature: string) {
-  toastMsg.value = `「${feature}」M3 上线后开放`
-  toastShown.value = true
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => {
-    toastShown.value = false
-  }, 2500)
+  ui.showToast(`「${feature}」M3 上线后开放`)
 }
 
-onUnmounted(() => clearTimeout(toastTimer))
+/** 顶栏 · 分享学习档案（演示：系统面板 / 复制链接） */
+async function shareProfile() {
+  const result = await shareDemoLink({
+    title: 'VocalVerse 学习档案',
+    text: `${displayName.value} · 累计练习 38 轮 · 平均分 86.4`,
+    url: 'https://vocalverse.demo/profile/demoadult',
+  })
+  if (result === 'shared') ui.showToast('已分享')
+  else if (result === 'copied') ui.showToast('档案链接已复制（演示链接）')
+  else if (result === 'failed') ui.showToast('复制失败，请手动复制')
+}
+
+/** 顶栏 · 齿轮：滚到设置区（页面内已有设置列表） */
+function scrollToSettings() {
+  document.querySelector('.u-settings')?.scrollIntoView({ behavior: 'smooth' })
+}
 
 function logout() {
   if (!window.confirm('确定退出登录吗？')) return
@@ -49,6 +58,17 @@ function logout() {
 
 <template>
   <div class="u-phone">
+    <MobileTopBar title="我的">
+      <template #actions>
+        <button class="u-topbar__act" type="button" title="分享档案（演示）" aria-label="分享档案" @click="shareProfile">
+          <MobileIcon name="share" :size="18" />
+        </button>
+        <button class="u-topbar__act" type="button" title="设置" aria-label="设置" @click="scrollToSettings">
+          <MobileIcon name="settings" :size="18" />
+        </button>
+      </template>
+    </MobileTopBar>
+
     <div class="u-content">
       <!-- 档案卡（四角星线稿锚点） -->
       <section class="u-profile">
@@ -144,10 +164,5 @@ function logout() {
     </div>
 
     <MobileTabBar />
-
-    <!-- Toast -->
-    <div class="u-toast" :class="{ show: toastShown }">
-      <span class="dot" /><span>{{ toastMsg }}</span>
-    </div>
   </div>
 </template>

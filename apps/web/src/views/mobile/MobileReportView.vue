@@ -10,13 +10,17 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { fetchReport, type ReportPayload } from '@/api/practice'
+import { shareDemoLink } from '@/composables/share'
+import { useUiStore } from '@/stores/ui'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
+import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import '@/styles/mobile-uic.css'
 
 const route = useRoute()
 const router = useRouter()
+const ui = useUiStore()
 
 /* ---------- 真实报告（结构见 docs/14 §3.1 metrics 契约） ---------- */
 interface ReportAttempt {
@@ -80,6 +84,19 @@ function fmtDuration(s: number | null | undefined): string | null {
   return m > 0 ? `${m} 分 ${sec} 秒` : `${sec} 秒`
 }
 
+/** 顶栏 · 分享报告（演示：系统面板 / 复制链接） */
+async function shareReport() {
+  const r = report.value
+  const result = await shareDemoLink({
+    title: 'VocalVerse 评分报告',
+    text: r ? `会话 #${route.query.reportId}` : 'Perfect Night · LE SSERAFIM · 12-16 20:15',
+    url: r ? `https://vocalverse.demo/report/${route.query.reportId}` : 'https://vocalverse.demo/report/demo',
+  })
+  if (result === 'shared') ui.showToast('已分享')
+  else if (result === 'copied') ui.showToast('报告链接已复制（演示链接）')
+  else if (result === 'failed') ui.showToast('复制失败，请手动复制')
+}
+
 /* ---------- 演示帧（无 reportId · 跟唱报告示例值） ---------- */
 const demoLines = [
   { lyric: "You know I'm just a girl...", comment: '音准优秀，连读自然', score: '95', color: '#1E2B26', accent: true },
@@ -90,19 +107,19 @@ const demoLines = [
 
 <template>
   <div class="u-phone">
-    <div class="u-content u-content--free">
-      <!-- 头部 -->
-      <header class="u-head" style="margin-bottom: 20px">
-        <button class="u-back" type="button" title="返回" @click="router.back()">
-          <MobileIcon name="back" />
+    <!-- 统一顶栏（返回 + 全局头像 / 评分报告 / 分享报告） -->
+    <MobileTopBar title="评分报告" back @back="router.back()">
+      <template #actions>
+        <button class="u-topbar__act" type="button" title="分享报告（演示）" aria-label="分享报告" @click="shareReport">
+          <MobileIcon name="share" :size="18" />
         </button>
-        <div style="flex: 1; min-width: 0">
-          <h1 style="font-size: 22px; font-weight: 700">评分报告</h1>
-          <p class="u-head__sub">
-            {{ report ? `会话 #${route.query.reportId}` : 'Perfect Night · LE SSERAFIM · 12-16 20:15' }}
-          </p>
-        </div>
-      </header>
+      </template>
+    </MobileTopBar>
+
+    <div class="u-content u-content--free">
+      <p class="u-head__sub" style="margin: 0 0 16px">
+        {{ report ? `会话 #${route.query.reportId}` : 'Perfect Night · LE SSERAFIM · 12-16 20:15' }}
+      </p>
 
       <!-- 深紫评分卡（同色系 chip + 大数值 + 音符线稿锚点 + 幽灵按钮） -->
       <section class="u-dark-card u-dark-card--purple">

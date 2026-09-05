@@ -17,6 +17,7 @@ import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
+import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import ScenePickerSheet from '@/components/mobile/ScenePickerSheet.vue'
 import '@/styles/mobile-uic.css'
 
@@ -395,12 +396,15 @@ function onSseEvent(e: SseStreamEvent) {
       role="status"
       :aria-label="lineStatus === 'busy' ? 'AI 处理中' : lineStatus === 'error' ? '出错了' : '空闲'"
     />
-    <div class="u-content u-content--dock" style="padding-top: 72px">
-      <!-- 顶部只留返回按钮（文字全部去掉）；返回 = 口语模式入口不再依赖 history（2026-09-05：router.back() 会撞 /demo） -->
-      <button class="u-back u-back--float" type="button" title="返回" @click="router.push('/m/home')">
-        <MobileIcon name="back" />
-      </button>
-
+    <!-- 统一顶栏（返回 + 全局头像 / 口语 / 场景选择） -->
+    <MobileTopBar title="口语" back @back="router.push('/m/home')">
+      <template #actions>
+        <button class="u-topbar__act" type="button" title="选择场景" aria-label="选择场景" @click="sheetOpen = true">
+          <MobileIcon name="coffee" :size="18" />
+        </button>
+      </template>
+    </MobileTopBar>
+    <div class="u-content u-content--dock">
       <!-- 开始流程第 1 步：先选场景（只留图 + 按钮；按钮仅此一个，底部功能行的重复入口在 choose 态隐藏） -->
       <section v-if="stage === 'choose'" class="u-empty u-empty--center">
         <div class="u-empty__art"><MobileArt name="mic" :size="96" /></div>

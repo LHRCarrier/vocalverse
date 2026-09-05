@@ -16,6 +16,7 @@ import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
+import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import '@/styles/mobile-uic.css'
 
 interface Bubble {
@@ -249,12 +250,15 @@ function replay(index: number, text: string) {
       role="status"
       :aria-label="lineStatus === 'busy' ? 'AI 处理中' : lineStatus === 'error' ? '出错了' : '空闲'"
     />
+    <!-- 统一顶栏（返回 + 全局头像 / 自由对话 / 设置） -->
+    <MobileTopBar title="自由对话" back @back="router.push('/m/chat')">
+      <template #actions>
+        <button class="u-topbar__act" type="button" title="设置" aria-label="设置" @click="router.push('/m/me')">
+          <MobileIcon name="settings" :size="18" />
+        </button>
+      </template>
+    </MobileTopBar>
     <div class="u-content u-fc-page">
-      <!-- 返回 = 口语模式入口（2026-09-05：router.back() 依赖 history，直进 /m/free-chat 会撞 /demo） -->
-      <button class="u-back u-back--float" type="button" title="返回" @click="router.push('/m/chat')">
-        <MobileIcon name="back" />
-      </button>
-
       <div ref="chatBox" class="u-fc-box">
         <div v-if="!bubbles.length" class="u-empty u-empty--center">
           <div class="u-empty__art"><MobileArt name="wave" :size="96" /></div>

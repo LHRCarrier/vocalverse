@@ -5,12 +5,18 @@
  * 当前为 UI 演示帧（后端跟唱引擎 M3 接入）：选歌/去跟唱均 toast 提示，数据为示例值。
  * 视觉：深青精选卡（同色系 chip + 幽灵按钮 + 大音符线稿锚点）→ 56px 分段 → 点线时间轴歌单。
  */
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, ref } from 'vue'
+
+import { shareDemoLink } from '@/composables/share'
+import { useUiStore } from '@/stores/ui'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
+import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import '@/styles/mobile-uic.css'
+
+const ui = useUiStore()
 
 type Tab = 'all' | 'hot' | 'fav'
 
@@ -94,32 +100,36 @@ const visibleSongs = computed(() =>
 )
 
 /* ---------- 演示交互 toast（跟唱引擎 M3 后替换为真实跳转） ---------- */
-const toastMsg = ref('')
-const toastShown = ref(false)
-let toastTimer: ReturnType<typeof setTimeout> | undefined
-
 function demoComingSoon(feature: string) {
-  toastMsg.value = `「${feature}」：跟唱引擎 M3 上线后开放`
-  toastShown.value = true
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => {
-    toastShown.value = false
-  }, 2500)
+  ui.showToast(`「${feature}」：跟唱引擎 M3 上线后开放`)
 }
 
-onUnmounted(() => clearTimeout(toastTimer))
+/** 顶栏 · 分享歌曲（演示：系统面板 / 复制链接） */
+async function shareSong() {
+  const result = await shareDemoLink({
+    title: 'Perfect Night · LE SSERAFIM',
+    text: 'VocalVerse 跟唱 · 最佳成绩 88.1 分',
+    url: 'https://vocalverse.demo/song/perfect-night',
+  })
+  if (result === 'shared') ui.showToast('已分享')
+  else if (result === 'copied') ui.showToast('歌曲链接已复制（演示链接）')
+  else if (result === 'failed') ui.showToast('复制失败，请手动复制')
+}
 </script>
 
 <template>
   <div class="u-phone">
+    <!-- 统一顶栏（全局头像 / 唱吧 / 分享歌曲） -->
+    <MobileTopBar title="唱吧">
+      <template #actions>
+        <button class="u-topbar__act" type="button" title="分享歌曲（演示）" aria-label="分享歌曲" @click="shareSong">
+          <MobileIcon name="share" :size="18" />
+        </button>
+      </template>
+    </MobileTopBar>
+
     <div class="u-content">
-      <!-- 头部 -->
-      <header class="u-head" style="margin-bottom: 20px">
-        <div>
-          <h1>唱吧</h1>
-          <p class="u-head__sub">英文歌逐句跟唱，音准与节奏即时评分。</p>
-        </div>
-      </header>
+      <p class="u-head__sub" style="margin: 0 0 16px">英文歌逐句跟唱，音准与节奏即时评分。</p>
 
       <!-- 本周精选（深青卡 · 每屏唯一深色卡 · 音符线稿锚点） -->
       <section class="u-dark-card u-dark-card--teal">
@@ -186,10 +196,5 @@ onUnmounted(() => clearTimeout(toastTimer))
     </div>
 
     <MobileTabBar />
-
-    <!-- Toast -->
-    <div class="u-toast" :class="{ show: toastShown }">
-      <span class="dot" /><span>{{ toastMsg }}</span>
-    </div>
   </div>
 </template>
