@@ -1122,6 +1122,247 @@ body {
 }
 
 /* ============================================================
+ * 社区主页（组长拍板 2026-09-05：主页 = 社区 + 今日练习入口；uic 纸面语言）
+ * ============================================================ */
+.u-comm {
+  padding: 20px 16px 140px; /* 底部留白给浮动 TabBar */
+}
+
+.u-comm__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.u-comm__title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--u-ink);
+}
+
+.u-comm__sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--u-sub);
+}
+
+.u-comm__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--u-ink);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* 今日练习 CTA（核心闭环入口） */
+.u-comm__cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--u-card);
+  border-radius: var(--u-r-card);
+  box-shadow: var(--u-shadow-float);
+  padding: 16px 18px;
+  margin-bottom: 22px;
+}
+
+.u-comm__cta-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--u-ink);
+}
+
+.u-comm__cta-sub {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--u-sub);
+}
+
+.u-comm__cta-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: var(--u-r-pill);
+  background: var(--u-ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 150ms ease-out, transform 60ms ease-out;
+}
+
+.u-comm__cta-btn:hover {
+  background: var(--u-ink-hover);
+}
+
+.u-comm__cta-btn:active {
+  transform: scale(0.96);
+}
+
+/* 动态流 */
+.u-comm__sec {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--u-ink);
+}
+
+.u-comm-item {
+  background: var(--u-card);
+  border-radius: var(--u-r-card);
+  box-shadow: var(--u-shadow-float);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.u-comm-item__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.u-comm-item__ava {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  flex: none;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.u-comm-item__who {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.u-comm-item__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--u-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.u-comm-item__meta {
+  font-size: 12px;
+  color: var(--u-sub);
+}
+
+/* 内容行：类型 · 标题 + 右侧分数 */
+.u-comm-item__body {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 12px 0 4px;
+  min-width: 0;
+}
+
+.u-comm-item__kind {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--u-r-chip);
+  background: var(--u-track);
+  color: var(--u-ink);
+}
+
+.u-comm-item__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--u-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.u-comm-item__score {
+  flex: none;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--u-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.u-comm-item__meta-line {
+  margin: 0;
+  font-size: 12px;
+  color: var(--u-sub);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 徽章（基于 u-chip 变体） */
+.u-comm-badge--star {
+  background: var(--u-star);
+  color: var(--u-ink);
+}
+
+.u-comm-badge--neutral {
+  background: var(--u-track);
+  color: var(--u-sub);
+}
+
+.u-comm-badge--success {
+  background: var(--u-track);
+  color: var(--u-success);
+}
+
+.u-comm-item__foot {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--u-paper-grid);
+}
+
+.u-comm-item__act {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: none;
+  padding: 0;
+  font: 500 12px var(--u-font);
+  color: var(--u-sub);
+  cursor: pointer;
+  transition: color 150ms ease-out;
+}
+
+.u-comm-item__act.is-liked {
+  color: var(--u-error);
+}
+
+.u-comm__note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--u-weak);
+  text-align: center;
+}
+
+/* ============================================================
  * 墨水流动加载动画（组员提供的 css-rain-bg 方案，2026-09-05 适配纸面主题）
  * 注：当前未被页面引用——预留给「APP 启动页 / 页面切换」类整幅加载（组长原意），
  * 后续需要时直接套 .u-load + .u-load__rain
