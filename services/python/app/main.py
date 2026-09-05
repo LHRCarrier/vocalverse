@@ -14,7 +14,16 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app import __version__
-from app.api.routes import audio, defense, events, health, placement, practice, recommendations
+from app.api.routes import (
+    audio,
+    defense,
+    events,
+    free_chat,
+    health,
+    placement,
+    practice,
+    recommendations,
+)
 from app.core.config import get_settings
 from app.core.response import BizError
 from app.core.trace import RequestIdLogFilter, RequestIdMiddleware
@@ -75,6 +84,7 @@ async def validation_error_handler(_: Request, exc: RequestValidationError) -> J
 app.include_router(health.router)
 app.include_router(audio.router)
 app.include_router(practice.router)
+app.include_router(free_chat.router)  # 自由对话（MVP，docs/14 §12：无状态 LLM 转发器）
 app.include_router(defense.router)
 app.include_router(placement.router)
 app.include_router(events.router)

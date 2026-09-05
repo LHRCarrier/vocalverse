@@ -210,6 +210,8 @@ class EventTypes:
     PRACTICE_COMPLETE = "practice_complete"
     FUN_ACTION = "fun_action"
     CORPUS_HIT = "corpus_hit"  # 语言点覆盖度命中（docs/14 §6.3，2026-09 拍板）
+    FREE_CHAT_OPEN = "free_chat_open"  # 自由对话进页（docs/14 §12.3，2026-09-05）
+    FREE_CHAT_TURN = "free_chat_turn"  # 自由对话每回合（payload audio: bool；docs/14 §12.3）
 
 
 class TicketStatuses:
