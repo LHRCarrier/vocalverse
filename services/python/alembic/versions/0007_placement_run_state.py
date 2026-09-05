@@ -1,7 +1,7 @@
 """入学测试 run 状态机支撑（阶段 B1/B3）：attempts.placement_id + 部分唯一索引
 
-Revision ID: 0005
-Revises: 0004
+Revision ID: 0007
+Revises: 0006
 Create Date: 2026-09-03
 
 依据（worklog 2026-09-03 阶段 B · local/34 B-1/B-3）：
@@ -19,8 +19,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0005"
-down_revision: str | None = "0004"
+revision: str = "0007"
+down_revision: str | None = "0006"
 branch_labels: str | None = None
 depends_on: str | None = None
 

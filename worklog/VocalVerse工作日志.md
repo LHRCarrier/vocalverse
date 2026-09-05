@@ -3,6 +3,23 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-04 feat/recommend-landing 整合 origin/main（组长为主 · 迁移撞号处置）
+
+**背景**：推荐 WIP 与组长 09-05~09-09 推进（99 commits：移动端 UI/口语 Hub/自由对话/社区页/README 重写）整合；组员决定 **C 类冲突以组长版为准**。
+
+**处置**：
+1. **WIP 规范提交**（快照保底 `wip/recommend-landing-snapshot`）：6 个 commit——fix(py) 音频守卫（has_min_words 40002 + ASR 静音前置过滤 + imageio-ffmpeg 依赖声明）/ test(py) / feat(web) / chore(infra) gitignore / docs / chore(poc)。`data/models` 组长版 gitignore 已覆盖（486MB 模型缓存，红线不入库）；
+2. **C 类**：docker-compose.yml、seed.py 以组长版为准（WIP 保留在快照分支）；
+3. **迁移撞号（关键）**：两侧各有一个 `revision=0005`（组长 `0005_events_free_chat` vs 本支 `0005_placement_run_state`，均 down=0004）→ alembic 双头 +「Revision 0005 present more than once」。处置：本支迁移**重排为 0007**（组长 0005/0006 已被多处应用不可改），链 0004→0005(events)→0006(tools)→**0007(placement_run_state)**；本地 dev 库重建（schema 重建 + upgrade head + seed，27 表 @ 0007）；
+4. **worklog 双日志并集**：脚本按标题去重、日期倒序拼接（75 条）；契约快照按合并后代码重新导出 + `pnpm gen:api` 重生成类型（8001 实跑，CI 语义比对格式无关）。
+
+**门禁**：Python ruff/format ✓ · pytest **271 passed**（含 3 个 alembic 单头/离线渲染用例，修前 268+3fail）· `alembic heads` 单头 0007 ✓；前端 lint/typecheck ✓ · test:run **19 passed** ✓ · build ✓（pnpm install 补 unplugin-icons 等上游新依赖）。
+
+**状态**：分支已含全部整合，**推送/PR 被网络阻断**（github.com:443 不可连；api.github.com 正常）。网络恢复后：`git push -u origin feat/recommend-landing` → 开 PR（base main，承接 PR#25 之后的 09-03+WIP+整合；描述需说明 5 项待组长确认：C 类取舍、序号待定号、RecTestView 生产路由违例、imageio-ffmpeg 补缺、gitignore）。
+
+**环境提醒**：本机 dev 库已重建（旧账号/测试 attempt 数据随 schema 重建清空，demo 数据已 seed 恢复）；8000/8080 旧服务进程建议重启（连接的是旧库状态）。
+
+—— 执行人：Faust-sudo
 
 ## 2026-09-09 PR#25 推荐系统落地 · 复审整改与合入（模型同步 / 契约快照 / CI 兜底）
 
