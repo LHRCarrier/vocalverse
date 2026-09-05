@@ -16,6 +16,9 @@ export type EventName =
   | 'fun_action'
   | 'free_chat_open'
   | 'free_chat_turn'
+  | 'free_chat_switch'
+  | 'free_chat_reset'
+  | 'free_chat_rate'
 
 export interface TrackOptions {
   page?: string

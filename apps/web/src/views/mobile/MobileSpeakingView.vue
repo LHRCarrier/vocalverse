@@ -306,7 +306,7 @@ function onSseEvent(e: SseStreamEvent) {
       <!-- 对话流：AI track 气泡 + 用户炭黑气泡 -->
       <template v-for="(m, i) in bubbles" :key="i">
         <div class="u-chat" :class="{ 'u-chat--user': m.role === 'user' }">
-          <span v-if="m.role === 'assistant'" class="u-ava" style="background: #16303a">
+          <span v-if="m.role === 'assistant'" class="u-ava" style="background: var(--u-dark-teal)">
             <MobileIcon name="wave" :size="16" />
           </span>
           <div class="u-bubble" :class="m.role === 'user' ? 'u-bubble--user' : 'u-bubble--ai'">

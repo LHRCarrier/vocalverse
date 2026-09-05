@@ -1442,7 +1442,7 @@ body {
 
 .u-hub__sub {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--u-sub);
 }
 
@@ -1501,7 +1501,7 @@ body {
 }
 
 .u-hub-card__desc {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--u-sub);
   white-space: nowrap;
   overflow: hidden;
@@ -1551,7 +1551,7 @@ body {
   padding: 3px 8px;
   border-radius: var(--u-r-chip);
   background: var(--u-track);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--u-ink);
   text-align: center;
@@ -1565,7 +1565,7 @@ body {
 }
 
 .u-hub-scene__title {
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1583,43 +1583,71 @@ body {
 /* ============================================================
  * 自由对话页（docs/14 §12；2026-09-05）
  * ============================================================ */
+/* 固定视口高度 + 内部滚动（2026-09-05：原 min-height:100vh 不约束 flex 子项 → 整页滚动、输入栏被顶出） */
 .u-fc-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-}
-
-/* 新对话（浮动右上角；标题栏已按组长反馈删除，2026-09-05） */
-.u-fc-reset {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border: none;
-  border-radius: var(--u-r-pill);
-  background: var(--u-track);
-  color: var(--u-ink);
-  font-size: 12.5px;
-  cursor: pointer;
-  transition: background-color 150ms ease-out;
-}
-
-.u-fc-reset--float {
-  position: absolute;
-  top: 24px;
-  right: 16px;
-  z-index: 20;
-}
-
-.u-fc-reset:hover {
-  background: var(--u-track-hover);
+  height: 100vh;
+  height: 100dvh;
+  padding-bottom: 0; /* 本页无浮动 Tab 栏：覆盖 .u-content 的 140px 底部留白 */
+  overflow: hidden;
 }
 
 /* 对话流（可滚动区，底部输入栏之外） */
 .u-fc-box {
   flex: 1;
+  min-height: 0; /* flex 溢出约束 → box 内部滚动 */
   overflow-y: auto;
   padding: 0 4px 12px;
+}
+
+/* Grok 式功能行（组长拍板 2026-09-05：切场景/新对话/语速；浅色主题映射，深卡每屏 ≤1 的约束下用 track 底） */
+.u-tb {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.u-tb-item {
+  flex: 1;
+  min-width: 0;
+  height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border: none;
+  border-radius: var(--u-r-inner);
+  background: var(--u-track);
+  color: var(--u-ink);
+  cursor: pointer;
+  transition: background-color 150ms ease-out, transform 60ms ease-out;
+}
+
+.u-tb-item:hover {
+  background: var(--u-track-hover);
+}
+
+.u-tb-item:active {
+  transform: scale(0.96);
+}
+
+.u-tb-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.u-tb-item__label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 输入栏 */
@@ -1652,24 +1680,25 @@ body {
   outline: none;
   background: transparent;
   padding: 4px 4px 4px 10px;
-  font-size: 15px;
+  font-size: 14px;
   font-family: var(--u-font);
   color: var(--u-ink);
 }
 
 .u-fc-input::placeholder {
-  color: var(--u-weak);
+  color: var(--u-sub);
 }
 
 .u-fc-input:disabled {
   opacity: 0.55;
 }
 
+/* 主/次钮（2026-09-05 voice-first：麦克风 = 右侧英雄钮 48px ink；发送 = 次钮 48px track） */
 .u-fc-mic,
 .u-fc-send {
   flex: none;
-  width: 38px;
-  height: 38px;
+  width: 48px;
+  height: 48px;
   border: none;
   border-radius: 50%;
   display: inline-flex;
@@ -1680,22 +1709,27 @@ body {
 }
 
 .u-fc-mic {
+  background: var(--u-ink);
+  color: #fff;
+  box-shadow: var(--u-shadow-float);
+}
+
+.u-fc-mic--rec {
+  background: var(--u-error);
+}
+
+.u-fc-mic:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.u-fc-send {
   background: var(--u-track);
   color: var(--u-ink);
 }
 
-.u-fc-mic--rec {
-  background: var(--u-ink);
-  color: #fff;
-}
-
-.u-fc-send {
-  background: var(--u-ink);
-  color: #fff;
-}
-
 .u-fc-send:disabled {
-  opacity: 0.35;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -1706,7 +1740,7 @@ body {
 
 .u-fc-page .u-fc-mic:focus-visible,
 .u-fc-page .u-fc-send:focus-visible,
-.u-fc-page .u-fc-reset:focus-visible {
+.u-fc-page .u-tb-item:focus-visible {
   outline: 2px solid var(--u-accent);
   outline-offset: 2px;
 }

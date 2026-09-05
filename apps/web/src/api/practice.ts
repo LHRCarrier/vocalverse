@@ -121,10 +121,11 @@ export async function createDefenseProfile(payload: Record<string, unknown>) {
   return resp.data
 }
 
-export async function tts(text: string): Promise<Blob> {
+export async function tts(text: string, rate = '+0%'): Promise<Blob> {
   const form = new FormData()
   form.append('text', text)
   form.append('voice', 'en-US-JennyNeural')
+  form.append('rate', rate)
   const resp = await request<{ audio_bytes: string; length: number }>('/api/v1/tts', {
     method: 'POST',
     body: form,

@@ -6,7 +6,7 @@
  * 输入 = 麦克风（ASR）或打字，输出 = 流式文本 + 回合结束后 TTS 自动播报（可点喇叭重听）。
  * 不做评分/报告/入库（分期见 docs/14 §12）。
  */
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { track } from '@/api/events'
@@ -25,6 +25,13 @@ interface Bubble {
   speakable?: boolean
 }
 
+/* 回复语速档位（后端 /api/v1/tts 已支持 rate 参数；本地记忆，2026-09-05 Grok 式功能行） */
+const RATE_CYCLE = [
+  { value: '+0%', label: '正常' },
+  { value: '+15%', label: '稍快' },
+  { value: '-25%', label: '稍慢' },
+] as const
+
 const router = useRouter()
 
 const bubbles = ref<Bubble[]>([])
@@ -36,6 +43,8 @@ const errorMsg = ref<string | null>(null)
 const currentAssistant = ref<Bubble | null>(null)
 const playingBubble = ref<number | null>(null)
 const chatBox = ref<HTMLElement | null>(null)
+const rateIndex = ref((Number(localStorage.getItem('vv_rate_idx') ?? 0) % RATE_CYCLE.length + RATE_CYCLE.length) % RATE_CYCLE.length)
+const rate = computed(() => RATE_CYCLE[rateIndex.value])
 
 let replayAudio: HTMLAudioElement | null = null
 let autoPlayToken = 0 // 回合自增：mounted 时递增，旧回合的播放回调失效
@@ -73,6 +82,19 @@ function resetChat() {
   replayAudio?.pause()
   replayAudio = null
   playingBubble.value = null
+  void track('free_chat_reset', {})
+}
+
+function goScene() {
+  // 自由对话 → 口语 Hub（用户自选场景；边界不由自由对话直入具体场景，见 docs/14 §12.4）
+  void track('free_chat_switch', { payload: { to: 'scene' } })
+  router.push('/m/speaking')
+}
+
+function cycleRate() {
+  rateIndex.value = (rateIndex.value + 1) % RATE_CYCLE.length
+  localStorage.setItem('vv_rate_idx', String(rateIndex.value))
+  void track('free_chat_rate', { payload: { rate: rate.value.value } })
 }
 
 function pushUser(text: string) {
@@ -187,7 +209,7 @@ async function playTts(text: string, index: number) {
     }
   }
   try {
-    const blob = await tts(text)
+    const blob = await tts(text, rate.value.value)
     if (!blob.size) {
       finish()
       return
@@ -231,17 +253,6 @@ function replay(index: number, text: string) {
         <MobileIcon name="back" />
       </button>
 
-      <button
-        v-if="bubbles.length"
-        class="u-fc-reset u-fc-reset--float"
-        type="button"
-        title="新对话（清空当前记忆）"
-        @click="resetChat"
-      >
-        <MobileIcon name="refresh" :size="16" />
-        新对话
-      </button>
-
       <div ref="chatBox" class="u-fc-box">
         <div v-if="!bubbles.length" class="u-empty">
           <div class="u-empty__art"><MobileArt name="wave" :size="96" /></div>
@@ -251,7 +262,7 @@ function replay(index: number, text: string) {
 
         <template v-for="(m, i) in bubbles" :key="i">
           <div class="u-chat" :class="{ 'u-chat--user': m.role === 'user' }">
-            <span v-if="m.role === 'assistant'" class="u-ava" style="background: #16303a">
+            <span v-if="m.role === 'assistant'" class="u-ava" style="background: var(--u-dark-teal)">
               <MobileIcon name="wave" :size="16" />
             </span>
             <div class="u-bubble" :class="m.role === 'user' ? 'u-bubble--user' : 'u-bubble--ai'">
@@ -278,6 +289,33 @@ function replay(index: number, text: string) {
       </div>
 
       <div class="u-fc-bar-wrap">
+        <!-- Grok 式功能行（2026-09-05 组长拍板）：切场景 / 新对话 / 语速 -->
+        <div class="u-tb" role="toolbar" aria-label="自由对话功能">
+          <button class="u-tb-item" type="button" title="回到口语 Hub 选择场景" @click="goScene">
+            <MobileIcon name="coffee" :size="22" />
+            <span class="u-tb-item__label">场景对话</span>
+          </button>
+          <button
+            class="u-tb-item"
+            type="button"
+            :disabled="!bubbles.length"
+            title="清空当前对话，重新开始"
+            @click="resetChat"
+          >
+            <MobileIcon name="refresh" :size="22" />
+            <span class="u-tb-item__label">新对话</span>
+          </button>
+          <button
+            class="u-tb-item"
+            type="button"
+            :title="`回复语速：${rate.label}（点击切换）`"
+            @click="cycleRate"
+          >
+            <MobileIcon name="clock" :size="22" />
+            <span class="u-tb-item__label">语速 · {{ rate.label }}</span>
+          </button>
+        </div>
+
         <div v-if="recording || sending" class="u-fc-state">
           {{ recording ? '聆听中… 点击 ■ 停止并发送' : 'AI 思考中…' }}
         </div>
@@ -286,11 +324,22 @@ function replay(index: number, text: string) {
             v-model="inputText"
             class="u-fc-input"
             type="text"
-            placeholder="说英语或打字…（Enter 发送）"
+            placeholder="说英语或打字…"
+            aria-label="聊天输入"
             :disabled="sending || recording"
             maxlength="2000"
             @keyup.enter="sendText"
           >
+          <button
+            class="u-fc-send"
+            type="button"
+            title="发送"
+            aria-label="发送"
+            :disabled="!inputText.trim() || sending || recording"
+            @click="sendText"
+          >
+            <MobileIcon name="arrow" :size="20" />
+          </button>
           <button
             class="u-fc-mic"
             :class="{ 'u-fc-mic--rec': recording }"
@@ -301,16 +350,6 @@ function replay(index: number, text: string) {
             @click="toggleMic"
           >
             <MobileIcon :name="recording ? 'stop' : 'mic'" :size="20" />
-          </button>
-          <button
-            class="u-fc-send"
-            type="button"
-            title="发送"
-            aria-label="发送"
-            :disabled="!inputText.trim() || sending || recording"
-            @click="sendText"
-          >
-            <MobileIcon name="arrow" :size="20" />
           </button>
         </div>
       </div>
