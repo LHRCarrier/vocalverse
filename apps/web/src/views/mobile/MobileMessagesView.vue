@@ -7,7 +7,6 @@
 import { ref } from 'vue'
 
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
-import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { createDemoConversations } from '@/data/messages-demo'
 import { useUiStore } from '@/stores/ui'
@@ -57,7 +56,5 @@ function messageSettings() {
         <span v-if="c.unread" class="u-msg__dot" aria-label="未读" />
       </RouterLink>
     </div>
-
-    <MobileTabBar />
   </div>
 </template>

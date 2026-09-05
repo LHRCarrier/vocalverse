@@ -3,6 +3,7 @@ import { NConfigProvider, NDialogProvider, NMessageProvider } from 'naive-ui'
 import { useRouter } from 'vue-router'
 
 import MobileAccountDrawer from '@/components/mobile/MobileAccountDrawer.vue'
+import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { themeOverrides } from '@/styles/theme'
@@ -29,6 +30,9 @@ function onDrawerLogout() {
     <n-dialog-provider>
       <n-message-provider>
         <router-view />
+
+        <!-- 全局底部 Tab 栏（路由显隐规则在组件内；二级页自动隐藏） -->
+        <MobileTabBar />
 
         <!-- 全局账户抽屉 + 全局 toast（2026-09-05：任意页面头像可开；各页不再自建 toast） -->
         <MobileAccountDrawer

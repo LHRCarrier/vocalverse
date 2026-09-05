@@ -12,7 +12,6 @@ import { useUiStore } from '@/stores/ui'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
-import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import '@/styles/mobile-uic.css'
 
@@ -194,7 +193,5 @@ async function shareSong() {
         当前为 UI 演示帧（M3 接入基频提取 + DTW 对齐评分），歌曲与成绩为示例数据。
       </p>
     </div>
-
-    <MobileTabBar />
   </div>
 </template>

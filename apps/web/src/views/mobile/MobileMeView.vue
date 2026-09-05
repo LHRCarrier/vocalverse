@@ -14,7 +14,6 @@ import { useUiStore } from '@/stores/ui'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
-import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import '@/styles/mobile-uic.css'
 
@@ -162,7 +161,5 @@ function logout() {
         统计与目标为演示帧数据，M3 接入真实学习档案后自动替换。
       </p>
     </div>
-
-    <MobileTabBar />
   </div>
 </template>

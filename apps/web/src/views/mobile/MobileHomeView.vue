@@ -15,7 +15,6 @@ import { useRouter } from 'vue-router'
 import MobileCommentsSheet from '@/components/mobile/MobileCommentsSheet.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobilePostCard from '@/components/mobile/MobilePostCard.vue'
-import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { shareDemoLink } from '@/composables/share'
 import { COMMUNITY_TABS, DEMO_FEED } from '@/data/community-demo'
@@ -176,7 +175,5 @@ function reloadFeed() {
       @update:open="openCommentsId = null"
       @add-comment="handleAddComment"
     />
-
-    <MobileTabBar />
   </div>
 </template>

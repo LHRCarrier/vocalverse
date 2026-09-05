@@ -38,6 +38,8 @@ const props = withDefaults(
       | 'volume'
       | 'mail'
       | 'settings'
+      | 'search'
+      | 'hash'
     size?: number
   }>(),
   { size: 20 },
@@ -233,6 +235,17 @@ const props = withDefaults(
     <template v-else-if="props.name === 'settings'">
       <circle cx="12" cy="12" r="3" />
       <path d="M12 4v2M12 18v2M4 12h2M18 12h2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4" />
+    </template>
+
+    <!-- 放大镜（搜索 · 2026-09-05） -->
+    <template v-else-if="props.name === 'search'">
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M15.8 15.8l4.7 4.7" />
+    </template>
+
+    <!-- 话题（# · 2026-09-05） -->
+    <template v-else-if="props.name === 'hash'">
+      <path d="M9 4.5L7 19.5M17 4.5l-2 15M4.5 9.5h15.5M4 14.5h15.5" />
     </template>
   </svg>
 </template>

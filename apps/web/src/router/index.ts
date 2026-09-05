@@ -50,6 +50,16 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/mobile/MobileChatView.vue'),
     meta: { title: '私信', requiresAuth: true },
   },
+  {
+    path: '/m/search',
+    component: () => import('@/views/mobile/MobileSearchView.vue'),
+    meta: { title: '搜索', requiresAuth: true },
+  },
+  {
+    path: '/m/compose',
+    component: () => import('@/views/mobile/MobileComposeView.vue'),
+    meta: { title: '发帖', requiresAuth: true },
+  },
 
   {
     path: '/',
