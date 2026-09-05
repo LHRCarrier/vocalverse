@@ -398,8 +398,8 @@ function onSseEvent(e: SseStreamEvent) {
       role="status"
       :aria-label="lineStatus === 'busy' ? 'AI 处理中' : lineStatus === 'error' ? '出错了' : '空闲'"
     />
-    <!-- 统一顶栏（返回 + 全局头像 / 口语 / 场景选择） -->
-    <MobileTopBar title="口语" back @back="router.push('/m/home')">
+    <!-- 统一顶栏（全局头像 / 口语 / 场景选择；返回已由练习组底栏 🏠 取代） -->
+    <MobileTopBar title="口语">
       <template #actions>
         <button class="u-topbar__act" type="button" title="选择场景" aria-label="选择场景" @click="sheetOpen = true">
           <IconCoffee />

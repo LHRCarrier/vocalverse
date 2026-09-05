@@ -246,8 +246,8 @@ function replay(index: number, text: string) {
       role="status"
       :aria-label="lineStatus === 'busy' ? 'AI 处理中' : lineStatus === 'error' ? '出错了' : '空闲'"
     />
-    <!-- 统一顶栏（返回 + 全局头像 / 自由对话 / 设置） -->
-    <MobileTopBar title="自由对话" back @back="router.push('/m/chat')">
+    <!-- 统一顶栏（全局头像 / 自由对话 / 设置；返回已由练习组底栏 🏠/☕ 取代） -->
+    <MobileTopBar title="自由对话">
       <template #actions>
         <button class="u-topbar__act" type="button" title="设置" aria-label="设置" @click="router.push('/m/me')">
           <IconSettings />

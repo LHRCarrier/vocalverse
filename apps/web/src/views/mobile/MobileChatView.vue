@@ -4,9 +4,8 @@
  * M3 接真实消息流（只换数据源，组件层不返工）。
  */
 import { computed, nextTick, onUnmounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 
-import IconArrowLeft from '~icons/tabler/arrow-left'
 import IconInfoCircle from '~icons/tabler/info-circle'
 
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
@@ -16,7 +15,6 @@ import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
 const route = useRoute()
-const router = useRouter()
 const ui = useUiStore()
 const auth = useAuthStore()
 const convId = Number(route.params.id)
@@ -64,9 +62,6 @@ onUnmounted(() => clearTimeout(replyTimer))
 <template>
   <div class="u-phone u-chat">
     <header class="u-chat__top">
-      <button class="u-topbar__back" type="button" title="返回私信" aria-label="返回私信" @click="router.push('/m/messages')">
-        <IconArrowLeft />
-      </button>
       <button class="u-topbar__ava" type="button" title="账户菜单" aria-label="账户菜单" @click="ui.openDrawer()">
         {{ avatarLetter }}
       </button>
