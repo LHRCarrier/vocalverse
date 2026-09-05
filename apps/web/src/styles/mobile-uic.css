@@ -899,6 +899,19 @@ body {
   max-width: 76%;
 }
 
+/* 用户气泡尾巴：与 AI 同款菱形，镜像到右缘（指向右侧用户头像中心 · 2026-09-05 晚 5） */
+.u-bubble--user::before {
+  content: '';
+  position: absolute;
+  right: -5px;
+  top: 18px;
+  width: 12px;
+  height: 12px;
+  background: var(--u-ink);
+  border-radius: 3px;
+  transform: rotate(45deg);
+}
+
 /* 重听按钮（AI 气泡内：完整听一遍后出现；行内排布 = 末行字末尾，垂直对齐末行字中心） */
 .u-replay {
   display: inline-flex;
