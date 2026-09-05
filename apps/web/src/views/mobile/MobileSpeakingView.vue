@@ -411,14 +411,9 @@ function onSseEvent(e: SseStreamEvent) {
       </template>
     </MobileTopBar>
     <div class="u-content u-content--dock">
-      <!-- 开始流程第 1 步：先选场景（只留图 + 按钮；按钮仅此一个，底部功能行的重复入口在 choose 态隐藏） -->
+      <!-- 开始流程第 1 步：先选场景（只留麦克风线稿锚点；「选择场景」= 顶栏 ☕ 唯一入口，2026-09-05 晚 6 删重复大按钮） -->
       <section v-if="stage === 'choose'" class="u-empty u-empty--center">
         <div class="u-empty__art"><MobileArt name="mic" :size="96" /></div>
-        <div class="u-done__actions" style="width: 100%; max-width: 280px">
-          <button class="u-btn u-btn--primary u-btn--block" type="button" @click="sheetOpen = true">
-            选择场景
-          </button>
-        </div>
       </section>
 
       <!-- 加载态：状态线已表达”处理中“，这里只留居中线稿锚点（无文案；2026-09-05） -->
@@ -499,10 +494,9 @@ function onSseEvent(e: SseStreamEvent) {
       </section>
     </div>
 
-    <!-- 底部 dock（2026-09-05：标签已删；开始流程 = 播放图标 → 点击开始 → 变回录音） -->
-    <div class="u-chat-dock">
+    <!-- 底部 dock（2026-09-05 晚 6：功能行删除——自由对话=底栏 💬、场景选择=顶栏 ☕；只剩录音主钮） -->
+    <div v-if="stage !== 'choose'" class="u-chat-dock">
       <button
-        v-if="stage !== 'choose'"
         class="u-rec"
         :class="{ 'u-rec--recording': recording, 'u-rec--busy': phase === 'busy' }"
         :disabled="phase !== 'ready' && !recording"
@@ -519,28 +513,6 @@ function onSseEvent(e: SseStreamEvent) {
         <MobileIcon v-else-if="recording" name="stop" :size="26" />
         <MobileIcon v-else name="mic" :size="30" />
       </button>
-
-      <div class="u-tb u-tb--dock" role="toolbar" aria-label="口语功能">
-        <button
-          class="u-tb-item"
-          type="button"
-          title="切换到自由对话（AI 对聊，无固定题卡）"
-          @click="router.push('/m/free-chat')"
-        >
-          <MobileIcon name="wave" :size="22" />
-          <span class="u-tb-item__label">自由对话</span>
-        </button>
-        <button
-          v-if="stage !== 'choose'"
-          class="u-tb-item"
-          type="button"
-          title="切换预置场景"
-          @click="sheetOpen = true"
-        >
-          <MobileIcon name="chevron" :size="22" />
-          <span class="u-tb-item__label">场景选择</span>
-        </button>
-      </div>
     </div>
 
     <ScenePickerSheet :open="sheetOpen" @update:open="sheetOpen = $event" @select="onScenePicked" />
