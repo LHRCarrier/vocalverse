@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vocalverse.ticket.TicketRepository;
+import com.vocalverse.user.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -23,6 +25,8 @@ class AuthFlowTest {
 
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
+  @Autowired private TicketRepository ticketRepository;
+  @Autowired private UserRepository users;
 
   @Test
   void fullAuthFlow() throws Exception {
@@ -95,5 +99,60 @@ class AuthFlowTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":1,\"level\":\"L2\"}"))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void forgotPasswordCreatesTicketAndHidesExistence() throws Exception {
+    String username = "forgot_" + System.nanoTime() % 1000000;
+    mockMvc
+        .perform(
+            post("/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ("{\"username\":\""
+                            + username
+                            + "\",\"password\":\"password123\","
+                            + "\"nickname\":\"Forgot\",\"ageGroup\":\"adult\"}")
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+        .andExpect(status().isOk());
+
+    // 存在用户：落工单 + 统一「已收到申请」文案（中文按非空/相等性断言，规避源码编码差）
+    String resp1 =
+        mockMvc
+            .perform(
+                post("/auth/forgot")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"username\":\"" + username + "\"}"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assert objectMapper.readTree(resp1).path("data").asText().length() > 10 : resp1;
+
+    // 不存在用户：同响应（防枚举——message 一致）
+    String resp2 =
+        mockMvc
+            .perform(
+                post("/auth/forgot")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"username\":\"nobody_xyz\"}"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assert objectMapper
+        .readTree(resp2)
+        .path("data")
+        .asText()
+        .equals(objectMapper.readTree(resp1).path("data").asText());
+
+    // 工单已落库（feedback / open）
+    var tickets =
+        ticketRepository.findByUserIdOrderByIdDesc(
+            users.findByUsernameIgnoreCase(username).orElseThrow().getId());
+    assert !tickets.isEmpty();
+    assert tickets.get(0).getKind().equals("feedback");
+    assert tickets.get(0).getTitle().equals("密码重置申请");
+    assert tickets.get(0).getStatus().equals("open");
   }
 }
