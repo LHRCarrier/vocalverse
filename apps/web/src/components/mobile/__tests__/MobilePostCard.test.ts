@@ -8,19 +8,19 @@ import MobilePostCard from '@/components/mobile/MobilePostCard.vue'
 
 import type { CommunityPostView } from '@/types/community'
 
+const mocks = vi.hoisted(() => ({ fetchComments: {} as ReturnType<typeof vi.fn>, addComment: {} as ReturnType<typeof vi.fn> }))
+
 vi.mock('@/api/community', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/community')>()
-  return {
-    ...actual,
-    fetchComments: vi.fn().mockResolvedValue({ items: [], nextCursor: null, hasMore: false }),
-    addComment: vi.fn().mockResolvedValue({
-      id: 99,
-      author: { id: 2, nickname: 'Kai', handle: null, tint: null, level: 'L2' },
-      body: 'Great post!',
-      createdAt: new Date().toISOString(),
-      replyToNickname: null,
-    }),
-  }
+  mocks.fetchComments = vi.fn().mockResolvedValue({ items: [], nextCursor: null, hasMore: false })
+  mocks.addComment = vi.fn().mockResolvedValue({
+    id: 99,
+    author: { id: 2, nickname: 'Kai', handle: null, tint: null, level: 'L2' },
+    body: 'Great post!',
+    createdAt: new Date().toISOString(),
+    replyToNickname: null,
+  })
+  return { ...actual, fetchComments: mocks.fetchComments, addComment: mocks.addComment }
 })
 
 function makePost(overrides: Partial<CommunityPostView> = {}): CommunityPostView {
@@ -53,7 +53,11 @@ function mountCard(post: CommunityPostView) {
   })
 }
 
-beforeEach(() => setActivePinia(createPinia()))
+beforeEach(() => {
+  setActivePinia(createPinia())
+  mocks.fetchComments?.mockClear()
+  mocks.addComment?.mockClear()
+})
 
 describe('MobilePostCard', () => {
   it('渲染作者 / 标题 / 摘要 / 互动计数（千位缩写 1.2k / LV 展示）', () => {
@@ -158,13 +162,32 @@ describe('MobileCommentsSheet', () => {
 
   it('渲染标题与「共 N 条」，空列表显示空态文案', async () => {
     const wrapper = mountSheet(46)
+    await flushPromises()
     expect(wrapper.text()).toContain('Title')
     expect(wrapper.text()).toContain('· 46')
     expect(wrapper.text()).toContain('还没有评论')
   })
 
+  it('重新打开（重挂载）会重新拉取——immediate watch 回归（评论消失 BUG）', async () => {
+    const wrapper = mountSheet(46)
+    await flushPromises()
+    expect(mocks.fetchComments).toHaveBeenCalledTimes(1)
+
+    // 模拟父级 v-if 关闭卸载 → 重开重挂载（open 值无变化，immediate 也必须重新请求）
+    wrapper.unmount()
+    const wrapper2 = mountSheet(46)
+    await flushPromises()
+    expect(mocks.fetchComments).toHaveBeenCalledTimes(2)
+
+    // 切帖（postId 变化，open 保持 true）→ 重新拉取该帖评论
+    await wrapper2.setProps({ postId: 2 })
+    await flushPromises()
+    expect(mocks.fetchComments).toHaveBeenCalledTimes(3)
+  })
+
   it('输入后发送：触发 add-comment 并清空输入；空输入禁发', async () => {
     const wrapper = mountSheet(0)
+    await flushPromises()
     const send = wrapper.get('button[aria-label="发表评论"]')
     expect(send.attributes('disabled')).toBeDefined()
 
@@ -179,6 +202,7 @@ describe('MobileCommentsSheet', () => {
 
   it('关闭按钮触发 update:open false', async () => {
     const wrapper = mountSheet(0)
+    await flushPromises()
     await wrapper.get('button[aria-label="关闭评论"]').trigger('click')
     expect(wrapper.emitted('update:open')).toEqual([[false]])
   })
