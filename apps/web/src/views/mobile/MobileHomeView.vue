@@ -19,7 +19,6 @@ import MobilePostCard from '@/components/mobile/MobilePostCard.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { shareDemoLink } from '@/composables/share'
 import { useCommunityStore } from '@/stores/community'
-import { useFollowStore } from '@/stores/follows'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
@@ -39,14 +38,10 @@ watch(activeTab, (id) => {
   void community.load(id)
 })
 
-/* 加好友 → 关注社区头条作者（S2 接真实关注流；S1 演示 toast，A-11） */
+/* 加好友 → 关注管理（S2 真实：跳通知中心「关注」tab，推荐关注里一键关注/取关） */
 function demoAddFriend() {
-  useFollowStore().follow(
-    'VocalVerse News',
-    '#37546e',
-    "发布了新帖：Inside China's English learning boom — AI partners meet human teachers",
-  )
-  ui.showToast('已关注 VocalVerse News（演示）· S2 接真实关注流')
+  ui.showToast('关注管理 → 通知中心「关注」')
+  void router.push({ path: '/m/notifications', query: { tab: 'follow' } })
 }
 
 /* 写消息（X 顶栏同款：私信入口 · 收敛进通知中心；S1 演示，A-12） */

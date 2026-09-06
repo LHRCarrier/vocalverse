@@ -18,6 +18,9 @@ export type RawAuthorView = components['schemas']['AuthorView']
 export type RawCommentView = components['schemas']['CommentView']
 export type RawFeedPage = components['schemas']['FeedPage']
 export type RawCommentPage = components['schemas']['CommentPage']
+export type RawFollowSummary = components['schemas']['FollowSummary']
+export type RawFollowRecommend = components['schemas']['FollowRecommend']
+export type RawNotificationsPage = components['schemas']['NotificationsPage']
 
 /** 媒体元数据（后端 media jsonb；字段集对齐 MediaItem——duration 存秒，C-06） */
 export interface PostMedia {
@@ -93,4 +96,36 @@ export interface CoinState {
 export interface ShareState {
   shared: boolean
   shareCount: number
+}
+
+/* ---------------- S2：关注 / 通知（docs/41） ---------------- */
+
+export type NotificationType = 'like' | 'coin' | 'share' | 'comment'
+
+export interface FollowSummary {
+  author: AuthorView
+  followedAt: string
+  youFollowBack: boolean
+}
+
+export interface FollowRecommend {
+  author: AuthorView
+  followed: boolean
+}
+
+export interface NotificationItem {
+  id: string
+  type: NotificationType
+  postId: number
+  postTitle: string
+  actorNickname: string
+  actorCount: number
+  commentBody: string | null
+  createdAt: string
+}
+
+export interface NotificationsPage {
+  items: NotificationItem[]
+  nextCursor: string | null
+  hasMore: boolean
 }

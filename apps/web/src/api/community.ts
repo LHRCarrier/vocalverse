@@ -15,10 +15,22 @@ import type {
   CommentView,
   CommunityPostView,
   FeedPage,
+  FollowRecommend,
+  FollowSummary,
   LikeState,
+  NotificationItem,
+  NotificationsPage,
   ShareState,
 } from '@/types/community'
-import type { RawCommentPage, RawCommentView, RawFeedPage, RawCommunityPostView } from '@/types/community'
+import type {
+  RawCommentPage,
+  RawCommentView,
+  RawFeedPage,
+  RawFollowRecommend,
+  RawFollowSummary,
+  RawNotificationsPage,
+  RawCommunityPostView,
+} from '@/types/community'
 
 export const DOMAIN_LABELS: Record<string, string> = {
   news: '新闻稿',
@@ -119,6 +131,48 @@ export function coinPost(id: number) {
 
 export function sharePost(id: number) {
   return request<ShareState>(`/api/v1/community/posts/${id}/shares`, { method: 'POST' }, JAVA_BASE)
+}
+
+/* ---------------- S2：关注 / 通知（docs/41） ---------------- */
+
+export function followUser(targetUserId: number) {
+  return request<null>(`/api/v1/community/follows/${targetUserId}`, { method: 'PUT' }, JAVA_BASE)
+}
+
+export function unfollowUser(targetUserId: number) {
+  return request<null>(`/api/v1/community/follows/${targetUserId}`, { method: 'DELETE' }, JAVA_BASE)
+}
+
+export async function fetchFollows(): Promise<FollowSummary[]> {
+  const res = await request<RawFollowSummary[]>(`/api/v1/community/follows`, undefined, JAVA_BASE)
+  return (res.data ?? []).map((r) => r as unknown as FollowSummary)
+}
+
+export async function fetchFollowRecommendations(): Promise<FollowRecommend[]> {
+  const res = await request<RawFollowRecommend[]>(`/api/v1/community/follows/recommendations`, undefined, JAVA_BASE)
+  return (res.data ?? []).map((r) => r as unknown as FollowRecommend)
+}
+
+export async function fetchFollowingFeed(cursor: string | null, limit = 10) {
+  const res = await request<RawFeedPage>(
+    `/api/v1/community/following-feed${qs({ cursor: cursor ?? '', limit })}`,
+    undefined,
+    JAVA_BASE,
+  )
+  return asPostPage(res.data)
+}
+
+export async function fetchNotifications(cursor: string | null, limit = 10): Promise<NotificationsPage> {
+  const res = await request<RawNotificationsPage>(
+    `/api/v1/community/notifications${qs({ cursor: cursor ?? '', limit })}`,
+    undefined,
+    JAVA_BASE,
+  )
+  return {
+    items: (res.data.items ?? []).map((n) => n as unknown as NotificationItem),
+    nextCursor: res.data.nextCursor ?? null,
+    hasMore: res.data.hasMore ?? false,
+  }
 }
 
 /* ---------------- 展示语义工具 ---------------- */

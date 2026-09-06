@@ -161,6 +161,37 @@ body {
   font-size: 11px;
 }
 
+/* 关注 tab：推荐关注管理 + 关注流（S2 · docs/41） */
+.u-notif__recs-title {
+  margin: 14px 20px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--u-ink);
+}
+
+.u-notif__rec {
+  padding-right: 12px;
+}
+
+.u-notif-follow-btn {
+  flex: none;
+  align-self: center;
+  padding: 7px 16px;
+  border: 1.5px solid var(--u-ink);
+  border-radius: 999px;
+  background: var(--u-ink);
+  color: var(--u-paper);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 120ms ease-out;
+}
+
+.u-notif-follow-btn.active {
+  border-color: var(--u-paper-grid);
+  background: transparent;
+  color: var(--u-ink-soft, #6b7280);
+}
+
 /* ============================================================
  * 按钮（全部胶囊：主=炭黑实心 / 次=track 灰底 / 纸面白底描边 /
  * 深色卡幽灵描边 / 危险=白底红字；高 48px；150ms 过渡）
