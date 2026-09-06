@@ -13,3 +13,6 @@ vocalverse:
   jwt:
     secret: vocalverse-dev-jwt-secret-0123456789abcdef
   service-token: change-me-internal-service-token
+  community:
+    post-enabled: true # 测试默认开（专测「关闭=403」的用例单独覆盖）
+    seed: false # 测试库干净：单测自建数据，命令行走种直接关掉
