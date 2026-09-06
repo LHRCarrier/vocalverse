@@ -185,6 +185,8 @@ function notReady(text: string) {
   justify-content: center;
   padding: 16px;
   background: #f0f0f0;
+  width: 100%;
+  box-sizing: border-box; /* 2026-09-06 防御：任何外层收窄/盒模型干扰下登录卡仍全宽居中 */
 }
 
 .form {

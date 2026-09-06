@@ -62,6 +62,12 @@ body {
   background: #edece8 !important;
 }
 
+/* 登录页（/login）：不受移动端灰底影响——路由 afterEach 切 body.is-login（2026-09-06） */
+html.is-login,
+body.is-login {
+  background: #f9fafb !important;
+}
+
 /* ============================================================
  * 手机容器（真页面：全屏；桌面下居中收窄）
  * ============================================================ */

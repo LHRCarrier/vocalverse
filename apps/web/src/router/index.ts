@@ -203,6 +203,9 @@ router.afterEach((to) => {
   document.title = to.meta.title
     ? `${String(to.meta.title)} · VocalVerse 声语界`
     : 'VocalVerse 声语界'
+  // 登录页专属 body 背景：mobile-uic.css 全局把 body 钉为移动端灰底（#edece8 !important），
+  // 退出登录（SPA 导航）后 body 残留该背景会让登录卡配色错位——用 .is-login 类切回纸白底（2026-09-06）。
+  document.body.classList.toggle('is-login', to.path === '/login')
 })
 
 export default router
