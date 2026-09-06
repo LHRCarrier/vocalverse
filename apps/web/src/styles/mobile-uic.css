@@ -2801,6 +2801,63 @@ body {
   padding: 0 16px 96px; /* 顶栏外置（MobileTopBar），底部贴底导航留白 */
 }
 
+/* ---------- 通知中心 · 互动通知（2026-09-09 消息收敛进通知） ---------- */
+.u-notices {
+  padding: 0 16px 96px;
+}
+
+.u-notices__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--u-paper-grid);
+}
+
+.u-notices__row.is-unread {
+  background: var(--u-paper); /* 未读底淡显（双通道：圆点 + 底色） */
+}
+
+.u-notices__icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--u-track);
+  color: var(--u-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.u-notices__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.u-notices__text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--u-ink);
+}
+
+.u-notices__when {
+  font-size: 11px;
+  color: var(--u-weak);
+}
+
+.u-notices__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--u-accent);
+  margin-top: 4px;
+}
+
 .u-msg__row {
   display: flex;
   align-items: center;

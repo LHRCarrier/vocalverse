@@ -29,7 +29,7 @@ const emit = defineEmits<{
 
 const items = [
   { icon: 'user' as const, label: '我的学习', path: '/m/learn', expandable: false },
-  { icon: 'mail' as const, label: '消息', path: '/m/messages', expandable: false },
+  { icon: 'bell' as const, label: '通知', path: '/m/notifications', expandable: false },
   { icon: 'settings' as const, label: '设置与隐私', path: null, expandable: true },
 ]
 
@@ -48,7 +48,7 @@ function onItem(it: (typeof items)[number]) {
     settingsOpen.value = !settingsOpen.value
     return
   }
-  emit('navigate', it.path)
+  if (it.path) emit('navigate', it.path)
 }
 
 function onSettingsChild(label: string) {

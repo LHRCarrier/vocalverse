@@ -40,9 +40,9 @@ function demoAddFriend() {
   ui.showToast('好友请求已发送 · M3 上线')
 }
 
-/* 写消息（X 顶栏同款：私信入口） */
+/* 写消息（X 顶栏同款：私信入口 · 2026-09-09 收敛进通知中心） */
 function openMessages() {
-  void router.push('/m/messages')
+  void router.push('/m/notifications')
 }
 
 /* ---------- 互动（组长 2026-09-05 升级拍板：评论/投币/分享全交互 · 演示帧本地，不落库） ---------- */

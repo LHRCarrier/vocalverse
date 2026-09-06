@@ -37,6 +37,7 @@ const props = withDefaults(
       | 'stop'
       | 'volume'
       | 'mail'
+      | 'bell'
       | 'settings'
       | 'search'
       | 'hash'
@@ -229,6 +230,12 @@ const props = withDefaults(
     <template v-else-if="props.name === 'mail'">
       <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
       <path d="M4.5 7.5l7.5 5.5 7.5-5.5" />
+    </template>
+
+    <!-- 铃铛（通知 · 2026-09-09） -->
+    <template v-else-if="props.name === 'bell'">
+      <path d="M12 4a5.5 5.5 0 0 0-5.5 5.5c0 4.2-1.5 5.5-1.5 5.5h14s-1.5-1.3-1.5-5.5A5.5 5.5 0 0 0 12 4z" />
+      <path d="M9.8 18.5a2.5 2.5 0 0 0 4.4 0" />
     </template>
 
     <!-- 齿轮（设置 · 2026-09-05） -->
