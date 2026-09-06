@@ -37,17 +37,22 @@ const draft = ref('')
 /** 展示计数 = 服务端总数 + 本次会话新增（父级按此同步卡片） */
 const total = () => props.commentCount + added.value
 
+/**
+ * 打开即拉取（immediate：面板由父级 v-if 挂载——关闭=卸载、重开=重挂载，open 值无"变化"
+ * 不会触发普通 watch，必须 immediate 才能在每次打开时重新请求；postId 监听防切帖残留）。
+ */
 watch(
-  () => props.open,
-  async (v) => {
-    if (v) {
-      draft.value = ''
-      await loadFirst()
-    } else {
+  () => [props.open, props.postId] as const,
+  async ([open]) => {
+    if (!open) {
       list.value = []
       added.value = 0
+      return
     }
+    draft.value = ''
+    await loadFirst()
   },
+  { immediate: true },
 )
 
 async function loadFirst() {
