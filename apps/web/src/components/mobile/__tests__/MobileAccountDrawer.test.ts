@@ -26,7 +26,7 @@ describe('MobileAccountDrawer', () => {
     expect(text).toContain('退出登录')
   })
 
-  it('菜单项 click 触发 navigate(path)；设置与隐私无 path → toast 不 navigate', async () => {
+  it('菜单项 click 触发 navigate(path)；设置与隐私 → 抽屉内展开子项（不 toast 不 navigate）', async () => {
     const wrapper = mountDrawer()
     const items = wrapper.findAll('.u-drawer__item')
     expect(items).toHaveLength(3)
@@ -34,9 +34,21 @@ describe('MobileAccountDrawer', () => {
     expect(wrapper.emitted('navigate')).toEqual([['/m/learn']])
     await items[1].trigger('click')
     expect(wrapper.emitted('navigate')).toEqual([['/m/learn'], ['/m/messages']])
-    // 设置与隐私：无 path → 只 toast，无 navigate
+    // 设置与隐私：展开子面板（帮助与反馈/数据与隐私/关于声语界），无 navigate
+    expect(wrapper.find('.u-drawer__submenu').exists()).toBe(false)
     await items[2].trigger('click')
     expect(wrapper.emitted('navigate')).toEqual([['/m/learn'], ['/m/messages']])
+    expect(wrapper.find('.u-drawer__submenu').exists()).toBe(true)
+    expect(wrapper.text()).toContain('帮助与反馈')
+    expect(wrapper.text()).toContain('数据与隐私')
+    expect(wrapper.text()).toContain('关于声语界')
+    // 再点收起
+    await items[2].trigger('click')
+    expect(wrapper.find('.u-drawer__submenu').exists()).toBe(false)
+    // 子项点击 → toast + 收起
+    await items[2].trigger('click')
+    await wrapper.findAll('.u-drawer__subitem')[0].trigger('click')
+    expect(wrapper.find('.u-drawer__submenu').exists()).toBe(false)
   })
 
   it('退出登录触发 logout', async () => {
