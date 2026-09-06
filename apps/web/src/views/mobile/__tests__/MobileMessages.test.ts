@@ -43,7 +43,7 @@ describe('MobileNotificationsView（通知中心 · 消息收敛 2026-09-09）',
     expect(wrapper.text()).toContain('Kai')
     expect(wrapper.text()).toContain('Teacher Lee')
     // 切通知 tab → 互动通知
-    await wrapper.findAll('.u-x-tab')[1].trigger('click')
+    await wrapper.findAll('.u-notif-tab')[1].trigger('click')
     const text = wrapper.text()
     expect(text).toContain('Momo 赞了你的帖子')
     expect(text).toContain('Kai 评论了你')
