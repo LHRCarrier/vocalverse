@@ -3290,21 +3290,27 @@ body {
 }
 
 /* ============================================================
- * 学习页（Duolingo 式画像：LV 徽章 + 经验条 + 速览/趋势 · 2026-09-05 组长拍板）
+ * 学习页（学习画像焦点：画像主卡 + 热力图 + 能力画像
+ * · 2026-09-05 组长拍板 Duolingo 式；2026-09-09 画像焦点改造 = docs/36；
+ *   2026-09-09 v2 组长反馈：卡片太多像拼凑 → 合并 3 卡（参考社区页密度），热力图精简）
  * ============================================================ */
 .u-learn {
   padding: 6px 16px 120px;
 }
 
+/* ---- 卡 1 · 画像主卡（身份行 ｜ 分割线 ｜ 今日四数） ---- */
 .u-learn-hero {
-  display: flex;
-  align-items: center;
-  gap: 16px;
   padding: 20px;
   background: var(--u-card);
   border-radius: var(--u-r-card);
   box-shadow: var(--u-shadow-float);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+}
+
+.u-learn-hero__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .u-learn-hero__badge {
@@ -3376,6 +3382,41 @@ body {
   color: var(--u-ink);
 }
 
+/* 今日四数（主卡内 · 分割线区） */
+.u-learn-hero__today {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--u-track);
+}
+
+.u-learn-today__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.u-learn-today__item + .u-learn-today__item {
+  border-left: 1px solid var(--u-track);
+}
+
+.u-learn-today__num {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.u-learn-today__label {
+  font-size: 11px;
+  color: var(--u-sub);
+  white-space: nowrap;
+}
+
+/* ---- 通用卡 ---- */
 .u-learn-card {
   padding: 16px 20px;
   background: var(--u-card);
@@ -3399,11 +3440,103 @@ body {
   min-width: 64px;
 }
 
+/* ---- 卡 2 · 学习热力图（12 周填满 · 无图例/切换/日期） ---- */
+.u-learn-heat {
+  padding: 16px 20px 12px;
+}
+
+.u-learn-heat__grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: repeat(7, auto);
+  gap: 3px;
+}
+
+.u-learn-heat__cell {
+  border: none;
+  padding: 0;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  background: var(--u-track);
+  cursor: pointer;
+  transition: transform 60ms ease-out;
+}
+
+.u-learn-heat__cell:active {
+  transform: scale(0.85);
+}
+
+.u-learn-heat__cell.future {
+  cursor: default;
+  background: var(--u-paper-grid);
+}
+
+.u-learn-heat__cell.future:active {
+  transform: none;
+}
+
+.u-learn-heat__cell.lv1 {
+  background: var(--u-pop-green-soft);
+}
+
+.u-learn-heat__cell.lv2 {
+  background: var(--u-pop-green);
+}
+
+.u-learn-heat__cell.lv3 {
+  background: var(--u-success);
+}
+
+.u-learn-heat__cell.today {
+  outline: 2px solid var(--u-accent);
+  outline-offset: 1px;
+}
+
+.u-learn-heat__cell.picked {
+  box-shadow: inset 0 0 0 2px var(--u-ink);
+}
+
+.u-learn-heat__xp {
+  margin-top: 10px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--u-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 卡 3 · 能力画像（趋势 + 场景 + 薄弱点 + AI 点评） ---- */
+.u-learn-ability__sub {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--u-ink);
+}
+
+.u-learn-ability__hint {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--u-weak);
+}
+
+.u-learn-trend__avg {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--u-success);
+}
+
 .u-learn-trend {
   display: flex;
   align-items: flex-end;
-  gap: 10px;
-  height: 88px;
+  gap: 8px;
+  height: 72px;
 }
 
 .u-learn-trend__bar {
@@ -3411,18 +3544,118 @@ body {
   min-width: 0;
   border-radius: 6px 6px 0 0;
   background: var(--u-track);
+  transition: background-color 150ms ease-out;
 }
 
-.u-learn-trend__bar:last-child {
-  background: var(--u-accent);
+.u-learn-trend__bar.tone-soft {
+  background: var(--u-pop-green-soft);
 }
 
-.u-learn-trend__scale {
-  margin-top: 6px;
-  font-size: 11px;
-  color: var(--u-weak);
-  text-align: center;
+.u-learn-trend__bar.tone-mid {
+  background: var(--u-pop-green);
+}
+
+.u-learn-trend__bar.tone-deep {
+  background: var(--u-success);
+}
+
+.u-learn-trend__bar.is-last {
+  background: var(--u-accent); /* 今日（与热力图 today 蓝框同语义） */
+}
+
+/* 场景掌握度（Duo-Strength 式强度条） */
+.u-learn-scenes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.u-learn-scenes__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.u-learn-scenes__name {
+  flex: none;
+  width: 118px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--u-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.u-learn-scenes__track {
+  flex: 1;
+  min-width: 0;
+  height: 8px;
+  border-radius: var(--u-r-pill);
+  background: var(--u-track);
+  overflow: hidden;
+}
+
+.u-learn-scenes__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--u-r-pill);
+  background: var(--u-star);
+  transition: width 300ms ease-out;
+}
+
+.u-learn-scenes__fill.high {
+  background: var(--u-success);
+}
+
+.u-learn-scenes__fill.low {
+  background: var(--u-error);
+}
+
+.u-learn-scenes__score {
+  flex: none;
+  width: 28px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--u-ink);
   font-variant-numeric: tabular-nums;
+}
+
+/* 结论区（薄弱点 + AI 点评）：与上部弱分割 */
+.u-learn-ability__concl {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--u-track);
+}
+
+.u-learn-ai {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.u-learn-ai__icon {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--u-accent);
+  color: var(--u-card);
+}
+
+.u-learn-ai__text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--u-ink);
 }
 
 /* ============================================================
