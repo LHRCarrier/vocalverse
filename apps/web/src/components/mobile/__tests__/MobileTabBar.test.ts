@@ -77,7 +77,7 @@ describe('MobileTabBar（双场景分组）', () => {
   })
 })
 
-describe('MobileLearnView（学习 · Duolingo 式画像）', () => {
+describe('MobileLearnView（学习 · 画像焦点改造 2026-09-09）', () => {
   it('渲染画像主卡：LV 徽章 / 等级名 / 经验条 / 速览与趋势', async () => {
     await router.push('/m/learn')
     await router.isReady()
@@ -91,6 +91,33 @@ describe('MobileLearnView（学习 · Duolingo 式画像）', () => {
     // 旧占位/旧练习内容不应保留
     expect(text).not.toContain('建设中')
     expect(text).not.toContain('今日目标')
+  })
+
+  it('画像焦点 3 卡结构：主卡含今日四数 / 热力图 / 能力画像', async () => {
+    await router.push('/m/learn')
+    await router.isReady()
+    const wrapper = mount(MobileLearnView, { global: { plugins: [router] } })
+    const text = wrapper.text()
+    expect(text).toContain('今日练习')
+    expect(text).toContain('本周练习')
+    expect(text).toContain('能力画像')
+    expect(text).toContain('场景掌握度')
+    expect(text).toContain('机场 · 航班变动') // 8 场景行
+    expect(text).toContain('本周 6 次练习') // AI 点评
+    // 热力图 = 12 周 × 7 天 = 84 格
+    expect(wrapper.findAll('.u-learn-heat__cell').length).toBe(12 * 7)
+    // 精简：无图例/切换按钮（2026-09-09 组长反馈：只留图 + 右下角经验）
+    expect(wrapper.findAll('.u-learn-heat__mode').length).toBe(0)
+    expect(text).not.toContain('近 12 周')
+  })
+
+  it('热力图：点格 → 右下角经验更新', async () => {
+    await router.push('/m/learn')
+    await router.isReady()
+    const wrapper = mount(MobileLearnView, { global: { plugins: [router] } })
+    const before = wrapper.find('.u-learn-heat__xp').text()
+    await wrapper.findAll('.u-learn-heat__cell:not(.future)')[0].trigger('click')
+    expect(wrapper.find('.u-learn-heat__xp').text()).not.toBe(before)
   })
 })
 

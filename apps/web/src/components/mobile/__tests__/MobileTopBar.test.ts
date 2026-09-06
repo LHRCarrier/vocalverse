@@ -22,6 +22,11 @@ describe('MobileTopBar', () => {
     expect(wrapper.emitted('back')).toHaveLength(1)
   })
 
+  it('showAvatar=false 时不渲染全局头像（2026-09-09 学习页去头像）', () => {
+    const wrapper = mount(MobileTopBar, { props: { title: '学习', showAvatar: false } })
+    expect(wrapper.find('button[aria-label="账户菜单"]').exists()).toBe(false)
+  })
+
   it('actions 插槽渲染右侧扩展按钮', () => {
     const wrapper = mount(MobileTopBar, {
       props: { title: '社区' },
