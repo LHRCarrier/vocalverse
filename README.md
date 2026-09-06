@@ -225,6 +225,7 @@ worklog/          团队工作日志（主线 VocalVerse工作日志.md + App �
 | `docs/33-UI修改SOP.md` | **App 端 UI 修改标准作业流程**：参考源优先（B 站视频/带注释参考图/uiverse 元素）→ 反馈分类（删/改/增/不动）→ 设计决策先写 → 实现 → 截图自检（真实后端链路 + focus 态）→ 门禁 → 文档与日志归位（UI 记录进 `worklog/安卓开发日志.md`）→ 分离 commit；含踩坑清单（色板普查/@iconify-json/ph 包名/Lucide ISC/中文负字距等） |
 | `docs/34-X界面复刻开源项目参考书.md` | **X 复刻参考书（Fwitter · TheAlphamerc/flutter_twitter_clone，MIT）**：定位=参考书非移植（与 docs/27 D1/D5 冲突）；屏幕↔VocalVerse 映射（A/B/C 借鉴级）+ 帖子卡组件粒度对照 + 交互参考 P0~P2 + 反借鉴清单 + 落地建议；仓库 2026-09 API 核验（停更/Dart 2/Firebase 全家桶/4.2k★） |
 | `docs/35-App端UI迭代SOP.md` | **App 端 UI 迭代 SOP（2026-09-05 定稿）**：人工反馈驱动六步循环（反馈→归类→决策先写→实现→门禁+截图自检→规格/日志/分 commit）+ 8 条硬性设计规则（tabler 无底图标/头像最左/双场景底栏/唯一入口/全局件挂 App/等级联动…）+ Playwright mock 鉴权自检与坐标实测方法 + 踩坑红榜（.u-chat 类名冲突/陈旧 vite/测试断言注意等） |
+| `docs/36-学习画像数据展示开源调研.md` | **学习画像数据展示开源调研（To C 向）**：学习页画像焦点前置调研——候选 11 项目（首选 DuoDash/Duolingo 仪表盘 MIT，次选 GitHubPoster 热力图/Duo-Strength 技能强度条/Skill Quest 数字卡）+ 四个焦点模式解剖 + VocalVerse 真实数据映射盘点（attempts 三维评分/词级错误/语言点覆盖已全量在库）+ 落地建议（主卡→今日四数→年度热力图→周趋势→场景掌握度条→薄弱点→AI 点评；零依赖自绘） |
 
 ## 里程碑（详见 docs/04、docs/06；状态随工作日志滚动更新）
 
