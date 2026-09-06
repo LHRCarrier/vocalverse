@@ -15,7 +15,7 @@ import { createSession, fetchScenarios, streamTurn, tts, type ScenarioItem } fro
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 
-import IconCoffee from '~icons/tabler/coffee'
+import IconSelector from '~icons/tabler/selector'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
@@ -409,12 +409,12 @@ function onSseEvent(e: SseStreamEvent) {
     <MobileTopBar title="口语" back @back="router.push('/m/learn')">
       <template #actions>
         <button class="u-topbar__act" type="button" title="选择场景" aria-label="选择场景" @click="sheetOpen = true">
-          <IconCoffee />
+          <IconSelector />
         </button>
       </template>
     </MobileTopBar>
     <div class="u-content u-content--dock">
-      <!-- 开始流程第 1 步：先选场景（只留麦克风线稿锚点；「选择场景」= 顶栏 ☕ 唯一入口，2026-09-05 晚 6 删重复大按钮） -->
+      <!-- 开始流程第 1 步：先选场景（只留麦克风线稿锚点；「选择场景」= 顶栏按钮唯一入口，2026-09-05 晚 6 删重复大按钮） -->
       <section v-if="stage === 'choose'" class="u-empty u-empty--center">
         <div class="u-empty__art"><MobileArt name="mic" :size="96" /></div>
       </section>
