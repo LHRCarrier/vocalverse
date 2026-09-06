@@ -89,9 +89,7 @@ def upgrade() -> None:
             server_default=sa.text("CURRENT_TIMESTAMP"),
             nullable=False,
         ),
-        sa.CheckConstraint(
-            "kind IN ('article', 'video', 'checkin')", name=op.f("ck_posts_kind")
-        ),
+        sa.CheckConstraint("kind IN ('article', 'video', 'checkin')", name=op.f("ck_posts_kind")),
         sa.CheckConstraint(
             "domain IS NULL OR domain IN ('news', 'teaching', 'overseas')",
             name=op.f("ck_posts_domain"),
@@ -99,18 +97,17 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "status IN ('visible', 'hidden', 'deleted')", name=op.f("ck_posts_status")
         ),
+        sa.ForeignKeyConstraint(["author_id"], ["users.id"], name=op.f("fk_posts_author_id_users")),
         sa.ForeignKeyConstraint(
-            ["author_id"], ["users.id"], name=op.f("fk_posts_author_id_users")
-        ),
-        sa.ForeignKeyConstraint(
-            ["session_id"], ["sessions.id"], name=op.f("fk_posts_session_id_sessions"), ondelete="SET NULL"
+            ["session_id"],
+            ["sessions.id"],
+            name=op.f("fk_posts_session_id_sessions"),
+            ondelete="SET NULL",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_posts")),
         sa.UniqueConstraint("slug", name="uq_posts_slug"),
     )
-    op.create_index(
-        "ix_posts_feed_time", "posts", ["status", "created_at", "id"], unique=False
-    )
+    op.create_index("ix_posts_feed_time", "posts", ["status", "created_at", "id"], unique=False)
     op.create_index(
         "ix_posts_domain_time", "posts", ["status", "domain", "created_at", "id"], unique=False
     )
@@ -203,7 +200,9 @@ def upgrade() -> None:
             ["root_id"], ["post_comments.id"], name=op.f("fk_post_comments_root_id_post_comments")
         ),
         sa.ForeignKeyConstraint(
-            ["parent_id"], ["post_comments.id"], name=op.f("fk_post_comments_parent_id_post_comments")
+            ["parent_id"],
+            ["post_comments.id"],
+            name=op.f("fk_post_comments_parent_id_post_comments"),
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_post_comments")),
     )
@@ -270,9 +269,7 @@ def upgrade() -> None:
             server_default=sa.text("CURRENT_TIMESTAMP"),
             nullable=False,
         ),
-        sa.CheckConstraint(
-            "follower_id <> followee_id", name=op.f("ck_follows_no_self_follow")
-        ),
+        sa.CheckConstraint("follower_id <> followee_id", name=op.f("ck_follows_no_self_follow")),
         sa.ForeignKeyConstraint(
             ["follower_id"], ["users.id"], name=op.f("fk_follows_follower_id_users")
         ),
