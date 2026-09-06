@@ -105,6 +105,9 @@ class UserProfile(TimestampMixin, Base):
     voice_type: Mapped[str | None] = mapped_column(String(32))  # 3 音色预设 key
     preferred_difficulty: Mapped[int | None] = mapped_column(SmallInteger)
     avatar_url: Mapped[str | None] = mapped_column(String(512))
+    # 社区展示字段（docs/37 §3.1：Java 写；handle=@ 展示名唯一、tint=头像色板）
+    handle: Mapped[str | None] = mapped_column(String(32))
+    tint: Mapped[str | None] = mapped_column(String(16))
     # 档位来源审计（docs/11 Q-B07）：placement=入学测试委托写入，manual=管理员改档；
     # cefr_level_at 用于对账（Python 读档前发现最新 completed placement 更新则重试委托）
     cefr_level_source: Mapped[str] = mapped_column(

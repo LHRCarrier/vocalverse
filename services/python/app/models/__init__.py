@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from .analytics import Event, Report
 from .base import Base, jsonb
+from .community import Follow, Post, PostComment, PostInteraction, PostLike
 from .content import (
     ListeningMaterial,
     Lrc,
@@ -22,7 +23,7 @@ from .content import (
 from .defense import DefenseProfile
 from .difficulty import MaterialDifficulty
 from .mastery import UserCorpusMastery, UserMastery
-from .practice import Attempt, PostLike, Score, Session, SingAttempt
+from .practice import Attempt, Score, Session, SingAttempt
 from .skill import UserSkillState
 from .tickets import Ticket
 from .usage import UsageLog
@@ -50,7 +51,12 @@ __all__ = [
     "Attempt",
     "Score",
     "SingAttempt",
+    # 社区域（Java 写方 · Python 只读映射，docs/37 §3）
+    "Post",
+    "PostComment",
     "PostLike",
+    "PostInteraction",
+    "Follow",
     # 答辩域
     "DefenseProfile",
     # 推荐域（local/31 §2，2026-09-02 设计）

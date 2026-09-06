@@ -6,7 +6,7 @@ source：turn（回合）/ meta_compensate（META 补偿）/ summary（滚动摘
 
 from __future__ import annotations
 
-from sqlalchemy import Integer, String, Text
+from sqlalchemy import Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin, bigint_pk
@@ -23,3 +23,8 @@ class UsageLog(TimestampMixin, Base):
     prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     meta: Mapped[str | None] = mapped_column(Text)  # 附加信息（session_id/user_id 等 JSON 字符串）
+
+    __table_args__ = (
+        # 报表按时间溯源（迁移 0004 已建，此处补齐元数据声明）
+        Index("ix_usage_log_created_at", "created_at"),
+    )

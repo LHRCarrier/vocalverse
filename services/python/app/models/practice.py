@@ -8,13 +8,12 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
-    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -239,28 +238,4 @@ class SingAttempt(CreatedAtMixin, Base):
         Index("ix_sing_attempts_user_created", "user_id", "created_at"),
         Index("ix_sing_attempts_song_id", "song_id"),
         Index("ix_sing_attempts_lrc_id", "lrc_id"),
-    )
-
-
-class PostLike(CreatedAtMixin, Base):
-    """社区点赞（**Python 写**；docs/06 §9.6 社区最小版「点赞」唯一必须持久化的数据）。
-
-    - 打卡与只读动态流**不建表**：单日≥1 次口语练习由 sessions 按日派生；
-      跨用户动态流由 sessions/attempts/users JOIN 派生；唯有点赞是多对多；
-    - 自然键 = (liker_id, author_id, practice_date)（一天最多 1 打卡）；
-    - 成绩卡片由前端 canvas 用 session/attempt 数据重生成，不落库。
-    """
-
-    __tablename__ = "post_likes"
-
-    id: Mapped[int] = bigint_pk()
-    liker_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
-    author_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
-    practice_date: Mapped[date] = mapped_column(Date, nullable=False)
-
-    __table_args__ = (
-        UniqueConstraint(
-            "liker_id", "author_id", "practice_date", name="uq_post_likes_liker_author_date"
-        ),
-        Index("ix_post_likes_author_date", "author_id", "practice_date"),
     )
