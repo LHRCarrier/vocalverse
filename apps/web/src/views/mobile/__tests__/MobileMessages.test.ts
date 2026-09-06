@@ -5,12 +5,14 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 
 import MobileChatView from '@/views/mobile/MobileChatView.vue'
 import MobileMessagesView from '@/views/mobile/MobileMessagesView.vue'
+import MobileNotificationsView from '@/views/mobile/MobileNotificationsView.vue'
 
 const router = createRouter({
   history: createMemoryHistory(),
   routes: [
     { path: '/m/messages', component: MobileMessagesView },
     { path: '/m/messages/:id', component: MobileChatView },
+    { path: '/m/notifications', component: MobileNotificationsView },
   ],
 })
 
@@ -29,6 +31,24 @@ describe('MobileMessagesView', () => {
     expect(text).toContain('Teacher Lee')
     expect(text).toContain('Great point! I will check it out tonight.')
     expect(wrapper.findAll('.u-msg__dot')).toHaveLength(1)
+  })
+})
+
+describe('MobileNotificationsView（通知中心 · 消息收敛 2026-09-09）', () => {
+  it('默认私信 tab：会话列表；切通知 tab → 互动通知；会话点击进详情', async () => {
+    await router.push('/m/notifications')
+    await router.isReady()
+    const wrapper = mount(MobileNotificationsView, { global: { plugins: [router] } })
+    // 默认 = 私信 tab（收敛的会话列表）
+    expect(wrapper.text()).toContain('Kai')
+    expect(wrapper.text()).toContain('Teacher Lee')
+    // 切通知 tab → 互动通知
+    await wrapper.findAll('.u-x-tab')[1].trigger('click')
+    const text = wrapper.text()
+    expect(text).toContain('Momo 赞了你的帖子')
+    expect(text).toContain('Kai 评论了你')
+    expect(text).toContain('Teacher Lee 关注了你')
+    expect(wrapper.findAll('.u-notices__row')).toHaveLength(4)
   })
 })
 

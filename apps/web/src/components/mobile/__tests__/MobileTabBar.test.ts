@@ -34,7 +34,7 @@ async function mountAt(path: string) {
 }
 
 describe('MobileTabBar（双场景分组）', () => {
-  it('社区组：5 位（社区/搜索/＋发帖/学习出口/私信）', async () => {
+  it('社区组：5 位（社区/搜索/＋发帖/学习出口/通知）', async () => {
     const wrapper = await mountAt('/m/home')
     expect(wrapper.find('.u-tabbar').exists()).toBe(true)
     const links = wrapper.findAll('a')
@@ -42,7 +42,7 @@ describe('MobileTabBar（双场景分组）', () => {
     expect(wrapper.find('a[aria-label="搜索"]').exists()).toBe(true)
     expect(wrapper.find('a[aria-label="发帖"]').exists()).toBe(true)
     expect(wrapper.find('a[aria-label="学习"]').exists()).toBe(true) // 出口
-    expect(wrapper.find('a[aria-label="私信"]').exists()).toBe(true)
+    expect(wrapper.find('a[aria-label="通知"]').exists()).toBe(true) // 私信收敛进通知中心
     expect(links[2].attributes('aria-label')).toBe('发帖') // 中央对称
   })
 
