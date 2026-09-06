@@ -2854,18 +2854,6 @@ body {
   background: var(--u-paper); /* 未读底淡显（双通道：圆点 + 底色） */
 }
 
-/* 互动通知 · 图标位（复用 u-msg__ava 44px 圆形 · Tabler 20px 1.5 与全局一致） */
-.u-msg__ava--icon {
-  background: var(--u-track);
-  color: var(--u-ink);
-}
-
-.u-msg__ava--icon svg {
-  width: 20px;
-  height: 20px;
-  stroke-width: 1.5;
-}
-
 .u-msg__row {
   display: flex;
   align-items: center;
@@ -2891,6 +2879,18 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+/* 互动通知 · 图标位（在 u-msg__ava 之后定义 → 覆盖其 color:#fff；黑色图标 · 组长反馈 2026-09-09） */
+.u-msg__ava--icon {
+  background: var(--u-track);
+  color: var(--u-ink);
+}
+
+.u-msg__ava--icon svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.5;
 }
 
 .u-msg__body {
