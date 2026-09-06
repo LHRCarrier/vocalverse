@@ -1,10 +1,15 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import MobileComposeView from '@/views/mobile/MobileComposeView.vue'
 import { useUiStore } from '@/stores/ui'
+
+vi.mock('@/api/community', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/community')>()
+  return { ...actual, createPost: vi.fn().mockResolvedValue({ id: 1 }) }
+})
 
 const router = createRouter({
   history: createMemoryHistory(),
@@ -29,8 +34,14 @@ describe('MobileComposeView', () => {
     expect(btn.attributes('disabled')).toBeUndefined()
 
     await btn.trigger('click')
-    expect(useUiStore().toastText).toBe('已发布（演示）')
     await flushPromises()
+    expect(useUiStore().toastText).toBe('已发布')
     expect(router.currentRoute.value.path).toBe('/m/home')
+  })
+
+  it('领域必选（默认教学分享）；切换领域 aria-pressed 生效', async () => {
+    const wrapper = mount(MobileComposeView)
+    const active = wrapper.findAll('button.u-compose__domain').find((b) => b.attributes('aria-pressed') === 'true')
+    expect(active?.text()).toContain('教学分享')
   })
 })

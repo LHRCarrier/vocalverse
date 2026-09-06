@@ -1,50 +1,94 @@
-import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
 import MobileCommentsSheet from '@/components/mobile/MobileCommentsSheet.vue'
 import MobilePostActions from '@/components/mobile/MobilePostActions.vue'
 import MobilePostCard from '@/components/mobile/MobilePostCard.vue'
 
-import type { CommunityPost } from '@/types/community'
+import type { CommunityPostView } from '@/types/community'
 
-function makePost(overrides: Partial<CommunityPost> = {}): CommunityPost {
+vi.mock('@/api/community', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/community')>()
+  return {
+    ...actual,
+    fetchComments: vi.fn().mockResolvedValue({ items: [], nextCursor: null, hasMore: false }),
+    addComment: vi.fn().mockResolvedValue({
+      id: 99,
+      author: { id: 2, nickname: 'Kai', handle: null, tint: null, level: 'L2' },
+      body: 'Great post!',
+      createdAt: new Date().toISOString(),
+      replyToNickname: null,
+    }),
+  }
+})
+
+function makePost(overrides: Partial<CommunityPostView> = {}): CommunityPostView {
   return {
     id: 1,
-    author: 'Global Post',
-    handle: '@globalpost',
-    level: 'L4',
-    time: '12 分钟前',
-    domain: '新闻稿',
-    kind: 'post',
-    title: "'AI learning' is taking over China's classrooms",
-    desc: 'Education experts say AI partners are changing how students practice speaking.',
-    media: { gradient: 'linear-gradient(135deg, #16303a, #2b5566)', label: '📰 NEWS' },
-    stats: { like: 1240, comment: 46, coin: 37, share: 15 },
-    comments: [{ author: 'Kai', text: 'Nice one.', time: '5 分钟前' }],
+    author: { id: 1, nickname: 'VocalVerse News', handle: 'vocalverse', tint: '#37546e', level: 'L4' },
+    kind: 'article',
+    domain: 'news',
+    title: "Inside China's English learning boom",
+    body: 'Education experts say AI partners are changing how students practice speaking.',
+    media: null,
+    createdAt: new Date().toISOString(),
+    likeCount: 1240,
+    commentCount: 46,
+    coinCount: 37,
+    shareCount: 15,
     liked: false,
     coined: false,
-    tint: '#16303a',
+    checkinOverall: null,
+    checkinPracticeCount: null,
+    checkinDate: null,
     ...overrides,
   }
 }
 
+function mountCard(post: CommunityPostView) {
+  return mount(MobilePostCard, {
+    props: { post, tintGradient: 'linear-gradient(135deg, #37546e, #6e96b4)' },
+    global: { plugins: [createPinia()] },
+  })
+}
+
+beforeEach(() => setActivePinia(createPinia()))
+
 describe('MobilePostCard', () => {
-  it('渲染作者 / 标题 / 摘要 / 媒体标签 / 互动计数（千位缩写 1.2k / LV 展示）', () => {
-    const wrapper = mount(MobilePostCard, { props: { post: makePost() } })
+  it('渲染作者 / 标题 / 摘要 / 互动计数（千位缩写 1.2k / LV 展示）', () => {
+    const wrapper = mountCard(makePost())
     const text = wrapper.text()
-    expect(text).toContain('Global Post')
-    expect(text).toContain('@globalpost')
-    expect(text).toContain('LV4') // level 'L4' → LV4（社交联动，2026-09-05）
-    expect(text).toContain('AI learning')
-    expect(text).toContain('📰 NEWS')
+    expect(text).toContain('VocalVerse News')
+    expect(text).toContain('@vocalverse')
+    expect(text).toContain('LV4')
+    expect(text).toContain('English learning')
+    expect(text).toContain('新闻稿') // domain 存储值 → 展示文案映射（A-03）
     expect(text).toContain('1.2k') // like 1240
     expect(text).toContain('46') // comment
     expect(text).toContain('37') // coin
     expect(text).toContain('15') // share
   })
 
+  it('打卡卡：整体分 / 今日次数 / 日期渲染', () => {
+    const wrapper = mountCard(
+      makePost({
+        kind: 'checkin',
+        domain: null,
+        checkinOverall: 88.5,
+        checkinPracticeCount: 3,
+        checkinDate: '2026-09-06',
+      }),
+    )
+    const text = wrapper.text()
+    expect(text).toContain('今日打卡')
+    expect(text).toContain('今日综合分') // overall 取整展示（toFixed(0)）
+    expect(text).toContain('3 次口语练习')
+    expect(text).toContain('2026-09-06')
+  })
+
   it('点赞按钮：click 触发 toggle-like；liked 态带 is-liked 与 aria-pressed', async () => {
-    const wrapper = mount(MobilePostCard, { props: { post: makePost() } })
+    const wrapper = mountCard(makePost())
     const button = wrapper.get('button[aria-label="点赞"]')
     expect(button.attributes('aria-pressed')).toBe('false')
 
@@ -57,98 +101,84 @@ describe('MobilePostCard', () => {
     expect(likedButton.attributes('aria-label')).toBe('取消点赞')
   })
 
-  it('投币 / 分享 / 评论按钮透传事件', async () => {
-    const wrapper = mount(MobilePostCard, { props: { post: makePost() } })
-    await wrapper.get('button[aria-label="投币"]').trigger('click')
+  it('支持 / 分享 / 评论按钮透传事件；已支持态 aria 锁定（不可取消）', async () => {
+    const wrapper = mountCard(makePost())
+    await wrapper.get('button[aria-label="支持"]').trigger('click')
     await wrapper.get('button[aria-label="分享"]').trigger('click')
     await wrapper.get('button[aria-label="评论"]').trigger('click')
-    expect(wrapper.emitted('toggle-coin')).toHaveLength(1)
+    expect(wrapper.emitted('coin')).toHaveLength(1)
     expect(wrapper.emitted('share')).toHaveLength(1)
     expect(wrapper.emitted('open-comments')).toHaveLength(1)
+
+    await wrapper.setProps({ post: makePost({ coined: true }) })
+    const coinedBtn = wrapper.get('button[aria-label="已支持（不可取消）"]')
+    expect(coinedBtn.attributes('aria-pressed')).toBe('true')
   })
 
-  it('视频帖：渲染视频封面样式与时长角标', () => {
-    const wrapper = mount(MobilePostCard, {
-      props: { post: makePost({ kind: 'video', duration: '6:23' }) },
-    })
+  it('视频帖：渲染视频封面样式与时长角标（seconds → m:ss）', () => {
+    const wrapper = mountCard(
+      makePost({ kind: 'video', media: { type: 'video', durationS: 383 } }),
+    )
     expect(wrapper.find('.u-comm-media--video').exists()).toBe(true)
     expect(wrapper.text()).toContain('6:23')
   })
 
-  it('无配图帖：不渲染媒体块', () => {
-    const wrapper = mount(MobilePostCard, {
-      props: { post: makePost({ media: undefined, desc: undefined }) },
-    })
+  it('无配图帖：不渲染媒体块（标题隐藏分支同样适用）', () => {
+    const wrapper = mountCard(makePost({ media: null, body: null, title: null }))
     expect(wrapper.find('.u-comm-media').exists()).toBe(false)
+    expect(wrapper.find('h3.u-comm-item__title').exists()).toBe(false)
   })
 })
 
 describe('MobilePostActions', () => {
-  it('四个操作均为 button（评论/点赞/投币/分享全交互）', () => {
+  it('四个操作均为 button（评论/点赞/支持/分享全交互）', () => {
     const wrapper = mount(MobilePostActions, {
-      props: { stats: makePost().stats, liked: false, coined: false },
+      props: { likeCount: 1, commentCount: 1, coinCount: 1, shareCount: 1, liked: false, coined: false },
     })
     expect(wrapper.findAll('button')).toHaveLength(4)
   })
 
-  it('投币：click 触发 toggle-coin；coined 态带 is-coined 与 aria-pressed', async () => {
+  it('支持：click 触发 coin；已支持态 aria 为不可取消', async () => {
     const wrapper = mount(MobilePostActions, {
-      props: { stats: makePost().stats, liked: false, coined: false },
+      props: { likeCount: 1, commentCount: 1, coinCount: 1, shareCount: 1, liked: false, coined: true },
     })
-    const button = wrapper.get('button[aria-label="投币"]')
+    const button = wrapper.get('button[aria-label="已支持（不可取消）"]')
     await button.trigger('click')
-    expect(wrapper.emitted('toggle-coin')).toHaveLength(1)
-
-    await wrapper.setProps({ coined: true })
+    expect(wrapper.emitted('coin')).toHaveLength(1)
     expect(wrapper.get('button.u-comm-action.is-coined').attributes('aria-pressed')).toBe('true')
-    expect(wrapper.get('button.u-comm-action.is-coined').attributes('aria-label')).toBe('取消投币')
-  })
-
-  it('评论与分享 click 各自触发事件', async () => {
-    const wrapper = mount(MobilePostActions, {
-      props: { stats: makePost().stats, liked: false, coined: false },
-    })
-    await wrapper.get('button[aria-label="评论"]').trigger('click')
-    await wrapper.get('button[aria-label="分享"]').trigger('click')
-    expect(wrapper.emitted('open-comments')).toHaveLength(1)
-    expect(wrapper.emitted('share')).toHaveLength(1)
   })
 })
 
 describe('MobileCommentsSheet', () => {
-  const mountSheet = (comments: CommunityPost['comments']) =>
+  const mountSheet = (commentCount: number) =>
     mount(MobileCommentsSheet, {
-      props: { open: true, title: 'Title', comments },
-      global: { stubs: { teleport: true } },
+      props: { open: true, postId: 1, title: 'Title', commentCount },
+      global: { stubs: { teleport: true }, plugins: [createPinia()] },
     })
 
-  it('渲染标题与评论列表', () => {
-    const wrapper = mountSheet([{ author: 'Kai', text: 'Nice one.', time: '5 分钟前' }])
+  it('渲染标题与「共 N 条」，空列表显示空态文案', async () => {
+    const wrapper = mountSheet(46)
     expect(wrapper.text()).toContain('Title')
-    expect(wrapper.text()).toContain('Kai')
-    expect(wrapper.text()).toContain('Nice one.')
-  })
-
-  it('空评论：显示空态文案', () => {
-    const wrapper = mountSheet([])
+    expect(wrapper.text()).toContain('· 46')
     expect(wrapper.text()).toContain('还没有评论')
   })
 
   it('输入后发送：触发 add-comment 并清空输入；空输入禁发', async () => {
-    const wrapper = mountSheet([])
+    const wrapper = mountSheet(0)
     const send = wrapper.get('button[aria-label="发表评论"]')
     expect(send.attributes('disabled')).toBeDefined()
 
     await wrapper.get('input').setValue('  Great post!  ')
     expect(send.attributes('disabled')).toBeUndefined()
     await send.trigger('click')
+    await flushPromises()
 
-    expect(wrapper.emitted('add-comment')).toEqual([['Great post!']])
+    expect(wrapper.emitted('update-count')).toBeTruthy()
     expect((wrapper.get('input').element as HTMLInputElement).value).toBe('')
   })
 
   it('关闭按钮触发 update:open false', async () => {
-    const wrapper = mountSheet([])
+    const wrapper = mountSheet(0)
     await wrapper.get('button[aria-label="关闭评论"]').trigger('click')
     expect(wrapper.emitted('update:open')).toEqual([[false]])
   })

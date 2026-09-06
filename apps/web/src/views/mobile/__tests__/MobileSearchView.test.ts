@@ -16,10 +16,10 @@ describe('MobileSearchView（演示搜索）', () => {
     expect(text).toContain('#Shadowing')
   })
 
-  it('输入关键词：帖子结果过滤（English → Global Post）', async () => {
+  it('输入关键词：帖子结果过滤（English → VocalVerse News）', async () => {
     const wrapper = mount(MobileSearchView)
     await wrapper.get('input[aria-label="搜索关键词"]').setValue('English')
-    expect(wrapper.text()).toContain('Global Post')
+    expect(wrapper.text()).toContain('VocalVerse News')
     expect(wrapper.text()).not.toContain('最近搜索')
   })
 
