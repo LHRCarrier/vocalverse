@@ -43,6 +43,8 @@ public class AuthController {
 
   public record LoginRequest(@NotBlank String username, @NotBlank String password) {}
 
+  public record ForgotRequest(@NotBlank @Size(max = 64) String username) {}
+
   public record RefreshRequest(@NotBlank String refreshToken) {}
 
   public record TokenResponse(
@@ -57,18 +59,21 @@ public class AuthController {
   private final RefreshTokenRepository refreshTokens;
   private final PasswordEncoder passwordEncoder;
   private final JwtService jwt;
+  private final com.vocalverse.ticket.TicketRepository tickets;
 
   public AuthController(
       UserRepository users,
       UserProfileRepository profiles,
       RefreshTokenRepository refreshTokens,
       PasswordEncoder passwordEncoder,
-      JwtService jwt) {
+      JwtService jwt,
+      com.vocalverse.ticket.TicketRepository tickets) {
     this.users = users;
     this.profiles = profiles;
     this.refreshTokens = refreshTokens;
     this.passwordEncoder = passwordEncoder;
     this.jwt = jwt;
+    this.tickets = tickets;
   }
 
   @PostMapping("/register")
@@ -139,6 +144,31 @@ public class AuthController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no such user"))
             .getRole();
     return Envelope.ok(issue(token.getUserId(), role, request));
+  }
+
+  /**
+   * 忘记密码（2026-09-06 · 演示环境无邮件/短信通道）：用户提交申请 → 落一条 feedback 工单 给管理端处理（tickets 写方 = Java，见 docs/06
+   * §9.6）。防枚举：用户名存在与否返回同一响应。
+   */
+  @PostMapping("/forgot")
+  public Envelope<String> forgot(@Valid @RequestBody ForgotRequest body) {
+    users
+        .findByUsernameIgnoreCase(body.username())
+        .ifPresent(
+            u -> {
+              Instant now = Instant.now();
+              com.vocalverse.ticket.TicketEntity t = new com.vocalverse.ticket.TicketEntity();
+              t.setUserId(u.getId());
+              t.setKind("feedback");
+              t.setTargetType("none");
+              t.setTitle("密码重置申请");
+              t.setContent("账号 " + body.username() + " 申请密码重置（演示环境无邮件通道，请管理员手动处理）");
+              t.setStatus("open");
+              t.setCreatedAt(now);
+              t.setUpdatedAt(now);
+              tickets.save(t);
+            });
+    return Envelope.ok("已收到申请：管理员将尽快处理（演示环境无邮件通道，请留意管理员工单）");
   }
 
   @GetMapping("/me")
