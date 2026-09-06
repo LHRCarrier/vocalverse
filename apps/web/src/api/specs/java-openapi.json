@@ -84,6 +84,58 @@
         }
       }
     },
+    "/api/v1/community/follows/{userId}" : {
+      "put" : {
+        "tags" : [ "community-social-controller" ],
+        "operationId" : "follow",
+        "parameters" : [ {
+          "name" : "userId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeVoid"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "community-social-controller" ],
+        "operationId" : "unfollow",
+        "parameters" : [ {
+          "name" : "userId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/songs/{id}" : {
       "get" : {
         "tags" : [ "content-admin-controller" ],
@@ -1310,6 +1362,112 @@
         }
       }
     },
+    "/api/v1/community/notifications" : {
+      "get" : {
+        "tags" : [ "community-social-controller" ],
+        "operationId" : "notifications",
+        "parameters" : [ {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 10
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeNotificationsPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/follows" : {
+      "get" : {
+        "tags" : [ "community-social-controller" ],
+        "operationId" : "follows",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeListFollowSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/follows/recommendations" : {
+      "get" : {
+        "tags" : [ "community-social-controller" ],
+        "operationId" : "followRecommendations",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeListFollowRecommend"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/following-feed" : {
+      "get" : {
+        "tags" : [ "community-social-controller" ],
+        "operationId" : "followingFeed",
+        "parameters" : [ {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 10
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeFeedPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/users" : {
       "get" : {
         "tags" : [ "admin-user-controller" ],
@@ -1496,6 +1654,21 @@
           },
           "data" : {
             "$ref" : "#/components/schemas/CoinState"
+          }
+        }
+      },
+      "EnvelopeVoid" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "type" : "object"
           }
         }
       },
@@ -2833,6 +3006,131 @@
           }
         }
       },
+      "EnvelopeNotificationsPage" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/NotificationsPage"
+          }
+        }
+      },
+      "NotificationItem" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "postId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "postTitle" : {
+            "type" : "string"
+          },
+          "actorNickname" : {
+            "type" : "string"
+          },
+          "actorCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "commentBody" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "NotificationsPage" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NotificationItem"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string"
+          },
+          "hasMore" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "EnvelopeListFollowSummary" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/FollowSummary"
+            }
+          }
+        }
+      },
+      "FollowSummary" : {
+        "type" : "object",
+        "properties" : {
+          "author" : {
+            "$ref" : "#/components/schemas/AuthorView"
+          },
+          "followedAt" : {
+            "type" : "string"
+          },
+          "youFollowBack" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "EnvelopeListFollowRecommend" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/FollowRecommend"
+            }
+          }
+        }
+      },
+      "FollowRecommend" : {
+        "type" : "object",
+        "properties" : {
+          "author" : {
+            "$ref" : "#/components/schemas/AuthorView"
+          },
+          "followed" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "EnvelopePageViewUserRow" : {
         "type" : "object",
         "properties" : {
@@ -3038,21 +3336,6 @@
           "page_size" : {
             "type" : "integer",
             "format" : "int32"
-          }
-        }
-      },
-      "EnvelopeVoid" : {
-        "type" : "object",
-        "properties" : {
-          "code" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "data" : {
-            "type" : "object"
           }
         }
       }

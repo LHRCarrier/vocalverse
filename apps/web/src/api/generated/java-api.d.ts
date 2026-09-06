@@ -36,6 +36,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/community/follows/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["follow"];
+        post?: never;
+        delete: operations["unfollow"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/songs/{id}": {
         parameters: {
             query?: never;
@@ -436,6 +452,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/community/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["notifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/community/follows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["follows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/community/follows/recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["followRecommendations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/community/following-feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["followingFeed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -509,6 +589,12 @@ export interface components {
             code?: number;
             message?: string;
             data?: components["schemas"]["CoinState"];
+        };
+        EnvelopeVoid: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: Record<string, never>;
         };
         SongUpsert: {
             title: string;
@@ -997,6 +1083,51 @@ export interface components {
             message?: string;
             data?: components["schemas"]["CommentPage"];
         };
+        EnvelopeNotificationsPage: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["NotificationsPage"];
+        };
+        NotificationItem: {
+            id?: string;
+            type?: string;
+            /** Format: int64 */
+            postId?: number;
+            postTitle?: string;
+            actorNickname?: string;
+            /** Format: int32 */
+            actorCount?: number;
+            commentBody?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        NotificationsPage: {
+            items?: components["schemas"]["NotificationItem"][];
+            nextCursor?: string;
+            hasMore?: boolean;
+        };
+        EnvelopeListFollowSummary: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["FollowSummary"][];
+        };
+        FollowSummary: {
+            author?: components["schemas"]["AuthorView"];
+            followedAt?: string;
+            youFollowBack?: boolean;
+        };
+        EnvelopeListFollowRecommend: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["FollowRecommend"][];
+        };
+        FollowRecommend: {
+            author?: components["schemas"]["AuthorView"];
+            followed?: boolean;
+        };
         EnvelopePageViewUserRow: {
             /** Format: int32 */
             code?: number;
@@ -1078,12 +1209,6 @@ export interface components {
             /** Format: int32 */
             page_size?: number;
         };
-        EnvelopeVoid: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: Record<string, never>;
-        };
     };
     responses: never;
     parameters: never;
@@ -1155,6 +1280,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["EnvelopeCoinState"];
+                };
+            };
+        };
+    };
+    follow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeVoid"];
+                };
+            };
+        };
+    };
+    unfollow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeVoid"];
                 };
             };
         };
@@ -2099,6 +2268,92 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["EnvelopeVoid"];
+                };
+            };
+        };
+    };
+    notifications: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeNotificationsPage"];
+                };
+            };
+        };
+    };
+    follows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeListFollowSummary"];
+                };
+            };
+        };
+    };
+    followRecommendations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeListFollowRecommend"];
+                };
+            };
+        };
+    };
+    followingFeed: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeFeedPage"];
                 };
             };
         };
