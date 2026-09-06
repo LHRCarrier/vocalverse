@@ -6,6 +6,8 @@ import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * 评论仓库（Java 写方；展示过滤 status='visible'；keyset ASC 分页）。
@@ -34,4 +36,11 @@ public interface PostCommentRepository
             pageable)
         .getContent();
   }
+
+  /** S2 通知：指向我（作者）可见帖子的评论，按时间倒序取近 window。 */
+  @Query(
+      "SELECT c FROM PostCommentEntity c "
+          + "WHERE c.postId IN (SELECT p.id FROM PostEntity p WHERE p.authorId = :authorId AND p.status = 'visible') "
+          + "ORDER BY c.createdAt DESC")
+  List<PostCommentEntity> findMine(@Param("authorId") Long authorId, Pageable pageable);
 }

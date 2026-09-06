@@ -8,7 +8,11 @@ import com.vocalverse.community.dto.CommunityView.CommentPage;
 import com.vocalverse.community.dto.CommunityView.CommentView;
 import com.vocalverse.community.dto.CommunityView.CommunityPostView;
 import com.vocalverse.community.dto.CommunityView.FeedPage;
+import com.vocalverse.community.dto.CommunityView.FollowRecommend;
+import com.vocalverse.community.dto.CommunityView.FollowSummary;
 import com.vocalverse.community.dto.CommunityView.LikeState;
+import com.vocalverse.community.dto.CommunityView.NotificationItem;
+import com.vocalverse.community.dto.CommunityView.NotificationsPage;
 import com.vocalverse.community.dto.CommunityView.ShareState;
 import com.vocalverse.user.UserEntity;
 import com.vocalverse.user.UserProfileEntity;
@@ -17,9 +21,13 @@ import com.vocalverse.user.UserRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -58,6 +66,7 @@ public class CommunityService {
   private final PostCommentRepository comments;
   private final PostLikeRepository likes;
   private final PostInteractionRepository interactions;
+  private final FollowRepository follows;
   private final UserRepository users;
   private final UserProfileRepository profiles;
   private final ObjectMapper mapper;
@@ -68,6 +77,7 @@ public class CommunityService {
       PostCommentRepository comments,
       PostLikeRepository likes,
       PostInteractionRepository interactions,
+      FollowRepository follows,
       UserRepository users,
       UserProfileRepository profiles,
       ObjectMapper mapper,
@@ -76,6 +86,7 @@ public class CommunityService {
     this.comments = comments;
     this.likes = likes;
     this.interactions = interactions;
+    this.follows = follows;
     this.users = users;
     this.profiles = profiles;
     this.mapper = mapper;
@@ -340,6 +351,224 @@ public class CommunityService {
 
   private static double maxIfPresent(double base, Double value) {
     return value == null ? base : Math.max(base, value);
+  }
+
+  // ------------------------------------------------------------------ S2 · 关注
+
+  @Transactional
+  public void follow(Long me, Long targetId) {
+    if (me.equals(targetId)) {
+      throw new CommunityException(42203, "不能关注自己", HttpStatus.BAD_REQUEST);
+    }
+    users
+        .findById(targetId)
+        .orElseThrow(() -> new CommunityException(40402, "用户不存在", HttpStatus.NOT_FOUND));
+    if (follows.findByFollowerIdAndFolloweeId(me, targetId).isEmpty()) {
+      FollowEntity f = new FollowEntity();
+      f.setFollowerId(me);
+      f.setFolloweeId(targetId);
+      f.setCreatedAt(Instant.now());
+      follows.saveAndFlush(f);
+    }
+  }
+
+  @Transactional
+  public void unfollow(Long me, Long targetId) {
+    follows.deleteByFollowerIdAndFolloweeId(me, targetId);
+  }
+
+  /** 关注列表（+对方是否也关注我 = 互关） */
+  public List<FollowSummary> followingList(Long me) {
+    List<FollowEntity> rows = follows.findByFollowerIdOrderByCreatedAtDesc(me);
+    List<Long> targetIds = rows.stream().map(FollowEntity::getFolloweeId).toList();
+    Map<Long, AuthorView> authors = loadAuthors(targetIds);
+    Set<Long> backers =
+        follows.findByFolloweeIdAndFollowerIdIn(me, targetIds).stream()
+            .map(FollowEntity::getFollowerId)
+            .collect(Collectors.toSet());
+    return rows.stream()
+        .map(
+            f ->
+                new FollowSummary(
+                    authors.getOrDefault(f.getFolloweeId(), emptyAuthor(f.getFolloweeId())),
+                    f.getCreatedAt().toString(),
+                    backers.contains(f.getFolloweeId())))
+        .toList();
+  }
+
+  /** 推荐关注：作者全量（排除自己），followed 标记；按个人主页时间倒序演示。 */
+  public List<FollowRecommend> recommendations(Long me) {
+    return users.findAll().stream()
+        .filter(u -> !u.getId().equals(me))
+        .map(
+            u -> {
+              AuthorView a =
+                  loadAuthors(List.of(u.getId())).getOrDefault(u.getId(), emptyAuthor(u.getId()));
+              boolean followed = follows.findByFollowerIdAndFolloweeId(me, u.getId()).isPresent();
+              return new FollowRecommend(a, followed);
+            })
+        .toList();
+  }
+
+  /** 关注流：仅关注作者的新内容（keyset DESC，复用 buildViews 聚合作者/互动态） */
+  public FeedPage followingFeed(Long me, String cursor, int limit) {
+    List<Long> followeeIds =
+        follows.findByFollowerIdOrderByCreatedAtDesc(me).stream()
+            .map(FollowEntity::getFolloweeId)
+            .toList();
+    Cursor c = decodeCursor(cursor);
+    int pageSize = clampLimit(limit);
+    PageRequest pageable =
+        PageRequest.of(0, pageSize + 1, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
+    List<PostEntity> rows = posts.followingFeed(followeeIds, c.ts(), c.id(), pageable);
+    boolean hasMore = rows.size() > pageSize;
+    List<PostEntity> page = hasMore ? rows.subList(0, pageSize) : rows;
+    List<CommunityPostView> views = buildViews(page, me);
+    String next = hasMore ? encodeCursor(lastKey(page)) : null;
+    return new FeedPage(views, next, hasMore);
+  }
+
+  // ------------------------------------------------------------------ S2 · 通知（派生 · mergeKey 聚合）
+
+  private record NotiGroup(
+      String key, Long postId, String action, int count, Instant latest, Long latestActorId) {}
+
+  private static final int NOTIFICATION_WINDOW = 50;
+
+  /**
+   * 互动通知（docs/38 §5 mergeKey 模板 · 演示窗口 = 近 50 条互动/评论，内存聚合）： like/coin/share 按 (post, action, 当日
+   * UTC) 聚合为「actor 等 N 人…」；comment 逐条带内容； 仅本人可见帖、排除自身动作（自赞/自评不通知）；cursor = base64(ts|itemId) 阈值分页。
+   */
+  public NotificationsPage notifications(Long me, String cursor, int limit) {
+    int pageSize = clampLimit(limit);
+    List<PostInteractionEntity> inters =
+        interactions.findMine(me, PageRequest.of(0, NOTIFICATION_WINDOW));
+    List<PostCommentEntity> cmts = comments.findMine(me, PageRequest.of(0, NOTIFICATION_WINDOW));
+    inters.removeIf(i -> i.getActorId().equals(me));
+    cmts.removeIf(c -> c.getAuthorId().equals(me));
+
+    Set<Long> postIds = new HashSet<>();
+    inters.forEach(i -> postIds.add(i.getPostId()));
+    cmts.forEach(c -> postIds.add(c.getPostId()));
+    Map<Long, PostEntity> postMap =
+        posts.findAllById(postIds).stream()
+            .collect(Collectors.toMap(PostEntity::getId, Function.identity()));
+    Set<Long> actorIds = new HashSet<>();
+    inters.forEach(i -> actorIds.add(i.getActorId()));
+    cmts.forEach(c -> actorIds.add(c.getAuthorId()));
+    Map<Long, AuthorView> actorMap = loadAuthors(new ArrayList<>(actorIds));
+
+    // 聚合 like/coin/share：mergeKey = postId|action|当日UTC
+    Map<String, NotiGroup> groups = new LinkedHashMap<>();
+    for (PostInteractionEntity i : inters) {
+      String key =
+          i.getPostId()
+              + "|"
+              + i.getAction()
+              + "|"
+              + i.getCreatedAt().atZone(ZoneOffset.UTC).toLocalDate();
+      NotiGroup prev = groups.get(key);
+      if (prev == null) {
+        groups.put(
+            key,
+            new NotiGroup(key, i.getPostId(), i.getAction(), 1, i.getCreatedAt(), i.getActorId()));
+      } else {
+        groups.put(
+            key,
+            new NotiGroup(
+                key,
+                prev.postId(),
+                prev.action(),
+                prev.count() + 1,
+                prev.latest().isAfter(i.getCreatedAt()) ? prev.latest() : i.getCreatedAt(),
+                prev.latest().isAfter(i.getCreatedAt()) ? prev.latestActorId() : i.getActorId()));
+      }
+    }
+
+    List<NotificationItem> items = new ArrayList<>();
+    for (NotiGroup g : groups.values()) {
+      items.add(
+          new NotificationItem(
+              "n|" + g.key(),
+              g.action(),
+              g.postId(),
+              titleOf(postMap.get(g.postId())),
+              nicknameOf(actorMap, g.latestActorId()),
+              g.count(),
+              null,
+              g.latest()));
+    }
+    for (PostCommentEntity c : cmts) {
+      items.add(
+          new NotificationItem(
+              "c|" + c.getId(),
+              "comment",
+              c.getPostId(),
+              titleOf(postMap.get(c.getPostId())),
+              nicknameOf(actorMap, c.getAuthorId()),
+              1,
+              c.getBody(),
+              c.getCreatedAt()));
+    }
+
+    // 排序：时间倒序，同刻按 itemId 升序（配合阈值游标）
+    items.sort(
+        Comparator.comparing(NotificationItem::createdAt)
+            .reversed()
+            .thenComparing(NotificationItem::id));
+
+    // 阈值游标
+    CursorThreshold threshold = decodeNotiCursor(cursor);
+    List<NotificationItem> filtered = new ArrayList<>();
+    for (NotificationItem it : items) {
+      if (threshold.ts() == null) {
+        filtered.add(it);
+        continue;
+      }
+      int tsCmp = it.createdAt().compareTo(threshold.ts());
+      if (tsCmp < 0 || (tsCmp == 0 && it.id().compareTo(threshold.id()) > 0)) {
+        filtered.add(it);
+      }
+    }
+    boolean hasMore = filtered.size() > pageSize;
+    List<NotificationItem> page = hasMore ? filtered.subList(0, pageSize) : filtered;
+    NotificationItem last = page.isEmpty() ? null : page.get(page.size() - 1);
+    String next = hasMore && last != null ? encodeNotiCursor(last.createdAt(), last.id()) : null;
+    return new NotificationsPage(page, next, hasMore);
+  }
+
+  private static String titleOf(PostEntity p) {
+    if (p == null) return "内容";
+    return KIND_CHECKIN.equals(p.getKind())
+        ? "今日打卡"
+        : (p.getTitle() != null ? p.getTitle() : p.getBody());
+  }
+
+  private static String nicknameOf(Map<Long, AuthorView> actors, Long id) {
+    AuthorView a = actors.get(id);
+    return a == null ? "有同修" : a.nickname();
+  }
+
+  private record CursorThreshold(Instant ts, String id) {}
+
+  private static CursorThreshold decodeNotiCursor(String cursor) {
+    if (cursor == null || cursor.isBlank()) {
+      return new CursorThreshold(null, null);
+    }
+    try {
+      String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+      String[] parts = raw.split("\\|");
+      return new CursorThreshold(Instant.parse(parts[0]), parts[1]);
+    } catch (Exception e) {
+      throw new CommunityException(42203, "分页游标非法", HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  private static String encodeNotiCursor(Instant ts, String id) {
+    String raw = micro(ts).toString() + "|" + id;
+    return Base64.getUrlEncoder()
+        .withoutPadding()
+        .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
   }
 
   // ------------------------------------------------------------------ 内部

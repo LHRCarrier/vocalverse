@@ -50,6 +50,30 @@ public interface PostRepository
         .getContent();
   }
 
+  /** S2 关注流：仅关注作者的新内容（keyset DESC；authorIds 为空 → 空结果，不走 SQL）。 */
+  default List<PostEntity> followingFeed(
+      List<Long> authorIds, Instant ts, Long id, Pageable pageable) {
+    if (authorIds.isEmpty()) {
+      return List.of();
+    }
+    return findAll(
+            (root, query, cb) -> {
+              List<jakarta.persistence.criteria.Predicate> ps = new ArrayList<>();
+              ps.add(cb.equal(root.get("status"), "visible"));
+              ps.add(root.get("authorId").in(authorIds));
+              if (ts != null) {
+                ps.add(
+                    cb.or(
+                        cb.lessThan(root.get("createdAt"), ts),
+                        cb.and(
+                            cb.equal(root.get("createdAt"), ts), cb.lessThan(root.get("id"), id))));
+              }
+              return cb.and(ps.toArray(new jakarta.persistence.criteria.Predicate[0]));
+            },
+            pageable)
+        .getContent();
+  }
+
   @Query("SELECT p FROM PostEntity p WHERE p.status = 'visible' AND p.id = :id")
   Optional<PostEntity> findVisible(@Param("id") Long id);
 
