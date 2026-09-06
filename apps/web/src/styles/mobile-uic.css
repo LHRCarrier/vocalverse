@@ -2609,8 +2609,11 @@ body {
   transition: background-color 150ms ease-out;
 }
 
+/* 关闭图标 = Tabler x（与底栏同源同风格；2026-09-06 组长反馈：plus 旋转 45° 观感差） */
 .u-sheet__close svg {
-  transform: rotate(45deg); /* plus → × */
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
 }
 
 .u-sheet__close:hover {

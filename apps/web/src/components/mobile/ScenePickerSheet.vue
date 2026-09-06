@@ -5,6 +5,7 @@
  * 场景列表懒加载（首次打开才 fetch；失败静默，空态提示 seed）。
  */
 import { ref, watch } from 'vue'
+import IconX from '~icons/tabler/x'
 
 import { fetchScenarios, type ScenarioItem } from '@/api/practice'
 
@@ -67,7 +68,7 @@ function pick(sceneId: number) {
               aria-label="关闭"
               @click="emit('update:open', false)"
             >
-              <MobileIcon name="plus" :size="18" />
+              <IconX />
             </button>
           </header>
           <p class="u-sheet__sub">

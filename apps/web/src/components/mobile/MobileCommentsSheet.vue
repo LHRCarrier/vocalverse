@@ -6,6 +6,7 @@
  * emit update-count（父级同步卡片计数，A-05 以后端 total 为准）；嵌套评论楼 = S3。
  */
 import { ref, watch } from 'vue'
+import IconX from '~icons/tabler/x'
 
 import { addComment, fetchComments, timeAgo } from '@/api/community'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
@@ -116,7 +117,7 @@ async function submit() {
               aria-label="关闭评论"
               @click="emit('update:open', false)"
             >
-              <MobileIcon name="plus" :size="18" />
+              <IconX />
             </button>
           </header>
           <p class="u-sheet__sub">{{ props.title }}</p>
