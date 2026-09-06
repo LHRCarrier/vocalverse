@@ -26,7 +26,7 @@ describe('MobileAccountDrawer', () => {
     expect(text).toContain('退出登录')
   })
 
-  it('菜单项 click：我的学习 → 展开四模块（navigate 详情·收起）；通知 → navigate；设置 → 展开子项 toast', async () => {
+  it('菜单项 click：我的学习 → 四模块；通知 → 三子项（私信/互动/关注?tab=）；设置 → 子项 toast', async () => {
     const wrapper = mountDrawer()
     const items = wrapper.findAll('.u-drawer__item')
     expect(items).toHaveLength(3)
@@ -42,12 +42,18 @@ describe('MobileAccountDrawer', () => {
     await wrapper.findAll('.u-drawer__subitem')[2].trigger('click')
     expect(wrapper.emitted('navigate')).toEqual([['/m/learn/speaking']])
     expect(wrapper.find('.u-drawer__submenu').exists()).toBe(false)
-    // 通知 → navigate
+    // 通知：展开三子项（私信/互动通知/关注动态 → ?tab= 直达）
     await items[1].trigger('click')
-    expect(wrapper.emitted('navigate')).toEqual([['/m/learn/speaking'], ['/m/notifications']])
+    expect(wrapper.find('.u-drawer__submenu').exists()).toBe(true)
+    expect(wrapper.text()).toContain('私信')
+    expect(wrapper.text()).toContain('互动通知')
+    expect(wrapper.text()).toContain('关注动态')
+    await wrapper.findAll('.u-drawer__subitem')[2].trigger('click')
+    expect(wrapper.emitted('navigate')).toEqual([['/m/learn/speaking'], ['/m/notifications?tab=follow']])
+    expect(wrapper.find('.u-drawer__submenu').exists()).toBe(false)
     // 设置与隐私：展开子面板（帮助与反馈/数据与隐私/关于声语界），无 navigate
     await items[2].trigger('click')
-    expect(wrapper.emitted('navigate')).toEqual([['/m/learn/speaking'], ['/m/notifications']])
+    expect(wrapper.emitted('navigate')).toEqual([['/m/learn/speaking'], ['/m/notifications?tab=follow']])
     expect(wrapper.find('.u-drawer__submenu').exists()).toBe(true)
     expect(wrapper.text()).toContain('帮助与反馈')
     // 子项点击 → toast + 收起

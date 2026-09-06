@@ -57,6 +57,14 @@ describe('MobileNotificationsView（通知中心 · 消息收敛 2026-09-09）',
     expect(text).toContain('更新了影子跟读素材')
     expect(wrapper.findAll('.u-notices__row')).toHaveLength(4)
   })
+
+  it('?tab= 参数直达对应 tab（抽屉通知下拉子项）', async () => {
+    await router.push('/m/notifications?tab=follow')
+    await router.isReady()
+    const wrapper = mount(MobileNotificationsView, { global: { plugins: [router] } })
+    expect(wrapper.text()).toContain('Momo 发布了新帖')
+    expect(wrapper.findAll('.u-notif-tab')[2].classes()).toContain('active')
+  })
 })
 
 describe('MobileChatView', () => {
