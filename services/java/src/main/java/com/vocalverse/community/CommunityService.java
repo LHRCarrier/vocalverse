@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -87,8 +88,10 @@ public class CommunityService {
     String normalized = normalizeDomain(domain);
     Cursor c = decodeCursor(cursor);
     int pageSize = clampLimit(limit);
-    // 多取一条判 hasMore（docs/37 §5 keyset 约定）
-    List<PostEntity> rows = posts.feed(normalized, c.ts(), c.id(), PageRequest.of(0, pageSize + 1));
+    // 多取一条判 hasMore（docs/37 §5 keyset 约定）；DESC 排序由 Pageable 携带（Criteria 执行）
+    PageRequest pageable =
+        PageRequest.of(0, pageSize + 1, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
+    List<PostEntity> rows = posts.feed(normalized, c.ts(), c.id(), pageable);
     boolean hasMore = rows.size() > pageSize;
     List<PostEntity> page = hasMore ? rows.subList(0, pageSize) : rows;
     List<CommunityPostView> views = buildViews(page, actorId);
@@ -157,9 +160,10 @@ public class CommunityService {
     requireVisible(postId);
     Cursor c = decodeCursor(cursor);
     int pageSize = clampLimit(limit);
-    // 多取一条判 hasMore（docs/37 §5 keyset 约定）
-    List<PostCommentEntity> rows =
-        comments.page(postId, c.ts(), c.id(), PageRequest.of(0, pageSize + 1));
+    // 多取一条判 hasMore（docs/37 §5 keyset 约定）；ASC 排序由 Pageable 携带（Criteria 执行）
+    PageRequest pageable =
+        PageRequest.of(0, pageSize + 1, Sort.by(Sort.Direction.ASC, "createdAt", "id"));
+    List<PostCommentEntity> rows = comments.page(postId, c.ts(), c.id(), pageable);
     boolean hasMore = rows.size() > pageSize;
     List<PostCommentEntity> page = hasMore ? rows.subList(0, pageSize) : rows;
     List<CommentView> views = page.stream().map(this::toCommentView).toList();
@@ -411,8 +415,9 @@ public class CommunityService {
     Map<Long, UserEntity> userMap =
         users.findAllById(authorIds).stream()
             .collect(Collectors.toMap(UserEntity::getId, Function.identity()));
+    // 用 user_id（非 PK）批量取档案：作者 id 是 users.id，findAllById 会命中错误行（2026-09-06 修复）
     Map<Long, UserProfileEntity> profileMap =
-        profiles.findAllById(authorIds).stream()
+        profiles.findByUserIdIn(authorIds).stream()
             .collect(Collectors.toMap(UserProfileEntity::getUserId, Function.identity()));
     Map<Long, AuthorView> out = new HashMap<>();
     for (Long id : authorIds) {

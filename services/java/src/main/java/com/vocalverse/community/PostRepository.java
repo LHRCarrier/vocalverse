@@ -1,15 +1,25 @@
 package com.vocalverse.community;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** 帖子仓库（Java 写方唯一入口；计数增减为原子 @Modifying，与互动行写入同事务）。 */
-public interface PostRepository extends JpaRepository<PostEntity, Long> {
+/**
+ * 帖子仓库（Java 写方唯一入口；计数增减为原子 @Modifying，与互动行写入同事务）。
+ *
+ * <p>feed 用 JPA Criteria（Java 侧判空）而非 JPQL `:param IS NULL`——首屏三参全 null 时， PostgreSQL 无法推断未类型化 NULL
+ * 参数（42P18 could not determine data type of parameter）， H2 容忍、PG 拒绝（2026-09-06 实测修复；JPQL 版在 H2
+ * 单测全绿、真机 500）。排序由 Pageable 携带（DESC created_at,id / ASC 详见注释）。
+ */
+public interface PostRepository
+    extends JpaRepository<PostEntity, Long>, JpaSpecificationExecutor<PostEntity> {
 
   Optional<PostEntity> findFirstBySlug(String slug);
 
@@ -18,23 +28,27 @@ public interface PostRepository extends JpaRepository<PostEntity, Long> {
   Optional<PostEntity> findFirstByAuthorIdAndCheckinDateAndKind(
       Long authorId, java.time.LocalDate date, String kind);
 
-  /**
-   * 领域流（keyset）：domain 过滤 + (created_at, id) DESC 游标。
-   *
-   * <p>domain 为 NULL 时返回全量（含打卡卡 NULL domain）。JPQL 的 (:domain IS NULL OR ...) 在 H2/PG 均可参数化；游标条件按
-   * (ts,id) 双键比较。
-   */
-  @Query(
-      "SELECT p FROM PostEntity p "
-          + "WHERE p.status = 'visible' "
-          + "AND (:domain IS NULL OR p.domain = :domain) "
-          + "AND (:ts IS NULL OR (p.createdAt < :ts OR (p.createdAt = :ts AND p.id < :id))) "
-          + "ORDER BY p.createdAt DESC, p.id DESC")
-  List<PostEntity> feed(
-      @Param("domain") String domain,
-      @Param("ts") Instant ts,
-      @Param("id") Long id,
-      org.springframework.data.domain.Pageable pageable);
+  /** keyset 分页（(created_at, id) DESC）：domain 为 null = 全量混排；ts/id 为 null = 首页。 */
+  default List<PostEntity> feed(String domain, Instant ts, Long id, Pageable pageable) {
+    return findAll(
+            (root, query, cb) -> {
+              List<jakarta.persistence.criteria.Predicate> ps = new ArrayList<>();
+              ps.add(cb.equal(root.get("status"), "visible"));
+              if (domain != null) {
+                ps.add(cb.equal(root.get("domain"), domain));
+              }
+              if (ts != null) {
+                ps.add(
+                    cb.or(
+                        cb.lessThan(root.get("createdAt"), ts),
+                        cb.and(
+                            cb.equal(root.get("createdAt"), ts), cb.lessThan(root.get("id"), id))));
+              }
+              return cb.and(ps.toArray(new jakarta.persistence.criteria.Predicate[0]));
+            },
+            pageable)
+        .getContent();
+  }
 
   @Query("SELECT p FROM PostEntity p WHERE p.status = 'visible' AND p.id = :id")
   Optional<PostEntity> findVisible(@Param("id") Long id);
