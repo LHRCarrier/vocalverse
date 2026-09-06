@@ -4,8 +4,8 @@
  * 社区场景一组 tab、学习场景一组 tab；各场景功能直接上底栏，彼此以出口图标互切：
  * - 社区组（/m/home 等）：🏠 社区 / 🔍 搜索 / ＋发帖(中央) / 📚 学习(出口) / ✉️ 私信
  * - 学习组（/m/learn 等）：🏠 Home(出口) / ☕ 场景对话 / 📖 笔记(中央) / 🎵 唱吧 / 💬 自由对话
- * 场景归属：社区 = home/search/messages(含会话)/me/report；学习 = learn/notes/chat(含场景)/free-chat/sing；
- * 沉浸页 compose 无底部栏。2026-09-05 晚 8：练习 → 学习更名（路由 /m/learn）。
+ * 场景归属：社区 = home/search/messages(含会话)/report；学习 = learn(含 :module 详情)/notes/chat(含场景)/free-chat/sing；
+ * 沉浸页 compose 无底部栏。2026-09-05 晚 8：练习 → 学习更名（路由 /m/learn）；09-09 /m/me 舍弃（收敛进抽屉）。
  */
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
@@ -25,11 +25,12 @@ const route = useRoute()
 
 const group = computed<null | 'community' | 'learn'>(() => {
   const p = route.path
-  if (p === '/m/home' || p === '/m/search' || p === '/m/me' || p === '/m/report' || p.startsWith('/m/messages')) {
+  if (p === '/m/home' || p === '/m/search' || p === '/m/report' || p.startsWith('/m/messages')) {
     return 'community'
   }
   if (
     p === '/m/learn' ||
+    p.startsWith('/m/learn/') ||
     p === '/m/notes' ||
     p.startsWith('/m/chat') ||
     p === '/m/free-chat' ||

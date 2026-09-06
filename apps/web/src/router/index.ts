@@ -36,9 +36,14 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '唱吧', requiresAuth: true },
   },
   {
-    path: '/m/me',
-    component: () => import('@/views/mobile/MobileMeView.vue'),
-    meta: { title: '我的', requiresAuth: true },
+    path: '/m/learn',
+    component: () => import('@/views/mobile/MobileLearnView.vue'),
+    meta: { title: '学习', requiresAuth: true },
+  },
+  {
+    path: '/m/learn/:module',
+    component: () => import('@/views/mobile/MobileLearnModuleView.vue'),
+    meta: { title: '学习模块', requiresAuth: true },
   },
   {
     path: '/m/messages',
@@ -59,11 +64,6 @@ const routes: RouteRecordRaw[] = [
     path: '/m/compose',
     component: () => import('@/views/mobile/MobileComposeView.vue'),
     meta: { title: '发帖', requiresAuth: true },
-  },
-  {
-    path: '/m/learn',
-    component: () => import('@/views/mobile/MobileLearnView.vue'),
-    meta: { title: '学习', requiresAuth: true },
   },
   {
     path: '/m/notes',

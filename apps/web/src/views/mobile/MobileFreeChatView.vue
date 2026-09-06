@@ -15,9 +15,11 @@ import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 import { useAuthStore } from '@/stores/auth'
 import { useProgressStore } from '@/stores/progress'
+import { useUiStore } from '@/stores/ui'
 
 const auth = useAuthStore()
 const progress = useProgressStore()
+const ui = useUiStore()
 
 /** 用户头像字母（与 AI 声波头像对称位 · X/Grok 式） */
 const avatarLetter = computed(() => (auth.me?.nickname ?? auth.me?.username ?? '我').slice(0, 1).toUpperCase())
@@ -255,10 +257,10 @@ function replay(index: number, text: string) {
       role="status"
       :aria-label="lineStatus === 'busy' ? 'AI 处理中' : lineStatus === 'error' ? '出错了' : '空闲'"
     />
-    <!-- 统一顶栏（← 回学习主页 + 全局头像 / 自由对话 / 设置；回社区 = 底栏 🏠 出口） -->
+    <!-- 统一顶栏（头像左一 + 离开钮；回社区 = 底栏 🏠 出口；设置与隐私 = 抽屉 → M3） -->
     <MobileTopBar title="自由对话" back @back="router.push('/m/learn')">
       <template #actions>
-        <button class="u-topbar__act" type="button" title="设置" aria-label="设置" @click="router.push('/m/me')">
+        <button class="u-topbar__act" type="button" title="设置" aria-label="设置" @click="ui.openDrawer()">
           <IconSettings />
         </button>
       </template>

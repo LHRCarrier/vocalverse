@@ -1,15 +1,18 @@
 <script setup lang="ts">
 /**
  * 账户抽屉（2026-09-05 组长拍板：底部「我的」tab 移除 → 首页顶栏头像点击弹出，X 式左侧滑出）
- * 用户卡 + 菜单项（你的资料 / 消息 / 设置与隐私 / 退出登录）。
+ * 2026-09-09 组长拍板：/m/me「我的」页面舍弃（信息收敛进抽屉）——用户卡保留，
+ * 菜单 = 我的学习（→ /m/learn）+ 消息 + 设置与隐私（演示帧 toast，M3 接真实设置页）。
  * 菜单项 emit navigate(path)，退出 emit logout——由挂载页接（路由跳转 + auth 清理）。
  */
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import { useProgressStore } from '@/stores/progress'
+import { useUiStore } from '@/stores/ui'
 
 import type { MeView } from '@/stores/auth'
 
 const progress = useProgressStore()
+const ui = useUiStore()
 
 const props = defineProps<{
   open: boolean
@@ -23,10 +26,15 @@ const emit = defineEmits<{
 }>()
 
 const items = [
-  { icon: 'user' as const, label: '你的资料', path: '/m/me' },
+  { icon: 'user' as const, label: '我的学习', path: '/m/learn' },
   { icon: 'mail' as const, label: '消息', path: '/m/messages' },
-  { icon: 'settings' as const, label: '设置与隐私', path: '/m/me' },
+  { icon: 'settings' as const, label: '设置与隐私', path: null },
 ]
+
+function onItem(it: (typeof items)[number]) {
+  if (it.path) emit('navigate', it.path)
+  else ui.showToast('「设置与隐私」M3 上线后开放')
+}
 </script>
 
 <template>
@@ -49,10 +57,10 @@ const items = [
           <nav class="u-drawer__menu" aria-label="账户菜单项">
             <button
               v-for="it in items"
-              :key="it.path + it.label"
+              :key="it.label"
               class="u-drawer__item"
               type="button"
-              @click="emit('navigate', it.path)"
+              @click="onItem(it)"
             >
               <MobileIcon :name="it.icon" :size="18" />
               <span class="u-drawer__label">{{ it.label }}</span>
