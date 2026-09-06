@@ -3,6 +3,17 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-06 社区 S2 实施（关注 + 互动通知真实化 · docs/41 定稿）
+
+- **背景**：docs/37 定稿 §5 预留的 S2 = 关注 + 通知中心「通知/关注」两 tab 真实化；私信维持演示（IM 范围）；
+- **Java（6 端点 · 50 op）**：FollowEntity/Repository（S1 建表 S2 实体化）+ 关注 4 端点（PUT/DELETE 幂等、自关注 42203、目标不存在 40402、推荐关注 followed 标记）；关注流 keyset（Criteria authorIds IN，未关注空短路）；**互动通知派生 + mergeKey 聚合**（(post, action, 当日 UTC) 分组 → 「张三 等 N 人…」，评论逐条，排除自身动作，仅本人可见帖，阈值游标 base64(ts|itemId)，演示窗口 50 条登记）；
+- **前端**：通知中心两 tab 接真（通知=聚合文案+类型图标；关注=推荐关注管理+关注流）+ 顶栏「加好友」收口为跳「关注」tab；api/community.ts 增 6 函数；
+- **测试**：Java `CommunitySocialTest` 5 例（幂等/越权/关注流/聚合/隔离）→ `mvn verify` **34** 绿；前端 4 例（聚合/关注流/动作重载/?tab 直达）→ vitest **71** 绿；lint/typecheck/build 绿；契约快照刷新（50 op）+ gen:api；
+- **踩坑**：① `@PathVariable` 参数名与路径变量不一致 → 关注写入静默未生效（显式 `@PathVariable("userId")`）；② 模板内 TS 断言 `as A | B` 被 vue 编译器当过滤器 → 类型收窄移入 script；③ 旧测试对通知中心演示断言迁出（被新专用测试取代）；
+- **登记**：docs/21（50 op + S2 两行）、docs/41（新，README 索引）、README 能测段、双日志。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
 ## 2026-09-06 社区内容 S1 实施完成（P1 模型+契约 → P2 打卡委托 → P3 前端接流 → P4 登记；按 docs/37 定稿 + docs/40 计划）
 
 - **P1 模型+契约（11 commits）**：契约冻结 5 项先登记（51ecb2d：错误码 40402/40302/42203/40904、envelope keyset 游标例外、/internal/checkin 契约、R-17 头修正、docs/20 写方矩阵）→ 迁移 0007（社区 5 表 + post_likes 键改造 0 行断言 + user_profiles.handle/tint + 部分唯一 uq_posts_checkin 双方言）+ 0008（存量 alembic check 漂移修正：user_skill_state 约束名/usage_log 索引声明；8225e38）→ Java 社区 10 端点 + 统一可见谓词 + 幂等互动 + CommunitySeeder（虚构作者 8 帖 + 历史打卡卡；5ce24fa）→ 单测 11 例（41c3328）+ 单写方探针 pytest 形态 M-2（315d57e）+ 契约快照（ab21114）。**踩坑**：① H2/JVM Instant 纳秒 vs DB 微秒精度差 → 游标归一 %1000（%1_000_000=毫秒会重复返页）；② @Modifying 计数不自清一级缓存 → 回读旧值（flush+clear）；③ 测试类无 @Transactional 方法间泄漏数据（补隔离）；
