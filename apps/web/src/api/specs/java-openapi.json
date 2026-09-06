@@ -661,6 +661,34 @@
         }
       }
     },
+    "/auth/forgot" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "forgot",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ForgotRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tickets" : {
       "post" : {
         "tags" : [ "ticket-controller" ],
@@ -2350,6 +2378,32 @@
             "type" : "string"
           },
           "password" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ForgotRequest" : {
+        "required" : [ "username" ],
+        "type" : "object",
+        "properties" : {
+          "username" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "EnvelopeString" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
             "type" : "string"
           }
         }
