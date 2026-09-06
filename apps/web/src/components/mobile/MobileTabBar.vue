@@ -10,10 +10,10 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
+import IconBell from '~icons/tabler/bell'
 import IconBook from '~icons/tabler/book'
 import IconCoffee from '~icons/tabler/coffee'
 import IconHome from '~icons/tabler/home'
-import IconMail from '~icons/tabler/mail'
 import IconMessageCircle from '~icons/tabler/message-circle'
 import IconMicrophone from '~icons/tabler/microphone'
 import IconMusic from '~icons/tabler/music'
@@ -82,7 +82,7 @@ const group = computed<null | 'community' | 'learn'>(() => {
       title="通知"
       aria-label="通知"
     >
-      <IconMail />
+      <IconBell />
     </RouterLink>
   </nav>
 

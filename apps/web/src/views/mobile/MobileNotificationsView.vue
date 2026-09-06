@@ -3,13 +3,17 @@
  * 移动端 · 通知中心（2026-09-09 组长反馈：消息收敛到通知——X 式一个入口 tab 分流）
  * Tab = 私信（会话列表，原 /m/messages 内容收敛进来）/ 通知（互动通知：点赞/评论/关注/系统）。
  * 私信会话点击 → /m/messages/:id（保留）；M3 接真实通知流（埋点事件派生）。
+ * 2026-09-09 v2 组长反馈：tab 均分整行居中（X 式）；通知行图标统一 Tabler（与底栏同款）。
  */
 import { ref } from 'vue'
 
+import IconHeart from '~icons/tabler/heart'
+import IconInfoCircle from '~icons/tabler/info-circle'
 import IconMail from '~icons/tabler/mail'
+import IconMessageCircle from '~icons/tabler/message-circle'
 import IconSettings from '~icons/tabler/settings'
+import IconUserPlus from '~icons/tabler/user-plus'
 
-import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { createDemoConversations } from '@/data/messages-demo'
 import { useUiStore } from '@/stores/ui'
@@ -25,22 +29,30 @@ function newMessage() {
   ui.showToast('新消息 · M3 上线')
 }
 function messageSettings() {
-  ui.showToast('私信设置 · M3 上线')
+  ui.showToast('通知设置 · M3 上线')
 }
 
 /* ---------- 互动通知（演示帧 · M3 埋点事件派生） ---------- */
-interface Notice {
-  icon: 'heart' | 'chat' | 'user-plus' | 'info'
-  text: string
-  when: string
-  unread: boolean
-}
-const notices: Notice[] = [
+const notices = [
   { icon: 'heart', text: 'Momo 赞了你的帖子 How I memorize 100 new words a month', when: '10:05', unread: true },
   { icon: 'chat', text: 'Kai 评论了你：Great point! I will check it out tonight.', when: '10:42', unread: true },
-  { icon: 'user-plus', text: 'Teacher Lee 关注了你', when: '昨天', unread: false },
+  { icon: 'follow', text: 'Teacher Lee 关注了你', when: '昨天', unread: false },
   { icon: 'info', text: '「影子跟读法」素材新增 2 篇（你的收藏清单）', when: '周二', unread: false },
-]
+] as const
+
+/* Tabler 图标对拍（与底栏同源 · docs/35 规则 1） */
+function noticeIcon(kind: string) {
+  switch (kind) {
+    case 'heart':
+      return IconHeart
+    case 'chat':
+      return IconMessageCircle
+    case 'follow':
+      return IconUserPlus
+    default:
+      return IconInfoCircle
+  }
+}
 </script>
 
 <template>
@@ -56,12 +68,12 @@ const notices: Notice[] = [
       </template>
     </MobileTopBar>
 
-    <!-- X 式 tab（私信 / 通知） -->
-    <nav class="u-x-tabs" aria-label="通知分类">
+    <!-- X 式 tab（均分整行 · 激活加粗 + 下划线） -->
+    <nav class="u-notif-tabs" aria-label="通知分类">
       <button
         v-for="t in tabs"
         :key="t"
-        class="u-x-tab"
+        class="u-notif-tab"
         :class="{ active: activeTab === t }"
         type="button"
         :aria-selected="activeTab === t"
@@ -96,7 +108,7 @@ const notices: Notice[] = [
     <div v-else class="u-notices">
       <section v-for="(n, i) in notices" :key="i" class="u-notices__row" :class="{ 'is-unread': n.unread }">
         <span class="u-notices__icon">
-          <MobileIcon :name="n.icon" :size="16" />
+          <component :is="noticeIcon(n.icon)" />
         </span>
         <span class="u-notices__body">
           <span class="u-notices__text">{{ n.text }}</span>

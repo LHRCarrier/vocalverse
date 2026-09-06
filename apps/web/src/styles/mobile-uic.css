@@ -2801,7 +2801,44 @@ body {
   padding: 0 16px 96px; /* 顶栏外置（MobileTopBar），底部贴底导航留白 */
 }
 
-/* ---------- 通知中心 · 互动通知（2026-09-09 消息收敛进通知） ---------- */
+/* ---------- 通知中心（2026-09-09 消息收敛进通知） ---------- */
+/* X 式 tab：均分整行居中 · 激活加粗 + 下划线（组长反馈 2026-09-09：太左 → 整行均分） */
+.u-notif-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--u-paper-grid);
+}
+
+.u-notif-tab {
+  flex: 1;
+  padding: 12px 0 10px;
+  border: none;
+  background: none;
+  font: 600 14px var(--u-font);
+  color: var(--u-sub);
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  transition: color 150ms ease-out;
+}
+
+.u-notif-tab.active {
+  color: var(--u-ink);
+  font-weight: 800;
+}
+
+.u-notif-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  transform: translateX(-50%);
+  width: 48px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--u-ink);
+}
+
+/* 互动通知列表 */
 .u-notices {
   padding: 0 16px 96px;
 }
@@ -2828,6 +2865,12 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.u-notices__icon svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.5; /* 图标统一 Tabler 1.5px（与底栏同源 · docs/35 规则 1） */
 }
 
 .u-notices__body {
