@@ -8,15 +8,18 @@ import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 /**
  * 演示账号播种（docs/07 ADR 35：预置 3 画像账号直接登录，演示推荐差异/年龄差异/水平差异）。
  *
- * <p>幂等：按 username 查重后跳过。密码统一 demo123456（仅演示环境启用，生产镜像由 VOICEVERSE_SEED_DEMO=false 关闭）。
+ * <p>幂等：按 username 查重后跳过。密码统一 demo123456（仅演示环境启用，生产镜像由 VOICEVERSE_SEED_DEMO=false 关闭）。 @Order(1)：先于
+ * CommunitySeeder(@Order(2))——社区历史打卡卡挂 demoadult。
  */
 @Component
+@Order(1)
 public class DemoSeeder implements CommandLineRunner {
 
   private static final Logger logger = LoggerFactory.getLogger(DemoSeeder.class);

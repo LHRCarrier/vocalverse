@@ -48,6 +48,13 @@ public class UserProfileEntity {
   @Column(name = "avatar_url", length = 512)
   private String avatarUrl;
 
+  /** 社区展示字段（docs/37 §3.1，Java 写；handle=@ 展示名不含 @、tint=头像色板） */
+  @Column(name = "handle", length = 32)
+  private String handle;
+
+  @Column(name = "tint", length = 16)
+  private String tint;
+
   @Column(name = "cefr_level_source", nullable = false, length = 16)
   private String cefrLevelSource;
 
@@ -134,6 +141,22 @@ public class UserProfileEntity {
 
   public void setAvatarUrl(String avatarUrl) {
     this.avatarUrl = avatarUrl;
+  }
+
+  public String getHandle() {
+    return handle;
+  }
+
+  public void setHandle(String handle) {
+    this.handle = handle;
+  }
+
+  public String getTint() {
+    return tint;
+  }
+
+  public void setTint(String tint) {
+    this.tint = tint;
   }
 
   public String getCefrLevelSource() {

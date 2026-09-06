@@ -24,6 +24,11 @@ vocalverse:
     secret: ${JWT_SECRET:vocalverse-dev-jwt-secret-0123456789abcdef}
     access-ttl-seconds: 3600
   service-token: ${SERVICE_TOKEN:change-me-internal-service-token}
+  community:
+    # 公众发帖开关（docs/37 A-15：公开仓库默认关闭；仅演示环境开启）
+    post-enabled: ${VOICEVERSE_COMMUNITY_POST_ENABLED:false}
+    # 演示内容种子（虚构作者 + 8 帖 + 历史打卡卡；仅演示环境）
+    seed: ${VOICEVERSE_COMMUNITY_SEED:true}
 
 management:
   endpoints:

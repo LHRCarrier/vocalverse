@@ -1,0 +1,432 @@
+package com.vocalverse.community;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vocalverse.community.dto.CommunityView.AuthorView;
+import com.vocalverse.community.dto.CommunityView.CoinState;
+import com.vocalverse.community.dto.CommunityView.CommentPage;
+import com.vocalverse.community.dto.CommunityView.CommentView;
+import com.vocalverse.community.dto.CommunityView.CommunityPostView;
+import com.vocalverse.community.dto.CommunityView.FeedPage;
+import com.vocalverse.community.dto.CommunityView.LikeState;
+import com.vocalverse.community.dto.CommunityView.ShareState;
+import com.vocalverse.user.UserEntity;
+import com.vocalverse.user.UserProfileEntity;
+import com.vocalverse.user.UserProfileRepository;
+import com.vocalverse.user.UserRepository;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * 社区内容服务（Java 写方唯一实现 · docs/37 §5）。
+ *
+ * <p>沿用口径：统一可见谓词 status='visible'；互动与计数增减同事务；like/coin/share 幂等 （唯一键兜底 + 重复请求返回当前态）；checkin
+ * 卡仅开放点赞（评论/投币/分享 40302）； media/checkin_snapshot 为 JSON 文本列 → ObjectMapper 转换。
+ */
+@Service
+public class CommunityService {
+
+  public static final String KIND_ARTICLE = "article";
+  public static final String KIND_VIDEO = "video";
+  public static final String KIND_CHECKIN = "checkin";
+  public static final String ACTION_LIKE = "like";
+  public static final String ACTION_COIN = "coin";
+  public static final String ACTION_SHARE = "share";
+  public static final String STATUS_VISIBLE = "visible";
+  private static final int MAX_LIMIT = 20;
+
+  /** keyset 游标（base64url(epochMillis|id)）；null = 首页。 */
+  private record Cursor(Instant ts, Long id) {}
+
+  private final PostRepository posts;
+  private final PostCommentRepository comments;
+  private final PostLikeRepository likes;
+  private final PostInteractionRepository interactions;
+  private final UserRepository users;
+  private final UserProfileRepository profiles;
+  private final ObjectMapper mapper;
+  private final boolean postEnabled;
+
+  public CommunityService(
+      PostRepository posts,
+      PostCommentRepository comments,
+      PostLikeRepository likes,
+      PostInteractionRepository interactions,
+      UserRepository users,
+      UserProfileRepository profiles,
+      ObjectMapper mapper,
+      @Value("${vocalverse.community.post-enabled:false}") boolean postEnabled) {
+    this.posts = posts;
+    this.comments = comments;
+    this.likes = likes;
+    this.interactions = interactions;
+    this.users = users;
+    this.profiles = profiles;
+    this.mapper = mapper;
+    this.postEnabled = postEnabled;
+  }
+
+  // ------------------------------------------------------------------ feed
+
+  public FeedPage feed(Long actorId, String domain, String cursor, int limit) {
+    String normalized = normalizeDomain(domain);
+    Cursor c = decodeCursor(cursor);
+    int pageSize = clampLimit(limit);
+    // 多取一条判 hasMore（docs/37 §5 keyset 约定）
+    List<PostEntity> rows = posts.feed(normalized, c.ts(), c.id(), PageRequest.of(0, pageSize + 1));
+    boolean hasMore = rows.size() > pageSize;
+    List<PostEntity> page = hasMore ? rows.subList(0, pageSize) : rows;
+    List<CommunityPostView> views = buildViews(page, actorId);
+    String next = hasMore ? encodeCursor(lastKey(page)) : null;
+    return new FeedPage(views, next, hasMore);
+  }
+
+  // ------------------------------------------------------------------ 帖
+
+  @Transactional
+  public CommunityPostView create(
+      Long userId, String title, String body, String kind, String domain) {
+    if (!postEnabled) {
+      throw new CommunityException(40302, "社区发帖功能未开放", HttpStatus.FORBIDDEN);
+    }
+    if (!(KIND_ARTICLE.equals(kind) || KIND_VIDEO.equals(kind))) {
+      throw new CommunityException(42203, "kind 仅支持 article/video", HttpStatus.BAD_REQUEST);
+    }
+    String normalized = normalizeDomain(domain);
+    if (normalized == null) {
+      throw new CommunityException(42203, "发帖必须选择领域", HttpStatus.BAD_REQUEST);
+    }
+    if (body == null || body.isBlank()) {
+      throw new CommunityException(42203, "帖子正文不能为空", HttpStatus.BAD_REQUEST);
+    }
+    PostEntity e = new PostEntity();
+    e.setAuthorId(userId);
+    e.setKind(kind);
+    e.setDomain(normalized);
+    e.setTitle(title);
+    e.setBody(body);
+    e.setStatus(STATUS_VISIBLE);
+    Instant now = Instant.now();
+    e.setCreatedAt(now);
+    e.setUpdatedAt(now);
+    e = posts.save(e);
+    return buildViews(List.of(e), userId).get(0);
+  }
+
+  public CommunityPostView detail(Long userId, Long postId) {
+    PostEntity post = posts.findById(postId).orElseThrow(() -> notFound("内容不存在或已删除"));
+    boolean isAuthor = post.getAuthorId().equals(userId);
+    if (!STATUS_VISIBLE.equals(post.getStatus()) && !isAuthor) {
+      throw notFound("内容不存在或已删除");
+    }
+    return buildViews(List.of(post), userId).get(0);
+  }
+
+  @Transactional
+  public void delete(Long userId, Long postId) {
+    PostEntity post = posts.findById(postId).orElseThrow(() -> notFound("内容不存在或已删除"));
+    if (!post.getAuthorId().equals(userId)) {
+      throw new CommunityException(40302, "只能删除自己的内容", HttpStatus.FORBIDDEN);
+    }
+    if (!STATUS_VISIBLE.equals(post.getStatus())) {
+      throw notFound("内容不存在或已删除"); // 幂等：已删除视为不存在
+    }
+    post.setStatus("deleted");
+    post.setUpdatedAt(Instant.now());
+    posts.save(post);
+  }
+
+  // ------------------------------------------------------------------ 评论
+
+  public CommentPage comments(Long actorId, Long postId, String cursor, int limit) {
+    requireVisible(postId);
+    Cursor c = decodeCursor(cursor);
+    int pageSize = clampLimit(limit);
+    // 多取一条判 hasMore（docs/37 §5 keyset 约定）
+    List<PostCommentEntity> rows =
+        comments.page(postId, c.ts(), c.id(), PageRequest.of(0, pageSize + 1));
+    boolean hasMore = rows.size() > pageSize;
+    List<PostCommentEntity> page = hasMore ? rows.subList(0, pageSize) : rows;
+    List<CommentView> views = page.stream().map(this::toCommentView).toList();
+    String next = hasMore ? encodeCursor(lastKey(page)) : null;
+    return new CommentPage(views, next, hasMore);
+  }
+
+  @Transactional
+  public CommentView addComment(Long userId, Long postId, String body) {
+    PostEntity post = requireVisible(postId);
+    if (KIND_CHECKIN.equals(post.getKind())) {
+      throw new CommunityException(40302, "打卡卡不支持评论", HttpStatus.FORBIDDEN);
+    }
+    if (body == null || body.isBlank() || body.length() > 500) {
+      throw new CommunityException(42203, "评论需 1~500 字", HttpStatus.BAD_REQUEST);
+    }
+    PostCommentEntity c = new PostCommentEntity();
+    c.setPostId(postId);
+    c.setAuthorId(userId);
+    c.setBody(body);
+    c.setStatus(STATUS_VISIBLE);
+    Instant now = Instant.now();
+    c.setCreatedAt(now);
+    c.setUpdatedAt(now);
+    c = comments.save(c);
+    posts.incrementComment(postId);
+    return toCommentView(c);
+  }
+
+  // ------------------------------------------------------------------ 互动
+
+  @Transactional
+  public LikeState like(Long userId, Long postId, boolean on) {
+    requireVisible(postId);
+    boolean liked;
+    if (on) {
+      if (likes.findByPostIdAndLikerId(postId, userId).isEmpty()) {
+        PostLikeEntity e = new PostLikeEntity();
+        e.setPostId(postId);
+        e.setLikerId(userId);
+        e.setCreatedAt(Instant.now());
+        likes.saveAndFlush(e);
+        posts.incrementLike(postId);
+        insertInteractionIdempotent(userId, postId, ACTION_LIKE);
+      }
+      liked = true;
+    } else {
+      likes.deleteByPostIdAndLikerId(postId, userId);
+      posts.decrementLike(postId);
+      interactions.deleteByActorIdAndPostIdAndAction(userId, postId, ACTION_LIKE);
+      liked = false;
+    }
+    return new LikeState(liked, requireVisible(postId).getLikeCount());
+  }
+
+  @Transactional
+  public CoinState coin(Long userId, Long postId) {
+    PostEntity post = requireVisible(postId);
+    if (KIND_CHECKIN.equals(post.getKind())) {
+      throw new CommunityException(40302, "打卡卡不支持投币", HttpStatus.FORBIDDEN);
+    }
+    boolean coined = insertInteractionIdempotent(userId, postId, ACTION_COIN);
+    if (coined) {
+      posts.incrementCoin(postId);
+    }
+    return new CoinState(coined, requireVisible(postId).getCoinCount());
+  }
+
+  @Transactional
+  public ShareState share(Long userId, Long postId) {
+    PostEntity post = requireVisible(postId);
+    if (KIND_CHECKIN.equals(post.getKind())) {
+      throw new CommunityException(40302, "打卡卡不支持分享", HttpStatus.FORBIDDEN);
+    }
+    boolean shared = insertInteractionIdempotent(userId, postId, ACTION_SHARE);
+    if (shared) {
+      posts.incrementShare(postId);
+    }
+    return new ShareState(shared, requireVisible(postId).getShareCount());
+  }
+
+  // ------------------------------------------------------------------ 内部
+
+  /** 唯一键幂等插入：true=本次新增；false=已存在（重复请求返回当前态，不双计）。 */
+  private boolean insertInteractionIdempotent(Long actorId, Long postId, String action) {
+    if (interactions.findByActorIdAndPostIdAndAction(actorId, postId, action).isPresent()) {
+      return false;
+    }
+    PostInteractionEntity e = new PostInteractionEntity();
+    e.setActorId(actorId);
+    e.setPostId(postId);
+    e.setAction(action);
+    e.setCreatedAt(Instant.now());
+    try {
+      interactions.saveAndFlush(e);
+      return true;
+    } catch (DataIntegrityViolationException duplicate) {
+      return false; // 并发重复：唯一键兜底，幂等
+    }
+  }
+
+  private PostEntity requireVisible(Long postId) {
+    return posts.findVisible(postId).orElseThrow(() -> notFound("内容不存在或已删除"));
+  }
+
+  private CommunityException notFound(String message) {
+    return new CommunityException(40402, message, HttpStatus.NOT_FOUND);
+  }
+
+  private String normalizeDomain(String domain) {
+    if (domain == null || domain.isBlank() || "recommend".equals(domain)) {
+      return null;
+    }
+    if (!Set.of("news", "teaching", "overseas").contains(domain)) {
+      throw new CommunityException(
+          42203, "domain 仅支持 news/teaching/overseas", HttpStatus.BAD_REQUEST);
+    }
+    return domain;
+  }
+
+  private int clampLimit(int limit) {
+    return Math.min(Math.max(limit, 1), MAX_LIMIT);
+  }
+
+  private List<CommunityPostView> buildViews(List<PostEntity> rows, Long actorId) {
+    if (rows.isEmpty()) {
+      return List.of();
+    }
+    List<Long> postIds = rows.stream().map(PostEntity::getId).toList();
+    Map<Long, AuthorView> authorMap =
+        loadAuthors(rows.stream().map(PostEntity::getAuthorId).toList());
+    Set<Long> likedSet = new HashSet<>();
+    Set<Long> coinedSet = new HashSet<>();
+    if (actorId != null) {
+      likes.findByLikerIdAndPostIdIn(actorId, postIds).forEach(l -> likedSet.add(l.getPostId()));
+      interactions
+          .findByActorIdAndPostIdInAndAction(actorId, postIds, ACTION_COIN)
+          .forEach(i -> coinedSet.add(i.getPostId()));
+    }
+    return rows.stream()
+        .map(
+            p ->
+                toPostView(
+                    p,
+                    authorMap.getOrDefault(p.getAuthorId(), emptyAuthor(p.getAuthorId())),
+                    likedSet.contains(p.getId()),
+                    coinedSet.contains(p.getId())))
+        .toList();
+  }
+
+  private Map<Long, AuthorView> loadAuthors(List<Long> authorIds) {
+    Map<Long, UserEntity> userMap =
+        users.findAllById(authorIds).stream()
+            .collect(Collectors.toMap(UserEntity::getId, Function.identity()));
+    Map<Long, UserProfileEntity> profileMap =
+        profiles.findAllById(authorIds).stream()
+            .collect(Collectors.toMap(UserProfileEntity::getUserId, Function.identity()));
+    Map<Long, AuthorView> out = new HashMap<>();
+    for (Long id : authorIds) {
+      UserEntity u = userMap.get(id);
+      UserProfileEntity p = profileMap.get(id);
+      out.putIfAbsent(
+          id,
+          new AuthorView(
+              id,
+              u == null ? "未知用户" : u.getNickname(),
+              p == null ? null : p.getHandle(),
+              p == null ? null : p.getTint(),
+              p == null ? "L1" : p.getCefrLevel()));
+    }
+    return out;
+  }
+
+  private AuthorView emptyAuthor(Long id) {
+    return new AuthorView(id, "未知用户", null, null, "L1");
+  }
+
+  private CommunityPostView toPostView(
+      PostEntity p, AuthorView author, boolean liked, boolean coined) {
+    JsonNode media = parseJson(p.getMedia());
+    Double checkinOverall = null;
+    Integer checkinPracticeCount = null;
+    if (KIND_CHECKIN.equals(p.getKind())) {
+      JsonNode snap = parseJson(p.getCheckinSnapshot());
+      if (snap != null) {
+        JsonNode overall = snap.get("overall");
+        JsonNode count = snap.get("practice_count");
+        checkinOverall = overall != null && overall.isNumber() ? overall.asDouble() : null;
+        checkinPracticeCount = count != null && count.isIntegralNumber() ? count.asInt() : 0;
+      }
+    }
+    return new CommunityPostView(
+        p.getId(),
+        author,
+        p.getKind(),
+        p.getDomain(),
+        p.getTitle(),
+        p.getBody(),
+        media,
+        p.getCreatedAt(),
+        p.getLikeCount(),
+        p.getCoinCount(),
+        p.getCommentCount(),
+        p.getShareCount(),
+        liked,
+        coined,
+        checkinOverall,
+        checkinPracticeCount,
+        p.getCheckinDate() == null ? null : p.getCheckinDate().toString());
+  }
+
+  private CommentView toCommentView(PostCommentEntity c) {
+    Map<Long, AuthorView> authorMap = loadAuthors(List.of(c.getAuthorId()));
+    AuthorView author = authorMap.getOrDefault(c.getAuthorId(), emptyAuthor(c.getAuthorId()));
+    return new CommentView(
+        c.getId(), author, c.getBody(), c.getCreatedAt(), c.getReplyToNickname());
+  }
+
+  private JsonNode parseJson(String json) {
+    if (json == null || json.isBlank()) {
+      return null;
+    }
+    try {
+      return mapper.readTree(json);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  private Cursor decodeCursor(String cursor) {
+    if (cursor == null || cursor.isBlank()) {
+      return new Cursor(null, null);
+    }
+    try {
+      String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+      String[] parts = raw.split("\\|");
+      // ISO-8601 全精度 + 微秒归一：DB 时间精度（6 位）与 JVM Instant（9 位）口径对齐，
+      // 否则同值比较错位、keyset 重复返回同页（toEpochMilli 截断同理，已弃）
+      return new Cursor(micro(Instant.parse(parts[0])), Long.parseLong(parts[1]));
+    } catch (Exception e) {
+      throw new CommunityException(42203, "分页游标非法", HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  private String encodeCursor(Cursor c) {
+    if (c == null || c.ts() == null || c.id() == null) {
+      return null;
+    }
+    String raw = micro(c.ts()).toString() + "|" + c.id();
+    return Base64.getUrlEncoder()
+        .withoutPadding()
+        .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+  }
+
+  /** 截断到微秒（TIMESTAMP(6) 口径；1 微秒 = 1000 ns——用 %1000，勿用 %1_000_000 那是毫秒）。 */
+  private static Instant micro(Instant i) {
+    return Instant.ofEpochSecond(i.getEpochSecond(), i.getNano() - i.getNano() % 1_000);
+  }
+
+  private Cursor lastKey(List<?> rows) {
+    if (rows.isEmpty()) {
+      return null;
+    }
+    Object last = rows.get(rows.size() - 1);
+    if (last instanceof PostEntity p) {
+      return new Cursor(p.getCreatedAt(), p.getId());
+    }
+    PostCommentEntity c = (PostCommentEntity) last;
+    return new Cursor(c.getCreatedAt(), c.getId());
+  }
+}
