@@ -3,6 +3,14 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-06 /auth/forgot 忘记密码（演示口径：工单闭环 + 防枚举 · 51 op）
+
+- 背景：组长反馈 Sign Up 应真注册、Forgot password 也要做；注册复用既有 `/auth/register`（前端补注册表单、注册即登录）；
+- **forgot**：`POST /auth/forgot {username}`（public）→ 用户存在则落 `tickets(feedback / 密码重置申请 / open)`（工单写方 Java，管理员侧可见可处理）；**防枚举**：存在与否同响应文案；演示环境无邮件/短信通道（登记：真实重置需邮件/短信通道 + 一次性令牌，P2）；
+- 测试：AuthFlowTest 增 forgot 用例（工单落库 kind/title/status + 防枚举同响应）→ `mvn verify` 35 全绿；快照刷新 51 op + gen:api；前端 LoginView 3 例。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
 ## 2026-09-06 社区 S2 实施（关注 + 互动通知真实化 · docs/41 定稿）
 
 - **背景**：docs/37 定稿 §5 预留的 S2 = 关注 + 通知中心「通知/关注」两 tab 真实化；私信维持演示（IM 范围）；
