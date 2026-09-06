@@ -24,7 +24,7 @@
 
 | # | 规则 | 具体值 |
 |---|---|---|
-| 1 | **顶栏图标统一 tabler**（`~icons/tabler/*`）无底 icon-only | 内容区图标 20px + 44px 触控区；hover 墨色/active 缩放；**禁止自绘 MobileIcon 进顶栏/底栏**（内容区可用，1.5px 圆头） |
+| 1 | **全站功能图标单一源 = Tabler**（`~icons/tabler/*` 或 `MobileIcon` 内部 tabler 官方 path）无底 icon-only | 内容区图标 20px + 44px 触控区；hover 墨色/active 缩放；**禁止自绘/其他库 path 混入功能图标层**（2026-09-06 组长拍板方案 A：MobileIcon 34 图标已全部换 tabler path、stroke 2 统一；新图标只从 Tabler 取；**装饰性插画（UicArt 手绘线稿等）不算图标**，允许独立；dev-only 预览画廊 UicIcon 按其自有视觉 spec 豁免） |
 | 2 | **头像固定最左侧第一位** | 顶栏左侧 = 头像（36px）→ 离开钮（如有）→ 标题（grid 三列 `1fr auto 1fr` 真居中）→ 右侧 actions |
 | 3 | **离开钮 = tabler `logout` scaleX(-1) 镜像**（门+箭头朝左） | 34px 与头像同级；**项目无 ← 语言**；语义 = 离开当前页（学习组功能页 → /m/learn；报告页 router.back()） |
 | 4 | **底栏双场景分组** | 社区组（🏠/🔍/＋📝/📚学习出口/✉️）· 学习组（🏠出口/☕/📖中央/🎵/💬）；5 位对称（左右各 2 + 中央正位）；沉浸页（/m/compose）无底栏；新增页面归属写 TabBar `group` computed |
