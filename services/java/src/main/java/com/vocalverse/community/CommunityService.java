@@ -16,6 +16,7 @@ import com.vocalverse.user.UserProfileRepository;
 import com.vocalverse.user.UserRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -238,6 +239,103 @@ public class CommunityService {
       posts.incrementShare(postId);
     }
     return new ShareState(shared, requireVisible(postId).getShareCount());
+  }
+
+  // ------------------------------------------------------------------ /internal/checkin
+
+  /**
+   * 打卡卡物化 upsert（docs/21 §4 · 幂等键 (author_id, checkin_date)：存在则 practice_count+1、
+   * overall=GREATEST(旧,新)、其余子分/时长更新为本次；否则插入新卡。仅 kind='checkin' 命中。
+   */
+  @Transactional
+  public long upsertCheckin(
+      Long userId,
+      String practiceDate,
+      Long sessionId,
+      Double overall,
+      Double pron,
+      Double gram,
+      Double fluency,
+      Integer turns,
+      Integer durationS) {
+    users
+        .findById(userId)
+        .orElseThrow(
+            () ->
+                new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND, "user not found"));
+    LocalDate date = LocalDate.parse(practiceDate);
+    PostEntity post =
+        posts.findFirstByAuthorIdAndCheckinDateAndKind(userId, date, KIND_CHECKIN).orElse(null);
+    Instant now = Instant.now();
+    if (post == null) {
+      post = new PostEntity();
+      post.setAuthorId(userId);
+      post.setKind(KIND_CHECKIN);
+      post.setTitle("今日打卡");
+      post.setStatus(STATUS_VISIBLE);
+      post.setCheckinDate(date);
+      post.setSessionId(sessionId);
+      post.setLikeCount(0);
+      post.setCoinCount(0);
+      post.setCommentCount(0);
+      post.setShareCount(0);
+      post.setCreatedAt(now);
+      post.setCheckinSnapshot(
+          writeCheckinSnapshot(null, overall, pron, gram, fluency, turns, durationS, 1));
+    } else {
+      post.setSessionId(sessionId == null ? post.getSessionId() : sessionId);
+      // 当日终态（C-16 口径：明示会刷新，不承诺历史稳定）
+      post.setCheckinSnapshot(
+          writeCheckinSnapshot(
+              parseJson(post.getCheckinSnapshot()),
+              overall,
+              pron,
+              gram,
+              fluency,
+              turns,
+              durationS,
+              null));
+    }
+    post.setUpdatedAt(now);
+    return posts.save(post).getId();
+  }
+
+  private String writeCheckinSnapshot(
+      JsonNode prev,
+      Double overall,
+      Double pron,
+      Double gram,
+      Double fluency,
+      Integer turns,
+      Integer durationS,
+      Integer practiceCount) {
+    try {
+      com.fasterxml.jackson.databind.node.ObjectNode n = mapper.createObjectNode();
+      double oldOverall =
+          prev != null && prev.path("overall").isNumber() ? prev.path("overall").asDouble() : -1;
+      n.put("overall", maxIfPresent(oldOverall, overall));
+      n.put("pron", pron == null ? null : pron);
+      n.put("gram", gram == null ? null : gram);
+      n.put("fluency", fluency == null ? null : fluency);
+      n.put("turns", turns == null ? 0 : turns);
+      n.put("duration_s", durationS == null ? 0 : durationS);
+      int count =
+          practiceCount != null
+              ? practiceCount
+              : (prev != null && prev.path("practice_count").isIntegralNumber()
+                      ? prev.path("practice_count").asInt()
+                      : 0)
+                  + 1;
+      n.put("practice_count", count);
+      return mapper.writeValueAsString(n);
+    } catch (Exception e) {
+      throw new IllegalStateException("打卡快照序列化失败", e);
+    }
+  }
+
+  private static double maxIfPresent(double base, Double value) {
+    return value == null ? base : Math.max(base, value);
   }
 
   // ------------------------------------------------------------------ 内部

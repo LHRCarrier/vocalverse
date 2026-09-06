@@ -29,6 +29,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
+    // 内部域（/internal/**）由 ServiceTokenFilter 处理：这里的 Authorization 是服务令牌，
+    // 不是 JWT——解析失败不得 clearContext（会抹掉 ServiceTokenFilter 刚设置的 ROLE_SERVICE，
+    // 导致内部端点 403；2026-09-06 修复，见 InternalCheckinApiTest 回归）。
+    if (request.getRequestURI().startsWith("/internal/")) {
+      filterChain.doFilter(request, response);
+      return;
+    }
     String header = request.getHeader("Authorization");
     if (header != null && header.startsWith("Bearer ")) {
       try {

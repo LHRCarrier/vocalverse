@@ -15,6 +15,9 @@ public interface PostRepository extends JpaRepository<PostEntity, Long> {
 
   Optional<PostEntity> findFirstByAuthorIdAndCheckinDate(Long authorId, java.time.LocalDate date);
 
+  Optional<PostEntity> findFirstByAuthorIdAndCheckinDateAndKind(
+      Long authorId, java.time.LocalDate date, String kind);
+
   /**
    * 领域流（keyset）：domain 过滤 + (created_at, id) DESC 游标。
    *
