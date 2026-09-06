@@ -20,20 +20,23 @@ describe('MobileAccountDrawer', () => {
     const text = wrapper.text()
     expect(text).toContain('演示用户')
     expect(text).toContain('@demoadult')
-    expect(text).toContain('你的资料')
+    expect(text).toContain('我的学习')
     expect(text).toContain('消息')
     expect(text).toContain('设置与隐私')
     expect(text).toContain('退出登录')
   })
 
-  it('菜单项 click 触发 navigate(path)', async () => {
+  it('菜单项 click 触发 navigate(path)；设置与隐私无 path → toast 不 navigate', async () => {
     const wrapper = mountDrawer()
     const items = wrapper.findAll('.u-drawer__item')
     expect(items).toHaveLength(3)
     await items[0].trigger('click')
-    expect(wrapper.emitted('navigate')).toEqual([['/m/me']])
+    expect(wrapper.emitted('navigate')).toEqual([['/m/learn']])
     await items[1].trigger('click')
-    expect(wrapper.emitted('navigate')).toEqual([['/m/me'], ['/m/messages']])
+    expect(wrapper.emitted('navigate')).toEqual([['/m/learn'], ['/m/messages']])
+    // 设置与隐私：无 path → 只 toast，无 navigate
+    await items[2].trigger('click')
+    expect(wrapper.emitted('navigate')).toEqual([['/m/learn'], ['/m/messages']])
   })
 
   it('退出登录触发 logout', async () => {

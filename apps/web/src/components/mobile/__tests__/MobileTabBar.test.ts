@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -11,6 +11,7 @@ const routes = [
   { path: '/m/home', component: { template: '<div/>' } },
   { path: '/m/search', component: { template: '<div/>' } },
   { path: '/m/learn', component: MobileLearnView },
+  { path: '/m/learn/:module', component: { template: '<div/>' } },
   { path: '/m/notes', component: MobileNotesView },
   { path: '/m/chat', component: { template: '<div/>' } },
   { path: '/m/chat/:sceneId?', component: { template: '<div/>' } },
@@ -18,7 +19,6 @@ const routes = [
   { path: '/m/sing', component: { template: '<div/>' } },
   { path: '/m/messages', component: { template: '<div/>' } },
   { path: '/m/messages/:id', component: { template: '<div/>' } },
-  { path: '/m/me', component: { template: '<div/>' } },
   { path: '/m/report', component: { template: '<div/>' } },
   { path: '/m/compose', component: { template: '<div/>' } },
 ]
@@ -58,16 +58,16 @@ describe('MobileTabBar（双场景分组）', () => {
     expect(links[2].attributes('aria-label')).toBe('笔记') // 中央对称
   })
 
-  it('学习场景内全部显示学习组（chat/场景直入/free-chat/sing/notes）', async () => {
-    for (const p of ['/m/chat', '/m/chat/3', '/m/free-chat', '/m/sing', '/m/notes']) {
+  it('学习场景内全部显示学习组（chat/场景直入/free-chat/sing/notes/learn:module）', async () => {
+    for (const p of ['/m/chat', '/m/chat/3', '/m/free-chat', '/m/sing', '/m/notes', '/m/learn/speaking']) {
       const wrapper = await mountAt(p)
       expect(wrapper.find('.u-tabbar').exists(), p).toBe(true)
       expect(wrapper.find('a[aria-label="返回社区"]').exists(), p).toBe(true)
     }
   })
 
-  it('社区场景内（会话/我的/报告）显示社区组；发帖沉浸页隐藏', async () => {
-    for (const p of ['/m/messages/1', '/m/me', '/m/report']) {
+  it('社区场景内（会话/报告）显示社区组；发帖沉浸页隐藏', async () => {
+    for (const p of ['/m/messages/1', '/m/report']) {
       const wrapper = await mountAt(p)
       expect(wrapper.find('.u-tabbar').exists(), p).toBe(true)
       expect(wrapper.find('a[aria-label="搜索"]').exists(), p).toBe(true)
@@ -77,38 +77,37 @@ describe('MobileTabBar（双场景分组）', () => {
   })
 })
 
-describe('MobileLearnView（学习 · 画像焦点改造 2026-09-09）', () => {
-  it('渲染画像主卡：LV 徽章 / 等级名 / 经验条 / 速览与趋势', async () => {
+describe('MobileLearnView（我的学习 · v4 画像总览 2026-09-09）', () => {
+  it('渲染欢迎定位 + 识别行 + 热力图 + 4 模块列表', async () => {
     await router.push('/m/learn')
     await router.isReady()
     const wrapper = mount(MobileLearnView, { global: { plugins: [router] } })
     const text = wrapper.text()
+    expect(text).toContain('Hi') // 欢迎定位行
     expect(text).toContain('LV3')
-    expect(text).toContain('对话能手')
     expect(text).toContain('XP')
-    expect(text).toContain('薄弱音素')
-    expect(text).toContain('流利度趋势')
-    // 旧占位/旧练习内容不应保留
+    // 4 个模块
+    for (const m of ['我的单词', '社区足迹', '我的发音', '练习情况']) {
+      expect(text).toContain(m)
+    }
+    expect(text).toContain('收录 24 词')
+    expect(text).toContain('发音 82 · 流利 78 · 语法 85')
+    // 热力图 = 12 周 × 7 天 = 84 格；无图例/切换
+    expect(wrapper.findAll('.u-learn-heat__cell').length).toBe(12 * 7)
+    expect(wrapper.findAll('.u-learn-heat__mode').length).toBe(0)
+    // 旧内容不应保留
     expect(text).not.toContain('建设中')
     expect(text).not.toContain('今日目标')
+    expect(text).not.toContain('薄弱音素')
   })
 
-  it('画像焦点 3 卡结构：主卡含今日四数 / 热力图 / 能力画像', async () => {
+  it('模块点击跳转 /m/learn/:module', async () => {
     await router.push('/m/learn')
     await router.isReady()
     const wrapper = mount(MobileLearnView, { global: { plugins: [router] } })
-    const text = wrapper.text()
-    expect(text).toContain('今日练习')
-    expect(text).toContain('本周练习')
-    expect(text).toContain('能力画像')
-    expect(text).toContain('场景掌握度')
-    expect(text).toContain('机场 · 航班变动') // 8 场景行
-    expect(text).toContain('本周 6 次练习') // AI 点评
-    // 热力图 = 12 周 × 7 天 = 84 格
-    expect(wrapper.findAll('.u-learn-heat__cell').length).toBe(12 * 7)
-    // 精简：无图例/切换按钮（2026-09-09 组长反馈：只留图 + 右下角经验）
-    expect(wrapper.findAll('.u-learn-heat__mode').length).toBe(0)
-    expect(text).not.toContain('近 12 周')
+    await wrapper.findAll('.u-learn-module')[2].trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/m/learn/speaking')
   })
 
   it('热力图：点格 → 右下角经验更新', async () => {
