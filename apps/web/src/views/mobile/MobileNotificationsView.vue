@@ -19,7 +19,7 @@ import { createDemoConversations } from '@/data/messages-demo'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
-const tabs = ['私信', '通知'] as const
+const tabs = ['私信', '通知', '关注'] as const
 const activeTab = ref<(typeof tabs)[number]>('私信')
 
 const ui = useUiStore()
@@ -39,6 +39,14 @@ const notices = [
   { icon: 'follow', text: 'Teacher Lee 关注了你', when: '昨天', unread: false },
   { icon: 'info', text: '「影子跟读法」素材新增 2 篇（你的收藏清单）', when: '周二', unread: false },
 ] as const
+
+/* ---------- 关注动态（用户关注的人的动态 · 按时间/未读优先 · 演示帧 M3 接真实流） ---------- */
+const follows = [
+  { name: 'Kai', tint: '#16303a', text: '发布了新帖：How I memorize 100 new words a month — the shadowing method', when: '10:05', unread: true },
+  { name: 'Momo', tint: '#3a2440', text: '发布了新帖：6 Minute English: Why do we procrastinate?', when: '09:41', unread: true },
+  { name: 'Teacher Lee', tint: '#232044', text: '更新了影子跟读素材：2 篇入门', when: '昨天', unread: false },
+  { name: 'BBC Learning English', tint: '#2b4a3a', text: '发布了新视频：Dorm life at MIT', when: '周二', unread: false },
+]
 
 /* Tabler 图标对拍（与底栏同源 · docs/35 规则 1） */
 function noticeIcon(kind: string) {
@@ -104,8 +112,8 @@ function noticeIcon(kind: string) {
       </RouterLink>
     </div>
 
-    <!-- Tab 2 · 互动通知 -->
-    <div v-else class="u-notices">
+    <!-- Tab 2 · 互动通知（你收到的互动） -->
+    <div v-else-if="activeTab === '通知'" class="u-notices">
       <section v-for="(n, i) in notices" :key="i" class="u-notices__row" :class="{ 'is-unread': n.unread }">
         <span class="u-notices__icon">
           <component :is="noticeIcon(n.icon)" />
@@ -118,6 +126,20 @@ function noticeIcon(kind: string) {
       </section>
 
       <p class="u-note" style="text-align: center; margin-top: 20px">互动通知 M3 接入（埋点事件派生）；私信流同排期。</p>
+    </div>
+
+    <!-- Tab 3 · 关注（你关注的人的动态 · 按时间/未读优先） -->
+    <div v-else class="u-notices">
+      <section v-for="(f, i) in follows" :key="i" class="u-notices__row" :class="{ 'is-unread': f.unread }">
+        <span class="u-notices__ava" :style="{ background: f.tint }">{{ f.name.slice(0, 1) }}</span>
+        <span class="u-notices__body">
+          <span class="u-notices__text"><b class="u-notices__who">{{ f.name }}</b> {{ f.text }}</span>
+          <time class="u-notices__when">{{ f.when }}</time>
+        </span>
+        <span v-if="f.unread" class="u-notices__dot" aria-label="未读" />
+      </section>
+
+      <p class="u-note" style="text-align: center; margin-top: 20px">关注的动态按发文时间倒序、未读优先；M3 接真实流（帖子 JOIN 关注关系）。</p>
     </div>
   </div>
 </template>

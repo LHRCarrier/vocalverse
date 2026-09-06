@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
  * 账户抽屉（2026-09-05 组长拍板：底部「我的」tab 移除 → 首页顶栏头像点击弹出，X 式左侧滑出）
- * 2026-09-09 组长拍板：/m/me「我的」页面舍弃（信息收敛进抽屉）——用户卡保留，
- * 菜单 = 我的学习（→ /m/learn）+ 消息 + 设置与隐私（**抽屉内展开子项**，组长反馈 2026-09-09：
- * 点了要有子功能拉出，不能只 toast）。
- * 设置子项：帮助与反馈 / 数据与隐私 / 关于声语界（沿用 /m/me 原设置列表；演示帧 toast，M3 接真实页）。
+ * 2026-09-09 组长拍板：/m/me「我的」页面舍弃（信息收敛进抽屉）——用户卡保留，菜单：
+ *   ① 我的学习（**抽屉内展开四个模块**：单词/社区足迹/发音/练习 → /m/learn/:module，组长反馈 2026-09-09 v2）
+ *   ② 通知（→ /m/notifications 通知中心）
+ *   ③ 设置与隐私（抽屉内展开子项：帮助与反馈/数据与隐私/关于声语界，演示帧 toast，M3 接真实页）
+ * 展开项右侧 chevron 在展开时旋转 180°（下拉指示与功能一致）。
  */
-import { ref } from 'vue'
+import { reactive } from 'vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import { useProgressStore } from '@/stores/progress'
 import { useUiStore } from '@/stores/ui'
@@ -27,33 +28,60 @@ const emit = defineEmits<{
   logout: []
 }>()
 
-const items = [
-  { icon: 'user' as const, label: '我的学习', path: '/m/learn', expandable: false },
-  { icon: 'bell' as const, label: '通知', path: '/m/notifications', expandable: false },
-  { icon: 'settings' as const, label: '设置与隐私', path: null, expandable: true },
-]
-
-/* 设置子项（沿用 /m/me 原设置列表 · 演示帧；M3 接真实页面） */
-const settingsChildren = [
-  { icon: 'info' as const, label: '帮助与反馈' },
-  { icon: 'heart' as const, label: '数据与隐私' },
-  { icon: 'wave' as const, label: '关于声语界' },
-]
-
-/** 设置子面板展开态（点击主项 toggle；chevron 旋转 180°） */
-const settingsOpen = ref(false)
-
-function onItem(it: (typeof items)[number]) {
-  if (it.expandable) {
-    settingsOpen.value = !settingsOpen.value
-    return
-  }
-  if (it.path) emit('navigate', it.path)
+interface MenuChild {
+  icon: 'book' | 'heart' | 'mic' | 'flame' | 'info' | 'wave'
+  label: string
+  path: string | null
 }
 
-function onSettingsChild(label: string) {
-  ui.showToast(`「${label}」M3 上线后开放`)
-  settingsOpen.value = false
+interface MenuItem {
+  icon: 'user' | 'bell' | 'settings'
+  label: string
+  path: string | null
+  children?: MenuChild[]
+}
+
+const items: MenuItem[] = [
+  {
+    icon: 'user',
+    label: '我的学习',
+    path: null,
+    children: [
+      { icon: 'book', label: '我的单词', path: '/m/learn/words' },
+      { icon: 'heart', label: '社区足迹', path: '/m/learn/community' },
+      { icon: 'mic', label: '我的发音', path: '/m/learn/speaking' },
+      { icon: 'flame', label: '练习情况', path: '/m/learn/practice' },
+    ],
+  },
+  { icon: 'bell', label: '通知', path: '/m/notifications' },
+  {
+    icon: 'settings',
+    label: '设置与隐私',
+    path: null,
+    children: [
+      { icon: 'info', label: '帮助与反馈', path: null },
+      { icon: 'heart', label: '数据与隐私', path: null },
+      { icon: 'wave', label: '关于声语界', path: null },
+    ],
+  },
+]
+
+/** 各项展开态（独立 toggle · 2026-09-09：我的学习四模块 / 设置子项） */
+const opens = reactive<Record<string, boolean>>({})
+
+function toggle(key: string) {
+  opens[key] = !opens[key]
+}
+
+function go(item: MenuItem, child?: MenuChild) {
+  const path = child?.path ?? item.path
+  if (path) {
+    emit('navigate', path)
+    opens[item.label] = false // 子项点击后收起面板
+    return
+  }
+  ui.showToast(`「${child?.label ?? item.label}」M3 上线后开放`)
+  opens[item.label] = false
 }
 </script>
 
@@ -75,32 +103,32 @@ function onSettingsChild(label: string) {
 
           <!-- 菜单 -->
           <nav class="u-drawer__menu" aria-label="账户菜单项">
-            <button
-              v-for="it in items"
-              :key="it.label"
-              class="u-drawer__item"
-              :class="{ 'is-open': it.expandable && settingsOpen }"
-              type="button"
-              @click="onItem(it)"
-            >
-              <MobileIcon :name="it.icon" :size="18" />
-              <span class="u-drawer__label">{{ it.label }}</span>
-              <MobileIcon name="chevron" :size="16" class="u-drawer__go" />
-            </button>
-
-            <!-- 设置子面板（抽屉内展开 · 2026-09-09 组长反馈：要有真子功能拉出） -->
-            <div v-if="settingsOpen" class="u-drawer__submenu" role="group" aria-label="设置子菜单">
+            <template v-for="it in items" :key="it.label">
               <button
-                v-for="c in settingsChildren"
-                :key="c.label"
-                class="u-drawer__subitem"
+                class="u-drawer__item"
+                :class="{ 'is-open': it.children && opens[it.label] }"
                 type="button"
-                @click="onSettingsChild(c.label)"
+                @click="it.children ? toggle(it.label) : go(it)"
               >
-                <MobileIcon :name="c.icon" :size="16" />
-                <span class="u-drawer__subitem__label">{{ c.label }}</span>
+                <MobileIcon :name="it.icon" :size="18" />
+                <span class="u-drawer__label">{{ it.label }}</span>
+                <MobileIcon name="chevron" :size="16" class="u-drawer__go" />
               </button>
-            </div>
+
+              <!-- 子面板（抽屉内展开 · 我的学习四模块 / 设置子项） -->
+              <div v-if="it.children && opens[it.label]" class="u-drawer__submenu" role="group" :aria-label="`${it.label}子菜单`">
+                <button
+                  v-for="c in it.children"
+                  :key="c.label"
+                  class="u-drawer__subitem"
+                  type="button"
+                  @click="go(it, c)"
+                >
+                  <MobileIcon :name="c.icon" :size="16" />
+                  <span class="u-drawer__subitem__label">{{ c.label }}</span>
+                </button>
+              </div>
+            </template>
           </nav>
 
           <!-- 危险区：退出登录 -->
