@@ -2848,87 +2848,22 @@ body {
   background: var(--u-ink);
 }
 
-/* 互动通知列表 */
-.u-notices {
-  padding: 0 16px 96px;
-}
-
-.u-notices__row {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 0;
-  border-top: 1px solid var(--u-paper-grid);
-}
-
-.u-notices__row.is-unread {
+/* 通知/关注 tab 与私信行同构（2026-09-09 组长反馈：统一以私信为标准）
+ * —— 复用 .u-msg__row 骨架；此块仅补图标位与未读行样式 */
+.u-msg__row.is-unread {
   background: var(--u-paper); /* 未读底淡显（双通道：圆点 + 底色） */
 }
 
-.u-notices__icon {
-  flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+/* 互动通知 · 图标位（复用 u-msg__ava 44px 圆形 · Tabler 20px 1.5 与全局一致） */
+.u-msg__ava--icon {
   background: var(--u-track);
   color: var(--u-ink);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
-.u-notices__icon svg {
+.u-msg__ava--icon svg {
   width: 20px;
   height: 20px;
-  stroke-width: 1.5; /* 图标统一 Tabler 1.5px（与底栏同源 · docs/35 规则 1） */
-}
-
-/* 关注动态 · 头像位（与私信会话同规格） */
-.u-notices__ava {
-  flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.u-notices__who {
-  font-weight: 700;
-  color: var(--u-ink);
-}
-
-.u-notices__body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.u-notices__text {
-  font-size: 13px;
-  font-weight: 500; /* 2026-09-09 组长反馈：正文字细 → 500 与全局一致（同 --u-font 族） */
-  line-height: 1.6;
-  color: var(--u-ink);
-}
-
-.u-notices__when {
-  font-size: 11px;
-  color: var(--u-weak);
-}
-
-.u-notices__dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--u-accent);
-  margin-top: 4px;
+  stroke-width: 1.5;
 }
 
 .u-msg__row {

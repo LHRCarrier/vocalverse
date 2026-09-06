@@ -52,12 +52,12 @@ function messageSettings() {
   ui.showToast('通知设置 · M3 上线')
 }
 
-/* ---------- 互动通知（演示帧 · M3 埋点事件派生） ---------- */
+/* ---------- 互动通知（演示帧 · M3 埋点事件派生；title=互动方，私信行同构） ---------- */
 const notices = [
-  { icon: 'heart', text: 'Momo 赞了你的帖子 How I memorize 100 new words a month', when: '10:05', unread: true },
-  { icon: 'chat', text: 'Kai 评论了你：Great point! I will check it out tonight.', when: '10:42', unread: true },
-  { icon: 'follow', text: 'Teacher Lee 关注了你', when: '昨天', unread: false },
-  { icon: 'info', text: '「影子跟读法」素材新增 2 篇（你的收藏清单）', when: '周二', unread: false },
+  { icon: 'heart', title: 'Momo', text: '赞了你的帖子 How I memorize 100 new words a month', when: '10:05', unread: true },
+  { icon: 'chat', title: 'Kai', text: '评论了你：Great point! I will check it out tonight.', when: '10:42', unread: true },
+  { icon: 'follow', title: 'Teacher Lee', text: '关注了你', when: '昨天', unread: false },
+  { icon: 'info', title: '声语界', text: '「影子跟读法」素材新增 2 篇（你的收藏清单）', when: '周二', unread: false },
 ] as const
 
 /* Tabler 图标对拍（与底栏同源 · docs/35 规则 1） */
@@ -124,31 +124,37 @@ function noticeIcon(kind: string) {
       </RouterLink>
     </div>
 
-    <!-- Tab 2 · 互动通知（你收到的互动） -->
-    <div v-else-if="activeTab === '通知'" class="u-notices">
-      <section v-for="(n, i) in notices" :key="i" class="u-notices__row" :class="{ 'is-unread': n.unread }">
-        <span class="u-notices__icon">
+    <!-- Tab 2 · 互动通知（你收到的互动 · 与私信行同构：图标位=头像位） -->
+    <div v-else-if="activeTab === '通知'" class="u-msg">
+      <section v-for="(n, i) in notices" :key="i" class="u-msg__row" :class="{ 'is-unread': n.unread }">
+        <span class="u-msg__ava u-msg__ava--icon">
           <component :is="noticeIcon(n.icon)" />
         </span>
-        <span class="u-notices__body">
-          <span class="u-notices__text">{{ n.text }}</span>
-          <time class="u-notices__when">{{ n.when }}</time>
+        <span class="u-msg__body">
+          <span class="u-msg__who">
+            <strong>{{ n.title }}</strong>
+            <time class="u-msg__time">{{ n.when }}</time>
+          </span>
+          <span class="u-msg__last">{{ n.text }}</span>
         </span>
-        <span v-if="n.unread" class="u-notices__dot" aria-label="未读" />
+        <span v-if="n.unread" class="u-msg__dot" aria-label="未读" />
       </section>
 
       <p class="u-note" style="text-align: center; margin-top: 20px">互动通知 M3 接入（埋点事件派生）；私信流同排期。</p>
     </div>
 
-    <!-- Tab 3 · 关注（你关注的人的动态 · 按时间/未读优先） -->
-    <div v-else class="u-notices">
-      <section v-for="(f, i) in follows" :key="i" class="u-notices__row" :class="{ 'is-unread': f.unread }">
-        <span class="u-notices__ava" :style="{ background: f.tint }">{{ f.name.slice(0, 1) }}</span>
-        <span class="u-notices__body">
-          <span class="u-notices__text"><b class="u-notices__who">{{ f.name }}</b> {{ f.text }}</span>
-          <time class="u-notices__when">{{ f.when }}</time>
+    <!-- Tab 3 · 关注（你关注的人的动态 · 与私信行同构：名字行+内容行） -->
+    <div v-else class="u-msg">
+      <section v-for="(f, i) in follows" :key="i" class="u-msg__row" :class="{ 'is-unread': f.unread }">
+        <span class="u-msg__ava" :style="{ background: f.tint }">{{ f.name.slice(0, 1) }}</span>
+        <span class="u-msg__body">
+          <span class="u-msg__who">
+            <strong>{{ f.name }}</strong>
+            <time class="u-msg__time">{{ f.when }}</time>
+          </span>
+          <span class="u-msg__last">{{ f.text }}</span>
         </span>
-        <span v-if="f.unread" class="u-notices__dot" aria-label="未读" />
+        <span v-if="f.unread" class="u-msg__dot" aria-label="未读" />
       </section>
 
       <p class="u-note" style="text-align: center; margin-top: 20px">关注的动态按发文时间倒序、未读优先；M3 接真实流（帖子 JOIN 关注关系）。</p>
