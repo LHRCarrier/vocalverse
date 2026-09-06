@@ -2,107 +2,98 @@
 /**
  * 移动端 · 英语社区主页（组长概念拍板 2026-09-05：点赞/分享/评论/投币 · 帖子+视频 · 三个领域）
  *
- * 领域：① 英语新闻稿 ② 英文教学/学习分享 ③ 外国学习生活·地方习俗习惯；视频 = 帖子视频版（排版另设计，参考 X）。
- * 排版参考 X：领域 Tab（推荐=全量）→ 混合信息流（帖子图文卡 / 视频封面卡）→ 互动行（评论/点赞/投币/分享）。
- * 仅数据展示（组长明示）：演示帧数据 + 点赞为本地点赞交互；分享/评论/投币暂为展示。
- * 组件拆分（docs/34 §4）：MobilePostCard / MobilePostMedia / MobilePostActions；状态规范见
- * docs/design-system/vocalverse/pages/community.md（加载/空态分支 M3 接真实流后生效）。
- * 后端真流 = docs/10 注记（sessions/attempts JOIN 派生 + post_likes）；M3 排期。
+ * S1 真实流（docs/37 §8）：数据源 = Java 社区接口（keyset 游标 + 服务端领域过滤）；
+ * 骨架/空态/刷新分支正式启用；打卡卡（kind=checkin）独立卡片（整体分 + 今日次数）。
+ * 领域 Tab（X 式）：为你推荐=全量混排（含打卡卡）；三领域=domain 过滤。
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import IconMail from '~icons/tabler/mail'
 import IconUserPlus from '~icons/tabler/user-plus'
 
+import { COMMUNITY_TABS } from '@/api/community'
 import MobileCommentsSheet from '@/components/mobile/MobileCommentsSheet.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobilePostCard from '@/components/mobile/MobilePostCard.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { shareDemoLink } from '@/composables/share'
-import { COMMUNITY_TABS, DEMO_FEED } from '@/data/community-demo'
-import { useAuthStore } from '@/stores/auth'
+import { useCommunityStore } from '@/stores/community'
 import { useFollowStore } from '@/stores/follows'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
-import type { CommunityPost, CommunityTab } from '@/types/community'
+import type { CommunityPostView } from '@/types/community'
 
-const auth = useAuthStore()
 const router = useRouter()
 const ui = useUiStore()
+const community = useCommunityStore()
 
-/* ---------- 领域标签（X 式：为你推荐 = 全量混排） ---------- */
 const tabs = COMMUNITY_TABS
-const activeTab = ref<CommunityTab>('为你推荐')
+const activeTab = ref<string | null>(null)
 
-/* 加好友 → 关注社区头条作者（2026-09-09：关注能力收敛进通知中心「关注」tab；演示帧 M3 接真实关注流） */
+/* 首页即拉流（真实数据） */
+void community.load(null)
+
+watch(activeTab, (id) => {
+  void community.load(id)
+})
+
+/* 加好友 → 关注社区头条作者（S2 接真实关注流；S1 演示 toast，A-11） */
 function demoAddFriend() {
   useFollowStore().follow(
-    'Global Post',
+    'VocalVerse News',
     '#37546e',
-    "发布了新帖：'AI learning' is taking over China's classrooms — what it means for English learners",
+    "发布了新帖：Inside China's English learning boom — AI partners meet human teachers",
   )
-  ui.showToast('已关注 Global Post · 动态见通知中心「关注」')
+  ui.showToast('已关注 VocalVerse News（演示）· S2 接真实关注流')
 }
 
-/* 写消息（X 顶栏同款：私信入口 · 2026-09-09 收敛进通知中心） */
+/* 写消息（X 顶栏同款：私信入口 · 收敛进通知中心；S1 演示，A-12） */
 function openMessages() {
   void router.push('/m/notifications')
 }
 
-/* ---------- 互动（组长 2026-09-05 升级拍板：评论/投币/分享全交互 · 演示帧本地，不落库） ---------- */
+/* ---------- 互动（后端真实接口·乐观更新） ---------- */
 const openCommentsId = ref<number | null>(null)
-const openCommentsPost = computed(() => items.value.find((p) => p.id === openCommentsId.value) ?? null)
-
-function toggleCoin(item: CommunityPost) {
-  item.coined = !item.coined
-  item.stats.coin += item.coined ? 1 : -1
-}
-
-/** 分享：系统分享面板可用则打开；否则复制演示链接（分享计数=转发数语义，点击不加计） */
-async function sharePost(item: CommunityPost) {
-  const result = await shareDemoLink({
-    title: item.title,
-    text: item.desc ?? '',
-    url: `https://vocalverse.demo/post/${item.id}`,
-  })
-  if (result === 'shared') ui.showToast('已分享')
-  else if (result === 'copied') ui.showToast('链接已复制（演示链接）')
-  else if (result === 'failed') ui.showToast('复制失败，请手动复制')
-}
-
-function addComment(item: CommunityPost, text: string) {
-  const author = auth.me?.nickname ?? auth.me?.username ?? '你'
-  item.comments.push({ author, text, time: '刚刚' })
-  item.stats.comment += 1
-}
-
-function handleAddComment(text: string) {
-  if (openCommentsPost.value) addComment(openCommentsPost.value, text)
-}
-
-/* ---------- 动态流（【演示帧】仅数据展示；M3 接真实 JOIN 流，只换数据源——docs/34 §7） ---------- */
-/** 深拷贝演示数据（点赞/投币/评论会改 item，不能直接引用模块级常量） */
-function clonePost(p: CommunityPost): CommunityPost {
-  return { ...p, stats: { ...p.stats }, comments: p.comments.slice() }
-}
-
-const items = ref<CommunityPost[]>(DEMO_FEED.map(clonePost))
-const feedLoading = ref(false)
-
-const visibleFeed = computed(() =>
-  activeTab.value === '为你推荐' ? items.value : items.value.filter((f) => f.domain === activeTab.value),
+const openCommentsPost = computed(
+  () => community.items.find((p) => p.id === openCommentsId.value) ?? null,
 )
 
-function toggleLike(item: CommunityPost) {
-  item.liked = !item.liked
-  item.stats.like += item.liked ? 1 : -1
+/** 分享：系统分享面板可用则打开（成功记录一次分享计数）；否则复制演示链接 */
+async function sharePost(item: CommunityPostView) {
+  const result = await shareDemoLink({
+    title: item.title ?? item.body ?? 'VocalVerse 社区内容',
+    text: item.body ?? '',
+    url: `https://vocalverse.demo/post/${item.id}`,
+  })
+  if (result === 'shared') {
+    await community.share(item)
+    ui.showToast('已分享')
+  } else if (result === 'copied') ui.showToast('链接已复制（演示链接）')
+  else ui.showToast('复制失败，请手动复制')
 }
 
-/** 空态「刷新看看」：演示帧直接重置为演示数据（M3 换真实列表接口 + loading/错误态） */
+function handleCommentCount(count: number) {
+  if (openCommentsId.value != null) community.syncCommentCount(openCommentsId.value, count)
+}
+
+/* 底部加载更多（游标） */
+function loadMore() {
+  void community.loadMore()
+}
+
+const visibleFeed = computed(() => community.items)
+
+/** 空态「刷新看看」：真实流重拉 */
 function reloadFeed() {
-  items.value = DEMO_FEED.map(clonePost)
+  void community.load(activeTab.value)
+}
+
+/** 作者色板取首色（tint #16303a → 渐变双色） */
+function tintGradient(tint: string | null | undefined): string {
+  if (!tint) return 'linear-gradient(135deg, #37546e, #6e96b4)'
+  return `linear-gradient(135deg, ${tint}, #fff3)`
 }
 </script>
 
@@ -125,20 +116,20 @@ function reloadFeed() {
       <nav class="u-x-tabs" aria-label="社区领域">
         <button
           v-for="t in tabs"
-          :key="t"
+          :key="t.label"
           class="u-x-tab"
-          :class="{ active: activeTab === t }"
+          :class="{ active: activeTab === t.id }"
           type="button"
-          :aria-selected="activeTab === t"
-          @click="activeTab = t"
+          :aria-selected="activeTab === t.id"
+          @click="activeTab = t.id"
         >
-          {{ t }}
-          <span v-if="t === '为你推荐'" class="u-x-caret" aria-hidden="true">▾</span>
+          {{ t.label }}
+          <span v-if="t.id === null" class="u-x-caret" aria-hidden="true">▾</span>
         </button>
       </nav>
 
-      <!-- 加载态：骨架卡（M3 真实流 >300ms 才出现；docs/31 硬规则 3） -->
-      <section v-if="feedLoading" class="u-comm-skel" aria-label="动态加载中" aria-busy="true">
+      <!-- 加载态：骨架卡（docs/31 硬规则 3：>300ms 才出现） -->
+      <section v-if="community.loading" class="u-comm-skel" aria-label="动态加载中" aria-busy="true">
         <div v-for="i in 3" :key="i" class="u-comm-skel__card">
           <span class="u-comm-skel__ava" />
           <span class="u-comm-skel__lines">
@@ -149,40 +140,54 @@ function reloadFeed() {
         </div>
       </section>
 
-      <!-- 空态：当前领域无内容（M3 出现条件；演示帧各领域均有数据） -->
+      <!-- 空态：当前领域无内容 -->
       <div v-else-if="visibleFeed.length === 0" class="u-comm-empty" role="status">
         <span class="u-comm-empty__icon"><MobileIcon name="info" :size="28" /></span>
-        <p class="u-comm-empty__title">该领域暂无内容</p>
-        <p class="u-comm-empty__sub">换个领域看看，或稍后再来～</p>
+        <p class="u-comm-empty__title">{{ community.error ? '加载失败' : '该领域暂无内容' }}</p>
+        <p class="u-comm-empty__sub">{{ community.error || '换个领域看看，或稍后再来～' }}</p>
         <button class="u-comm-empty__btn" type="button" @click="reloadFeed">
           <MobileIcon name="refresh" :size="15" />
           刷新看看
         </button>
       </div>
 
-      <!-- 信息流：帖子图文卡 / 视频封面卡（参考 X；组件拆分 docs/34 §4） -->
+      <!-- 信息流：帖子图文卡 / 视频封面卡 / 打卡卡（参考 X；组件拆分 docs/34 §4） -->
       <template v-else>
         <MobilePostCard
           v-for="item in visibleFeed"
           :key="item.id"
           :post="item"
-          @toggle-like="toggleLike(item)"
-          @toggle-coin="toggleCoin(item)"
+          :tint-gradient="tintGradient(item.author.tint)"
+          @toggle-like="community.toggleLike(item)"
+          @coin="community.coin(item)"
           @share="sharePost(item)"
           @open-comments="openCommentsId = item.id"
         />
       </template>
 
-      <p class="u-comm__note">内容为演示数据，仅展示；互动与真实流的接口按 docs/10 注记排期 M3。</p>
+      <!-- 游标加载更多 -->
+      <button
+        v-if="community.hasMore && !community.loading"
+        class="u-comm-more"
+        type="button"
+        :disabled="community.loadingMore"
+        @click="loadMore"
+      >
+        {{ community.loadingMore ? '加载中…' : '加载更多' }}
+      </button>
+
+      <p class="u-comm__note">内容为社区真实数据：三领域 Tab 服务端过滤；为你推荐=全量混排（含打卡卡）。</p>
     </div>
 
-    <!-- 评论面板（演示级：列表 + 发表；嵌套楼 M3） -->
+    <!-- 评论面板（真实流：服务端列表 + 发表；嵌套楼 S3；v-if 守卫下的可选链兜底） -->
     <MobileCommentsSheet
+      v-if="openCommentsPost"
+      :post-id="openCommentsPost?.id ?? 0"
       :open="openCommentsId !== null"
-      :title="openCommentsPost?.title ?? ''"
-      :comments="openCommentsPost?.comments ?? []"
+      :title="openCommentsPost?.title ?? openCommentsPost?.body ?? '内容'"
+      :comment-count="openCommentsPost?.commentCount ?? 0"
       @update:open="openCommentsId = null"
-      @add-comment="handleAddComment"
+      @update-count="handleCommentCount"
     />
   </div>
 </template>

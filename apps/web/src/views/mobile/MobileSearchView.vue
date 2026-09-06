@@ -8,9 +8,21 @@ import { computed, ref } from 'vue'
 
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
-import { DEMO_FEED } from '@/data/community-demo'
 import { createDemoConversations } from '@/data/messages-demo'
 import '@/styles/mobile-uic.css'
+
+/**
+ * 搜索（S3 后置 · A-13）：真实帖子/用户/教程索引随 S3 上线；当前为静态演示样本
+ * （community-demo.ts 已随 S1 删除，此处保留少量展示样例维持演示可看性）。
+ */
+const SEARCH_SAMPLES = [
+  { id: 1, author: 'VocalVerse News', handle: '@vocalverse', tint: '#37546e', domain: '新闻稿', title: "Inside China's English learning boom", desc: 'AI partners meet human teachers' },
+  { id: 2, author: 'Teacher Amy', handle: '@amyteach', tint: '#3a2440', domain: '教学分享', title: 'Three words that make small talk easy', desc: 'Listen, shadow, compare' },
+  { id: 3, author: 'Emma English', handle: '@emmaenglish', tint: '#1e2b26', domain: '教学分享', title: '5 phrasal verbs for your next coffee order', desc: 'With example dialogues' },
+  { id: 4, author: 'Teacher Lee', handle: '@leeenglish', tint: '#232044', domain: '教学分享', title: 'How I memorize 20 new words — the shadowing method', desc: 'Listen, shadow, record, compare' },
+  { id: 5, author: 'Liz in London', handle: '@lizlondon', tint: '#0f3a44', domain: '海外生活', title: 'My first Bonfire Night in London', desc: 'A failed plot and sparks over the Thames' },
+  { id: 6, author: 'Mia in Boston', handle: '@miaboston', tint: '#2b4a3a', domain: '海外生活', title: 'Dorm life in Boston: my morning in 60 seconds', desc: 'Kitchen talk and roommate practices' },
+]
 
 type SearchTab = '帖子' | '用户' | '教程'
 const tabs: SearchTab[] = ['帖子', '用户', '教程']
@@ -30,7 +42,7 @@ const tutorials = [
 const kw = computed(() => keyword.value.trim().toLowerCase())
 const posts = computed(() =>
   kw.value
-    ? DEMO_FEED.filter((p) => `${p.author} ${p.title} ${p.desc ?? ''}`.toLowerCase().includes(kw.value)).slice(0, 10)
+    ? SEARCH_SAMPLES.filter((p) => `${p.author} ${p.title} ${p.desc}`.toLowerCase().includes(kw.value)).slice(0, 10)
     : [],
 )
 const foundUsers = computed(() =>

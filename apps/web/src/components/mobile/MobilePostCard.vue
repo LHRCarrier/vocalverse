@@ -1,57 +1,84 @@
 <script setup lang="ts">
 /**
- * 社区卡片 · 帖子容器（docs/34 §4：tweet.dart 粒度对照）
- * 头部作者行 + 标题 + 摘要 + 媒体（MobilePostMedia）+ 互动行（MobilePostActions）。
- * 互动状态由父级维护（演示帧本地；M3 走后端，见 docs/34 §7.2）。
+ * 社区卡片 · 帖子容器（docs/34 §4：tweet.dart 粒度对照；S1 真实流）
+ *
+ * 头部作者行（昵称/@handle/LV/tint 头像）+ 标题/摘要（无标题隐藏，A-01）+
+ * 媒体（MobilePostMedia）+ 互动行（MobilePostActions）。
+ * kind=checkin：打卡卡分支——整体分 + 今日练习次数 + 日期 mark（docs/37 §8）。
+ * 互动状态由 store 维护（乐观更新，docs/34 §7.2）。
  */
 import MobilePostActions from '@/components/mobile/MobilePostActions.vue'
 import MobilePostMedia from '@/components/mobile/MobilePostMedia.vue'
+import { authorDisplay, domainLabel, timeAgo } from '@/api/community'
 
-import type { CommunityPost } from '@/types/community'
+import type { CommunityPostView } from '@/types/community'
 
 const props = defineProps<{
-  post: CommunityPost
+  post: CommunityPostView
+  tintGradient: string
 }>()
 
 const emit = defineEmits<{
   'toggle-like': []
-  'toggle-coin': []
+  coin: []
   share: []
   'open-comments': []
 }>()
+
+/** 打卡卡：整体分展示（后端只回公开面 {overall, practice_count}，C-08） */
+const checkinScore = props.post.checkinOverall
+const checkinCount = props.post.checkinPracticeCount ?? 0
 </script>
 
 <template>
-  <section class="u-comm-item" :aria-label="`${props.post.author} 的动态`">
+  <section class="u-comm-item" :aria-label="`${props.post.author.nickname} 的动态`">
     <header class="u-comm-item__head">
-      <span class="u-comm-item__ava" :style="{ background: props.post.tint }">{{
-        props.post.author.slice(0, 1)
+      <span class="u-comm-item__ava" :style="{ background: props.post.author.tint ?? '#37546e' }">{{
+        props.post.author.nickname.slice(0, 1)
       }}</span>
       <span class="u-comm-item__who">
         <span class="u-comm-item__name">
-          {{ props.post.author }}
-          <span class="u-comm-item__domain">{{ props.post.domain }}</span>
+          {{ props.post.author.nickname }}
+          <span class="u-comm-item__domain">{{ domainLabel(props.post.domain) }}</span>
         </span>
-        <span class="u-comm-item__meta">{{ props.post.handle }} · LV{{ props.post.level.slice(1) }} · {{ props.post.time }}</span>
+        <span class="u-comm-item__meta">
+          {{ authorDisplay(props.post.author.handle) }} · LV{{ props.post.author.level.slice(1) }} · {{ timeAgo(props.post.createdAt) }}
+        </span>
       </span>
     </header>
 
-    <h3 class="u-comm-item__title">{{ props.post.title }}</h3>
-    <p v-if="props.post.desc" class="u-comm-item__desc">{{ props.post.desc }}</p>
+    <!-- 打卡卡（当日聚合：整体分 + 次数 + 日期） -->
+    <template v-if="props.post.kind === 'checkin'">
+      <h3 class="u-comm-item__title">今日打卡</h3>
+      <p class="u-comm-item__desc">
+        完成 {{ checkinCount }} 次口语练习 · 今日综合分
+        <strong class="u-comm-item__score">{{ checkinScore == null ? '—' : checkinScore.toFixed(0) }}</strong>
+        <time class="u-comm-item__time">{{ props.post.checkinDate }}</time>
+      </p>
+    </template>
+
+    <template v-else>
+      <h3 v-if="props.post.title" class="u-comm-item__title">{{ props.post.title }}</h3>
+      <p v-if="props.post.body" class="u-comm-item__desc">{{ props.post.body }}</p>
+    </template>
 
     <MobilePostMedia
-      v-if="props.post.media"
+      v-if="props.post.media || props.post.kind === 'video'"
       :media="props.post.media"
       :kind="props.post.kind"
-      :duration="props.post.duration"
+      :tint-gradient="props.tintGradient"
+      :duration-s="props.post.media?.durationS ?? null"
     />
 
     <MobilePostActions
-      :stats="props.post.stats"
+      :like-count="props.post.likeCount"
+      :comment-count="props.post.commentCount"
+      :coin-count="props.post.coinCount"
+      :share-count="props.post.shareCount"
       :liked="props.post.liked"
       :coined="props.post.coined"
       @toggle-like="emit('toggle-like')"
-      @toggle-coin="emit('toggle-coin')"
+      @coin="emit('coin')"
       @share="emit('share')"
       @open-comments="emit('open-comments')"
     />

@@ -2,7 +2,8 @@
 /**
  * 移动端 · 通知中心（2026-09-09 组长反馈：消息收敛到通知——X 式一个入口 tab 分流）
  * Tab = 私信（会话列表，原 /m/messages 内容收敛进来）/ 通知（互动通知：点赞/评论/关注/系统）。
- * 私信会话点击 → /m/messages/:id（保留）；M3 接真实通知流（埋点事件派生）。
+ * 私信会话点击 → /m/messages/:id（保留）；S1 三 tab 均为演示帧（A-11/A-12：与真实社区流并存
+ * 时须显式标注，避免虚假通知混淆真实互动）；S2 接真实通知（interactions 派生 + mergeKey 聚合）。
  * 2026-09-09 v2 组长反馈：tab 均分整行居中（X 式）；通知行图标统一 Tabler（与底栏同款）。
  */
 import { computed, ref, watch } from 'vue'
@@ -87,6 +88,8 @@ function noticeIcon(kind: string) {
         </button>
       </template>
     </MobileTopBar>
+
+    <p class="u-note u-notif__demo">演示数据：私信/互动通知/关注流 S2 接入真实数据。</p>
 
     <!-- X 式 tab（均分整行 · 激活加粗 + 下划线） -->
     <nav class="u-notif-tabs" aria-label="通知分类">

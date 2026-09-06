@@ -33,7 +33,7 @@ export interface Envelope<T> {
 }
 
 const PYTHON_BASE = import.meta.env.VITE_PYTHON_BASE ?? ''
-const JAVA_BASE = import.meta.env.VITE_JAVA_BASE ?? '/manage'
+export const JAVA_BASE = import.meta.env.VITE_JAVA_BASE ?? '/manage'
 
 /** 全局访问令牌（由 auth store 写入；request 自动携带）。 */
 let authToken: string | null = null

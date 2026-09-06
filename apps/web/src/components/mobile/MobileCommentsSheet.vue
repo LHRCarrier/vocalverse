@@ -1,42 +1,94 @@
 <script setup lang="ts">
 /**
- * 社区卡片 · 评论面板（2026-09-05 组长升级拍板：评论全交互，演示帧级）
- * 复用 u-sheet 弹层体系（与 ScenePickerSheet 同套）：遮罩 + 底部卡片；
- * 演示评论列表 + 发表输入条；发送本地追加（emit add-comment，父级写回 post.comments 并计数 +1）。
- * 嵌套评论楼 = M3（docs/34 §5 P1）。
+ * 社区卡片 · 评论面板（S1 真实流：docs/37 §8）
+ *
+ * 复用 u-sheet 弹层体系；打开时服务端拉首页（keyset 游标，ASC），发表后顶部插入并
+ * emit update-count（父级同步卡片计数，A-05 以后端 total 为准）；嵌套评论楼 = S3。
  */
 import { ref, watch } from 'vue'
 
+import { addComment, fetchComments, timeAgo } from '@/api/community'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
+import { useUiStore } from '@/stores/ui'
 
-import type { PostComment } from '@/types/community'
+import type { CommentView } from '@/types/community'
 
 const props = defineProps<{
   open: boolean
+  postId: number
   title: string
-  comments: PostComment[]
+  commentCount: number
 }>()
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  'add-comment': [text: string]
+  'update-count': [value: number]
 }>()
 
+const ui = useUiStore()
+const list = ref<CommentView[]>([])
+const cursor = ref<string | null>(null)
+const hasMore = ref(false)
+const loading = ref(false)
+const loadingMore = ref(false)
+const added = ref(0)
 const draft = ref('')
 
-/* 每次打开清空草稿 */
+/** 展示计数 = 服务端总数 + 本次会话新增（父级按此同步卡片） */
+const total = () => props.commentCount + added.value
+
 watch(
   () => props.open,
-  (v) => {
-    if (v) draft.value = ''
+  async (v) => {
+    if (v) {
+      draft.value = ''
+      await loadFirst()
+    } else {
+      list.value = []
+      added.value = 0
+    }
   },
 )
 
-function submit() {
+async function loadFirst() {
+  loading.value = true
+  try {
+    const page = await fetchComments(props.postId, null)
+    list.value = page.items
+    cursor.value = page.nextCursor
+    hasMore.value = page.hasMore
+  } catch (e) {
+    ui.showToast(e instanceof Error ? e.message : '评论加载失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function loadMore() {
+  if (loadingMore.value || !hasMore.value || !cursor.value) return
+  loadingMore.value = true
+  try {
+    const page = await fetchComments(props.postId, cursor.value)
+    list.value = list.value.concat(page.items)
+    cursor.value = page.nextCursor
+    hasMore.value = page.hasMore
+  } finally {
+    loadingMore.value = false
+  }
+}
+
+async function submit() {
   const text = draft.value.trim()
   if (!text) return
-  emit('add-comment', text)
-  draft.value = ''
+  try {
+    const comment = await addComment(props.postId, text)
+    list.value = [comment, ...list.value]
+    added.value += 1
+    emit('update-count', total())
+    draft.value = ''
+  } catch (e) {
+    ui.showToast(e instanceof Error ? e.message : '发表失败')
+  }
 }
 </script>
 
@@ -51,7 +103,7 @@ function submit() {
           @keydown.esc="emit('update:open', false)"
         >
           <header class="u-sheet__head">
-            <h2 class="u-sheet__title">评论</h2>
+            <h2 class="u-sheet__title">评论 <span class="u-comments__count">· {{ total() }}</span></h2>
             <button
               class="u-sheet__close"
               type="button"
@@ -64,16 +116,22 @@ function submit() {
           </header>
           <p class="u-sheet__sub">{{ props.title }}</p>
 
-          <ul v-if="props.comments.length" class="u-comments__list">
-            <li v-for="(c, i) in props.comments" :key="i" class="u-comments__item">
-              <span class="u-comments__ava">{{ c.author.slice(0, 1) }}</span>
+          <p v-if="loading" class="u-comments__empty">评论加载中…</p>
+          <ul v-else-if="list.length" class="u-comments__list">
+            <li v-for="c in list" :key="c.id" class="u-comments__item">
+              <span class="u-comments__ava" :style="{ background: c.author.tint ?? '#37546e' }">{{
+                c.author.nickname.slice(0, 1)
+              }}</span>
               <span class="u-comments__body">
                 <span class="u-comments__who">
-                  {{ c.author }}
-                  <time class="u-comments__time">{{ c.time }}</time>
+                  {{ c.author.nickname }}
+                  <time class="u-comments__time">{{ timeAgo(c.createdAt) }}</time>
                 </span>
-                <span class="u-comments__text">{{ c.text }}</span>
+                <span class="u-comments__text">{{ c.body }}</span>
               </span>
+            </li>
+            <li v-if="hasMore" class="u-comments__more">
+              <button type="button" :disabled="loadingMore" @click="loadMore">加载更多评论</button>
             </li>
           </ul>
           <p v-else class="u-comments__empty">还没有评论，来抢沙发～</p>
@@ -83,7 +141,7 @@ function submit() {
               v-model="draft"
               class="u-comments__input"
               type="text"
-              maxlength="200"
+              maxlength="500"
               placeholder="写下你的评论…"
               aria-label="评论内容"
               @keydown.enter="submit"

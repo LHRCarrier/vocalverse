@@ -155,6 +155,12 @@ body {
   line-height: 1.6;
 }
 
+/* 通知中心演示标注（S1 三 tab 演示帧 · A-12） */
+.u-notif__demo {
+  margin: 8px 20px 0;
+  font-size: 11px;
+}
+
 /* ============================================================
  * 按钮（全部胶囊：主=炭黑实心 / 次=track 灰底 / 纸面白底描边 /
  * 深色卡幽灵描边 / 危险=白底红字；高 48px；150ms 过渡）
@@ -1234,7 +1240,36 @@ body {
   overflow: hidden;
 }
 
-/* 配图 / 视频封面（演示渐变块） */
+/* 打卡卡：分数强调 + 日期（S1 真实流） */
+.u-comm-item__score {
+  font-size: 15px;
+  color: var(--u-accent, #2f6bff);
+}
+
+.u-comm-item__time {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--u-ink-soft);
+}
+
+/* 加载更多（游标分页按钮 · S1 真实流） */
+.u-comm-more {
+  display: block;
+  margin: 14px auto 4px;
+  padding: 8px 22px;
+  border: 1.5px solid var(--u-ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--u-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.u-comm-more:disabled {
+  opacity: 0.5;
+}
+
+/* 配图 / 视频封面（渐变占位 + 真实图片） */
 .u-comm-media {
   position: relative;
   margin-top: 10px;
@@ -1244,6 +1279,14 @@ body {
   align-items: flex-end;
   padding: 10px 12px;
   overflow: hidden;
+}
+
+.u-comm-media__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .u-comm-media--video {
@@ -1537,6 +1580,27 @@ body {
   font-size: 13px;
   color: var(--u-weak);
   text-align: center;
+}
+
+/* 评论计数与加载更多（S1 真实流） */
+.u-comments__count {
+  font-size: 12px;
+  color: var(--u-weak);
+  font-weight: 400;
+}
+
+.u-comments__more {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0;
+}
+
+.u-comments__more button {
+  border: none;
+  background: transparent;
+  color: var(--u-weak);
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .u-comments__bar {
@@ -3977,6 +4041,30 @@ body {
 
 .u-compose__count.busy {
   color: var(--u-accent);
+}
+
+/* 领域选择 chips（S1 真实流 · 后端必填） */
+.u-compose__domains {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.u-compose__domain {
+  padding: 6px 14px;
+  border: 1.5px solid var(--u-paper-grid);
+  border-radius: 999px;
+  background: var(--u-paper);
+  color: var(--u-ink);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 120ms ease-out;
+}
+
+.u-compose__domain.active {
+  border-color: var(--u-ink);
+  background: var(--u-ink);
+  color: var(--u-paper);
 }
 
 .u-compose__tools {

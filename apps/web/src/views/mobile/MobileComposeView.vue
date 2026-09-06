@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
- * 移动端 · 发帖（2026-09-05 组长拍板 4：底部中央 ＋ = 发帖，X 式内容闭环；演示帧）
- * X compose 同款：顶栏右「发帖」按钮 + 正文文本域 + 工具行（图片/视频/话题/表情）。
- * 发布 = toast 演示 + 回社区；M3 接真实发布接口（帖子+视频双形态入流）。
+ * 移动端 · 发帖（2026-09-05 组长拍板 4：底部中央 ＋ = 发帖，X 式内容闭环；S1 真实流）
+ * 正文 280 字（纯文本发帖，D-Q7）+ 领域选择（后端必填）；发布成功 → 回社区（发布后上游可见）。
+ * 图片/视频/话题/表情维持「未接入」占位（S1 不发媒体；图片/视频按钮 S2 上传后接）。
  */
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { createPost } from '@/api/community'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { useUiStore } from '@/stores/ui'
@@ -17,16 +18,32 @@ const ui = useUiStore()
 
 const text = ref('')
 const MAX = 280
-const canPost = computed(() => text.value.trim().length > 0)
+const canPost = computed(() => text.value.trim().length > 0 && domain.value !== null)
+
+const domains = [
+  { id: 'news', label: '新闻稿' },
+  { id: 'teaching', label: '教学分享' },
+  { id: 'overseas', label: '海外生活' },
+]
+const domain = ref<string | null>('teaching')
+const submitting = ref(false)
 
 function attach(kind: string) {
-  ui.showToast(`「${kind}」接入 M3 上线`)
+  ui.showToast(`「${kind}」S2 上传接入`)
 }
 
-function post() {
-  if (!canPost.value) return
-  ui.showToast('已发布（演示）')
-  void router.push('/m/home')
+async function post() {
+  if (!canPost.value || submitting.value) return
+  submitting.value = true
+  try {
+    await createPost({ body: text.value.trim(), kind: 'article', domain: domain.value! })
+    ui.showToast('已发布')
+    void router.push('/m/home')
+  } catch (e) {
+    ui.showToast(e instanceof Error ? e.message : '发布失败')
+  } finally {
+    submitting.value = false
+  }
 }
 </script>
 
@@ -34,7 +51,7 @@ function post() {
   <div class="u-phone u-compose">
     <MobileTopBar title="发帖" back @back="router.push('/m/home')">
       <template #actions>
-        <button class="u-topbar__btn" type="button" :disabled="!canPost" aria-label="发布" @click="post">
+        <button class="u-topbar__btn" type="button" :disabled="!canPost || submitting" aria-label="发布" @click="post">
           发帖
         </button>
       </template>
@@ -50,6 +67,21 @@ function post() {
       />
 
       <p class="u-compose__count" :class="{ busy: text.length >= MAX * 0.9 }">{{ text.length }}/{{ MAX }}</p>
+
+      <!-- 领域选择（后端必填：news/teaching/overseas） -->
+      <div class="u-compose__domains" aria-label="选择领域">
+        <button
+          v-for="d in domains"
+          :key="d.id"
+          class="u-compose__domain"
+          :class="{ active: domain === d.id }"
+          type="button"
+          :aria-pressed="domain === d.id"
+          @click="domain = d.id"
+        >
+          {{ d.label }}
+        </button>
+      </div>
 
       <div class="u-compose__tools">
         <button class="u-compose__tool" type="button" @click="attach('图片')">
@@ -70,9 +102,7 @@ function post() {
         </button>
       </div>
 
-      <p class="u-note" style="margin-top: 12px">
-        演示帧：发布后回社区流（M3 接入真实发布，帖子+视频双形态）。
-      </p>
+      <p class="u-note" style="margin-top: 12px">真实发布：纯文本 + 领域；媒体上传 S2 接入（按钮暂未启用）。</p>
     </div>
   </div>
 </template>
