@@ -4,6 +4,38 @@
  */
 
 export interface paths {
+    "/api/v1/community/posts/{id}/likes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["like"];
+        post?: never;
+        delete: operations["unlike"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/community/posts/{id}/coins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["coin"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/songs/{id}": {
         parameters: {
             query?: never;
@@ -164,6 +196,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/community/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["feed"];
+        put?: never;
+        post: operations["create_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/community/posts/{id}/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["share"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/community/posts/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["comments"];
+        put?: never;
+        post: operations["addComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/songs": {
         parameters: {
             query?: never;
@@ -205,7 +285,7 @@ export interface paths {
         };
         get: operations["list_2"];
         put?: never;
-        post: operations["create_1"];
+        post: operations["create_2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -324,6 +404,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/community/posts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["detail"];
+        put?: never;
+        post?: never;
+        delete: operations["delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -347,7 +443,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["detail"];
+        get: operations["detail_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -376,6 +472,28 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        EnvelopeLikeState: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["LikeState"];
+        };
+        LikeState: {
+            liked?: boolean;
+            /** Format: int32 */
+            likeCount?: number;
+        };
+        CoinState: {
+            coined?: boolean;
+            /** Format: int32 */
+            coinCount?: number;
+        };
+        EnvelopeCoinState: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["CoinState"];
+        };
         SongUpsert: {
             title: string;
             artist?: string;
@@ -638,6 +756,83 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
+        CreatePostRequest: {
+            title?: string;
+            body: string;
+            kind: string;
+            domain: string;
+        };
+        AuthorView: {
+            /** Format: int64 */
+            id?: number;
+            nickname?: string;
+            handle?: string;
+            tint?: string;
+            level?: string;
+        };
+        CommunityPostView: {
+            /** Format: int64 */
+            id?: number;
+            author?: components["schemas"]["AuthorView"];
+            kind?: string;
+            domain?: string;
+            title?: string;
+            body?: string;
+            media?: components["schemas"]["JsonNode"];
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int32 */
+            likeCount?: number;
+            /** Format: int32 */
+            coinCount?: number;
+            /** Format: int32 */
+            commentCount?: number;
+            /** Format: int32 */
+            shareCount?: number;
+            liked?: boolean;
+            coined?: boolean;
+            /** Format: double */
+            checkinOverall?: number;
+            /** Format: int32 */
+            checkinPracticeCount?: number;
+            checkinDate?: string;
+        };
+        EnvelopeCommunityPostView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["CommunityPostView"];
+        };
+        JsonNode: Record<string, never>;
+        EnvelopeShareState: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["ShareState"];
+        };
+        ShareState: {
+            shared?: boolean;
+            /** Format: int32 */
+            shareCount?: number;
+        };
+        AddCommentRequest: {
+            body: string;
+        };
+        CommentView: {
+            /** Format: int64 */
+            id?: number;
+            author?: components["schemas"]["AuthorView"];
+            body?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            replyToNickname?: string;
+        };
+        EnvelopeCommentView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["CommentView"];
+        };
         QuestionUpsert: {
             /** Format: int32 */
             examRevision: number;
@@ -742,6 +937,28 @@ export interface components {
             status?: string;
             service?: string;
         };
+        EnvelopeFeedPage: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["FeedPage"];
+        };
+        FeedPage: {
+            items?: components["schemas"]["CommunityPostView"][];
+            nextCursor?: string;
+            hasMore?: boolean;
+        };
+        CommentPage: {
+            items?: components["schemas"]["CommentView"][];
+            nextCursor?: string;
+            hasMore?: boolean;
+        };
+        EnvelopeCommentPage: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["CommentPage"];
+        };
         EnvelopePageViewUserRow: {
             /** Format: int32 */
             code?: number;
@@ -823,6 +1040,12 @@ export interface components {
             /** Format: int32 */
             page_size?: number;
         };
+        EnvelopeVoid: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: Record<string, never>;
+        };
     };
     responses: never;
     parameters: never;
@@ -832,6 +1055,72 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    like: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeLikeState"];
+                };
+            };
+        };
+    };
+    unlike: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeLikeState"];
+                };
+            };
+        };
+    };
+    coin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeCoinState"];
+                };
+            };
+        };
+    };
     getSong: {
         parameters: {
             query?: never;
@@ -1258,6 +1547,127 @@ export interface operations {
             };
         };
     };
+    feed: {
+        parameters: {
+            query?: {
+                domain?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeFeedPage"];
+                };
+            };
+        };
+    };
+    create_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePostRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeCommunityPostView"];
+                };
+            };
+        };
+    };
+    share: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeShareState"];
+                };
+            };
+        };
+    };
+    comments: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeCommentPage"];
+                };
+            };
+        };
+    };
+    addComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddCommentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeCommentView"];
+                };
+            };
+        };
+    };
     listSongs: {
         parameters: {
             query?: {
@@ -1377,7 +1787,7 @@ export interface operations {
             };
         };
     };
-    create_1: {
+    create_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -1587,6 +1997,50 @@ export interface operations {
             };
         };
     };
+    detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeCommunityPostView"];
+                };
+            };
+        };
+    };
+    delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeVoid"];
+                };
+            };
+        };
+    };
     list: {
         parameters: {
             query?: {
@@ -1612,7 +2066,7 @@ export interface operations {
             };
         };
     };
-    detail: {
+    detail_1: {
         parameters: {
             query?: never;
             header?: never;

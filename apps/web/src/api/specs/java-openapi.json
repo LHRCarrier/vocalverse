@@ -5,6 +5,85 @@
     "version" : "v0"
   },
   "paths" : {
+    "/api/v1/community/posts/{id}/likes" : {
+      "put" : {
+        "tags" : [ "community-controller" ],
+        "operationId" : "like",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeLikeState"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "community-controller" ],
+        "operationId" : "unlike",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeLikeState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/posts/{id}/coins" : {
+      "put" : {
+        "tags" : [ "community-controller" ],
+        "operationId" : "coin",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeCoinState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/songs/{id}" : {
       "get" : {
         "tags" : [ "content-admin-controller" ],
@@ -530,6 +609,179 @@
         }
       }
     },
+    "/api/v1/community/posts" : {
+      "get" : {
+        "tags" : [ "community-controller" ],
+        "operationId" : "feed",
+        "parameters" : [ {
+          "name" : "domain",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 10
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeFeedPage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "community-controller" ],
+        "operationId" : "create_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreatePostRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeCommunityPostView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/posts/{id}/shares" : {
+      "post" : {
+        "tags" : [ "community-controller" ],
+        "operationId" : "share",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeShareState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/posts/{id}/comments" : {
+      "get" : {
+        "tags" : [ "community-controller" ],
+        "operationId" : "comments",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 10
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeCommentPage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "community-controller" ],
+        "operationId" : "addComment",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AddCommentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeCommentView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/songs" : {
       "get" : {
         "tags" : [ "content-admin-controller" ],
@@ -714,7 +966,7 @@
       },
       "post" : {
         "tags" : [ "question-admin-controller" ],
-        "operationId" : "create_1",
+        "operationId" : "create_2",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -978,6 +1230,58 @@
         }
       }
     },
+    "/api/v1/community/posts/{id}" : {
+      "get" : {
+        "tags" : [ "community-controller" ],
+        "operationId" : "detail",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeCommunityPostView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "community-controller" ],
+        "operationId" : "delete",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/users" : {
       "get" : {
         "tags" : [ "admin-user-controller" ],
@@ -1038,7 +1342,7 @@
     "/api/v1/admin/users/{id}" : {
       "get" : {
         "tags" : [ "admin-user-controller" ],
-        "operationId" : "detail",
+        "operationId" : "detail_1",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
@@ -1113,6 +1417,60 @@
   },
   "components" : {
     "schemas" : {
+      "EnvelopeLikeState" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/LikeState"
+          }
+        }
+      },
+      "LikeState" : {
+        "type" : "object",
+        "properties" : {
+          "liked" : {
+            "type" : "boolean"
+          },
+          "likeCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "CoinState" : {
+        "type" : "object",
+        "properties" : {
+          "coined" : {
+            "type" : "boolean"
+          },
+          "coinCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "EnvelopeCoinState" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/CoinState"
+          }
+        }
+      },
       "SongUpsert" : {
         "required" : [ "audioUrl", "level", "title" ],
         "type" : "object",
@@ -1840,6 +2198,210 @@
           }
         }
       },
+      "CreatePostRequest" : {
+        "required" : [ "body", "domain", "kind" ],
+        "type" : "object",
+        "properties" : {
+          "title" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "body" : {
+            "maxLength" : 8000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "kind" : {
+            "maxLength" : 16,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "domain" : {
+            "maxLength" : 16,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "AuthorView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "nickname" : {
+            "type" : "string"
+          },
+          "handle" : {
+            "type" : "string"
+          },
+          "tint" : {
+            "type" : "string"
+          },
+          "level" : {
+            "type" : "string"
+          }
+        }
+      },
+      "CommunityPostView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "author" : {
+            "$ref" : "#/components/schemas/AuthorView"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "domain" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "body" : {
+            "type" : "string"
+          },
+          "media" : {
+            "$ref" : "#/components/schemas/JsonNode"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "likeCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "coinCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "commentCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "shareCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "liked" : {
+            "type" : "boolean"
+          },
+          "coined" : {
+            "type" : "boolean"
+          },
+          "checkinOverall" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "checkinPracticeCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "checkinDate" : {
+            "type" : "string"
+          }
+        }
+      },
+      "EnvelopeCommunityPostView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/CommunityPostView"
+          }
+        }
+      },
+      "JsonNode" : {
+        "type" : "object"
+      },
+      "EnvelopeShareState" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/ShareState"
+          }
+        }
+      },
+      "ShareState" : {
+        "type" : "object",
+        "properties" : {
+          "shared" : {
+            "type" : "boolean"
+          },
+          "shareCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "AddCommentRequest" : {
+        "required" : [ "body" ],
+        "type" : "object",
+        "properties" : {
+          "body" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "CommentView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "author" : {
+            "$ref" : "#/components/schemas/AuthorView"
+          },
+          "body" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "replyToNickname" : {
+            "type" : "string"
+          }
+        }
+      },
+      "EnvelopeCommentView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/CommentView"
+          }
+        }
+      },
       "QuestionUpsert" : {
         "required" : [ "examRevision", "itemIndex", "kind", "prompt" ],
         "type" : "object",
@@ -2130,6 +2692,70 @@
           }
         }
       },
+      "EnvelopeFeedPage" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/FeedPage"
+          }
+        }
+      },
+      "FeedPage" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CommunityPostView"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string"
+          },
+          "hasMore" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "CommentPage" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CommentView"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string"
+          },
+          "hasMore" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "EnvelopeCommentPage" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/CommentPage"
+          }
+        }
+      },
       "EnvelopePageViewUserRow" : {
         "type" : "object",
         "properties" : {
@@ -2335,6 +2961,21 @@
           "page_size" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }
+      },
+      "EnvelopeVoid" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "type" : "object"
           }
         }
       }
