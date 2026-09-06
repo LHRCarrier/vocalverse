@@ -497,6 +497,34 @@
         }
       }
     },
+    "/internal/checkin" : {
+      "post" : {
+        "tags" : [ "internal-checkin-controller" ],
+        "operationId" : "checkin",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CheckinRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeLong"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/register" : {
       "post" : {
         "tags" : [ "auth-controller" ],
@@ -2015,6 +2043,55 @@
           "data" : {
             "type" : "integer",
             "format" : "int64"
+          }
+        }
+      },
+      "CheckinRequest" : {
+        "required" : [ "practiceDate", "snapshot", "userId" ],
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "practiceDate" : {
+            "type" : "string"
+          },
+          "sessionId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "snapshot" : {
+            "$ref" : "#/components/schemas/Snapshot"
+          }
+        }
+      },
+      "Snapshot" : {
+        "type" : "object",
+        "properties" : {
+          "overall" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "pron" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "gram" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "fluency" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "turns" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "durationS" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },

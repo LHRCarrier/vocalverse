@@ -132,6 +132,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/checkin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["checkin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/register": {
         parameters: {
             query?: never;
@@ -691,6 +707,28 @@ export interface components {
             message?: string;
             /** Format: int64 */
             data?: number;
+        };
+        CheckinRequest: {
+            /** Format: int64 */
+            userId: number;
+            practiceDate: string;
+            /** Format: int64 */
+            sessionId?: number;
+            snapshot: components["schemas"]["Snapshot"];
+        };
+        Snapshot: {
+            /** Format: double */
+            overall?: number;
+            /** Format: double */
+            pron?: number;
+            /** Format: double */
+            gram?: number;
+            /** Format: double */
+            fluency?: number;
+            /** Format: int32 */
+            turns?: number;
+            /** Format: int32 */
+            durationS?: number;
         };
         RegisterRequest: {
             username: string;
@@ -1437,6 +1475,30 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LevelRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeLong"];
+                };
+            };
+        };
+    };
+    checkin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckinRequest"];
             };
         };
         responses: {
