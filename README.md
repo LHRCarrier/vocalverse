@@ -18,7 +18,7 @@ VocalVerse 面向不同年龄段英语学习者，产品形态 = **「练」+「
 |---|---|
 | 前端 | **Vue 3 + TypeScript(strict) + Vite 6 + pnpm**；移动端真形态页面 + Capacitor 手机壳（Android 首发） |
 | Python 服务 | **FastAPI**：ASR（faster-whisper small/int8/CPU）、TTS（edge-tts，Azure 备胎）、讯飞评测（发音评分基线）+ wav2vec2 微调（门禁化自研加分项）、唱歌评分（pyin + DTW）、DeepSeek LLM 对话 Agent（TTS 播报）、推荐；社区流由既有会话/尝试数据派生（docs/10 注记） |
-| Java 服务 | **Spring Boot 3.3 / Java 21**（薄管理端）：用户管理、场景/歌曲库 CRUD、工单、JWT 签发 |
+| Java 服务 | **Spring Boot 3.3 / Java 21**（薄服务端：管理端 + 社区内容 C 端 + JWT 签发）：用户管理、场景/歌曲库 CRUD、工单、**社区 feed/发帖/评论/点赞/支持/分享（5 表单写方，docs/37）**、JWT 签发 |
 | 大模型 | DeepSeek API（场景扮演、自由对话、语法判定、评分报告生成、答辩） |
 | 模型训练 | **PyTorch**（CPU 推理；云 GPU 训练隔离环境）+ **Scikit-learn**（推荐、水平预测） |
 | 数据 | PostgreSQL（Alembic 唯一 schema 真源）· Redis（会话/缓存/限流） |
@@ -48,9 +48,9 @@ VocalVerse 面向不同年龄段英语学习者，产品形态 = **「练」+「
 
 ### 0. 先明确当前阶段能测什么
 
-- ✅ **能测**：注册/登录（Java JWT，演示账号 `demoadult`/`demoteen`/`demosenior`，密码 `demo123456`）→ 移动端全流程：**社区首页**（英语动态流·演示帧，点赞可点）→ **口语**（先选场景 → 播放开场白 → 录音 ≤15s → 三维评分 + 语言点覆盖 + 教练笔记 → 8 轮收尾 → 评分报告）→ **AI 自由说**（麦克风或打字 → DeepSeek 流式 + TTS 播报）→ **我的**；自定义答辩导师（粘贴论文 → AI 评委英文提问 → 等级反馈）；埋点 15 类事件；SSE 流式（音频为时间轴权威、文本字幕）。
+- ✅ **能测**：注册/登录（Java JWT，演示账号 `demoadult`/`demoteen`/`demosenior`，密码 `demo123456`）→ 移动端全流程：**社区首页（S1 真实流：三领域 Tab + 为你推荐混排（含每日打卡卡）+ 发帖/评论/点赞/支持/分享，Java 社区接口）** → **口语**（先选场景 → 播放开场白 → 录音 ≤15s → 三维评分 + 语言点覆盖 + 教练笔记 → 8 轮收尾 → 评分报告）→ **AI 自由说**（麦克风或打字 → DeepSeek 流式 + TTS 播报）→ **我的**；自定义答辩导师（粘贴论文 → AI 评委英文提问 → 等级反馈）；埋点 15 类事件；SSE 流式（音频为时间轴权威、文本字幕）。
 - ⏳ 真实语音链路需 `.env` 密钥（DeepSeek/讯飞）+ ffmpeg + whisper 模型；缺省时全链路走 Fake（`APP_TESTING=true`），联调冒烟脚本：`python scripts/poc/demo_smoke.py`。
-- ⏳ 唱吧/推荐/报表与**社区真实流**（sessions/attempts JOIN 派生 + post_likes）仍按 M3 排期推进；社区页当前为演示帧（仅展示）。
+- ⏳ 唱吧/推荐/报表仍按 M3 排期推进；社区 S1 真实流已上线（发帖开关 `VOICEVERSE_COMMUNITY_POST_ENABLED=true` 演示开启、生产默认关）；**通知中心三 tab（S2）/搜索与嵌套楼（S3）仍为演示帧**。
 
 ### 1. 一次性准备（工具链）
 

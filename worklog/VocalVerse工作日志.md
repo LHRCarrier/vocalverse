@@ -3,6 +3,17 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-06 社区内容 S1 实施完成（P1 模型+契约 → P2 打卡委托 → P3 前端接流 → P4 登记；按 docs/37 定稿 + docs/40 计划）
+
+- **P1 模型+契约（11 commits）**：契约冻结 5 项先登记（51ecb2d：错误码 40402/40302/42203/40904、envelope keyset 游标例外、/internal/checkin 契约、R-17 头修正、docs/20 写方矩阵）→ 迁移 0007（社区 5 表 + post_likes 键改造 0 行断言 + user_profiles.handle/tint + 部分唯一 uq_posts_checkin 双方言）+ 0008（存量 alembic check 漂移修正：user_skill_state 约束名/usage_log 索引声明；8225e38）→ Java 社区 10 端点 + 统一可见谓词 + 幂等互动 + CommunitySeeder（虚构作者 8 帖 + 历史打卡卡；5ce24fa）→ 单测 11 例（41c3328）+ 单写方探针 pytest 形态 M-2（315d57e）+ 契约快照（ab21114）。**踩坑**：① H2/JVM Instant 纳秒 vs DB 微秒精度差 → 游标归一 %1000（%1_000_000=毫秒会重复返页）；② @Modifying 计数不自清一级缓存 → 回读旧值（flush+clear）；③ 测试类无 @Transactional 方法间泄漏数据（补隔离）；
+- **P2 打卡内部委托（5 commits）**：统一 internal client（3s + raise_for_status + camelCase；b14a0d2/f6e91eb）+ **修复 P0-6**（placement 档位回写 user_id→userId + 不再静默吞错；双侧契约测试回归）；complete_session 收尾触发打卡物化（仅 dialog、快照=最新 attempt、幂等键 (userId, practiceDate)）；迁移 0009 sessions.checkin_synced_at。**踩坑**：JwtAuthFilter 解析内部域伪 Bearer 失败清空 ServiceTokenFilter 身份 → 内部端点 403（已修：/internal/** 跳过 JWT 解析）；
+- **P3 前端接流**（e5dd13d/8df1245，UI 明细见 `worklog/安卓开发日志.md` 同日条目）：api/community.ts（JAVA_BASE + 集中映射）+ stores/community.ts（游标/领域过滤/乐观回滚）+ 视图组件契约对齐（kind 真源 article/video/checkin、投币改「支持」不可取消、发帖领域 chips、评论面板真实流、通知中心标注演示）；community-demo.ts 删除；预览联调页 /preview/community（后端 test-only 开关豁免登记 docs/13 §8）；
+- **P4 登记（本 commit）**：docs/06（§1/§9.6/§9.7/§10/§14）、docs/10（表 19→24 + 社区注记 + 写方矩阵）、docs/21（44 op、R-7 已修、P0-6 已修）、docs/34 §7 口径、docs/13 §8 例外、README（技术栈 Java 行 + 能测社区段）；
+- **验证**：pytest **195** 绿（含探针/内部委托 7 例）、`mvn verify` **29** 绿（社区 14 例 + 契约快照对账）、`alembic check` 真 PG **零 diff**、vitest **65** 绿、lint/typecheck/build 三端全绿；
+- **演示/联调**: `/preview/community` → `/m/home`（`VOICEVERSE_COMMUNITY_POST_ENABLED=true` + Java 种子）；冒烟路径见 docs/40 §1 DoD。
+
+—— 执行人：组长 LHRCarrier（AI 代工整理）
+
 ## 2026-09-06 社区内容 S1：调研 → 四官拷问 → 方案定稿 → 实施计划（组长全量认领）
 
 - **背景**：移动端 community UI 已由组长完成（帖子+视频/三领域/投币/评论/发帖/关注/通知中心），docs/37 初稿按 docs/20 §3.1 判据落 Java 承办 + 打卡物化；
