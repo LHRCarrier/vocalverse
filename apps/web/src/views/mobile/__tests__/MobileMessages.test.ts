@@ -35,34 +35,40 @@ describe('MobileMessagesView', () => {
 })
 
 describe('MobileNotificationsView（通知中心 · 消息收敛 2026-09-09）', () => {
-  it('默认私信 tab：会话列表；切通知/关注 tab 各自内容', async () => {
+  it('默认私信 tab：会话列表；切通知/关注 tab 各自内容（行同构 u-msg__row）', async () => {
     await router.push('/m/notifications')
     await router.isReady()
     const wrapper = mount(MobileNotificationsView, { global: { plugins: [router] } })
     // 默认 = 私信 tab（收敛的会话列表）
     expect(wrapper.text()).toContain('Kai')
     expect(wrapper.text()).toContain('Teacher Lee')
-    // 切通知 tab → 互动通知
+    // 切通知 tab → 互动通知（名字行 + 内容行拆分）
     await wrapper.findAll('.u-notif-tab')[1].trigger('click')
     let text = wrapper.text()
-    expect(text).toContain('Momo 赞了你的帖子')
-    expect(text).toContain('Kai 评论了你')
-    expect(text).toContain('Teacher Lee 关注了你')
-    expect(wrapper.findAll('.u-notices__row')).toHaveLength(4)
+    expect(text).toContain('Momo')
+    expect(text).toContain('赞了你的帖子')
+    expect(text).toContain('Kai')
+    expect(text).toContain('评论了你')
+    expect(text).toContain('Teacher Lee')
+    expect(text).toContain('关注了你')
+    expect(wrapper.findAll('.u-msg__row')).toHaveLength(4)
     // 切关注 tab → 关注的动态（按时间/未读）
     await wrapper.findAll('.u-notif-tab')[2].trigger('click')
     text = wrapper.text()
-    expect(text).toContain('Momo 发布了新帖')
-    expect(text).toContain('BBC Learning English 发布了新视频')
+    expect(text).toContain('Momo')
+    expect(text).toContain('发布了新帖')
+    expect(text).toContain('BBC Learning English')
+    expect(text).toContain('发布了新视频')
     expect(text).toContain('更新了影子跟读素材')
-    expect(wrapper.findAll('.u-notices__row')).toHaveLength(4)
+    expect(wrapper.findAll('.u-msg__row')).toHaveLength(4)
   })
 
   it('?tab= 参数直达对应 tab（抽屉通知下拉子项）', async () => {
     await router.push('/m/notifications?tab=follow')
     await router.isReady()
     const wrapper = mount(MobileNotificationsView, { global: { plugins: [router] } })
-    expect(wrapper.text()).toContain('Momo 发布了新帖')
+    expect(wrapper.text()).toContain('Momo')
+    expect(wrapper.text()).toContain('发布了新帖')
     expect(wrapper.findAll('.u-notif-tab')[2].classes()).toContain('active')
   })
 })
