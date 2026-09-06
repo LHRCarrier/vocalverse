@@ -5,7 +5,8 @@
  * 私信会话点击 → /m/messages/:id（保留）；M3 接真实通知流（埋点事件派生）。
  * 2026-09-09 v2 组长反馈：tab 均分整行居中（X 式）；通知行图标统一 Tabler（与底栏同款）。
  */
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 import IconHeart from '~icons/tabler/heart'
 import IconInfoCircle from '~icons/tabler/info-circle'
@@ -16,14 +17,33 @@ import IconUserPlus from '~icons/tabler/user-plus'
 
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { createDemoConversations } from '@/data/messages-demo'
+import { useFollowStore } from '@/stores/follows'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
 const tabs = ['私信', '通知', '关注'] as const
-const activeTab = ref<(typeof tabs)[number]>('私信')
+type Tab = (typeof tabs)[number]
+
+const MAPPING: Record<string, Tab> = { msg: '私信', notice: '通知', follow: '关注' }
+
+const route = useRoute()
+const activeTab = ref<Tab>('私信')
+
+/* ?tab=msg|notice|follow 直达（抽屉通知下拉子项 · 2026-09-09） */
+watch(
+  () => route.query.tab,
+  (v) => {
+    const t = MAPPING[String(v ?? '')]
+    if (t) activeTab.value = t
+  },
+  { immediate: true },
+)
 
 const ui = useUiStore()
 const conversations = ref(createDemoConversations())
+
+const followStore = useFollowStore()
+const follows = computed(() => followStore.activities)
 
 function newMessage() {
   ui.showToast('新消息 · M3 上线')
@@ -39,14 +59,6 @@ const notices = [
   { icon: 'follow', text: 'Teacher Lee 关注了你', when: '昨天', unread: false },
   { icon: 'info', text: '「影子跟读法」素材新增 2 篇（你的收藏清单）', when: '周二', unread: false },
 ] as const
-
-/* ---------- 关注动态（用户关注的人的动态 · 按时间/未读优先 · 演示帧 M3 接真实流） ---------- */
-const follows = [
-  { name: 'Kai', tint: '#16303a', text: '发布了新帖：How I memorize 100 new words a month — the shadowing method', when: '10:05', unread: true },
-  { name: 'Momo', tint: '#3a2440', text: '发布了新帖：6 Minute English: Why do we procrastinate?', when: '09:41', unread: true },
-  { name: 'Teacher Lee', tint: '#232044', text: '更新了影子跟读素材：2 篇入门', when: '昨天', unread: false },
-  { name: 'BBC Learning English', tint: '#2b4a3a', text: '发布了新视频：Dorm life at MIT', when: '周二', unread: false },
-]
 
 /* Tabler 图标对拍（与底栏同源 · docs/35 规则 1） */
 function noticeIcon(kind: string) {

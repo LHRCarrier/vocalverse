@@ -22,6 +22,7 @@ import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { shareDemoLink } from '@/composables/share'
 import { COMMUNITY_TABS, DEMO_FEED } from '@/data/community-demo'
 import { useAuthStore } from '@/stores/auth'
+import { useFollowStore } from '@/stores/follows'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
@@ -35,9 +36,14 @@ const ui = useUiStore()
 const tabs = COMMUNITY_TABS
 const activeTab = ref<CommunityTab>('为你推荐')
 
-/* 加好友演示（仅数据展示 · M3 接真实好友/关注流） */
+/* 加好友 → 关注社区头条作者（2026-09-09：关注能力收敛进通知中心「关注」tab；演示帧 M3 接真实关注流） */
 function demoAddFriend() {
-  ui.showToast('好友请求已发送 · M3 上线')
+  useFollowStore().follow(
+    'Global Post',
+    '#37546e',
+    "发布了新帖：'AI learning' is taking over China's classrooms — what it means for English learners",
+  )
+  ui.showToast('已关注 Global Post · 动态见通知中心「关注」')
 }
 
 /* 写消息（X 顶栏同款：私信入口 · 2026-09-09 收敛进通知中心） */
@@ -105,7 +111,7 @@ function reloadFeed() {
     <!-- 统一顶栏（全局头像 → 账户抽屉 / 标题「社区」/ 右侧：加好友 + 写消息） -->
     <MobileTopBar title="社区">
       <template #actions>
-        <button class="u-topbar__act" type="button" title="加好友（演示）" aria-label="加好友" @click="demoAddFriend">
+        <button class="u-topbar__act" type="button" title="关注" aria-label="关注" @click="demoAddFriend">
           <IconUserPlus />
         </button>
         <button class="u-topbar__act" type="button" title="写消息" aria-label="写消息" @click="openMessages">
