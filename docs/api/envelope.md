@@ -13,14 +13,15 @@
 - `code = 0`：成功；非 0 为业务错误码（见 `error-codes.md`）
 - HTTP 状态码负责传输层错误（404/413/429/5xx），`code` 负责业务语义，两者并存
 - 时间字段一律 UTC ISO-8601
-- 分页：`data = { items: [], total, page, page_size }`
+- 分页（offset 型）：`data = { items: [], total, page, page_size }`
+- 分页（**keyset 游标例外 · 社区流专用**，2026-09-06 登记）：`data = { items: [], next_cursor, has_more }`——无 `total/page/page_size`（无限长流分页无法也不必要总数）；请求参数 `cursor`（`base64(created_at_iso|id)`）+ `limit ≤ 20`，服务端取 `limit+1` 判 `has_more`；`next_cursor` 为 null 表示到尾
 
 ## 端点分组
 
 | 前缀 | 服务 | 说明 |
 |---|---|---|
 | `/api/v1/*` | Python:8000 | 语音/LLM/推荐热路径（前端直连） |
-| `/manage/api/v1/*` | Java:8080 | 管理端（用户/场景/歌曲库/工单）+ 登录发号 |
+| `/manage/api/v1/*` | Java:8080 | 管理端（用户/场景/歌曲库/工单）+ **社区 C 端**（community/*）+ 登录发号 |
 | `/healthz` `/readyz` | Python | 健康检查 |
 | `/actuator/health` | Java | 健康检查 |
 
@@ -28,4 +29,4 @@
 
 - access JWT：`Authorization: Bearer <token>`，15 分钟
 - refresh JWT：httpOnly + SameSite=Lax + Secure cookie，7 天，`POST /manage/api/v1/auth/refresh`
-- Java 签发（HS256 共享 secret），Python 验签；Java↔Python 内部调用带 `X-Service-Token` 头
+- Java 签发（HS256 共享 secret），Python 验签；Java↔Python 内部调用带 `Authorization: Bearer <service-token>`（2026-09-06 修正：R-17 文档与代码对齐——docs/06/20 旧表述 `X-Service-Token` 以本行为准，见 docs/21 §4）
