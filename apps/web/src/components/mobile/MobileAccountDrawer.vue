@@ -29,7 +29,7 @@ const emit = defineEmits<{
 }>()
 
 interface MenuChild {
-  icon: 'book' | 'heart' | 'mic' | 'flame' | 'info' | 'wave' | 'mail' | 'bell' | 'user-plus'
+  icon: 'book' | 'heart' | 'mic' | 'flame' | 'info' | 'wave' | 'mail' | 'bell' | 'user-plus' | 'hash'
   label: string
   path: string | null
 }
@@ -48,7 +48,7 @@ const items: MenuItem[] = [
     path: null,
     children: [
       { icon: 'book', label: '我的单词', path: '/m/learn/words' },
-      { icon: 'heart', label: '社区足迹', path: '/m/learn/community' },
+      { icon: 'hash', label: '社区足迹', path: '/m/learn/community' },
       { icon: 'mic', label: '我的发音', path: '/m/learn/speaking' },
       { icon: 'flame', label: '练习情况', path: '/m/learn/practice' },
     ],

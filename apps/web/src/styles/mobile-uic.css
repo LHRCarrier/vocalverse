@@ -2702,7 +2702,8 @@ body {
   transform: rotate(180deg);
 }
 
-/* 设置子面板（抽屉内展开 · 2026-09-09 组长反馈：点了要有子功能拉出） */
+/* 设置子面板（抽屉内展开 · 2026-09-09 组长反馈：点了要有子功能拉出；
+ * 2026-09-09 v2 组长反馈：字太细 → 700 加粗加黑，图标描边 2.0 与父项一致） */
 .u-drawer__submenu {
   margin: -4px 0 8px 30px; /* 左缩进对齐图标位 */
   border-top: 1px solid var(--u-paper-grid);
@@ -2717,11 +2718,16 @@ body {
   border: none;
   border-bottom: 1px solid var(--u-paper-grid);
   background: none;
-  color: var(--u-sub);
-  font: 500 13px var(--u-font);
+  color: var(--u-ink);
+  font: 700 13px var(--u-font); /* 加粗加黑（组长反馈 v2：原 500 太细） */
   cursor: pointer;
   text-align: left;
   transition: background-color 120ms ease-out, color 150ms ease-out;
+}
+
+/* 子项图标：描边 2.0 与父项同视觉粗细（=16px 与父 18px 尺寸差导致的"更细"观感修正） */
+.u-drawer__subitem svg {
+  stroke-width: 2;
 }
 
 .u-drawer__subitem:last-child {
