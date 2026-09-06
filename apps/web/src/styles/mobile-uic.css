@@ -55,7 +55,11 @@
 
 html,
 body {
-  background: #edece8; /* 手机容器外的展示底 */
+  background: #edece8; /* 手机容器外的展示底（2026-09-09 修复宽屏滚动上浅下深：global.css body #F9FAFB 后加载覆盖 → !important 确保移动端权威） */
+}
+
+body {
+  background: #edece8 !important;
 }
 
 /* ============================================================
