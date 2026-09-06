@@ -74,6 +74,20 @@ export const useAuthStore = defineStore('auth', () => {
     await fetchMe()
   }
 
+  /** 忘记密码：演示环境无邮件/短信通道 → 落管理员工单（Java /auth/forgot，防枚举同响应） */
+  async function forgotPassword(username: string) {
+    const resp = await request<string>(
+      '/auth/forgot',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+      },
+      '/manage',
+    )
+    return resp.data ?? '已收到申请，管理员将尽快处理'
+  }
+
   async function fetchMe() {
     if (!token.value) return
     try {
@@ -104,7 +118,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, refreshToken, me, login, register, fetchMe, refresh, clear }
+  return { token, refreshToken, me, login, register, forgotPassword, fetchMe, refresh, clear }
 })
 
 /** 启动时恢复会话（路由守卫调用一次）。 */

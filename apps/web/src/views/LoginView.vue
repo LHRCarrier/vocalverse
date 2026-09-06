@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
- * 登录页 v5.2 —— uiverse @JohnnyCSilva/bad-cheetah-74【精准复刻·最终版】（MIT，保留版权声明）
- * v5.2：去除「用户名/密码」label（图标+占位已传达信息）；全文案英文（与元素一致）；
- *       选中（focus-within）蓝框线修正（1.5px #2d79f3，0.2s transition）。
- * 产品接线（视觉保持原版）：Sign In=真实登录；Sign Up=一键演示账号；Forgot/第三方=占位提示。
+ * 登录页 v5.3 —— uiverse @JohnnyCSilva/bad-cheetah-74【精准复刻·最终版】（MIT，保留版权声明）
+ * v5.3（2026-09-06 组长反馈）：Sign Up = **真实注册**（原有业务端点 /auth/register，注册即登录），
+ * 不再是一键填演示账号；Forgot password = 忘记密码申请（演示环境无邮件/短信通道 → 落管理员工单
+ * POST /auth/forgot，防枚举同响应）；第三方登录仍为占位提示。
  */
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -12,25 +12,47 @@ import IconUser from '~icons/tabler/user'
 import { useAuthStore } from '@/stores/auth'
 import '@/styles/mobile-soft.css'
 
+type Mode = 'login' | 'register' | 'forgot'
+
 const router = useRouter()
 const auth = useAuthStore()
 
-const email = ref('')
+const mode = ref<Mode>('login')
+
+/* ---- 登录 ---- */
+const username = ref('')
 const password = ref('')
+/* ---- 注册 ---- */
+const regUsername = ref('')
+const regNickname = ref('')
+const regPassword = ref('')
+/* ---- 忘记密码 ---- */
+const forgotUsername = ref('')
+const forgotDone = ref(false)
+
 const errorMsg = ref('')
+const notice = ref('')
 const loading = ref(false)
 const success = ref(false)
+
+function switchMode(m: Mode) {
+  mode.value = m
+  errorMsg.value = ''
+  notice.value = ''
+  forgotDone.value = false
+  success.value = false
+}
 
 async function submit() {
   if (loading.value) return
   loading.value = true
   errorMsg.value = ''
   try {
-    await auth.login(email.value.trim(), password.value)
+    await auth.login(username.value.trim(), password.value)
     loading.value = false
     success.value = true
     setTimeout(() => {
-      router.push((router.currentRoute.value.query.redirect as string) ?? '/m/home')
+      void router.push((router.currentRoute.value.query.redirect as string) ?? '/m/home')
     }, 200)
   } catch (e) {
     errorMsg.value = (e as Error).message
@@ -38,15 +60,47 @@ async function submit() {
   }
 }
 
-/* Sign Up = 一键演示账号（团队联调） */
-function demoLogin() {
+/** 注册即登录（Java /auth/register；演示环境 nickname 必填、ageGroup 默认成年中级） */
+async function register() {
   if (loading.value) return
-  email.value = 'demoadult'
-  password.value = 'demo123456'
-  void submit()
+  loading.value = true
+  errorMsg.value = ''
+  try {
+    await auth.register({
+      username: regUsername.value.trim(),
+      password: regPassword.value,
+      nickname: regNickname.value.trim(),
+      ageGroup: 'adult',
+    })
+    loading.value = false
+    success.value = true
+    setTimeout(() => {
+      void router.push((router.currentRoute.value.query.redirect as string) ?? '/m/home')
+    }, 200)
+  } catch (e) {
+    errorMsg.value = (e as Error).message
+    loading.value = false
+  }
 }
 
-const notice = ref('')
+/** 忘记密码：提交申请 → 管理员工单（无邮件通道的演示口径） */
+async function forgot() {
+  if (loading.value) return
+  const name = forgotUsername.value.trim()
+  if (!name) return
+  loading.value = true
+  errorMsg.value = ''
+  try {
+    const message = await auth.forgotPassword(name)
+    notice.value = message
+    forgotDone.value = true
+    loading.value = false
+  } catch (e) {
+    errorMsg.value = (e as Error).message
+    loading.value = false
+  }
+}
+
 function notReady(text: string) {
   notice.value = text
   setTimeout(() => {
@@ -57,52 +111,127 @@ function notReady(text: string) {
 
 <template>
   <div class="s-login">
-    <form class="form" @submit.prevent="submit">
-      <div class="inputForm">
-        <IconUser aria-hidden="true" />
-        <input
-          id="vv-email"
-          v-model="email"
-          class="input"
-          placeholder="Enter your Username"
-          aria-label="Username"
-          name="username"
-          autocomplete="username"
-        >
-      </div>
-
-      <div class="inputForm">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" viewBox="-64 0 512 512" height="20">
-          <path
-            d="m336 512h-288c-26.453125 0-48-21.523438-48-48v-224c0-26.476562 21.546875-48 48-48h288c26.453125 0 48 21.523438 48 48v224c0 26.476562-21.546875 48-48 48zm-288-288c-8.8125 0-16 7.167969-16 16v224c0 8.832031 7.1875 16 16 16h288c8.8125 0 16-7.167969 16-16v-224c0-8.832031-7.1875-16-16-16zm0 0"
-          />
-          <path
-            d="m304 224c-8.832031 0-16-7.167969-16-16v-80c0-52.929688-43.070312-96-96-96s-96 43.070312-96 96v80c0 8.832031-7.167969 16-16 16s-16-7.167969-16-16v-80c0-70.59375 57.40625-128 128-128s128 57.40625 128 128v80c0 8.832031-7.167969 16-16 16zm0 0"
-          />
-        </svg>
-        <input
-          id="vv-password"
-          v-model="password"
-          class="input"
-          placeholder="Enter your Password"
-          aria-label="Password"
-          type="password"
-          name="password"
-          autocomplete="current-password"
-        >
-      </div>
-
-      <div class="flex-row">
-        <div>
-          <input id="remember" type="radio" name="remember">
-          <label for="remember">Remember me </label>
+    <form class="form" @submit.prevent="mode === 'register' ? register() : submit()">
+      <template v-if="mode === 'login'">
+        <div class="inputForm">
+          <IconUser aria-hidden="true" />
+          <input
+            id="vv-username"
+            v-model="username"
+            class="input"
+            placeholder="Enter your Username"
+            aria-label="Username"
+            name="username"
+            autocomplete="username"
+          >
         </div>
-        <span class="span" role="button" tabindex="0" @click="notReady('Demo: contact admin to reset')">Forgot password?</span>
-      </div>
-      <button class="button-submit" type="submit" :disabled="loading">
-        {{ success ? 'Signed In' : loading ? 'Signing in…' : 'Sign In' }}
-      </button>
-      <p class="p">Don't have an account? <span class="span" role="button" tabindex="0" @click="demoLogin">Sign Up</span></p>
+
+        <div class="inputForm">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" viewBox="-64 0 512 512" height="20">
+            <path
+              d="m336 512h-288c-26.453125 0-48-21.523438-48-48v-224c0-26.476562 21.546875-48 48-48h288c26.453125 0 48 21.523438 48 48v224c0 26.476562-21.546875 48-48 48zm-288-288c-8.8125 0-16 7.167969-16 16v224c0 8.832031 7.1875 16 16 16h288c8.8125 0 16-7.167969 16-16v-224c0-8.832031-7.1875-16-16-16zm0 0"
+            />
+            <path
+              d="m304 224c-8.832031 0-16-7.167969-16-16v-80c0-52.929688-43.070312-96-96-96s-96 43.070312-96 96v80c0 8.832031-7.167969 16-16 16s-16-7.167969-16-16v-80c0-70.59375 57.40625-128 128-128s128 57.40625 128 128v80c0 8.832031-7.167969 16-16 16zm0 0"
+            />
+          </svg>
+          <input
+            id="vv-password"
+            v-model="password"
+            class="input"
+            placeholder="Enter your Password"
+            aria-label="Password"
+            type="password"
+            name="password"
+            autocomplete="current-password"
+          >
+        </div>
+
+        <div class="flex-row">
+          <div>
+            <input id="remember" type="radio" name="remember">
+            <label for="remember">Remember me </label>
+          </div>
+          <span class="span" role="button" tabindex="0" @click="switchMode('forgot')">Forgot password?</span>
+        </div>
+        <button class="button-submit" type="submit" :disabled="loading">
+          {{ success ? 'Signed In' : loading ? 'Signing in…' : 'Sign In' }}
+        </button>
+        <p class="p">Don't have an account? <span class="span" role="button" tabindex="0" @click="switchMode('register')">Sign Up</span></p>
+      </template>
+
+      <template v-else-if="mode === 'register'">
+        <p class="p line">Create your account</p>
+        <div class="inputForm">
+          <IconUser aria-hidden="true" />
+          <input
+            id="reg-username"
+            v-model="regUsername"
+            class="input"
+            placeholder="Username"
+            aria-label="注册用户名"
+            name="reg-username"
+            autocomplete="username"
+          >
+        </div>
+        <div class="inputForm">
+          <IconUser aria-hidden="true" />
+          <input
+            id="reg-nickname"
+            v-model="regNickname"
+            class="input"
+            placeholder="Nickname"
+            aria-label="昵称"
+            name="reg-nickname"
+            autocomplete="nickname"
+          >
+        </div>
+        <div class="inputForm">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" viewBox="-64 0 512 512" height="20">
+            <path
+              d="m336 512h-288c-26.453125 0-48-21.523438-48-48v-224c0-26.476562 21.546875-48 48-48h288c26.453125 0 48 21.523438 48 48v224c0 26.476562-21.546875 48-48 48zm-288-288c-8.8125 0-16 7.167969-16 16v224c0 8.832031 7.1875 16 16 16h288c8.8125 0 16-7.167969 16-16v-224c0-8.832031-7.1875-16-16-16zm0 0"
+            />
+            <path
+              d="m304 224c-8.832031 0-16-7.167969-16-16v-80c0-52.929688-43.070312-96-96-96s-96 43.070312-96 96v80c0 8.832031-7.167969 16-16 16s-16-7.167969-16-16v-80c0-70.59375 57.40625-128 128-128s128 57.40625 128 128v80c0 8.832031-7.167969 16-16 16zm0 0"
+            />
+          </svg>
+          <input
+            id="reg-password"
+            v-model="regPassword"
+            class="input"
+            placeholder="Password (min 8)"
+            aria-label="注册密码"
+            type="password"
+            name="reg-password"
+            autocomplete="new-password"
+          >
+        </div>
+        <button class="button-submit" type="submit" :disabled="loading || !regUsername.trim() || !regNickname.trim() || !regPassword">
+          {{ loading ? 'Creating…' : 'Sign Up' }}
+        </button>
+        <p class="p">Already have an account? <span class="span" role="button" tabindex="0" @click="switchMode('login')">Sign In</span></p>
+      </template>
+
+      <template v-else>
+        <p class="p line">Reset your password</p>
+        <p class="p note-text">Enter your username and we'll file a password reset request for the admin. （演示环境无邮件通道，管理员工单处理）</p>
+        <div class="inputForm">
+          <IconUser aria-hidden="true" />
+          <input
+            id="forgot-username"
+            v-model="forgotUsername"
+            class="input"
+            placeholder="Your Username"
+            aria-label="忘记密码用户名"
+            name="forgot-username"
+            autocomplete="username"
+          >
+        </div>
+        <button class="button-submit" type="button" :disabled="loading || !forgotUsername.trim()" @click="forgot">
+          {{ loading ? 'Submitting…' : 'Submit Request' }}
+        </button>
+        <p class="p"><span class="span" role="button" tabindex="0" @click="switchMode('login')">Back to Sign In</span></p>
+      </template>
 
       <p class="p line">Or With</p>
 
@@ -293,8 +422,17 @@ function notReady(text: string) {
   margin: 5px 0;
 }
 
+.p.line {
+  margin-top: 14px;
+}
+
 .p.notice {
   color: #2d79f3;
+}
+
+.p.note-text {
+  font-size: 12px;
+  color: #444;
 }
 
 .error-line {
