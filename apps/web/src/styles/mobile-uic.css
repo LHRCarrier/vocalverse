@@ -2694,6 +2694,62 @@ body {
 
 .u-drawer__go {
   color: var(--u-weak);
+  transition: transform 150ms ease-out;
+}
+
+/* 主项展开态：chevron 旋转 180°（子面板展开指示） */
+.u-drawer__item.is-open .u-drawer__go {
+  transform: rotate(180deg);
+}
+
+/* 设置子面板（抽屉内展开 · 2026-09-09 组长反馈：点了要有子功能拉出） */
+.u-drawer__submenu {
+  margin: -4px 0 8px 30px; /* 左缩进对齐图标位 */
+  border-top: 1px solid var(--u-paper-grid);
+}
+
+.u-drawer__subitem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  border: none;
+  border-bottom: 1px solid var(--u-paper-grid);
+  background: none;
+  color: var(--u-sub);
+  font: 500 13px var(--u-font);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 120ms ease-out, color 150ms ease-out;
+}
+
+.u-drawer__subitem:last-child {
+  border-bottom: none;
+}
+
+.u-drawer__subitem:active {
+  background: var(--u-track);
+}
+
+.u-drawer__subitem__label {
+  flex: 1;
+}
+
+/* 子面板展开淡入（复用抽屉过渡节奏） */
+.u-drawer__submenu {
+  animation: u-drawer-sub-in 180ms ease-out;
+}
+
+@keyframes u-drawer-sub-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .u-drawer__foot {
