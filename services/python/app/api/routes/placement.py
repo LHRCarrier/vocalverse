@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -23,6 +25,8 @@ from app.models import Attempt, Placement, PlacementQuestion
 from app.models.base import AttemptKinds, Levels
 
 router = APIRouter(prefix="/api/v1/placement", tags=["placement"])
+
+logger = logging.getLogger(__name__)
 
 QA_REF = "The candidate's answer should be short and coherent."
 
@@ -176,21 +180,18 @@ async def finalize(body: FinalizeIn, user_id: int = Depends(get_current_user_id)
 
 
 async def _callback_level(user_id: int, level: str) -> None:
-    """委托 Java 更新 user_profiles.level（Java 是唯一写者；内部 service-token）。"""
-    import httpx
+    """委托 Java 更新 user_profiles.cefr_level（Java 是唯一写者；内部 service-token）。
 
-    from app.core.config import get_settings
+    P0-6 修复（2026-09-06，docs/21 §4）：键名 camelCase（userId）+ raise_for_status + 告警日志
+    ——旧实现发 ``user_id``（Java DTO 反序列化 null → 400）且 httpx 默认不抛 4xx、外层静默吞，
+    链路 100% 断零告警。失败仍不阻塞 finalize（降级口径不变，由 placements 校对源兜底）。
+    """
+    from app.core.internal_client import post_internal
 
-    settings = get_settings()
     try:
-        async with httpx.AsyncClient(timeout=3) as client:
-            await client.post(
-                f"{settings.java_base_url}/internal/level",
-                json={"user_id": user_id, "level": level},
-                headers={"Authorization": f"Bearer {settings.service_token}"},
-            )
-    except Exception:  # Java 未就绪/网络异常：静默（M2 演示不阻塞）
-        return
+        post_internal("/internal/level", {"userId": user_id, "level": level})
+    except Exception as exc:  # Java 未就绪/网络异常：降级（不阻塞 finalize），但必须留痕
+        logger.warning("internal /internal/level 回写失败 userId=%s: %s", user_id, exc)
 
 
 def _dec(v):

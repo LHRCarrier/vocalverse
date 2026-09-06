@@ -91,6 +91,9 @@ class Session(TimestampMixin, Base):
     summary: Mapped[str | None] = mapped_column(Text)
     summary_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     summary_failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # 打卡卡同步标记（docs/37 §5/C-17，迁移 0009）：/internal/checkin 成功落卡时间；
+    # NULL = 未同步（失败不阻塞收尾，留待补扫/P2 重试）
+    checkin_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
         CheckConstraint(

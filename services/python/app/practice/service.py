@@ -211,6 +211,7 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
         db.add(report)
         db.commit()
         _post_session_skills(db, session)
+        _post_session_checkin(db, session)
         return int(report.id)
     finally:
         db.close()
@@ -241,6 +242,61 @@ def _post_session_skills(db, session) -> None:
         _learner_invalidate(int(session.user_id))
     except Exception:
         pass
+
+
+def _post_session_checkin(db, session) -> None:
+    """收尾挂钩（docs/37 §6）：练习会话（dialog）成功收尾 → 委托 Java 物化当日打卡卡。
+
+    契约（docs/21 §4）：camelCase 全键名（userId/practiceDate/sessionId/snapshot{...}）；
+    幂等键 (userId, practiceDate)——Java 侧每日一卡 upsert（practice_count+1、overall 取最佳），
+    重试无害；失败不阻塞收尾（checkin_synced_at 留 NULL，P2 登记补扫）；重复收尾由标记短路。
+    """
+    if session.kind != SessionKinds.DIALOG or session.checkin_synced_at is not None:
+        return
+    try:
+        from app.core.internal_client import post_internal
+        from app.models import Attempt
+
+        attempts = list(
+            db.execute(
+                select(Attempt)
+                .where(Attempt.session_id == session.id)
+                .order_by(Attempt.id.desc())
+                .limit(1)
+            ).scalars()
+        )
+        last = attempts[0] if attempts else None
+
+        def _f(v):
+            return None if v is None else float(v)
+
+        now = datetime.now(UTC)
+        post_internal(
+            "/internal/checkin",
+            {
+                "userId": int(session.user_id),
+                "practiceDate": now.date().isoformat(),
+                "sessionId": int(session.id),
+                "snapshot": {
+                    "overall": _f(last.overall_score) if last else None,
+                    "pron": _f(last.pron_score) if last else None,
+                    "gram": _f(last.gram_score) if last else None,
+                    "fluency": _f(last.flu_score) if last else None,
+                    "turns": int(session.turn_count or 0),
+                    "durationS": int(session.duration_s or 0),
+                },
+            },
+        )
+        session.checkin_synced_at = now
+        db.commit()
+    except Exception as exc:
+        logger.warning(
+            "checkin sync skipped session=%s user=%s (%s): retry/backfill later",
+            session.id,
+            session.user_id,
+            exc,
+        )
+        db.rollback()
 
 
 def _f(v: Decimal | None) -> float | None:
