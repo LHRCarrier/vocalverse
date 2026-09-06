@@ -26,27 +26,31 @@ describe('MobileAccountDrawer', () => {
     expect(text).toContain('退出登录')
   })
 
-  it('菜单项 click 触发 navigate(path)；设置与隐私 → 抽屉内展开子项（不 toast 不 navigate）', async () => {
+  it('菜单项 click：我的学习 → 展开四模块（navigate 详情·收起）；通知 → navigate；设置 → 展开子项 toast', async () => {
     const wrapper = mountDrawer()
     const items = wrapper.findAll('.u-drawer__item')
     expect(items).toHaveLength(3)
-    await items[0].trigger('click')
-    expect(wrapper.emitted('navigate')).toEqual([['/m/learn']])
-    await items[1].trigger('click')
-    expect(wrapper.emitted('navigate')).toEqual([['/m/learn'], ['/m/notifications']])
-    // 设置与隐私：展开子面板（帮助与反馈/数据与隐私/关于声语界），无 navigate
+    // 我的学习：展开四模块
     expect(wrapper.find('.u-drawer__submenu').exists()).toBe(false)
+    await items[0].trigger('click')
+    expect(wrapper.find('.u-drawer__submenu').exists()).toBe(true)
+    expect(wrapper.text()).toContain('我的单词')
+    expect(wrapper.text()).toContain('社区足迹')
+    expect(wrapper.text()).toContain('我的发音')
+    expect(wrapper.text()).toContain('练习情况')
+    // 点子项 → navigate 详情 + 面板收起
+    await wrapper.findAll('.u-drawer__subitem')[2].trigger('click')
+    expect(wrapper.emitted('navigate')).toEqual([['/m/learn/speaking']])
+    expect(wrapper.find('.u-drawer__submenu').exists()).toBe(false)
+    // 通知 → navigate
+    await items[1].trigger('click')
+    expect(wrapper.emitted('navigate')).toEqual([['/m/learn/speaking'], ['/m/notifications']])
+    // 设置与隐私：展开子面板（帮助与反馈/数据与隐私/关于声语界），无 navigate
     await items[2].trigger('click')
-    expect(wrapper.emitted('navigate')).toEqual([['/m/learn'], ['/m/notifications']])
+    expect(wrapper.emitted('navigate')).toEqual([['/m/learn/speaking'], ['/m/notifications']])
     expect(wrapper.find('.u-drawer__submenu').exists()).toBe(true)
     expect(wrapper.text()).toContain('帮助与反馈')
-    expect(wrapper.text()).toContain('数据与隐私')
-    expect(wrapper.text()).toContain('关于声语界')
-    // 再点收起
-    await items[2].trigger('click')
-    expect(wrapper.find('.u-drawer__submenu').exists()).toBe(false)
     // 子项点击 → toast + 收起
-    await items[2].trigger('click')
     await wrapper.findAll('.u-drawer__subitem')[0].trigger('click')
     expect(wrapper.find('.u-drawer__submenu').exists()).toBe(false)
   })
