@@ -496,6 +496,51 @@ def test_rate_limit_429(client, auth_headers, monkeypatch):
     assert resp.status_code == 429
 
 
+def test_turn_rate_limit_buckets_by_action(client, auth_headers, monkeypatch):
+    """2026-09-07 评审：分桶按 action **实际消耗**扣（此前无差别扣 asr+ise+llm 三桶——
+    hint/demo/abandon 零管线消耗也扣，会误耗尽用户配额）。修复前 hint/abandon 断言失败。
+    """
+    import app.core.ratelimit as rl
+
+    buckets: list[str] = []
+
+    async def fake_consume(bucket, limit, user_id):
+        buckets.append(bucket)
+        return 0, 60
+
+    monkeypatch.setattr(rl, "_redis_consume", fake_consume)
+
+    def turn(session_id: int, action: str, audio: bool):
+        kwargs: dict = {"data": {"action": action}, "headers": auth_headers}
+        if audio:
+            kwargs["files"] = {"audio": ("a.webm", FAKE_AUDIO, "audio/webm")}
+        resp = client.post(f"/api/v1/sessions/{session_id}/turns", **kwargs)
+        assert resp.status_code == 200, resp.text
+
+    # normal（音频回合）：ASR + ISE + LLM 三桶各 1
+    sid = _make_dialog_session(client, auth_headers)
+    turn(sid, "normal", audio=True)
+    assert buckets == ["asr", "ise", "llm"], buckets
+
+    # start：无转写/评分，仅 LLM 首句
+    buckets.clear()
+    sid = _make_dialog_session(client, auth_headers)
+    turn(sid, "start", audio=False)
+    assert buckets == ["llm"], buckets
+
+    # hint（无音频轻分支）：零管线消耗 → 零扣
+    buckets.clear()
+    sid = _make_dialog_session(client, auth_headers)
+    turn(sid, "hint", audio=False)
+    assert buckets == [], buckets
+
+    # abandon（收尾）：仅 LLM 摘要
+    buckets.clear()
+    sid = _make_dialog_session(client, auth_headers)
+    turn(sid, "abandon", audio=False)
+    assert buckets == ["llm"], buckets
+
+
 # ---------------------------------------------------------------------------
 # 音频下界守卫（40002）：前端停止键可用后，误触会产出 ~0ms 的 webm
 # ---------------------------------------------------------------------------

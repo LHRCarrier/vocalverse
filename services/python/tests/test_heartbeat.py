@@ -65,3 +65,17 @@ async def test_serialize_called_per_event() -> None:
 
     out = [p async for p in ev.heartbeat_stream(core(), 30.0)]
     assert out == ['data: {"type": "text_delta", "text": "hi"}\n\n']
+
+
+async def test_zero_interval_passthrough_no_ping() -> None:
+    """interval<=0 = 关闭心跳：纯透传零 ping（2026-09-07 评审：修复前 0 → sleep(0) 忙循环洪泛）。"""
+
+    async def core():
+        await asyncio.sleep(0.001)
+        yield "a"
+        await asyncio.sleep(0.001)
+        yield "b"
+
+    out = [p async for p in ev.heartbeat_stream(core(), 0.0, serialize=lambda x: x)]
+    assert out == ["a", "b"]
+    assert ev.PING_LINE not in out
