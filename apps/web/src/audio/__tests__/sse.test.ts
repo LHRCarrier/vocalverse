@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { parseSseBuffer } from '../sse'
+import { openSseFetch, parseSseBuffer, SSE_IDLE_TIMEOUT_MS } from '../sse'
 
 describe('parseSseBuffer（docs/16 A1：跨 chunk/多 data/心跳/坏块）', () => {
   it('解析单事件', () => {
@@ -43,5 +43,83 @@ describe('parseSseBuffer（docs/16 A1：跨 chunk/多 data/心跳/坏块）', ()
     )
     expect(rest).toBe('')
     expect(events.map((e) => e.type)).toEqual(['audio_chunk', 'turn_end'])
+  })
+})
+
+describe('openSseFetch idle 超时（R-18 / 审计 R-18：90s 无字节 → 报错取消）', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  /** 构造假流：read() 顺序返回受控 promise；pending(sentinel=false) 永远挂起。 */
+  function makeFakeStream(reads: Array<() => Promise<{ done: boolean; value?: Uint8Array }>>) {
+    const cancel = vi.fn().mockResolvedValue(undefined)
+    const read = vi.fn()
+    reads.forEach((factory) => read.mockImplementationOnce(factory))
+    read.mockImplementation(() => new Promise(() => {})) // 默认挂起
+    return { ok: true, body: { getReader: () => ({ read, cancel }) } } as unknown as Response
+  }
+
+  function mockFetchWith(resp: Response) {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(resp))
+  }
+
+  it('90s 无任何数据 → onError(SSE 空闲超时) + onClose + cancel', async () => {
+    vi.useFakeTimers()
+    mockFetchWith(makeFakeStream([]))
+    const onError = vi.fn()
+    const onClose = vi.fn()
+    openSseFetch(
+      '/api/v1/sessions/1/turns',
+      { method: 'POST', body: new FormData() },
+      { onError, onClose },
+    )
+    await vi.advanceTimersByTimeAsync(SSE_IDLE_TIMEOUT_MS + 1)
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('SSE 空闲超时') }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('数据/心跳到达会重置 idle 计时（85s + 85s 不超时，再到 10s 才超时）', async () => {
+    vi.useFakeTimers()
+    const enc = new TextEncoder()
+    const pingBytes = enc.encode(': ping\n\n')
+    const dataBytes = enc.encode('data: {"type":"text_delta","text":"hi"}\n\n')
+    // 按真实时序分布：read1(ping) 10s 后到达 → read2(data) 再 20s 后到达 → read3 挂起
+    // 预期：每次到达即重置计时（30s+80s=110s 不超时；再 20s > 90s 阈值才超时）
+    const calls: Array<() => Promise<{ done: boolean; value?: Uint8Array }>> = [
+      () => new Promise((res) => setTimeout(() => res({ done: false, value: pingBytes }), 10_000)),
+      () => new Promise((res) => setTimeout(() => res({ done: false, value: dataBytes }), 20_000)),
+    ]
+    mockFetchWith(makeFakeStream(calls))
+    const onError = vi.fn()
+    const onEvent = vi.fn()
+    openSseFetch(
+      '/api/v1/sessions/1/turns',
+      { method: 'POST', body: new FormData() },
+      { onError, onEvent },
+    )
+    await vi.advanceTimersByTimeAsync(110_000)
+    expect(onEvent).toHaveBeenCalledWith({ type: 'text_delta', text: 'hi' }) // ping 被忽略、data 正常解析
+    expect(onError).not.toHaveBeenCalled() // 10s/30s 两次数据各自重置，110s 尚未触发（30+80<90）
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('SSE 空闲超时') }),
+    )
+  })
+
+  it('服务端正常 EOF(done) → 仅 onClose，不报错', async () => {
+    vi.useFakeTimers()
+    const onError = vi.fn()
+    const onClose = vi.fn()
+    mockFetchWith(makeFakeStream([async () => ({ done: true })]))
+    openSseFetch(
+      '/api/v1/sessions/1/turns',
+      { method: 'POST', body: new FormData() },
+      { onError, onClose },
+    )
+    await vi.advanceTimersByTimeAsync(0)
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(onError).not.toHaveBeenCalled()
   })
 })
