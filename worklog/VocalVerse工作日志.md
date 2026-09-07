@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 组员 PR 评审处置与合入：PR#30 / PR#31 已完成（两 PR 均 MERGED）
+
+- **PR#30 fix/p0-hardening → MERGED**（merge commit b360fbb）：处置 6 commits——① 阻断项：`sse.ts` read 拒绝改 `reject(err)` 传播（断网 onError+onClose、AbortError 静默）+ 2 例回归测试；② `heartbeat_stream` interval≤0 透传（兑现「0=关闭心跳」，修复前 0.063s 产 1363 行 ping）+ 1 例；③ `_persist_dialog_turn` 改线程内自建自关 Session（SQLAlchemy 非线程安全模式消除）；④ `post_turn` 分桶按 action 实际消耗（normal/retry 三桶、start/abandon 仅 LLM、hint/demo 无音频零扣）+ 4 断言测试；⑤ nginx `/manage/internal` 去尾斜杠拦截；⑥ 三份 workflow 补 `workflow_dispatch`（见下）；遗留登记 3 项（complete 短路晚于 LLM 摘要、demo/hint/abandon 分支同步 DB 写、联调页豁免）；
+- **PR#31 feat/auth-session-security → MERGED**（merge commit 163e83b）：处置 4 commits——① `MobileSpeakingView` turn_end 空文本不解锁喇叭 + 1 例测试（与自由对话页 `if(reply)` 守卫一致）；② `logout` 吊销失败 `console.warn` 可观测 + 1 例测试；③ docs/18 J1 已知边界登记（access token 1h 残留 +「记住我」纯客户端语义）；④ 同款 workflow 补跑口；
+- **CI 踩坑（已修，2026-09-07）**：本仓 `pull_request` 触发当前未生效——PR 分支推送后 0 run（与 python-ci 已有注释的 PR#24/#25 踩坑一致）；处置：frontend-ci/java-ci/secret-scan 补 `workflow_dispatch`（python-ci 早有），4 份 workflow `yaml.safe_load` 校验通过，手动补跑 8 个 workflow（两分支各 4）全绿——**后续 PR 分支需 `gh workflow run <name> --ref <branch>` 手动补跑，合入前须人工确认**；
+- **合入流水**：#30 先合 → #31 `merge origin/main`（worklog 置顶区冲突按时间序人工解决：评审记录→#31 记录→#30 记录→旧内容）→ 手动补跑 CI → approve → merge；分支保护 = 1 个 approving review 且**新推送后旧批准自动失效**（dismiss_stale_reviews）——需在最终 head 上重新 approve；
+- **验证**：本地 python 229 passed, 4 skipped（无 Docker 容器用例 skip）/ ruff+format 绿；前端 lint/typecheck/vitest 84/build 绿；Java 零改动（mvn verify CI 全绿）；8 个手动 CI 全绿（#30 含 Single-Writer 探针步骤，job 明细已核）。
+
+—— 执行人：组长 LHRCarrier（AI 代审代改，2026-09-07）
+
 ## 2026-09-07 组员 PR 评审：PR#30（P0 加固收口）/ PR#31（会话安全增强 + 重听逐句化）
 
 - **PR#30 fix/p0-hardening → request-changes（1 阻断 + 7 建议）**：
