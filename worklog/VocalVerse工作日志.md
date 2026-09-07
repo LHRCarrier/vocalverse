@@ -3,6 +3,20 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 TTS 链路整改 P0-A：流式句切分「缩写/小数点/网址误拆」修复 + 架构解耦
+
+- **背景**：对抗拷问 vtts-03 指出的句切分硬伤——旧 `_SENTENCE_END_RE=[.!?][\s…]*` 无任何守卫，`Mr./Dr./U.S./3.5/Ph.D./.com` 被当句号切错。已用旧正则实测复现：`"Mr. Smith went to the store."→['Mr.','Smith went to the store.']`、`"It's 3.5 miles away."→["It's 3.","5 miles away."]`、`"The U.S. economy grew."→['The U.','S.','economy grew.']`、`"Visit example.com today."→['Visit example.','com today.']`。
+- **架构解耦**（用户要求模块分清楚）：把流式句切分从 1000+ 行 `app/practice/orchestrator.py` 抽成**独立纯模块** `app/audio/textproc/sentence_splitter.py`（engine-agnostic，不 import 引擎/网络/配置）；后续文本归一化/发音词典/ssml-lite 同归 `app/audio/textproc/`（见 docs/44）。
+- **改动**：
+  - 新增 `app/audio/textproc/__init__.py`、`app/audio/textproc/sentence_splitter.py`：`StreamSentenceSplitter`/`find_sentence_end`/`MAX_SENTENCE_CHARS`；含缩写表 `_ABBREVIATION_GUARDS`（cap/digit 守卫）+ 中缀（3.5/U.S/e.g/Ph.D/v2.5）+ 点分缩写+单字母缩写 + 网址后缀 + 括号标签守卫 + 长句「分句边界→词边界→避开括号 tag 硬切」。
+  - `app/practice/orchestrator.py`：删除内联 class + `_SENTENCE_END_RE` + `_MAX_SENTENCE_CHARS` + `import re`，改 `from app.audio.textproc.sentence_splitter import StreamSentenceSplitter`（构造器新增可选 `max_sentence_chars`，默认 300，对外行为兼容；`_MAX_SENTENCE_CHARS` 改名 `MAX_SENTENCE_CHARS` 已同步引用）。
+  - `tests/test_stream_sentence.py`：导入改指新模块，新增 8 例回归（P0-A，修复前必失败）。
+- **验证**：`pytest tests/test_stream_sentence.py` 17 passed；全量 `pytest -q` **238 passed, 4 skipped**；`ruff check` + `ruff format --check` 绿（仅 4 文件，均 "All checks passed"）。
+- **口径说明**：按「宁少切、不误切」原则——`"on Elm St. He moved."` 的 `St.` 带 cap 守卫会被保守并入一句（假阴性可接受）；句间停顿控制/`AudioChunk.duration` 属 P1-C，下步处理。
+- **待办（下步）**：P1-A 文本归一化（`normalize_for_tts`），归 `app/audio/textproc/normalize.py`；随后 P0-B 引擎生命周期 + P1-C 缺句上报/duration。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-07）
+
 ## 2026-09-07 组员 PR 评审处置与合入：PR#30 / PR#31 已完成（两 PR 均 MERGED）
 
 - **PR#30 fix/p0-hardening → MERGED**（merge commit b360fbb）：处置 6 commits——① 阻断项：`sse.ts` read 拒绝改 `reject(err)` 传播（断网 onError+onClose、AbortError 静默）+ 2 例回归测试；② `heartbeat_stream` interval≤0 透传（兑现「0=关闭心跳」，修复前 0.063s 产 1363 行 ping）+ 1 例；③ `_persist_dialog_turn` 改线程内自建自关 Session（SQLAlchemy 非线程安全模式消除）；④ `post_turn` 分桶按 action 实际消耗（normal/retry 三桶、start/abandon 仅 LLM、hint/demo 无音频零扣）+ 4 断言测试；⑤ nginx `/manage/internal` 去尾斜杠拦截；⑥ 三份 workflow 补 `workflow_dispatch`（见下）；遗留登记 3 项（complete 短路晚于 LLM 摘要、demo/hint/abandon 分支同步 DB 写、联调页豁免）；
