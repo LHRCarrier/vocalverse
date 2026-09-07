@@ -252,9 +252,12 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                 # 流利度时间戳特征（docs/06 §9.3 辅助口径：wpm/停顿；数据源 = 词级时间戳）
                 fluency = compute_fluency_features(res.words or [], float(res.duration or 0.0))
                 asr_meta = {
-                    "asr_seconds": round(len(audio) / 16000, 1),
+                    # vasr-05：asr_seconds 用 whisper 实际时长（旧实现把 webm 字节当 16k 采样率算）
+                    "asr_seconds": round(float(res.duration or 0.0) or len(audio) / 16000, 1),
                     "wpm": fluency["wpm"],
                     "pause_count": fluency["pause_count"],
+                    # vasr-10 判别位：静音（no_speech）与转写失败区分，供提示/统计使用
+                    "no_speech": bool(res.no_speech),
                 }
             except Exception as exc:
                 logger.warning("asr failed: %s", exc)
@@ -401,9 +404,11 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                 )
         if meta is None:
             meta = MetaResult(reply=full_text, meta=None, ok=False)
-        if not meta.ok:
+        if not meta.ok and getattr(state, "meta_failures", 0) < 2:
             # META 缺失补偿（docs/26 §9.4）：流式未守契约 → 后置一次低温度提取调用；
-            # 仍失败 → 既有降级（rule conclude 兜底，不伪造元数据）
+            # 仍失败 → 既有降级（rule conclude 兜底，不伪造元数据）。
+            # py-10：连续失败 ≥2 次（会话内）后跳过补偿 —— 高失败率下不再「每次必付一次调用」，
+            # 直接规则兜底（代价可控：meta 缺失时 hits/grammar 已有降级路径）。
             meta = await compensate_meta(
                 llm,
                 reply_text=full_text,
@@ -411,6 +416,13 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                 action=action,
                 concluded_by_turn=(state.current_turn + 1 >= (session.assigned_turns or 8)),
             )
+            if not meta.ok:
+                state.meta_failures = getattr(state, "meta_failures", 0) + 1
+                logger.warning(
+                    "meta 补偿失败（session=%s 第 %d 次）→ 规则兜底，本会话后续跳过补偿",
+                    state.session_id,
+                    getattr(state, "meta_failures", 0),
+                )
         reply = meta.reply or full_text
         if not reply:
             reply = _fallback_reply(transcript)
@@ -430,9 +442,13 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             vocab=meta.vocab,
         )
         score_status = "unavailable"
+        score_late = False
         if score_task is not None:
             try:
-                score = await score_task
+                # va-03：评分 3s 有限等待（docs/14 §3.2「迟到≤3s 显示未评测」落地为代码行为）
+                # —— shield 保证超时**不取消** score_task（Task 结果供第 7 步落库继续用），
+                # 但第 6 步不再等它：ISE 挂起时整轮 SSE 不被拖住。
+                score = await asyncio.wait_for(asyncio.shield(score_task), timeout=3.0)
                 if score is not None and score.overall is not None:
                     yield ev.ScoreDelta(
                         turn_index=turn_index,
@@ -441,6 +457,14 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                         grammar=float(score.grammar) if score.grammar is not None else None,
                     )
                     score_status = "ok"
+            except TimeoutError:
+                score_late = True
+                score_status = "unavailable"
+                logger.warning(
+                    "score 迟到超时（3s）→ 本轮未评测（docs/14 §3.2；session=%s turn=%s）",
+                    state.session_id,
+                    turn_index,
+                )
             except Exception:
                 score_status = "unavailable"
         else:
@@ -452,7 +476,7 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         seq_user = state.next_seq
         seq_assistant = seq_user + 1
         score = None
-        if score_task is not None:
+        if score_task is not None and not score_late:
             try:
                 score = await score_task  # Task 结果可重复读取（第 6 步已 await）
             except Exception:
@@ -783,7 +807,14 @@ async def _shadow_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             fluency.get("pause_ratio") or None,
         )
         coach = coach_note(sc) or (
-            None if transcript else "Couldn't catch that — try again a bit louder, please."
+            # vasr-10：no_speech（静音/无话语）与「听不清」分流，提示更准、不反复重试
+            (
+                "It sounds quiet — try speaking up a little!"
+                if getattr(res, "no_speech", False)
+                else "Couldn't catch that — try again a bit louder, please."
+            )
+            if not transcript
+            else None
         )
         rhythm = None
         rhythm_vals = [v for v in (sc.speed_match, sc.pause_score) if v is not None]

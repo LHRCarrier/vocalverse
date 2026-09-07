@@ -29,8 +29,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote
 
-from app.audio.asr import _ffmpeg_bin
 from app.audio.base import ScorerClient, ScoreResult
+from app.audio.ffmpeg_utils import run_ffmpeg
 
 ISE_URL = "wss://ise-api.xfyun.cn/v2/open-ise"
 
@@ -40,6 +40,13 @@ _ISE_SEM = asyncio.Semaphore(_ISE_CONCURRENCY)
 
 # 音频帧大小：服务端校验 data.data（base64）≤ 26000 字符 → 原始 PCM 每帧 ≤ ~19KB
 _FRAME_BYTES = 19000
+
+# 分级超时（va-03 / 审查官 P0：外部依赖失效典型是"挂起"而非"抛错"，评分的降级承诺
+# 不能架在「异常可被 except」之上——之前 ws.recv() 无接收超时、score_task 无界等待，
+# ISE 一旦不回帧 → 整轮 SSE 停摆，直接证伪「迟到≤3s 不阻塞」口径）。
+# ① 每帧接收 5s；② 单次评分（ws 会话全交互）总预算 12s；③ 编排器侧再给 3s 有限等待。
+_ISE_RECV_TIMEOUT_S = 5.0
+_ISE_SCORE_TIMEOUT_S = 12.0
 
 
 async def _to_pcm16(audio_bytes: bytes, timeout_s: float = 15.0) -> bytes:
@@ -52,9 +59,10 @@ async def _to_pcm16(audio_bytes: bytes, timeout_s: float = 15.0) -> bytes:
         src = tmp.name
     pcm = src + ".pcm"
     try:
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                _ffmpeg_bin(),
+        # 统一护栏（va-01）：共享 run_ffmpeg（async + 超时 kill + 非零上抛），
+        # 与 asr 侧同源，消除两份转码实现的参数/超时漂移。
+        await run_ffmpeg(
+            [
                 "-y",
                 "-i",
                 src,
@@ -67,19 +75,9 @@ async def _to_pcm16(audio_bytes: bytes, timeout_s: float = 15.0) -> bytes:
                 "-f",
                 "s16le",
                 pcm,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-        except FileNotFoundError as exc:
-            raise RuntimeError(f"ffmpeg 未找到: {_ffmpeg_bin()}") from exc
-        try:
-            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_s)
-        except TimeoutError as exc:
-            proc.kill()
-            await proc.wait()
-            raise RuntimeError(f"ffmpeg 转码超时（{timeout_s}s）: {src}") from exc
-        if proc.returncode != 0:
-            raise RuntimeError(f"ffmpeg 转码失败（exit={proc.returncode}）: {stderr or b''}")
+            ],
+            timeout_s=timeout_s,
+        )
         return Path(pcm).read_bytes()
     finally:
         Path(src).unlink(missing_ok=True)
@@ -158,27 +156,30 @@ class ISEClient(ScorerClient):
                 "auf": "audio/L16;rate=16000",
             }
             async with connect(self._ws_url(), open_timeout=10, close_timeout=5) as ws:
-                # 1) 参数帧
-                await ws.send(
-                    json.dumps(
-                        {
-                            "common": {"app_id": self._app_id},
-                            "business": business,
-                            "data": {"status": 0, "data": ""},
-                        }
-                    )
-                )
-                # 2) 音频帧（business 每帧带，cmd 切 auw + aus；仅 common 首帧，2026-09-03 实测）
-                for aus, status, chunk_b64 in _ise_frames(pcm):
+                # va-03：会话全程墙钟预算（超时即关连上抛 → 评分降级「未评测」，绝不挂流）
+                async with asyncio.timeout(_ISE_SCORE_TIMEOUT_S):
+                    # 1) 参数帧
                     await ws.send(
                         json.dumps(
                             {
-                                "business": {**business, "cmd": "auw", "aus": aus},
-                                "data": {"status": status, "data": chunk_b64},
+                                "common": {"app_id": self._app_id},
+                                "business": business,
+                                "data": {"status": 0, "data": ""},
                             }
                         )
                     )
-                payload = await _recv_result(ws)
+                    # 2) 音频帧（business 每帧带，cmd 切 auw + aus；仅 common 首帧，
+                    #    2026-09-03 实测）
+                    for aus, status, chunk_b64 in _ise_frames(pcm):
+                        await ws.send(
+                            json.dumps(
+                                {
+                                    "business": {**business, "cmd": "auw", "aus": aus},
+                                    "data": {"status": status, "data": chunk_b64},
+                                }
+                            )
+                        )
+                    payload = await _recv_result(ws)
             xml_text = payload.decode("utf-8", "replace")
             parsed = _parse_ise({"code": 0, "data": {"ise_res": {"xml": xml_text}}})
             return ScoreResult(
@@ -190,10 +191,16 @@ class ISEClient(ScorerClient):
             )
 
 
-async def _recv_result(ws) -> bytes:
-    """循环收帧直到 status=2；结果帧 data.data = base64(XML 结果字符串)（2026-09-03 实测）。"""
+async def _recv_result(ws, *, recv_timeout_s: float = _ISE_RECV_TIMEOUT_S) -> bytes:
+    """循环收帧直到 status=2；结果帧 data.data = base64(XML 结果字符串)（2026-09-03 实测）。
+
+    va-03：每帧接收 5s 墙钟（外围依赖挂起时及早失败——降级「未评测」而非无限等）。
+    """
     while True:
-        frame = json.loads(await ws.recv())
+        try:
+            frame = json.loads(await asyncio.wait_for(ws.recv(), timeout=recv_timeout_s))
+        except TimeoutError as exc:
+            raise RuntimeError(f"ISE 收帧超时（{recv_timeout_s}s）") from exc
         if frame.get("code") not in (None, 0):
             raise RuntimeError(f"ISE 错误: {frame.get('code')} {frame.get('message')}")
         data = frame.get("data") or {}

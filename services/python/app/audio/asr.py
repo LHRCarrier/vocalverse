@@ -11,33 +11,18 @@ from __future__ import annotations
 
 import asyncio
 import tempfile
+import threading
 from pathlib import Path
 
 from app.audio.base import ASRClient, ASRResult
-
-_FFMPEG = "ffmpeg"
+from app.audio.ffmpeg_utils import run_ffmpeg
 
 # docs/06 §8：模型侧信号量（whisper 并发 2）；多请求排队不雪崩
 _ASR_CONCURRENCY = 2
 _ASR_SEM = asyncio.Semaphore(_ASR_CONCURRENCY)
 
-
-def _ffmpeg_bin() -> str:
-    """ffmpeg 路径：① env FFMPEG_BIN → ② PATH 中 ffmpeg → ③ imageio-ffmpeg 自带二进制
-    （pip/uv 附带、免管理员，README 登记）→ ④ 兜底 "ffmpeg"（让 subprocess 报可读错误）。"""
-    import os
-    import shutil
-
-    if os.environ.get("FFMPEG_BIN"):
-        return os.environ["FFMPEG_BIN"]
-    if shutil.which("ffmpeg"):
-        return _FFMPEG
-    try:
-        import imageio_ffmpeg
-
-        return imageio_ffmpeg.get_ffmpeg_exe()
-    except Exception:
-        return _FFMPEG
+#: 转写墙钟超时（vasr-01：whisper 线程挂起 → 槽位永不释放 → 全站 ASR 死锁）。
+_ASR_TRANSCRIBE_TIMEOUT_S = 300.0
 
 
 class FasterWhisperClient(ASRClient):
@@ -46,23 +31,36 @@ class FasterWhisperClient(ASRClient):
         self._device = device
         self._compute_type = compute_type
         self._model = None  # 延迟加载（首次调用 ≈10~30s；lifespan 预热见 main.py）
+        self._load_lock = threading.Lock()  # vasr-09：并发首请求只加载一次（双重检查）
 
     def _get_model(self):
         if self._model is None:
-            from faster_whisper import WhisperModel
+            with self._load_lock:
+                if self._model is None:
+                    from faster_whisper import WhisperModel
 
-            self._model = WhisperModel(
-                self._model_name, device=self._device, compute_type=self._compute_type
-            )
+                    self._model = WhisperModel(
+                        self._model_name, device=self._device, compute_type=self._compute_type
+                    )
         return self._model
+
+    def warm(self) -> None:
+        """显式预热（vasr-09：替代 getattr(client, '_get_model', None) 的脆弱探针）。"""
+        self._get_model()
 
     def transcribe_sync(self, wav_path: str, language: str = "en") -> ASRResult:
         model = self._get_model()
         # word_timestamps=True：词级时间戳（流利度时间戳特征数据源，docs/06 §9.3）；
+        # vad_filter=True：Silero VAD（docs/06 §8:116 承诺，审计 R-09 / 拷问 vasr-07）——
+        # 静音/噪声段前置裁剪，稳定词界 + 降带 BGM 录音的 CER；空段由 no_speech_prob 判别。
         # 注意 transcribe 返回**生成器**，先 list() 物化一次——重复迭代同一生成器
         # 第二次永远为空（旧代码 segments 恒空、2026-09-04 联调发现 words 恒空的根因）
         segments, info = model.transcribe(
-            wav_path, language=language, beam_size=5, word_timestamps=True
+            wav_path,
+            language=language,
+            beam_size=5,
+            word_timestamps=True,
+            vad_filter=True,
         )
         segments = list(segments)
         text = "".join(s.text for s in segments).strip()
@@ -77,6 +75,7 @@ class FasterWhisperClient(ASRClient):
                         "probability": float(getattr(w, "probability", 0.0) or 0.0),
                     }
                 )
+        no_speech_prob = float(getattr(info, "no_speech_prob", 0.0) or 0.0)
         return ASRResult(
             text=text,
             language=info.language or language,
@@ -84,6 +83,9 @@ class FasterWhisperClient(ASRClient):
             segments=[{"start": s.start, "end": s.end, "text": s.text} for s in segments],
             words=words,
             duration=float(getattr(info, "duration", 0.0) or 0.0),
+            # vasr-10 判别位：静音/无话语（>0.7 或 VAD 后空文本）与「失败」区分，
+            # 前端提示从「听不清重说」变成「似乎没说话，请再试」而非反复重试。
+            no_speech=no_speech_prob > 0.7 or (not text),
         )
 
     async def transcribe(self, audio_bytes: bytes, language: str = "en") -> ASRResult:
@@ -102,37 +104,23 @@ class FasterWhisperClient(ASRClient):
                 # docs/19 P0-2：ffmpeg 同步 subprocess 阻塞事件循环（音频卡死→整个进程停摆）。
                 # 改 async 子进程 + 15s 超时（超时 kill，防占资源/僵尸进程）。
                 await _run_ffmpeg_async(src, wav)
-                return await asyncio.to_thread(self.transcribe_sync, wav, language)
+                # vasr-01：转写本体墙钟超时 —— whisper 线程挂起时 signal 槽位可释放，
+                # 避免「挂 2 次 = 全站 ASR 永久死亡」；超时按失败处理（可降级/重试）。
+                return await asyncio.wait_for(
+                    asyncio.to_thread(self.transcribe_sync, wav, language),
+                    timeout=_ASR_TRANSCRIBE_TIMEOUT_S,
+                )
             finally:
                 for p in (src, wav):
                     Path(p).unlink(missing_ok=True)
 
 
 async def _run_ffmpeg_async(src: str, wav: str, timeout_s: float = 15.0) -> None:
-    """ffmpeg 转码（async + 超时强制 kill；docs/19 P0-2 / P1-3：外部依赖超时分层）。"""
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            _ffmpeg_bin(),
-            "-y",
-            "-i",
-            src,
-            "-ar",
-            "16000",
-            "-ac",
-            "1",
-            "-f",
-            "wav",
-            wav,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError(f"ffmpeg 未找到: {_ffmpeg_bin()}") from exc
-    try:
-        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_s)
-    except TimeoutError as exc:
-        proc.kill()
-        await proc.wait()
-        raise RuntimeError(f"ffmpeg 转码超时（{timeout_s}s）: {src}") from exc
-    if proc.returncode != 0:
-        raise RuntimeError(f"ffmpeg 转码失败（exit={proc.returncode}）: {stderr or b''}")
+    """ffmpeg 转码（async + 超时强制 kill；docs/19 P0-2 / P1-3：外部依赖超时分层）。
+
+    统一护栏见 app.audio.ffmpeg_utils.run_ffmpeg（va-01：单真源，避免与 ise 漂移）。
+    """
+    await run_ffmpeg(
+        ["-y", "-i", src, "-ar", "16000", "-ac", "1", "-f", "wav", wav],
+        timeout_s=timeout_s,
+    )

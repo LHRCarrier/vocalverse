@@ -24,6 +24,12 @@ class DeepSeekLLMClient(LLMClient):
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._model = model
+        # py-05：连接池常驻（实例由 base.get_llm_client 缓存复用）——每次调用新建
+        # AsyncClient = 每回合 2~3 次 TCP+TLS 握手重建；池化后 keep-alive 复用。
+        self._client = httpx.AsyncClient(
+            timeout=httpx.Timeout(90.0),
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+        )
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -57,18 +63,17 @@ class DeepSeekLLMClient(LLMClient):
         }
         if any("json" in (m.get("content") or "").lower() for m in messages):
             payload["response_format"] = {"type": "json_object"}
-        async with httpx.AsyncClient(timeout=90) as client:
-            resp = await client.post(
-                f"{self._base_url}/chat/completions",
-                headers=self._headers(),
-                json=payload,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return (
-                data["choices"][0]["message"]["content"],
-                self._usage_of(data, self._model),
-            )
+        resp = await self._client.post(
+            f"{self._base_url}/chat/completions",
+            headers=self._headers(),
+            json=payload,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return (
+            data["choices"][0]["message"]["content"],
+            self._usage_of(data, self._model),
+        )
 
     async def chat(
         self,
@@ -104,15 +109,12 @@ class DeepSeekLLMClient(LLMClient):
             "max_tokens": max_tokens,
             "messages": messages,
         }
-        async with (
-            httpx.AsyncClient(timeout=90) as client,
-            client.stream(
-                "POST",
-                f"{self._base_url}/chat/completions",
-                headers=self._headers(),
-                json=payload,
-            ) as resp,
-        ):
+        async with self._client.stream(
+            "POST",
+            f"{self._base_url}/chat/completions",
+            headers=self._headers(),
+            json=payload,
+        ) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
                 if not line.startswith("data:"):

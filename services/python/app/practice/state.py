@@ -64,6 +64,8 @@ class SessionState:
     question_id: int | None = None  # defense：当前题 id
     pending: dict | None = None  # defense：等级阶梯选出的下一题
     updated_at: float = field(default_factory=time.time)
+    # py-10：META 补偿连续失败计数（≥2 后跳过补偿，规则兜底，控 LLM 配额）
+    meta_failures: int = 0
 
 
 class MemoryStateStore:

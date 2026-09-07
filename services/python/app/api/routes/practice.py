@@ -142,6 +142,27 @@ async def post_turn(
             min_bytes=settings.min_upload_bytes,
             max_bytes=settings.max_upload_bytes,
         )
+        # vasr-05：录音时长超上限前置拒绝（42203，先校验后落盘/扣额度）——防
+        # 「45s 录音进 15s 对话轮」污染 wpm/停顿口径并白烧 ASR/ISE 配额；时长探不出
+        # （ffprobe/ffmpeg 缺失、坏容器）不阻断——字节界继续兜底（保守：宁可放过分不拦错）。
+        import tempfile
+        from pathlib import Path as _Path
+
+        from app.audio.ffmpeg_utils import probe_duration_seconds
+
+        with tempfile.NamedTemporaryFile(suffix=".in", delete=False) as tmp:
+            tmp.write(data)
+            probe_src = tmp.name
+        try:
+            dur = await probe_duration_seconds(probe_src)
+        finally:
+            _Path(probe_src).unlink(missing_ok=True)
+        if dur is not None and dur > settings.max_dialog_seconds:
+            raise BizError(
+                http_status=422,
+                code=42204,
+                message=f"audio too long: {dur:.0f}s (max {settings.max_dialog_seconds}s)",
+            )
     # 用户录音落盘（docs/14 §6.1：attempts.audio_url 引用；24h 惰性过期清理）
     audio_url = save_audio_bytes(data) if data else None
 

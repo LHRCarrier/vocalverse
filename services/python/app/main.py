@@ -53,8 +53,14 @@ logger = logging.getLogger("vocalverse")
 logger.addFilter(RequestIdLogFilter())  # 每条日志带 request_id（docs/06 §11）
 
 
-def _prewarm_asr() -> None:
-    """预热 whisper（首个请求免 30s 卡顿）；失败仅告警不阻塞启动（docs/06 §8）。"""
+async def _prewarm_asr() -> None:
+    """预热 whisper（首个请求免 30s 卡顿）；失败仅告警不阻塞启动（docs/06 §8）。
+
+    vasr-09：模型加载是 CPU 重活 → 必须进线程（旧实现同步 `_get_model()` 跑在事件循环，
+    阻塞就绪探测 10~30s）；显式 `warm()` 替代 `getattr(client, '_get_model')` 脆弱探针。
+    """
+    import asyncio
+
     try:
         settings = get_settings()
         if settings.testing or settings.asr_model == "":
@@ -62,8 +68,8 @@ def _prewarm_asr() -> None:
         from app.audio.base import get_asr_client
 
         client = get_asr_client()
-        if client and getattr(client, "_get_model", None):
-            client._get_model()  # noqa: SLF001 - 预热专用
+        if client is not None:
+            await asyncio.to_thread(client.warm)
             logger.info("whisper 模型预热完成")
     except Exception as exc:
         logger.warning("whisper 预热失败（不阻塞启动）: %s", exc)
@@ -73,7 +79,7 @@ def _prewarm_asr() -> None:
 async def lifespan(_: FastAPI):
     settings = get_settings()
     logger.info("vocalverse python-api %s starting (env=%s)", __version__, settings.app_env)
-    _prewarm_asr()  # whisper 预热（docs/06 §8：防首个请求卡 30s；testing/无模型跳过）
+    await _prewarm_asr()  # whisper 预热（docs/06 §8：防首个请求卡 30s；testing/无模型跳过）
     yield
     logger.info("vocalverse python-api stopped")
 
