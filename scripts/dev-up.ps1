@@ -64,11 +64,15 @@ if (-not $env:APP_ASR_MODEL -and (Test-Path $ModelSnapshotRoot)) {
 $EnvFile = Join-Path $Root ".env"
 if (Test-Path $EnvFile) {
     Get-Content $EnvFile | ForEach-Object {
-        # TrimStart(BOM)：Windows 记事本保存的 .env 首行带 BOM，直接匹配会把 BOM 并进键名
+        # TrimStart(BOM)：Windows 记事本保存的 .env 首行带 BOM，直接匹配会把 BOM 并进键名。
+        # **空值键跳过**（2026-09-07 踩坑：根 .env 的 APP_DEEPSEEK_API_KEY 留空，注入后环境变量
+        # 空串优先级高于 pydantic env_file（services/python/.env 的真 key）→ LLM 静默走 Fake！
+        # 空值 = 未配置语义，交给各服务自己的 .env 层取值。
         if ($_ -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$') {
             $name = $matches[1].TrimStart([char]0xFEFF)
-            if (-not (Test-Path "env:$name")) {
-                Set-Item -Path "env:$name" -Value $matches[2].Trim('"').Trim("'")
+            $val = $matches[2].Trim('"').Trim("'")
+            if ($val -ne "" -and -not (Test-Path "env:$name")) {
+                Set-Item -Path "env:$name" -Value $val
             }
         }
     }
