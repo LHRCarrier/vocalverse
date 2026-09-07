@@ -143,6 +143,8 @@ function onSseEvent(e: SseStreamEvent) {
       }
       break
     case 'turn_end':
+      // R-13：权威轮次纠偏（answer() 的乐观 +1 以服务端回带为准）
+      questionIndex.value = e.expected_turn != null ? e.expected_turn : questionIndex.value
       break
     case 'meta_block':
       answerLevel.value = e.level ?? null

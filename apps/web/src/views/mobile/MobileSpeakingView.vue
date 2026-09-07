@@ -402,7 +402,8 @@ function onSseEvent(e: SseStreamEvent) {
       break
     case 'turn_end': {
       scoreStatus.value = e.score_status === 'ok' ? scoreStatus.value : e.score_status
-      currentTurn.value += 1
+      // R-13：权威轮次纠偏（服务端回带 expected_turn；断线/刷新后不再靠乐观计数撞 40903）
+      currentTurn.value = e.expected_turn ?? currentTurn.value + 1
       // 每条 AI 话语回合结束即解锁重听喇叭（docs/14 §3.2「awaiting_user 可选行动：…重听…」/§2.3 重听为用户主动动作；
       // 2026-09-07 用户反馈：场景对话不能只有开场一句有按钮 —— 历史气泡保留标记，逐句可播，
       // 与自由对话页 per-turn 解锁一致（MobileFreeChatView turn_end 同款））

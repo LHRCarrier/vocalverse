@@ -76,6 +76,9 @@ class TurnEnd(pydantic.BaseModel):
     type: Literal["turn_end"] = "turn_end"
     turn_index: int
     score_status: Literal["ok", "pending", "unavailable"] = "ok"
+    #: R-13 / va-arch-09：服务端权威轮次（本回合完成后 state.current_turn）——
+    #: 客户端下轮提交的 expected_turn；断线/刷新后的乐观计数以此纠偏（根治 40903「重来」）
+    expected_turn: int | None = None
 
 
 class SessionEnd(pydantic.BaseModel):

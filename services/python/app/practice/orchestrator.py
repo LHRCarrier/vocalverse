@@ -319,7 +319,9 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             state.last_action = action
             db.commit()
             await get_state_store().put(state)
-            yield ev.TurnEnd(turn_index=turn_index, score_status="unavailable")
+            yield ev.TurnEnd(
+                turn_index=turn_index, score_status="unavailable", expected_turn=state.current_turn
+            )
             return
 
         # 滚动摘要/学习者画像读库走 to_thread（P0-2：async 上下文不阻塞）
@@ -543,7 +545,9 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         # 摘要双轨（docs/26 §10.3①）：回合落库后异步增量压缩（失败标记 → 下次自动重试）
         asyncio.create_task(SummarizerService(llm).maybe_summarize(state.session_id))
 
-        yield ev.TurnEnd(turn_index=turn_index, score_status=score_status)
+        yield ev.TurnEnd(
+            turn_index=turn_index, score_status=score_status, expected_turn=state.current_turn
+        )
 
         # 9) 收尾判定（MetaExecutor：meta.conclude 或轮次上限或用户放弃）
         limit = session.assigned_turns or 8
@@ -600,7 +604,11 @@ async def _defense_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             db.commit()
             await get_state_store().put(state)
             yield ev.TurnStart(turn_index=state.current_turn + 1, question=q.get("question"))
-            yield ev.TurnEnd(turn_index=state.current_turn + 1, score_status="ok")
+            yield ev.TurnEnd(
+                turn_index=state.current_turn + 1,
+                score_status="ok",
+                expected_turn=state.current_turn,
+            )
             return
 
         # ---- 作答回合 ----
@@ -658,7 +666,11 @@ async def _defense_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             level=level,
             hits={"hits": hits, "total": len(key_points)},
         )
-        yield ev.TurnEnd(turn_index=turn_index, score_status="ok" if lang else "unavailable")
+        yield ev.TurnEnd(
+            turn_index=turn_index,
+            score_status="ok" if lang else "unavailable",
+            expected_turn=state.current_turn,
+        )
         if done:
             summary = f"答辩练习完成，共 {len(state.answered)} 题。"
             report_id = await asyncio.to_thread(complete_session, state.session_id, llm, summary)
@@ -778,7 +790,9 @@ async def _shadow_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             )
             if demo_url:
                 yield ev.AudioChunk(url=demo_url, duration=demo_duration)
-            yield ev.TurnEnd(turn_index=turn_index, score_status="pending")
+            yield ev.TurnEnd(
+                turn_index=turn_index, score_status="pending", expected_turn=state.current_turn
+            )
             await get_state_store().put(state)
             return
 
@@ -892,7 +906,9 @@ async def _shadow_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         state.current_turn += 1
         state.last_action = action
         db.commit()
-        yield ev.TurnEnd(turn_index=turn_index, score_status=score_status)
+        yield ev.TurnEnd(
+            turn_index=turn_index, score_status=score_status, expected_turn=state.current_turn
+        )
 
         if conclude:
             summary = f"影子跟读完成，共 {len(sentences)} 句。"

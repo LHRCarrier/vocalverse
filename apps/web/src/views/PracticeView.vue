@@ -241,7 +241,8 @@ function onSseEvent(e: SseStreamEvent) {
     case 'turn_end':
       scoreStatus.value = e.score_status === 'ok' ? scoreStatus.value : e.score_status
       last.scoreStatus = e.score_status
-      currentTurn.value += 1
+      // R-13：权威轮次纠偏（服务端回带 expected_turn）
+      currentTurn.value = e.expected_turn ?? currentTurn.value + 1
       phase.value = 'ready'
       armRescueTimer()
       break

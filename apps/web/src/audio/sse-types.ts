@@ -65,6 +65,8 @@ export interface TurnEndEvent {
   type: 'turn_end'
   turn_index: number
   score_status: 'ok' | 'pending' | 'unavailable'
+  /** R-13：服务端权威轮次（下一轮应提交的 expected_turn），断线/刷新后纠偏乐观计数 */
+  expected_turn?: number | null
 }
 
 export interface SessionEndEvent {
