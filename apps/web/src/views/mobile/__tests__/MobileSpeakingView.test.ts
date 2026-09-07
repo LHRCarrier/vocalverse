@@ -145,4 +145,20 @@ describe('MobileSpeakingView（场景对话重听按钮）', () => {
     await flushPromises()
     expect(practiceApi.tts).toHaveBeenCalledWith('Welcome! to the airport.')
   })
+
+  it('回合无 text_delta（LLM 失败降级）→ 该回合不出现空文本喇叭（评审建议：修复前无条件解锁）', async () => {
+    const wrapper = await mountView()
+    // 开场白 1 个喇叭
+    expect(wrapper.findAll('.u-replay')).toHaveLength(1)
+
+    // 无文本回合：turn_start（空 question）→ 直接 turn_end（降级路径不流式输出文本）
+    fake.recorderOnStop!(new Blob(['x']), 'audio/webm', 3000)
+    await flushPromises()
+    fake.onEvent!({ type: 'turn_start', turn_index: 0, question: '' } as SseStreamEvent)
+    fake.onEvent!({ type: 'turn_end', turn_index: 0, score_status: 'unavailable' } as SseStreamEvent)
+    await nextTick()
+
+    // 空文本气泡不解锁（修复前：target.speakable=true → 2 个喇叭，点击重播空文本会 422）
+    expect(wrapper.findAll('.u-replay')).toHaveLength(1)
+  })
 })
