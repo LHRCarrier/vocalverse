@@ -53,25 +53,35 @@ def parse_duration_from_stderr(text: str) -> float | None:
 
 
 async def run_ffmpeg(args: list[str], timeout_s: float = 15.0) -> bytes:
-    """执行 ffmpeg（args 不含二进制），返回 stderr 字节；超时 kill + 非零 exit 上抛。"""
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            ffmpeg_bin(),
-            *args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError(f"ffmpeg 未找到: {ffmpeg_bin()}") from exc
-    try:
-        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_s)
-    except TimeoutError as exc:
-        proc.kill()
-        await proc.wait()
-        raise RuntimeError(f"ffmpeg 超时（{timeout_s}s）: {' '.join(args[:2])}") from exc
-    if proc.returncode != 0:
-        raise RuntimeError(f"ffmpeg 失败（exit={proc.returncode}）: {stderr or b''}")
-    return stderr
+    """执行 ffmpeg（args 不含二进制），返回 stderr 字节；超时 kill + 非零 exit 上抛。
+
+    ⚠️ 2026-09-07 部署坑（Windows + uvicorn --reload）：``asyncio.create_subprocess_exec``
+    在 SelectorEventLoop 上抛 NotImplementedError（uvicorn loops/asyncio.py：win32 且
+    use_subprocess=True（--reload）时选 Selector；Selector 不支持子进程）+ 事件循环会被
+    平台策略钉死（模块 import 时 loop 已创建，运行时改策略无效）。
+    → 实现改 ``asyncio.to_thread(subprocess.run(..., timeout=...))``：任何 loop 类型可用
+    （to_thread 基于线程池，不依赖 loop 子进程传输），仍满足 P0-2（重活不进事件循环，超时
+    由 subprocess.run 自动 kill+wait）。语义与旧实现一致：超时/非零 → RuntimeError。
+    """
+    import subprocess
+
+    def _run_sync() -> bytes:
+        try:
+            proc = subprocess.run(
+                [ffmpeg_bin(), *args],
+                capture_output=True,
+                timeout=timeout_s,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(f"ffmpeg 超时（{timeout_s}s）: {' '.join(args[:2])}") from exc
+        except FileNotFoundError as exc:
+            raise RuntimeError(f"ffmpeg 未找到: {ffmpeg_bin()}") from exc
+        if proc.returncode != 0:
+            raise RuntimeError(f"ffmpeg 失败（exit={proc.returncode}）: {proc.stderr or b''}")
+        return proc.stderr or b""
+
+    return await asyncio.to_thread(_run_sync)
 
 
 async def probe_duration_seconds(path: str, timeout_s: float = 5.0) -> float | None:
@@ -79,41 +89,45 @@ async def probe_duration_seconds(path: str, timeout_s: float = 5.0) -> float | N
 
     策略：ffprobe -show_entries format=duration -of json（快且准）；缺 ffprobe 时
     回退 ``ffmpeg -i`` 的 stderr Duration 解析（不解码，仅头探测）。
+    实现同样走 ``asyncio.to_thread(subprocess.run)``（run_ffmpeg 同因：
+    SelectorEventLoop 下 create_subprocess_exec 不可用，见 run_ffmpeg 注释）。
     """
     import json as _json
+    import subprocess
 
-    probe = ffprobe_bin()
-    if probe is not None:
+    def _ffprobe() -> float | None:
+        probe = ffprobe_bin()
+        if probe is None:
+            return None
         try:
-            proc = await asyncio.create_subprocess_exec(
-                probe,
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "json",
-                path,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            proc = subprocess.run(
+                [probe, "-v", "error", "-show_entries", "format=duration", "-of", "json", path],
+                capture_output=True,
+                timeout=timeout_s,
+                check=False,
             )
-            _, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout_s)
-            if proc.returncode == 0:
+            if proc.returncode == 0 and proc.stdout:
                 data = _json.loads(proc.stdout.decode("utf-8", "replace") or "{}")
                 dur = float(data.get("format", {}).get("duration") or 0.0)
                 return dur if dur > 0 else None
         except Exception:
-            pass  # 回退 ffmpeg -i
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            ffmpeg_bin(),
-            "-i",
-            path,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_s)
-        # ffmpeg -i 无输出参数时以 exit 1 结束，但头信息仍完整打在 stderr —— 忽略退出码
-        return parse_duration_from_stderr(stderr.decode("utf-8", "replace"))
-    except Exception:
+            pass
         return None
+
+    def _ffmpeg_fallback() -> float | None:
+        try:
+            proc = subprocess.run(
+                [ffmpeg_bin(), "-i", path],
+                capture_output=True,
+                timeout=timeout_s,
+                check=False,
+            )
+            # ffmpeg -i 无输出参数时以 exit 1 结束，但头信息仍完整打在 stderr —— 忽略退出码
+            return parse_duration_from_stderr((proc.stderr or b"").decode("utf-8", "replace"))
+        except Exception:
+            return None
+
+    dur = await asyncio.to_thread(_ffprobe)
+    if dur is not None:
+        return dur
+    return await asyncio.to_thread(_ffmpeg_fallback)
