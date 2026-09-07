@@ -3,6 +3,19 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 POST /auth/logout 登出撤销 + SecurityConfig 白名单收窄（配合前端「记住我」）
+
+- 触发：用户反馈「关闭重开仍登录」→ 拍板补安全短板：退出登录必须是**有效登出**（原仅前端 `clear()`，30 天滑动窗口内 refresh 仍可续命）；
+- 实现（Java）：
+  1. `AuthController.logout`：`POST /auth/logout`（需合法 access token，无 Body）→ 吊销该用户**全部**未撤销 refresh token（`RefreshTokenRepository.findByUserIdAndRevokedAtIsNull` + 置 `revoked_at` 后 `saveAll`；`Envelope.<Void>ok(null)`）；
+  2. `SecurityConfig`：`/auth/**` 全开放 → 公开白名单**仅** `login/register/refresh/forgot`；`/auth/logout`、`/auth/me` 落入 `anyRequest().authenticated()`；**匿名访问受保护端点 = Spring Security 6 默认 403**（非 401；401 仅来自 ServiceTokenFilter 显式 sendError 与 ResponseStatusException）——测试断言按实际行为写并注释说明；
+  3. `AuthFlowTest.logoutRevokesAllRefreshTokens`：注册 + 再登录产生两份 refresh → logout 后**两份全部失效**（含未参与本次登出的注册期 token）+ 无令牌 403；
+- 契约：springdoc 快照 `apps/web/src/api/specs/java-openapi.json` 经 `CONTRACT_SNAPSHOT_GENERATE=1` 重建（新增 `/auth/logout` 路径）；`pnpm gen:api` 同步 `java-api.d.ts`（+36 行）；docs/18 J1 行补 logout 登记；
+- 验证：`mvn verify` 全绿（含 ContractSnapshotTest 契约对账、AuthFlowTest 5 例）；前端配套（记住我/退出接线/测试）见安卓日志同日期条；Python 零改动（`/auth` 全走 Java）；
+- 边界：登出后旧 refresh 立即 401，「30 天窗口可续命」关闭；登录限流、演示账号弱密码（demo123456）为已知项（安全评审意见，未在本轮范围，建议答辩前处理）。
+
+—— 执行人：Faust-sudo（AI 代工）
+
 ## 2026-09-06 /auth/forgot 忘记密码（演示口径：工单闭环 + 防枚举 · 51 op）
 
 - 背景：组长反馈 Sign Up 应真注册、Forgot password 也要做；注册复用既有 `/auth/register`（前端补注册表单、注册即登录）；
