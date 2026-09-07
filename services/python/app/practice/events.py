@@ -110,6 +110,12 @@ async def heartbeat_stream(inner, interval_s: float, serialize=sse_payload):
     - sleep 先到（静默）→ **不取消** 仍挂起的 anext 任务（复用），只 yield 心跳行；
     生成器结束到（StopAsyncIteration）→ 正常返回。
     """
+    if interval_s <= 0:
+        # 「关闭心跳」语义（配置注释 0=关闭）：透传内部流，避免 sleep(0) 忙循环 PING 行
+        # （2026-09-07 评审复现：0.063s 产出 1363 行 `: ping`，见 PR#30）。
+        async for event in inner:
+            yield serialize(event)
+        return
     it = inner.__aiter__()
     next_task: asyncio.Task | None = None
     while True:

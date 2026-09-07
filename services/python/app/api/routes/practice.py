@@ -158,11 +158,21 @@ async def post_turn(
         raise BizError(http_status=422, code=42202, message="audio required for this action")
 
     # 分桶限流：预检（归属/状态/输入）通过后再扣额度——修复审计 R-06「先扣后校验」；
-    # 桶 = ASR/ISE/LLM 各计 1（docs/06 §7 按子资源分桶，/turns 不单计）。
+    # 按 action 实际消耗扣桶（2026-09-07 评审：此前无差别扣 3 桶——hint/demo/abandon
+    # 实际零管线消耗却扣 ASR/ISE/LLM，轻动作会误耗尽用户配额并 429）：
+    # - normal/retry（音频回合）：ASR 转写 + ISE 评分 + LLM 回复 → 三桶各 1
+    #   （docs/06 §7 按子资源分桶，/turns 不单计）；
+    # - start：无转写/评分，仅 LLM 首句 → 仅 LLM 1；
+    # - abandon：收尾仅 LLM 摘要 → 仅 LLM 1；
+    # - hint/demo（无音频轻分支零消耗；带音频走 LLM 段 → 仅 LLM 1）。
     limits = bucket_limits()
-    await consume("asr", limits["asr"], user_id)
-    await consume("ise", limits["ise"], user_id)
-    await consume("llm", limits["llm"], user_id)
+    if action in ("normal", "retry"):
+        await consume("asr", limits["asr"], user_id)
+        await consume("ise", limits["ise"], user_id)
+        await consume("llm", limits["llm"], user_id)
+    else:
+        if action not in ("hint", "demo") or audio is not None:
+            await consume("llm", limits["llm"], user_id)
 
     orchestrator = get_orchestrator()
 

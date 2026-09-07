@@ -158,7 +158,6 @@ async def _synth_sentence(
 
 
 def _persist_dialog_turn(
-    db,
     *,
     session_id: int,
     user_id: int,
@@ -178,37 +177,43 @@ def _persist_dialog_turn(
 
     调用方必须在线程外完成全部 IO 求值（score 已 await、fluency/hits 已备齐），
     本函数只做构造 + commit —— 不持连接跨 await，不阻塞事件循环。
+    2026-09-07 评审：**Session 在工作线程内自建并自关**（SQLAlchemy 官方明确 Session
+    非线程安全；此前把事件循环线程创建并已使用的 db 移交 to_thread，属未保证模式）。
     """
-    db.add(
-        ScenarioMessage(
-            session_id=session_id,
-            seq=seq_user,
-            role="user",
-            origin="proactive" if action == "normal" else "respond",
-            action=action if action in ("demo", "correction", "retry", "hint") else None,
-            content=transcript or f"[{action}]",
-            audio_url=audio_url,
-            meta={"corpus_hits": hits, **asr_meta, "action": action},
-        )
-    )
-    if attempt_data is not None:
+    db = get_session_factory()()
+    try:
         db.add(
-            Attempt(
-                scenario_message_id=_find_msg_id(db, session_id, seq_user),
-                **attempt_data,
+            ScenarioMessage(
+                session_id=session_id,
+                seq=seq_user,
+                role="user",
+                origin="proactive" if action == "normal" else "respond",
+                action=action if action in ("demo", "correction", "retry", "hint") else None,
+                content=transcript or f"[{action}]",
+                audio_url=audio_url,
+                meta={"corpus_hits": hits, **asr_meta, "action": action},
             )
         )
-    db.add(
-        ScenarioMessage(
-            session_id=session_id,
-            seq=seq_assistant,
-            role="assistant",
-            content=reply,
-            audio_url=assistant_audio_url,
-            meta=assistant_meta,
+        if attempt_data is not None:
+            db.add(
+                Attempt(
+                    scenario_message_id=_find_msg_id(db, session_id, seq_user),
+                    **attempt_data,
+                )
+            )
+        db.add(
+            ScenarioMessage(
+                session_id=session_id,
+                seq=seq_assistant,
+                role="assistant",
+                content=reply,
+                audio_url=assistant_audio_url,
+                meta=assistant_meta,
+            )
         )
-    )
-    db.commit()
+        db.commit()
+    finally:
+        db.close()
 
 
 # ---------------------------------------------------------------------------
@@ -520,7 +525,6 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         }
         await asyncio.to_thread(
             _persist_dialog_turn,
-            db,
             session_id=int(state.session_id),
             user_id=int(session.user_id),
             seq_user=seq_user,
