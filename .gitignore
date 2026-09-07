@@ -77,3 +77,6 @@ Thumbs.db
 *.m4a
 # 在豁免区下方重复豁免 fixture 目录，确保优先级
 !**/tests/fixtures/**
+
+# HF 模型下载缓存（构建上下文预下载用；红线禁止提交，2026-09-07）
+services/python/.models-cache/

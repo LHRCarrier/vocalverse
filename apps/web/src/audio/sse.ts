@@ -1,13 +1,18 @@
 /**
- * SSE 客户端 v2（docs/14 §3.3 / docs/16 A1）：
+ * SSE 客户端 v2（docs/14 §3.3 / docs/16 A1 / R-18）：
  * - `openSseFetch`：POST multipart 音频 + fetch ReadableStream 解析 SSE
  *   （EventSource 仅 GET，不能承载 POST 音频；本仓库无其他 GET 流消费方，统一替换）；
  * - 事件边界：`\n\n` 分隔、单事件可含多 `data:` 行（聚合）；`: ping` 心跳注释行忽略；
+ *   **注释行会重置 idle 超时**（R-18：服务端每 ≤30s 推 `: ping`，前端据此判定长静默）；
+ * - **Idle 超时**（R-18 / 审计 R-18）：90s 内无任何字节 → `onError('SSE 空闲超时')` +
+ *   `onClose()` + `reader.cancel()`（防 whisper 卡死 / 中间代理断流后永久 busy）；
  * - AbortController 由调用方持有（组件卸载/跳转必须 abort，防连接泄漏）；
- * - 解析器为纯函数（`parseSseBuffer`），可单测（跨 chunk/多 data/未知事件）。
+ * - 解析器为纯函数（`parseSseBuffer`），可单测（跨 chunk/多 data/未知事件/心跳）。
  */
 
 import type { SseStreamEvent } from './sse-types'
+
+export const SSE_IDLE_TIMEOUT_MS = 90_000 // R-18：> 3× 心跳间隔(15s)，容 LLM 首 token/长音频
 
 export interface SseHandlers {
   onEvent?: (event: SseStreamEvent) => void
@@ -68,7 +73,33 @@ export function openSseFetch(
       const reader = resp.body.getReader()
       const decoder = new TextDecoder()
       for (;;) {
-        const { done, value } = await reader.read()
+        // R-18 idle 超时：每次 read 重置计时（任何字节——含 ': ping' 注释行——到达即重置）；
+        // 超时 → 主动取消流并报错（防永久 busy；上层按 error 提示/重试）。
+        // read 拒绝（断网/abort）必须 reject 外层 Promise——否则 await 永久挂起、
+        // onError/onClose 不触发、90s 兜底失效（2026-09-07 评审复现，见 PR#30）。
+        const readResult = await new Promise<{ done: boolean; value?: Uint8Array } | 'timeout'>(
+          (resolve, reject) => {
+            const timer = setTimeout(() => resolve('timeout'), SSE_IDLE_TIMEOUT_MS)
+            reader.read().then(
+              (r) => {
+                clearTimeout(timer)
+                resolve(r)
+              },
+              (err) => {
+                clearTimeout(timer)
+                reader.cancel().catch(() => {})
+                reject(err)
+              },
+            )
+          },
+        )
+        if (readResult === 'timeout') {
+          await reader.cancel().catch(() => {})
+          handlers.onError?.(new Error('SSE 空闲超时（90s 无数据）'))
+          handlers.onClose?.()
+          return
+        }
+        const { done, value } = readResult
         if (done) break
         buffer += decoder.decode(value, { stream: true })
         const [rest, events] = parseSseBuffer(buffer)

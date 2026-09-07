@@ -20,7 +20,12 @@ _session_factory: sessionmaker[Session] | None = None
 
 
 def get_engine():
-    """惰性单例 engine（SQLite 需 check_same_thread=False 便于测试/多线程）。"""
+    """惰性单例 engine（SQLite 需 check_same_thread=False 便于测试/多线程）。
+
+    docs/19 P0-2（2026-09-07）：PG 显式连接池（pool_size=20 / max_overflow=10 /
+    pool_timeout=5），配合短事务化防"连接被 SSE 回合长持 + 排队爆池"；SQLite 维持默认
+    （:memory: 用 StaticPool 单连接共享，测试语义）。
+    """
     global _engine
     if _engine is None:
         url = get_settings().database_url
@@ -31,6 +36,8 @@ def get_engine():
                 from sqlalchemy.pool import StaticPool
 
                 kwargs["poolclass"] = StaticPool  # 内存库须单连接共享（测试）
+        else:
+            kwargs.update(pool_size=20, max_overflow=10, pool_timeout=5)
         _engine = create_engine(url, **kwargs)
     return _engine
 

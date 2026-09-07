@@ -23,6 +23,12 @@ public class JwtService {
   public JwtService(
       @Value("${vocalverse.jwt.secret}") String secret,
       @Value("${vocalverse.jwt.access-ttl-seconds:3600}") long accessTtlSeconds) {
+    // docs/19 P0-9：密钥缺失/过短 → 启动即失败（fail-fast），不复用仓库默认值。
+    // docs/06 §11：≥32 字节为 JJWT 硬性要求；空串会在首次签名时才炸，改为显式早抛。
+    if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+      throw new IllegalStateException(
+          "vocalverse.jwt.secret 未配置或过短（≥32 字节）：检查 JWT_SECRET 环境变量（docs/19 P0-9）");
+    }
     this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     this.accessTtlSeconds = accessTtlSeconds;
   }

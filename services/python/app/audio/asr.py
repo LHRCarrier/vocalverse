@@ -2,18 +2,24 @@
 
 - 延迟导入 faster_whisper/torch（重依赖，轻量测试环境走 Fake）；
 - CPU 工作必须进线程（anyio.to_thread 由编排器包装）——本类仅同步接口；
-- ffmpeg 是本服务唯一硬依赖（WebM/opus → 16k mono wav），生产镜像已装。
+- ffmpeg 是本服务唯一硬依赖（WebM/opus → 16k mono wav），生产镜像已装；
+- 并发护栏：模块级信号量 2（docs/06 §8 并发决策：whisper 并发 2，与讯飞 ISE 一致；
+  docs/19 P1-4 / 审计 R-10——此前全仓 0 个 Semaphore，10 人并发直涌线程池）。
 """
 
 from __future__ import annotations
 
-import subprocess
+import asyncio
 import tempfile
 from pathlib import Path
 
 from app.audio.base import ASRClient, ASRResult
 
 _FFMPEG = "ffmpeg"
+
+# docs/06 §8：模型侧信号量（whisper 并发 2）；多请求排队不雪崩
+_ASR_CONCURRENCY = 2
+_ASR_SEM = asyncio.Semaphore(_ASR_CONCURRENCY)
 
 
 def _ffmpeg_bin() -> str:
@@ -81,21 +87,52 @@ class FasterWhisperClient(ASRClient):
         )
 
     async def transcribe(self, audio_bytes: bytes, language: str = "en") -> ASRResult:
-        import asyncio
         import os
 
-        os.makedirs("data/audio/tmp", exist_ok=True)
-        with tempfile.NamedTemporaryFile(suffix=".in", delete=False, dir="data/audio/tmp") as tmp:
-            tmp.write(audio_bytes)
-            src = tmp.name
-        try:
+        # docs/06 §8 信号量护栏：限并发转写（排队不雪崩）；也在 /asr 裸端点与 /turns 热路径同时生效
+        async with _ASR_SEM:
+            os.makedirs("data/audio/tmp", exist_ok=True)
+            with tempfile.NamedTemporaryFile(
+                suffix=".in", delete=False, dir="data/audio/tmp"
+            ) as tmp:
+                tmp.write(audio_bytes)
+                src = tmp.name
             wav = src + ".wav"
-            subprocess.run(
-                [_ffmpeg_bin(), "-y", "-i", src, "-ar", "16000", "-ac", "1", "-f", "wav", wav],
-                check=True,
-                capture_output=True,
-            )
-            return await asyncio.to_thread(self.transcribe_sync, wav, language)
-        finally:
-            for p in (src, src + ".wav"):
-                Path(p).unlink(missing_ok=True)
+            try:
+                # docs/19 P0-2：ffmpeg 同步 subprocess 阻塞事件循环（音频卡死→整个进程停摆）。
+                # 改 async 子进程 + 15s 超时（超时 kill，防占资源/僵尸进程）。
+                await _run_ffmpeg_async(src, wav)
+                return await asyncio.to_thread(self.transcribe_sync, wav, language)
+            finally:
+                for p in (src, wav):
+                    Path(p).unlink(missing_ok=True)
+
+
+async def _run_ffmpeg_async(src: str, wav: str, timeout_s: float = 15.0) -> None:
+    """ffmpeg 转码（async + 超时强制 kill；docs/19 P0-2 / P1-3：外部依赖超时分层）。"""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            _ffmpeg_bin(),
+            "-y",
+            "-i",
+            src,
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            "-f",
+            "wav",
+            wav,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"ffmpeg 未找到: {_ffmpeg_bin()}") from exc
+    try:
+        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_s)
+    except TimeoutError as exc:
+        proc.kill()
+        await proc.wait()
+        raise RuntimeError(f"ffmpeg 转码超时（{timeout_s}s）: {src}") from exc
+    if proc.returncode != 0:
+        raise RuntimeError(f"ffmpeg 转码失败（exit={proc.returncode}）: {stderr or b''}")

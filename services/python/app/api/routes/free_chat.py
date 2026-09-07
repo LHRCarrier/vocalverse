@@ -53,22 +53,12 @@ class _HistoryMsg(BaseModel):
     content: str
 
 
-async def _rl_asr(user_id: int = Depends(get_current_user_id)) -> None:
-    await consume("asr", bucket_limits()["asr"], user_id)
-
-
-async def _rl_llm(user_id: int = Depends(get_current_user_id)) -> None:
-    await consume("llm", bucket_limits()["llm"], user_id)
-
-
 @router.post("/turn")
 async def free_chat_turn(
     audio: UploadFile | None = File(default=None),
     text: str | None = Form(default=None),
     history: str = Form(default="[]"),
     user_id: int = Depends(get_current_user_id),
-    _a: None = Depends(_rl_asr),
-    _l: None = Depends(_rl_llm),
 ):
     """单轮自由对话：audio / text 至少其一（都空 → 422，流外预检）。
 
@@ -100,20 +90,35 @@ async def free_chat_turn(
     typed = (text or "").strip()[:_MAX_TEXT] or None
     turn_index = sum(1 for m in hist if m.role == "user") + 1
 
+    # 分桶限流：预检（history/kind/音频校验）通过后再扣——审计 R-06「先扣后校验」修复；
+    # ASR 桶仅实际转写时扣（docs/19 P1-5：按实际消耗计，打字轮不耗 ASR）。
+    limits = bucket_limits()
+    if kind == "audio":
+        await consume("asr", limits["asr"], user_id)
+    await consume("llm", limits["llm"], user_id)
+
     async def event_stream():
         try:
-            user_text = typed
-            if kind == "audio":
-                asr = await get_asr_client().transcribe(data)  # type: ignore[arg-type]
-                user_text = asr.text
-                yield ev.sse_payload(ev.UserTranscript(turn_index=turn_index, text=user_text))
-            runner = TurnRunner(get_llm_client())
-            messages: list[dict[str, str]] = [{"role": "system", "content": _SYSTEM_PROMPT}]
-            messages += [{"role": m.role, "content": m.content} for m in hist]
-            messages.append({"role": "user", "content": user_text or "(no speech)"})
-            async for delta in runner.run(messages):
-                yield ev.sse_payload(ev.TextDelta(text=delta))
-            yield ev.sse_payload(ev.TurnEnd(turn_index=turn_index, score_status="unavailable"))
+            settings = get_settings()
+
+            async def _core():
+                """产出事件对象（序列化统一由 heartbeat_stream 的 serialize 完成）。"""
+                user_text = typed
+                if kind == "audio":
+                    asr = await get_asr_client().transcribe(data)  # type: ignore[arg-type]
+                    user_text = asr.text
+                    yield ev.UserTranscript(turn_index=turn_index, text=user_text)
+                runner = TurnRunner(get_llm_client())
+                messages: list[dict[str, str]] = [{"role": "system", "content": _SYSTEM_PROMPT}]
+                messages += [{"role": m.role, "content": m.content} for m in hist]
+                messages.append({"role": "user", "content": user_text or "(no speech)"})
+                async for delta in runner.run(messages):
+                    yield ev.TextDelta(text=delta)
+                yield ev.TurnEnd(turn_index=turn_index, score_status="unavailable")
+
+            # R-18：心跳包装（同 practice 热路径；静默 ≥15s 推 ': ping'，不取消内部流）
+            async for payload in ev.heartbeat_stream(_core(), settings.sse_heartbeat_seconds):
+                yield payload
         except Exception as exc:
             logger.exception("free-chat turn failed: %s", exc)
             yield ev.sse_payload(ev.StreamError(code="internal", recoverable=True))

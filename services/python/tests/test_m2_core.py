@@ -103,8 +103,8 @@ async def test_state_ttl():
     state = SessionState(session_id=7, kind="dialog")
     await store.put(state)
     assert (await store.get(7)) is not None
-    # 手动过期
-    store._data[7] = (state, time.time() - 1)
+    # 手动过期：P0-1 门面化后测试环境强制内存后端（get_redis→None），内部实现为 _impl
+    store._impl._data[7] = (state, time.time() - 1)
     assert (await store.get(7)) is None
 
 
@@ -445,6 +445,39 @@ def test_event_types_all_15_insertable(client, auth_headers):
 # ---------------------------------------------------------------------------
 # 限流：LLM 桶 429
 # ---------------------------------------------------------------------------
+def _make_dialog_session(client, auth_headers) -> int:
+    """建已发布场景 + 建会话，返回 session_id（与 test_full_dialog_turn_sse_flow 同款）。
+
+    归属校验（P0-3，2026-09-07）先于输入校验/限流：测试须用真实存在的会话，
+    否则会先撞 404/40401 而非被测分支。
+    """
+    from app.db import get_session_factory
+    from app.models import Scenario
+
+    db = get_session_factory()()
+    try:
+        scenario = Scenario(
+            title="回合守卫测试场景",
+            scene_type="cafe",
+            difficulty=1,
+            system_prompt="You are Bella, a friendly barista.",
+            opening_line="Hi there!",
+            target_corpus="I'd like a coffee, please.|请给我来杯咖啡",
+            interest_tags=[],
+            status="published",
+        )
+        db.add(scenario)
+        db.commit()
+        sid = scenario.id
+    finally:
+        db.close()
+    resp = client.post(
+        "/api/v1/sessions", json={"kind": "dialog", "scenario_id": sid}, headers=auth_headers
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()["data"]["id"]
+
+
 def test_rate_limit_429(client, auth_headers, monkeypatch):
     import app.core.ratelimit as rl
 
@@ -452,14 +485,60 @@ def test_rate_limit_429(client, auth_headers, monkeypatch):
         raise __import__("fastapi").HTTPException(status_code=429, detail="rate limited (llm)")
 
     monkeypatch.setattr(rl, "_redis_consume", fake_consume)
+    session_id = _make_dialog_session(client, auth_headers)
     resp = client.post(
-        "/api/v1/sessions/1/turns",
+        f"/api/v1/sessions/{session_id}/turns",
         data={"action": "normal"},
         files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
         headers=auth_headers,
     )
-    # 会话预检先于限流？依赖顺序先跑 → 429
+    # 顺序：归属 ✓ → 状态预检 ✓ → 音频校验 ✓ → 限流 → 429
     assert resp.status_code == 429
+
+
+def test_turn_rate_limit_buckets_by_action(client, auth_headers, monkeypatch):
+    """2026-09-07 评审：分桶按 action **实际消耗**扣（此前无差别扣 asr+ise+llm 三桶——
+    hint/demo/abandon 零管线消耗也扣，会误耗尽用户配额）。修复前 hint/abandon 断言失败。
+    """
+    import app.core.ratelimit as rl
+
+    buckets: list[str] = []
+
+    async def fake_consume(bucket, limit, user_id):
+        buckets.append(bucket)
+        return 0, 60
+
+    monkeypatch.setattr(rl, "_redis_consume", fake_consume)
+
+    def turn(session_id: int, action: str, audio: bool):
+        kwargs: dict = {"data": {"action": action}, "headers": auth_headers}
+        if audio:
+            kwargs["files"] = {"audio": ("a.webm", FAKE_AUDIO, "audio/webm")}
+        resp = client.post(f"/api/v1/sessions/{session_id}/turns", **kwargs)
+        assert resp.status_code == 200, resp.text
+
+    # normal（音频回合）：ASR + ISE + LLM 三桶各 1
+    sid = _make_dialog_session(client, auth_headers)
+    turn(sid, "normal", audio=True)
+    assert buckets == ["asr", "ise", "llm"], buckets
+
+    # start：无转写/评分，仅 LLM 首句
+    buckets.clear()
+    sid = _make_dialog_session(client, auth_headers)
+    turn(sid, "start", audio=False)
+    assert buckets == ["llm"], buckets
+
+    # hint（无音频轻分支）：零管线消耗 → 零扣
+    buckets.clear()
+    sid = _make_dialog_session(client, auth_headers)
+    turn(sid, "hint", audio=False)
+    assert buckets == [], buckets
+
+    # abandon（收尾）：仅 LLM 摘要
+    buckets.clear()
+    sid = _make_dialog_session(client, auth_headers)
+    turn(sid, "abandon", audio=False)
+    assert buckets == ["llm"], buckets
 
 
 # ---------------------------------------------------------------------------
@@ -490,9 +569,13 @@ def test_placement_size_guard_lets_normal_audio_through(client, auth_headers):
 
 
 def test_turn_rejects_empty_audio(client, auth_headers):
-    """对话回合同样挡空录音：否则会推进 current_turn 且不可重来。"""
+    """对话回合同样挡空录音：否则会推进 current_turn 且不可重来。
+
+    （P0-3 后顺序：归属校验 → 音频下界守卫 → 状态预检，故须用真实会话验证 40002。）
+    """
+    session_id = _make_dialog_session(client, auth_headers)
     resp = client.post(
-        "/api/v1/sessions/999999/turns",
+        f"/api/v1/sessions/{session_id}/turns",
         data={"action": "normal"},
         files={"audio": ("a.webm", b"\x1aE\xdf\xa3", "audio/webm")},
         headers=auth_headers,
@@ -501,12 +584,16 @@ def test_turn_rejects_empty_audio(client, auth_headers):
     assert resp.json()["code"] == 40002
 
 
-def test_stub_pipeline_endpoints_keep_no_lower_bound(client):
-    """/asr /score 是无状态管线端点，不消耗可耗尽资源 → 保持 min_bytes=0 的历史行为。"""
+def test_stub_pipeline_endpoints_keep_no_lower_bound(client, auth_headers):
+    """/asr /score 是无状态管线端点，不消耗可耗尽资源 → 保持 min_bytes=0 的历史行为。
+
+    （docs/19 P0-4 起需鉴权——auth_headers 直通；下界行为不变。）
+    """
     resp = client.post(
         "/api/v1/asr",
         files={"audio": ("tiny.wav", b"RIFF__tiny__", "audio/wav")},
         data={"language": "en"},
+        headers=auth_headers,
     )
     assert resp.status_code == 200, resp.text
     assert resp.json()["code"] == 0
