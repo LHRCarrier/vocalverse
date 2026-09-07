@@ -22,6 +22,8 @@ const mode = ref<Mode>('login')
 /* ---- 登录 ---- */
 const username = ref('')
 const password = ref('')
+/** 记住我（2026-09-07 由 UI 死控件变真功能：勾选=持久会话，不勾=关闭即登出） */
+const remember = ref(true)
 /* ---- 注册 ---- */
 const regUsername = ref('')
 const regNickname = ref('')
@@ -48,7 +50,7 @@ async function submit() {
   loading.value = true
   errorMsg.value = ''
   try {
-    await auth.login(username.value.trim(), password.value)
+    await auth.login(username.value.trim(), password.value, remember.value)
     loading.value = false
     success.value = true
     setTimeout(() => {
@@ -66,12 +68,15 @@ async function register() {
   loading.value = true
   errorMsg.value = ''
   try {
-    await auth.register({
-      username: regUsername.value.trim(),
-      password: regPassword.value,
-      nickname: regNickname.value.trim(),
-      ageGroup: 'adult',
-    })
+    await auth.register(
+      {
+        username: regUsername.value.trim(),
+        password: regPassword.value,
+        nickname: regNickname.value.trim(),
+        ageGroup: 'adult',
+      },
+      remember.value,
+    )
     loading.value = false
     success.value = true
     setTimeout(() => {
@@ -148,8 +153,8 @@ function notReady(text: string) {
         </div>
 
         <div class="flex-row">
-          <div>
-            <input id="remember" type="radio" name="remember">
+          <div class="remember-wrap">
+            <input id="remember" v-model="remember" type="checkbox" name="remember">
             <label for="remember">Remember me </label>
           </div>
           <span class="span" role="button" tabindex="0" @click="switchMode('forgot')">Forgot password?</span>
@@ -205,6 +210,12 @@ function notReady(text: string) {
             name="reg-password"
             autocomplete="new-password"
           >
+        </div>
+        <div class="flex-row">
+          <div class="remember-wrap">
+            <input id="remember-reg" v-model="remember" type="checkbox" name="remember-reg">
+            <label for="remember-reg">Remember me </label>
+          </div>
         </div>
         <button class="button-submit" type="submit" :disabled="loading || !regUsername.trim() || !regNickname.trim() || !regPassword">
           {{ loading ? 'Creating…' : 'Sign Up' }}
@@ -386,6 +397,49 @@ function notReady(text: string) {
   font-size: 14px;
   color: black;
   font-weight: 400;
+}
+
+/* Remember me 圆钮（2026-09-07 用户反馈：参照 uiverse bad-cheetah-74 原设计 —— 该页对 input 无自定义样式，
+ * 即浏览器原生 radio 观感：中性灰描边空圆 + 选中蓝点；此处保留 checkbox 语义（可勾选/取消），仅外观复刻原生 */
+.remember-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.remember-wrap input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none; /* Capacitor iOS/Android WebView 同源一致 */
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  border: 2px solid #767676; /* 原生 radio 同款中性灰描边 */
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 选中：原生 radio 观感 —— 蓝描边 + 圆内蓝点（无填充、无勾） */
+.remember-wrap input[type='checkbox']:checked {
+  border-color: #2d79f3;
+}
+
+.remember-wrap input[type='checkbox']:checked::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2d79f3;
+}
+
+.remember-wrap input[type='checkbox']:focus-visible {
+  outline: 2px solid #2d79f3;
+  outline-offset: 2px;
 }
 
 .span {
