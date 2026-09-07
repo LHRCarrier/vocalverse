@@ -3,6 +3,20 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 TTS 链路整改 P1-A：文本归一化（缩写展开 / 数字→单词 / 零宽与重复标点清理）
+
+- **背景**：对抗拷问 vtts-05——LLM 原文直接喂 edge-tts（orchestrator.py:397-400），`50%`、`3.5`、`Dr.`、`U.S.`、网址、重复标点等被读错/读怪；且全仓无任何归一化（num2words/缩写展开/零宽清理均为零命中）。
+- **架构解耦**：新增纯模块 `app/audio/textproc/normalize.py`（engine-agnostic，幂等、绝不抛错、括号标记安全），与 `sentence_splitter.py` 同归 `app/audio/textproc/`。
+- **改动**：
+  - 新增 `app/audio/textproc/normalize.py`：`normalize_for_tts`/`normalize_text`。规则：安全过滤（零宽/bidi/连续标点封顶3/空白规整）+ 缩写展开（Dr./Mr./St./vs./etc./e.g./i.e.，cap/digit 守卫）+ 数字→单词（百分比/小数/序数/货币/年份/整数，经 num2words 0.5.14）；保守不改（粘字母 MP3/v2.5、千分位 1,000、区间 3-5、版本号 3.5.1、前导零 007、7+位ID）；`[...]`/`[[...]]` 标记跳过。
+  - 接线到两个 choke point：`app/practice/orchestrator.py` `_tts_url_from_bytes`（归一化在缓存键前）与 `app/api/routes/audio.py` `/tts`（合成前归一化）——此两处为文本→引擎唯一入口。
+  - 依赖：`pyproject.toml`/`uv.lock` 增 `num2words>=0.5`（MIT）。
+- **验证**：`pytest tests/test_text_normalize.py` 14 passed；全量 `pytest -q` **252 passed, 4 skipped**；受牵涉测试（audio_stub/m2_core/free_chat/stream_sentence）71 passed；`ruff check` + `ruff format --check` 全绿。
+- **口径**：保守——假阴性（数字不改）可接受，假阳性（改坏意思）不可接受；缩写式（I'll/We're）不做归一（edge-tts 原生可读）；`"No."` 未入表（对话答复常见真句）故 `"No. 5"`→`"No. five"` 为该边缘可接受。
+- **待办（下步）**：P0-B 引擎生命周期（`is_available/ensure_ready/unload` + provider 分派 + 超时/熔断）→ P1-C 缺句上报/duration。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-07）
+
 ## 2026-09-07 TTS 链路整改 P0-A：流式句切分「缩写/小数点/网址误拆」修复 + 架构解耦
 
 - **背景**：对抗拷问 vtts-03 指出的句切分硬伤——旧 `_SENTENCE_END_RE=[.!?][\s…]*` 无任何守卫，`Mr./Dr./U.S./3.5/Ph.D./.com` 被当句号切错。已用旧正则实测复现：`"Mr. Smith went to the store."→['Mr.','Smith went to the store.']`、`"It's 3.5 miles away."→["It's 3.","5 miles away."]`、`"The U.S. economy grew."→['The U.','S.','economy grew.']`、`"Visit example.com today."→['Visit example.','com today.']`。

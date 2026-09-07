@@ -54,11 +54,11 @@
 - **目标**：`Mr.`、`St.`、`Dr.`、`U.S.`、`3.5`、`Ph.D`、`f(x)=2.` 不被拆成独立句子；长句不再被 300 字符硬切到词中间。
 - **改什么（已解耦）**：新增纯模块 `services/python/app/audio/textproc/sentence_splitter.py`（**架构解耦**：把句切分从 1000+ 行 `app/practice/orchestrator.py` 抽出，engine-agnostic 纯逻辑，后续归一/发音/ssml 同归 `app/audio/textproc/`）；`orchestrator.py` 改为 import；`tests/test_stream_sentence.py` 改导入并加 8 例回归。
 - **怎么做（借鉴自写）**：
-  1. 把句界判定抽成**纯函数** `find_sentence_boundary(buf) -> int`（便于单测）。
+  1. 把句界判定抽成**纯函数** `find_sentence_end(text) -> int`（便于单测；已实现于 `app/audio/textproc/sentence_splitter.py`，另导出 `StreamSentenceSplitter` / `MAX_SENTENCE_CHARS`）。
   2. 加**守卫**：`a-zA-Z.[a-zA-Z]`（`U.S.`）、缩写表（`Mr/St/Dr/Prof/Mrs/Ms/Inc/Ltd/vs/etc/e.g/i.e/…`，词前大写缩写 `cap` 守卫同 VS chunked_tts.py:35-39/216-243）、`数字.数字`（小数点）、网址 `.com/.net/…`、`[...]` 括号内不切。
   3. 超长句：优先按 **分句边界**（`;:,—`/破折号）切，回落 `rfind(' ')`，再回落**避开括号 tag 的硬切**（VS `_find_last_clause_boundary` / `_safe_hard_cut` 思路）；`_MAX_SENTENCE_CHARS` 300 保留为上限。
   4. 首版只需 en 数据（我们产品对话为英语），honorific 表放 `app/audio/`（或 `app/textproc/`）供后续扩展。
-- **验收 / 回归（修复前必失败）**：`tests/`/`app/practice/test_sentence_splitter.py` 新增：`"Mr. Smith went to the store."` → 1 句；`"It's 3.5 miles away."` → 1 句；`"The U.S. economy grew."` → 1 句；`"Dr. Smith and Prof. Lee left."` → 1 句；`"I scored 98. Good."` → 2 句；当前实现的 `_SENTENCE_END_RE` 对这些**全部失败**。
+- **验收 / 回归（修复前必失败）**：`tests/test_stream_sentence.py` 新增 8 例（实现于 2026-09-07，17 passed + 全量 238 passed / 4 skipped + ruff 全绿）：`"Mr. Smith went to the store."` → 1 句；`"It's 3.5 miles away."` → 1 句；`"The U.S. economy grew."` → 1 句；`"Dr. Smith and Prof. Lee left."` → 1 句；`"I scored 98. Good."` → 2 句；当前实现的 `_SENTENCE_END_RE` 对这些**全部失败**。
 - **风险/回退**：低。真 `TTSProbe` 无关，纯字符串逻辑。回归失败则回退到 no-op（不切=整段合成），保持正确性优先于细分。
 - **建议 PR**：纯 Python + 测试，1 PR，`chore(test) + fix(tts)`。
 
@@ -87,17 +87,17 @@
 - **风险/回退**：高（需要密钥/许可/新依赖）。**建议本步放在 P0-A/P0-B 之后**；最低成本路径是「先删假配置 + 改文档措辞」，Azure 真接线列为独立后续 PR。
 - **建议 PR**：`chore(tts): drop dead azure config`（若接线则 `feat(tts): azure backend`，含 `.env.example` 占位符）。
 
-### P1-A · vtts-05 文本前处理：归一化（数字/缩写/清洗）·发音词典·ssml-lite 子集
+### P1-A · vtts-05 文本前处理：归一化（数字/缩写/清洗）·发音词典·ssml-lite 子集（✅ 归一化已实现）
 
 - **目标**：`I'll`/`We're`/`50%`/`3.5`/`the U.S.`/`St.` 读对；拼写/专名可词典纠音。
-- **改什么**：新增 `services/python/app/audio/textproc.py`（或 `app/audio/normalize.py`）；在 `orchestrator.py:397-400`（`_spawn(line)` 前）与 `routes/audio.py:91` 的 **text 入口统一拦截**。
+- **改什么（已解耦）**：新增纯模块 `services/python/app/audio/textproc/normalize.py`（engine-agnostic，与 `sentence_splitter.py` 同归 `app/audio/textproc/`）；已接线到两个 choke point——`orchestrator.py` `_tts_url_from_bytes`（归一化在缓存键前）与 `routes/audio.py` `/tts`（合成前归一化）。依赖 `num2words>=0.5`（MIT）。
 - **怎么做（借鉴自写，引 MIT `num2words`）**：
-  1. `normalize_for_tts(text, language)`：**幂等、绝不 raise**（任何异常回退原文）。做：零宽/连续标点清理、缩写展开（`Dr./Mr./St./vs./etc./e.g. + U.S.`，带 cap/digit 守卫）、数字→单词（`50%`→`fifty percent`、年份/序数/货币）。
-  2. `apply_lexicon(text, dict)`：词边界整词替换 + 最长优先（处理专名读错）；可选 `[[term|replacement]]` 内联覆盖。
+  1. `normalize_for_tts(text, language)`：**幂等、绝不 raise**（任何异常回退原文）。做：零宽/连续标点清理、缩写展开（`Dr./Mr./St./vs./etc./e.g.`，带 cap/digit 守卫）、数字→单词（`50%`→`fifty percent`、年份/序数/货币/小数/整数）。**已完成**。
+  2. `apply_lexicon(text, dict)`：词边界整词替换 + 最长优先（处理专名读错）；可选 `[[term|replacement]]` 内联覆盖。**未做（后置）**。
   3. **不做**（后置）：完整 SSML-lite 解析也放 P1-E；本步只做引擎无关的文本清洗。
-- **验收**：纯函数测试：`normalize_for_tts("50%")=="fifty percent"`、`"3.5"`→`three point five`、`"Dr."`→`"Doctor "`；`normalize(normalize(x))==normalize(x)`（幂等）；输入为 `[pause 300ms]`/`[[gif|jiff]]` 时**不破坏**（括号内跳过）。
-- **风险/回退**：低。纯函数、可回退（异常回退原文）。走 `textproc.py` 独立模块，不对 `TTSClient` 动刀。
-- **建议 PR**：`feat(tts): text normalization`（含 num2words 依赖 + 纯函数测试）。
+- **验收（已达成）**：纯函数测试：`normalize_for_tts("50%")=="fifty percent"`、`"3.5"`→`three point five`、`"Dr."`→`"Doctor "`；`normalize(normalize(x))==normalize(x)`（幂等）；`[pause 300ms]`/`[[…]]` 不破坏（括号内跳过）。
+- **风险/回退**：低。纯函数、可回退（异常回退原文）。走 `textproc/` 独立模块，不对 `TTSClient` 动刀。
+- **建议 PR**：`feat(tts): text normalization`（含 num2words 依赖 + 纯函数测试）。已按此实现。
 
 ### P1-B · vtts-06 缓存确定性：键扩容 + TTL + /tts 复用
 
