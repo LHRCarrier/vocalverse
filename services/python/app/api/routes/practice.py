@@ -308,6 +308,33 @@ async def get_report(
 # ---------------------------------------------------------------------------
 # 音频回放（docs/14 §6.2：验归属 + 24h 惰性过期 → 410）
 # ---------------------------------------------------------------------------
+@router.get("/audio/tts/{name}")
+async def get_tts_audio(name: str, user_id: int = Depends(get_current_user_id)):
+    """AI TTS 输出流（tts/ 前缀，独立路由；双段路径无法与 /audio/{name} 单段参数兼容）。
+
+    2026-09-07（用户实测 403）：流式多句音频只有首句落库（attempt/message 引用），
+    其余 chunk 无归属引用 → get_audio 归属校验 403。TTS 为会话内生成物（非隐私录音），
+    登录 + 未过期即放行；用户录音仍由 /audio/{name} 严格归属。
+    """
+    if not _SAFE_NAME.match(name):
+        raise BizError(http_status=400, code=40001, message="bad audio name")
+    settings = get_settings()
+    path = Path(settings.audio_dir) / "tts" / name
+    if not path.exists() or path.stat().st_mtime + settings.audio_ttl_hours * 3600 < time.time():
+        if path.exists():
+            path.unlink(missing_ok=True)  # 惰性清理
+        raise BizError(http_status=410, code=41001, message="audio expired")
+
+    async def _tts_stream():
+        with open(path, "rb") as f:
+            while chunk := f.read(64 * 1024):
+                yield chunk
+
+    return StreamingResponse(
+        _tts_stream(), media_type="audio/mpeg", headers={"Cache-Control": "private, max-age=0"}
+    )
+
+
 @router.get("/audio/{name}")
 async def get_audio(
     name: str,

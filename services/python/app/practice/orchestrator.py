@@ -88,7 +88,7 @@ async def _tts_url_from_bytes(
     except Exception as exc:  # edge-tts 断网/缓存写盘失败等
         logger.warning("sentence no audio: %r (reason: %s)", text, exc)
         return None, None
-    return save_audio_bytes(data), mp3_duration_seconds(data)
+    return save_tts_audio_bytes(data), mp3_duration_seconds(data)
 
 
 def save_audio_bytes(data: bytes) -> str:
@@ -103,6 +103,26 @@ def save_audio_bytes(data: bytes) -> str:
         with open(path, "wb") as f:
             f.write(data)
     return f"/api/v1/audio/{name}"
+
+
+def save_tts_audio_bytes(data: bytes) -> str:
+    """AI TTS 输出（非用户录音）→ data/audio/tts/{sha1}.mp3，返回 /api/v1/audio/tts/{sha1}.mp3。
+
+    2026-09-07（用户实测 403）：流式多句音频只有首句落库（attempt/message 引用），
+    其余 chunk 无归属引用 → get_audio 归属校验 403。TTS 输出放 tts/ 前缀，路由对该前缀
+    只校验登录+过期（见 routes/practice.py get_audio），用户录音仍走严格归属校验。
+    """
+    import os
+
+    settings = get_settings()
+    tts_dir = os.path.join(settings.audio_dir, "tts")
+    os.makedirs(tts_dir, exist_ok=True)
+    name = hashlib.sha1(data).hexdigest()[:32] + ".mp3"
+    path = os.path.join(tts_dir, name)
+    if not os.path.exists(path):
+        with open(path, "wb") as f:
+            f.write(data)
+    return f"/api/v1/audio/tts/{name}"
 
 
 async def _synth_sentence(
