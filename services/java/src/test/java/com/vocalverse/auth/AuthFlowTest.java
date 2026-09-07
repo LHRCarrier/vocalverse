@@ -155,4 +155,64 @@ class AuthFlowTest {
     assert tickets.get(0).getTitle().equals("密码重置申请");
     assert tickets.get(0).getStatus().equals("open");
   }
+
+  @Test
+  void logoutRevokesAllRefreshTokens() throws Exception {
+    // 注册 + 再登录一次 → 该用户持两份 refresh token（验证「全部吊销」而非仅吊销当次）
+    String username = "logout_" + System.nanoTime() % 1000000;
+    String registerResp =
+        mockMvc
+            .perform(
+                post("/auth/register")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        ("{\"username\":\""
+                                + username
+                                + "\",\"password\":\"password123\","
+                                + "\"nickname\":\"Logout\",\"ageGroup\":\"adult\"}")
+                            .getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String refresh1 =
+        objectMapper.readTree(registerResp).path("data").path("refreshToken").asText();
+    String loginResp =
+        mockMvc
+            .perform(
+                post("/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"username\":\"" + username + "\",\"password\":\"password123\"}"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    JsonNode loginData = objectMapper.readTree(loginResp).path("data");
+    String access2 = loginData.path("accessToken").asText();
+    String refresh2 = loginData.path("refreshToken").asText();
+
+    // 无令牌调用 logout → 403（匿名访问受保护端点：Spring Security 6 默认 AccessDenied → 403；
+    // 401 仅来自 ServiceTokenFilter 显式 sendError 与 ResponseStatusException，见既有用例）
+    mockMvc.perform(post("/auth/logout")).andExpect(status().isForbidden());
+
+    // 带 access token 登出 → 吊销全部
+    mockMvc
+        .perform(post("/auth/logout").header("Authorization", "Bearer " + access2))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value(0));
+
+    // 两份 refresh 均已失效（含注册期签发的 refresh1 —— 即「退出登录后 30 天窗口内不得续命」）
+    mockMvc
+        .perform(
+            post("/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"refreshToken\":\"" + refresh1 + "\"}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"refreshToken\":\"" + refresh2 + "\"}"))
+        .andExpect(status().isUnauthorized());
+  }
 }
