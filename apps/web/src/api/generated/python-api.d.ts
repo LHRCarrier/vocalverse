@@ -199,6 +199,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audio/tts/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Tts Audio
+         * @description AI TTS 输出流（tts/ 前缀，独立路由；双段路径无法与 /audio/{name} 单段参数兼容）。
+         *
+         *     2026-09-07（用户实测 403）：流式多句音频只有首句落库（attempt/message 引用），
+         *     其余 chunk 无归属引用 → get_audio 归属校验 403。TTS 为会话内生成物（非隐私录音），
+         *     登录 + 未过期即放行；用户录音仍由 /audio/{name} 严格归属。
+         */
+        get: operations["get_tts_audio_api_v1_audio_tts__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audio/{name}": {
         parameters: {
             query?: never;
@@ -418,6 +442,11 @@ export interface components {
              * @default 0
              */
             duration: number;
+            /**
+             * No Speech
+             * @default false
+             */
+            no_speech: boolean;
         };
         /** Body_asr_api_v1_asr_post */
         Body_asr_api_v1_asr_post: {
@@ -1020,6 +1049,40 @@ export interface operations {
             };
             path: {
                 report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_tts_audio_api_v1_audio_tts__name__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                name: string;
             };
             cookie?: never;
         };
