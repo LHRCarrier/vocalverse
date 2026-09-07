@@ -44,6 +44,11 @@ services:
       APP_ENV: development
       APP_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vocalverse}:${POSTGRES_PASSWORD:-vocalverse-dev}@postgres:5432/${POSTGRES_DB:-vocalverse}
       APP_REDIS_URL: redis://redis:6379/0
+      # 密钥显式必填（docs/19 P0-9：缺值 compose 直接报错；dev 值由 .env 提供，.env.example 含占位）
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?required}
+      APP_SERVICE_TOKEN: ${APP_SERVICE_TOKEN:?required}
+      # 模型使用镜像内预下载副本（docs/06 §8 / 审计 R-11：容器网络到 HF 不可达；本地裸跑仍走 'small' 联网下载）
+      APP_ASR_MODEL: /app/models/whisper-small
     # docs/06 §8：whisper 信号量 2 下多 worker 收益为负（每进程 ≈500MB 模型）；内存 ≥2GB 显式护栏
     mem_limit: 2g
     ports:
@@ -95,6 +100,9 @@ services:
       DB_NAME: ${POSTGRES_DB:-vocalverse}
       DB_USER: ${POSTGRES_USER:-vocalverse}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-vocalverse-dev}
+      # 密钥显式必填（docs/19 P0-9：缺值 compose 直接报错；dev 值由 .env 提供，.env.example 含占位）
+      JWT_SECRET: ${JWT_SECRET:?required}
+      SERVICE_TOKEN: ${SERVICE_TOKEN:?required}
     ports:
       - "8080:8080"
     depends_on:
