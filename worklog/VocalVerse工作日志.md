@@ -3,6 +3,19 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 回归修复：口语/自由说 ASR 全挂（uvicorn --reload 事件循环 + ffmpeg 依赖剪枝）
+
+- **现象**：口语页「管线提示: asr_failed」、自由说「自由对话提示: internal」（两页首步都是 ASR）；`local/dev-logs/python-8000.err.log` 铁证 —— `raise NotImplementedError`（asyncio/subprocess.py → base_events.py:528 `_make_subprocess_transport`）；
+- **根因（双问题叠加，均非业务代码）**：
+  1. **uvicorn `--reload` 在 Windows 用 SelectorEventLoop**（`uvicorn/loops/asyncio.py`：`win32 and not use_subprocess → Proactor`，`--reload` 时 use_subprocess=True → Selector）——**Selector 不支持 `asyncio` 子进程**，`create_subprocess_exec` 直接 NotImplementedError；方式 A（docker 无 --reload → Proactor）不受影响，故此前「正常」；
+  2. **`uv sync` 剪枝**：`imageio-ffmpeg`（本机 ffmpeg 二进制兜底，asr.py/README 登记）此前以传递依赖存在于 venv，我同步依赖后**被移除** → ffmpeg 缺失（即便修好循环也照样失败）；
+- **修复**：① `ffmpeg_utils.run_ffmpeg/probe_duration_seconds` 全部改 **`asyncio.to_thread(subprocess.run(..., timeout=...))`**（任何 loop 类型可用；仍满足 P0-2 线程化 + 超时 kill；asr/ise 无需改动）；② `pyproject` **显式声明 `imageio-ffmpeg>=0.5`**（防再次剪枝）；③ 回归锁 `test_run_ffmpeg_works_under_selector_loop`（Selector 下真实执行）+ 非零/缺失错误断言；
+- **验证**：`ffmpeg_bin()` 解析到 imageio 内嵌二进制；全量 `pytest -q` **297 passed** + ruff 全绿（121 文件）；`uvicorn --reload` 已热重载；
+- **遗留（本机真链路前提）**：`data/models` 无 whisper 模型缓存且 `HF_HUB_OFFLINE=1`（dev-up 注入）→ 真实 ASR 需要先下载模型（`HF_HUB_OFFLINE=0` + `WhisperModel('small')` 预下载一次）或演示档 `APP_TESTING=true`（README 演示口径：无密钥全 Fake），二者选一后页面即可用；
+- **踩坑**：SelectorEventLoop 下 `asyncio` 子进程不可用属平台级行为，代码层面不能靠运行时改 loop 策略（uvicorn 先建 loop 后 import app）；ffmpeg 二进制依赖必须显式声明（传递依赖不可靠）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-07）
+
 ## 2026-09-07 部署踩坑：JWT_SECRET 未注入导致 Java :8080 启动失败（dev-up.ps1 补 .env 注入）
 
 - **现象**：`.\scripts\dev-up.ps1 start` → python/vite 健康 True，java False；`local/dev-logs/java-8080.out.log` 尾：`Caused by: java.lang.IllegalStateException: vocalverse.jwt.secret 未配置或过短（≥32 字节）：检查 JWT_SECRET 环境变量（docs/19 P0-9）`（JwtService.java:29 fail-fast）；
