@@ -75,8 +75,10 @@ export function openSseFetch(
       for (;;) {
         // R-18 idle 超时：每次 read 重置计时（任何字节——含 ': ping' 注释行——到达即重置）；
         // 超时 → 主动取消流并报错（防永久 busy；上层按 error 提示/重试）。
+        // read 拒绝（断网/abort）必须 reject 外层 Promise——否则 await 永久挂起、
+        // onError/onClose 不触发、90s 兜底失效（2026-09-07 评审复现，见 PR#30）。
         const readResult = await new Promise<{ done: boolean; value?: Uint8Array } | 'timeout'>(
-          (resolve) => {
+          (resolve, reject) => {
             const timer = setTimeout(() => resolve('timeout'), SSE_IDLE_TIMEOUT_MS)
             reader.read().then(
               (r) => {
@@ -86,7 +88,7 @@ export function openSseFetch(
               (err) => {
                 clearTimeout(timer)
                 reader.cancel().catch(() => {})
-                throw err
+                reject(err)
               },
             )
           },
