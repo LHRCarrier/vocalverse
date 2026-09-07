@@ -44,6 +44,16 @@ describe('parseSseBuffer（docs/16 A1：跨 chunk/多 data/心跳/坏块）', ()
     expect(rest).toBe('')
     expect(events.map((e) => e.type)).toEqual(['audio_chunk', 'turn_end'])
   })
+
+  it('audio_chunk 透传服务端时长估算（docs/44 P1-C：duration 可选字段）', () => {
+    const [, events] = parseSseBuffer(
+      'data: {"type":"audio_chunk","url":"/a/2.mp3","duration":1.5}\n\n',
+    )
+    expect(events[0]).toEqual({ type: 'audio_chunk', url: '/a/2.mp3', duration: 1.5 })
+    // 旧端/旧服务端无 duration 时不影响解析
+    const [, legacy] = parseSseBuffer('data: {"type":"audio_chunk","url":"/a/3.mp3"}\n\n')
+    expect(legacy[0]).toEqual({ type: 'audio_chunk', url: '/a/3.mp3' })
+  })
 })
 
 describe('openSseFetch idle 超时（R-18 / 审计 R-18：90s 无字节 → 报错取消）', () => {
