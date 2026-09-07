@@ -31,6 +31,43 @@ def test_parse_duration_from_stderr_hhmmss() -> None:
 
 
 # ---------------------------------------------------------------------------
+# va-01 · run_ffmpeg 事件循环兼容（2026-09-07 部署坑回归锁）
+# ---------------------------------------------------------------------------
+
+
+def test_run_ffmpeg_works_under_selector_loop() -> None:
+    """Windows + uvicorn --reload 用 SelectorEventLoop（uvicorn/loops/asyncio.py），
+    asyncio.create_subprocess_exec 在 Selector 上抛 NotImplementedError（ASR 全挂）。
+    修复：run_ffmpeg 走 to_thread(subprocess.run) —— 本用例在 Selector 上验证可跑。
+    """
+    import asyncio
+
+    from app.audio.ffmpeg_utils import run_ffmpeg
+
+    loop = asyncio.SelectorEventLoop()
+    try:
+        out = loop.run_until_complete(run_ffmpeg(["-version"], timeout_s=10))
+    except RuntimeError as exc:
+        if "未找到" in str(exc):
+            pytest.skip("环境无 ffmpeg（CI/轻量环境）")
+        raise
+    finally:
+        loop.close()
+    # ffmpeg -version 打到 stdout；run_ffmpeg 语义上只收 stderr（错误通道）。
+    # 断言「未抛错且返回 bytes」即证明 SelectorEventLoop 下子进程真实执行成功。
+    assert isinstance(out, bytes)
+
+
+async def test_run_ffmpeg_raises_on_nonzero_exit() -> None:
+    from app.audio.ffmpeg_utils import run_ffmpeg
+
+    # 环境无 ffmpeg 时抛「未找到」；有 ffmpeg 时对不存在输入抛「失败」——两者都是
+    # 明确的子进程层错误（错误发生在 exec 之前/之后都不再是 NotImplementedError）。
+    with pytest.raises(RuntimeError, match="ffmpeg"):
+        await run_ffmpeg(["-i", "definitely-missing-file.in"], timeout_s=10)
+
+
+# ---------------------------------------------------------------------------
 # vasr-07 / vasr-10 · ASR：VAD 参数 + no_speech 判别
 # ---------------------------------------------------------------------------
 
