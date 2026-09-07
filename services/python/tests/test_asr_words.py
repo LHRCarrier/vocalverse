@@ -41,13 +41,14 @@ class _FakeModel:
     def __init__(self):
         self.calls: list[dict] = []
 
-    def transcribe(self, wav_path, language="en", beam_size=5, word_timestamps=False):
+    def transcribe(self, wav_path, language="en", beam_size=5, word_timestamps=False, vad_filter=False):
         self.calls.append(
             {
                 "wav": wav_path,
                 "language": language,
                 "beam_size": beam_size,
                 "word_timestamps": word_timestamps,
+                "vad_filter": vad_filter,  # vasr-07：断言 VAD 已接线
             }
         )
 

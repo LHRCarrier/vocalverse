@@ -8,7 +8,7 @@ import subprocess
 import wave
 
 import pytest
-from app.audio.asr import _ffmpeg_bin
+from app.audio.ffmpeg_utils import ffmpeg_bin as _ffmpeg_bin
 from app.audio.ise import _ise_frames, _parse_ise, _to_pcm16
 
 # 真实响应结构（2026-09-03 实测）：sentence 层 accuracy/fluency/standard/total，
