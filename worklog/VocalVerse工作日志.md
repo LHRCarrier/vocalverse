@@ -3,6 +3,25 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 语音链路剩余队列 P1 批（va-01/03/08 · vasr-01/05/07/09/10 · py-05/10）· 156 op
+
+- **背景**：性能拷问×审查剩余「语音链路 Python 侧 P0/P1」全量落地（组长裁决续做）；含 1 项审查官升格 P0（va-03 ISE 收帧超时）；
+- **va-03（P0·最痛）ISE 分级超时**：`_recv_result` 每帧接收 5s 墙钟（wait_for）；`score()` ws 会话总预算 12s（`asyncio.timeout`）；编排器 `await score_task` 改 **`wait_for(shield, 3s)`**（docs/14 §3.2「迟到≤3s 显示未评测」落为代码）：超时**不取消** score_task（shield），第 6 步不再等它 → **ISE 挂起不再拖停整轮 SSE**；落库侧以 `score_late` 门控不再重复无界 await；
+- **vasr-07 Silero VAD（最强实锤兑现）**：`transcribe` 加 `vad_filter=True`（faster-whisper 内置，零新依赖）——docs/06 §8:116 承诺从「没做」变「一行兑现」，静音/噪段前置裁剪，稳词界 + 降带 BGM CER；
+- **vasr-09 模型加载**：`_get_model` 双重检查锁（threading.Lock，并发首请求只加载一次）；`main._prewarm_asr` 改 `await asyncio.to_thread(client.warm)`（**显式 warm() 替代 getattr 探针**；加载移出事件循环，就绪探测不再被 10~30s 阻塞）；
+- **vasr-01 转写墙钟**：`asyncio.wait_for(to_thread(transcribe), 300s)` —— whisper 挂起时信号量槽位可释放，消除「挂 2 次=全站 ASR 永久死亡」；
+- **vasr-05 时长校验 + asr_seconds 修正**：`/turns` 前置 ffprobe（缺则 ffmpeg -i stderr 解析，`ffmpeg_utils.probe_duration_seconds`）→ 超 `max_dialog_seconds` 返回 **42204**（先校验后落盘/扣额度；探不出不阻断，字节界兜底）；`asr_seconds` 改用 `res.duration`（旧实现把 webm 字节当 16k 算）；错误码 42204 已登记 docs/api/error-codes.md（**42203 已被社区占用，踩坑：先查表再用**）；
+- **vasr-10 判别位**：`ASRResult.no_speech`（no_speech_prob>0.7 或空转写）；影子跟读提示分流（「太安静了，试着大声一点」vs「没听清」），提高提示准确度、避免无意义的反复重试；
+- **va-01 ffmpeg 工具层**：新 `app/audio/ffmpeg_utils.py`（`ffmpeg_bin/ffprobe_bin/run_ffmpeg/parse_duration_from_stderr/probe_duration_seconds`）——asr/ise 两份内联转码收拢为单一护栏（asr.py 除 `_run_ffmpeg_async` 薄壳；ise `_to_pcm16` 直接 run_ffmpeg；test_ise 导入与二进制探测同步迁移）；
+- **va-08 评分客户端分级**：`get_scorer_client` 缺 Key 时按 `app_env` 分级—— **production → `UnavailableScorerClient` fail-fast**（score() 抛可读错误→明确「未评测」，杜绝假分 88/90/86/85 静默流入 skill/推荐链）；development → Fake+**`is_fake=True` 显式标识** + 告警日志；
+- **py-05 LLM 连接池**：`DeepSeekLLMClient` 构造期常驻 `httpx.AsyncClient(limits=…)`；`base.get_llm_client` 按 (key, base_url, model) **缓存实例**（此前每调用新建 = 每次 TLS 握手）；
+- **py-10 META 补偿封顶**：`SessionState.meta_failures`（新字段）——会话内连续失败 ≥2 次后跳过补偿，规则兜底（控 LLM 配额）；
+- **验证**：新 `tests/test_audio_hardening.py` 10 例（时长解析纯函数/VAD+no_speech 判别/4 线程单次加载/ISE 收帧超时与正常帧/LLM 实例缓存/评分 fail-fast 与 Fake 标识）+ `test_asr_words` 适配 vad_filter 参数；全量 `pytest -q` **291 passed/1 skipped** + ruff 全绿（120 文件格式化）；
+- **踩坑**：① Async 函数/`asyncio.timeout` 嵌套信号量内 ws 会话——预算边界放 connect 内；② 42203 撞车（先查表）；③ `vad_filter` 参数让既有 `_FakeModel.transcribe` 签名炸（TypeError unexpected kwarg）——fakes 需同步补参；④ 评分超时若直接 wait_for 会**取消** score_task → 第 7 步落库重 await 崩（CancelledError）——必须 shield + score_late 门控；
+- **登记**：docs/api/error-codes.md（42204）；影子提示文案分流见安卓日志；R-13 权威轮次与 SSE golden 属下一批（跨端）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-07）
+
 ## 2026-09-07 性能拷问 P0 两连 + P1-B：推荐缓存 500 修复 / SSE 收尾同步解堵 / TTS 缓存确定性 · 67 op
 
 - **背景**：上轮「性能拷问×审查」3 个 P0 + 1 个 P1 一并落地（组长裁决），全部按 code/test/docs 三 commit；
