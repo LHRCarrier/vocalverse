@@ -122,4 +122,36 @@ describe('openSseFetch idle 超时（R-18 / 审计 R-18：90s 无字节 → 报�
     expect(onClose).toHaveBeenCalledTimes(1)
     expect(onError).not.toHaveBeenCalled()
   })
+
+  it('读取中途拒绝（网络断开）→ onError + onClose（回归：修复前外层 Promise 永不结算，挂起）', async () => {
+    vi.useFakeTimers()
+    mockFetchWith(makeFakeStream([() => Promise.reject(new Error('network lost'))]))
+    const onError = vi.fn()
+    const onClose = vi.fn()
+    openSseFetch(
+      '/api/v1/sessions/1/turns',
+      { method: 'POST', body: new FormData() },
+      { onError, onClose },
+    )
+    await vi.advanceTimersByTimeAsync(0)
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('network lost') }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('abort（AbortError）→ 静默返回，不触发 onError/onClose（主动取消不算错误）', async () => {
+    vi.useFakeTimers()
+    const abortErr = new Error('aborted')
+    abortErr.name = 'AbortError'
+    mockFetchWith(makeFakeStream([() => Promise.reject(abortErr)]))
+    const onError = vi.fn()
+    const onClose = vi.fn()
+    openSseFetch(
+      '/api/v1/sessions/1/turns',
+      { method: 'POST', body: new FormData() },
+      { onError, onClose },
+    )
+    await vi.advanceTimersByTimeAsync(0)
+    expect(onError).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+  })
 })
