@@ -28,12 +28,35 @@ New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
 # HF 缓存约定（docs/06 §8 · 方式 B 本地，2026-09-04 修复；与容器 hf-cache 卷约定为两套口径，
 # 容器侧由 compose/镜像承载——当前未注入属 K03 未闭合项，另立整改）：
-# huggingface 被墙 → 一律走仓库 data/models 本地缓存（宿主预下载 faster-whisper-small）。
+# huggingface 被墙 → 默认走仓库 data/models 本地缓存（宿主预下载 faster-whisper-small）。
 # 不设则首次 ASR 尝试联网下载 → 连接/SSL 失败 → /placement/items/*/audio 500。
 # 仅在用户未显式设置时注入（与 main.py setdefault 同语义，尊重显式覆盖）。
-if (-not $env:HF_HOME) { $env:HF_HOME = Join-Path $Root "data\models" }
+# 2026-09-07 修正：**默认 HF 缓存（%USERPROFILE%\.cache\huggingface）已有模型时不再注入
+# HF_HOME**（此前无条件注入 data/models——该目录缺失时 HF 绕开已下载模型 → 预热失败、ASR 全挂）；
+# 仅当默认缓存也不存在时才切仓库目录（新机/净环境兜底）。
+if (-not $env:HF_HOME) {
+    if (-not (Test-Path (Join-Path $env:USERPROFILE ".cache\huggingface\hub"))) {
+        $env:HF_HOME = Join-Path $Root "data\models"
+    }
+}
 if (-not $env:HF_HUB_OFFLINE) { $env:HF_HUB_OFFLINE = "1" }
 if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
+
+# 本地模型直载（2026-09-07 修复：huggingface_hub 新版对缓存快照做「完整性校验」，被墙环境下
+# 下载不完整即拒绝加载（"incomplete: file(s) missing"），且 HF_ENDPOINT/缓存状态差异难以稳定。
+# → faster-whisper 支持**本地目录路径**加载：找到含 model.bin 的完整快照，设 APP_ASR_MODEL 直指
+# 该目录（完全绕过 HF 缓存/网络）；找不到才回退默认（联网/仓库预下载口径）。
+# 用户显式设置了 APP_ASR_MODEL 则尊重（此分支只在未设置时执行）。
+# 实测（2026-09-07）：VoiceStudio 的 models--Systran--faster-whisper-large-v3 可直载可用，
+# 但 CPU int8 RTF≈5.6（5.8s 音频需 32s）不满足对话「3~5s 反馈」→ 不默认启用；如需精听/离线
+# 标注可显式设 APP_ASR_MODEL=<该目录 snapshots/<rev>>。turbo（deepdml-ct2）缺 tokenizer 不可用。
+$ModelSnapshotRoot = Join-Path $env:USERPROFILE ".cache\huggingface\hub\models--Systran--faster-whisper-small\snapshots"
+if (-not $env:APP_ASR_MODEL -and (Test-Path $ModelSnapshotRoot)) {
+    $snap = Get-ChildItem $ModelSnapshotRoot -Directory -ErrorAction SilentlyContinue |
+        Where-Object { Test-Path (Join-Path $_.FullName "model.bin") } |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($snap) { $env:APP_ASR_MODEL = $snap.FullName }
+}
 
 # 根 .env 注入（2026-09-07 部署踩坑：Java application.yml 用 `${JWT_SECRET:}`，方式 B 本地
 # 的 Maven 子进程不读 .env —— 无键时 JwtService P0-9 fail-fast 拒绝启动（8080 起不来），
