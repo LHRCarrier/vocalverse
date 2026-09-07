@@ -41,7 +41,9 @@ class _FakeModel:
     def __init__(self):
         self.calls: list[dict] = []
 
-    def transcribe(self, wav_path, language="en", beam_size=5, word_timestamps=False, vad_filter=False):
+    def transcribe(
+        self, wav_path, language="en", beam_size=5, word_timestamps=False, vad_filter=False
+    ):
         self.calls.append(
             {
                 "wav": wav_path,
