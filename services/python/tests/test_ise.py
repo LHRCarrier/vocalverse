@@ -55,12 +55,13 @@ def _wav_8k_1s() -> bytes:
 
 
 @_NEED_FFMPEG
-def test_to_pcm16_converts_to_16k_mono_s16le() -> None:
+async def test_to_pcm16_converts_to_16k_mono_s16le() -> None:
     """回归：ISE 只收 16k 单声道 s16le 裸 PCM（auf=L16;rate=16000, aue=raw）。
 
     编排器传入原始 WebM 字节；1s@8k → 1s@16k = 16000×2 字节（不转码 ISE 解码失败）。
+    （P0-2 起 _to_pcm16 为 async：ffmpeg 子进程化 + 15s 超时，docs/19 P0-2。）
     """
-    out = _to_pcm16(_wav_8k_1s())
+    out = await _to_pcm16(_wav_8k_1s())
     assert len(out) == 16000 * 2
 
 
