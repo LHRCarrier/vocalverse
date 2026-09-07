@@ -11,6 +11,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { track } from '@/api/events'
+import { loadAudioBlob } from '@/api/client'
 import { createSession, fetchScenarios, streamTurn, tts, type ScenarioItem } from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
@@ -100,18 +101,28 @@ function pump() {
   const url = queue.shift()
   if (!url) return
   pumping = true
-  speaker.src = url
-  speaker.onended = () => {
-    pumping = false
-    pump()
-    maybeUnlockTurn()
-  }
-  // autoplay 被拒/环境不支持：跳过继续，绝不卡队列（用户可手动重听）
-  speaker.play().catch(() => {
-    pumping = false
-    pump()
-    maybeUnlockTurn()
-  })
+  // 2026-09-07 修复「后续音频不自动播」真正根因：GET /api/v1/audio/{name} 强制 Bearer 鉴权
+  // （docs/06 §11），原生 <audio> 请求不带 Authorization → 401 静默失败。改为带 token 的
+  // loadAudioBlob 先拉 blob → objectURL 播放（与开场白/重听同一管道）；失败跳过不卡队列。
+  void loadAudioBlob(url)
+    .then((blob) => {
+      if (!blob.size) throw new Error('empty audio')
+      const objectUrl = createUrl(blob)
+      speaker.src = objectUrl
+      speaker.onended = () => {
+        revokeUrl(objectUrl)
+        pumping = false
+        pump()
+        maybeUnlockTurn()
+      }
+      return speaker.play()
+    })
+    .catch((err) => {
+      console.warn('[speaker] chunk playback failed:', err)
+      pumping = false
+      pump()
+      maybeUnlockTurn()
+    })
 }
 
 function queueChunk(url: string) {

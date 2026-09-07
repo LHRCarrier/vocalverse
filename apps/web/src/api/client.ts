@@ -114,6 +114,33 @@ export function readyz() {
   return request<{ status: string; app_env: string; asr: string; tts: string }>('/readyz')
 }
 
+/**
+ * 音频二进制拉取（GET /api/v1/audio/{name} 为原始 mp3 流，非 envelope）。
+ * 2026-09-07 修复「回合音频不自动播」：原生 <audio> 无法携带 Authorization（docs/06 §11
+ * Bearer 强制）→ 401 静默失败；统一改「带 token fetch → objectURL」blob 播放管道。
+ * 401 会话续期与 request 同款（authRefresher 单飞）。
+ */
+export async function loadAudioBlob(path: string): Promise<Blob> {
+  const fetchBlob = async (): Promise<Blob> => {
+    const resp = await fetch(`${PYTHON_BASE}${path}`, { headers: authHeaders() })
+    if (!resp.ok) throw new ApiError(-1, `audio fetch failed: HTTP ${resp.status}`, resp.status)
+    return await resp.blob()
+  }
+  try {
+    return await fetchBlob()
+  } catch (e) {
+    if (e instanceof ApiError && e.httpStatus === 401 && authRefresher && !refreshing) {
+      refreshing = true
+      try {
+        if (await authRefresher()) return await fetchBlob()
+      } finally {
+        refreshing = false
+      }
+    }
+    throw e
+  }
+}
+
 export function pingJava() {
   return request<PingData>('/api/v1/ping', undefined, JAVA_BASE)
 }

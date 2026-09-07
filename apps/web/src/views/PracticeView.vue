@@ -9,6 +9,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { NButton, NCard, NProgress, NTag } from 'naive-ui'
 
 import { track } from '@/api/events'
+import { loadAudioBlob } from '@/api/client'
 import { createSession, fetchScenarios, streamTurn, tts, type ScenarioItem } from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
@@ -126,30 +127,40 @@ async function playTts(text: string) {
 }
 
 function playChunk(url: string, duration?: number | null) {
-  const audio = new Audio(url)
-  audioQueue.push(audio)
-  let advanced = false
-  const advance = () => {
-    if (advanced) return
-    advanced = true
-    audioQueue.shift()?.play().catch(() => undefined)
-  }
-  audio.onended = advance
-  // 兜底：ended 不触发时按时长定时推进（docs/44 P1-C；优先服务端估算，同 playTts 口径）
-  audio.addEventListener(
-    'loadedmetadata',
-    () => {
-      const ms =
-        Number.isFinite(audio.duration) && audio.duration > 0
-          ? audio.duration * 1000
-          : duration && duration > 0
-            ? duration * 1000
-            : 0
-      if (ms > 0) setTimeout(advance, Math.min(ms + 400, 15000))
-    },
-    { once: true },
-  )
-  if (audioQueue.length === 1) audio.play().catch(() => undefined)
+  // 2026-09-07：原生 <audio> 不带 Bearer（GET /api/v1/audio 强制鉴权）→ 401；改带 token 拉 blob 再播
+  void loadAudioBlob(url)
+    .then((blob) => {
+      if (!blob.size) throw new Error('empty audio')
+      const objectUrl = createUrl(blob)
+      const audio = new Audio(objectUrl)
+      audioQueue.push(audio)
+      let advanced = false
+      const advance = () => {
+        if (advanced) return
+        advanced = true
+        revokeUrl(objectUrl)
+        audioQueue.shift()?.play().catch(() => undefined)
+      }
+      audio.onended = advance
+      // 兜底：ended 不触发时按时长定时推进（docs/44 P1-C；同 playTts 口径）
+      audio.addEventListener(
+        'loadedmetadata',
+        () => {
+          const ms =
+            Number.isFinite(audio.duration) && audio.duration > 0
+              ? audio.duration * 1000
+              : duration && duration > 0
+                ? duration * 1000
+                : 0
+          if (ms > 0) setTimeout(advance, Math.min(ms + 400, 15000))
+        },
+        { once: true },
+      )
+      if (audioQueue.length === 1) audio.play().catch(() => undefined)
+    })
+    .catch((err) => {
+      console.warn('[practice] audio_chunk fetch failed:', err)
+    })
 }
 
 async function startRecording() {
