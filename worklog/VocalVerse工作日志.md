@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 跨端收尾：R-13 权威轮次 + SSE 协议 golden 双端护栏 · 31 op
+
+- **R-13（va-arch-09，P1·S）**：`events.py TurnEnd` 增 `expected_turn`（服务端权威：本回合完成后 `state.current_turn`，即下一轮应提交的 `expected_turn`）；orchestrator **6 处 TurnEnd 发射点**全部回带（对话/轻回合/demo-hint/辩护/影子）；前端三处采纳——`MobileSpeakingView`/`PracticeView` 的 `currentTurn` 与 `DefenseView` 的 `questionIndex` 改为 **`e.expected_turn ?? 乐观值`**（乐观推进保留、服务端纠偏兜底）——断线/刷新后不再靠前端计数撞 40903「重来」；
+- **va-arch-04 SSE 协议 golden（P1·M）**：新增**单语料双端断言**——`tests/fixtures/sse_event_cases.json`（v1 快照 12 例：全部 9 种事件 + audio_chunk 含/不含 duration + turn_end 含/不含 expected_turn + meta_block 最小/全量；由后端 pydantic 模型生成）→ 后端 `test_sse_protocol_golden.py` 3 例（序列化字节一致/重建回环/exclude_none 语义固化）+ 前端 `sse-protocol-golden.test.ts` 2 例（parseSseBuffer 解析==语料/缺省字段不存在）；**任一边契约漂移 → 单边 CI 红**（VS「共享 golden corpus 双端断言」工程思路落地，AGPL 仅借鉴）；
+- **验证**：后端全量 `pytest -q` **294 passed/1 skipped** + ruff 全绿；前端 `lint/typecheck/test:run`（**95 passed**，+2 golden）/build 全绿；
+- **踩坑**：① 前端 golden 读文件不能用 `new URL(relative, import.meta.url)`（vitest 下 import.meta.url 非 file scheme）→ `path.resolve(process.cwd(), …)`（cwd=apps/web，两级上级=仓库根）；② `asyncio.wait_for` 直接包 score_task 会**取消**任务致落库侧 CancelledError——shield+门控（见上批）；③ TurnEnd 6 处发射点多行/单行形态不一，逐个核对；
+- **登记**：docs/14 §3.3（turn_end 行 + golden 护栏说明）；App 端轮次显示纠偏见安卓日志。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-07）
+
 ## 2026-09-07 语音链路剩余队列 P1 批（va-01/03/08 · vasr-01/05/07/09/10 · py-05/10）· 156 op
 
 - **背景**：性能拷问×审查剩余「语音链路 Python 侧 P0/P1」全量落地（组长裁决续做）；含 1 项审查官升格 P0（va-03 ISE 收帧超时）；
