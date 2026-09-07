@@ -14,7 +14,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-import re
 from pathlib import Path
 
 from app.agent.domains.learner import get_rendered
@@ -24,6 +23,7 @@ from app.agent.runtime.meta_executor import MetaExecutor, compensate_meta
 from app.agent.runtime.turn_runner import TurnRunner
 from app.audio.base import ASRClient, LLMClient, ScorerClient, TTSClient
 from app.audio.fluency import compute_fluency_features
+from app.audio.textproc.sentence_splitter import StreamSentenceSplitter
 from app.audio.tts import atomic_write_cache, cached_audio_path, tts_cache_key
 from app.core.config import get_settings
 from app.db import get_session_factory
@@ -53,52 +53,9 @@ logger = logging.getLogger("vocalverse")
 
 _meta_executor = MetaExecutor()
 
-# 流内句边界：.!? 及后随空白/引号/括号；无标点超长句截断上限（docs/19 P0-5 健壮性：
-# LLM 不守规矩时不拖垮单句合成尖峰）
-_SENTENCE_END_RE = re.compile(r"[.!?][\s\"'”‘’\)]*")
-_MAX_SENTENCE_CHARS = 300
-
-
-class StreamSentenceSplitter:
-    """流式 TextDelta → 完整句（遇句边界立即出句；flush 收尾句）。
-
-    - 跨 chunk 安全（缓冲累积后统一切分）；
-    - 输出句已 strip；空句/纯标点不产出；
-    - 输入为 TurnRunner 泄漏门放行的**纯正文**（META 已被剥离，docs/26）。
-    """
-
-    def __init__(self) -> None:
-        self._buf = ""
-
-    def push(self, delta: str) -> list[str]:
-        self._buf += delta
-        out: list[str] = []
-        while True:
-            if len(self._buf) > _MAX_SENTENCE_CHARS:
-                # 无标点长句：从最后一个空格处切（保留词边界）
-                cut = self._buf.rfind(" ", 0, _MAX_SENTENCE_CHARS)
-                if cut <= 0:
-                    cut = _MAX_SENTENCE_CHARS
-                sentence, self._buf = self._buf[:cut].strip(), self._buf[cut:].lstrip()
-                if sentence:
-                    out.append(sentence)
-                continue
-            m = _SENTENCE_END_RE.search(self._buf)
-            if not m:
-                break
-            # 边界匹配可能吞入后随空白/引号，rstrip 掉句尾边界字符
-            # （"Great job!  \"" → "Great job!"）
-            sentence = self._buf[: m.end()].rstrip(" \t\r\n\"'”‘’()")
-            self._buf = self._buf[m.end() :]
-            # 纯标点/空白句不产出（"Wow!!" 的第二个 "!" 不成为独立句子）
-            if sentence and any(c.isalnum() for c in sentence):
-                out.append(sentence)
-        return out
-
-    def flush(self) -> list[str]:
-        """流结束：残余无标点文本也作为最后一句（音频/字幕完整闭合）。"""
-        rest, self._buf = self._buf.strip(), ""
-        return [rest] if rest else []
+# 流内句切分见 app/audio/textproc/sentence_splitter.py（独立纯模块，供 orchestrator 复用）：
+# - 缩写（Mr./Dr./…）/ 小数点（3.5）/ 网址 / 括号标签守卫，杜绝把句号当缩写点切错；
+# - 无标点超长句按 分句边界→词边界→避开括号 tag 硬切（单句合成尖峰防护，docs/19 P0-5）。
 
 
 class OrchestratorError(HTTPException):
