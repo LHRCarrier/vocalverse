@@ -116,6 +116,42 @@ async def test_synthesis_failure_reports_and_returns_none_pair(caplog) -> None:
 
 async def test_synthesis_success_returns_url_and_duration() -> None:
     url, duration = await _tts_url_from_bytes(_FramesTTS(), "Hi.", "en-US-JennyNeural", "+0%")
-    assert url is not None and url.startswith("/api/v1/audio/")
+    assert url is not None and url.startswith("/api/v1/audio/tts/")  # TTS 输出走 tts/ 前缀
     assert duration is not None
     assert abs(duration - 100 * _FRAME_S) < 0.01
+
+
+# ---------------------------------------------------------------------------
+# get_audio：tts/ 前缀免归属校验（2026-09-07 用户实测 403 回归锁）
+# ---------------------------------------------------------------------------
+
+
+def test_get_audio_tts_prefix_skips_ownership(client, monkeypatch) -> None:
+    """AI TTS 输出（tts/ 前缀）：登录+未过期即放行，无需 attempt/message 引用。"""
+    from pathlib import Path as _P
+
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    tts_dir = _P(settings.audio_dir) / "tts"
+    tts_dir.mkdir(parents=True, exist_ok=True)
+    name = "a" * 32 + ".mp3"
+    (tts_dir / name).write_bytes(b"ID3fakemp3payload")
+
+    resp = client.get(f"/api/v1/audio/tts/{name}", headers={"X-Test-User-Id": "1"})
+    assert resp.status_code == 200, resp.text
+    assert resp.content == b"ID3fakemp3payload"
+
+
+def test_get_audio_plain_name_still_requires_ownership(client) -> None:
+    """用户录音路径（无 tts/ 前缀）：无归属引用 → 40301（归属校验保持）。"""
+    from pathlib import Path as _P
+
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    _P(settings.audio_dir).mkdir(parents=True, exist_ok=True)
+    name = "b" * 32 + ".mp3"
+    (_P(settings.audio_dir) / name).write_bytes(b"useraudio")
+    resp = client.get(f"/api/v1/audio/{name}", headers={"X-Test-User-Id": "1"})
+    assert resp.status_code == 403
