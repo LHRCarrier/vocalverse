@@ -40,6 +40,9 @@ class TextDelta(pydantic.BaseModel):
 class AudioChunk(pydantic.BaseModel):
     type: Literal["audio_chunk"] = "audio_chunk"
     url: str
+    #: 单句音频时长估算（秒，服务端 MP3 帧头估算，docs/44 P1-C / vtts-04）。
+    #: None=不可估算或旧端兼容——sse_payload 用 exclude_none，字段缺失时前端安全忽略。
+    duration: float | None = None
 
 
 class MetaBlock(pydantic.BaseModel):

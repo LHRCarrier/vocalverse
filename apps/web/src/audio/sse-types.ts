@@ -26,6 +26,8 @@ export interface TextDeltaEvent {
 export interface AudioChunkEvent {
   type: 'audio_chunk'
   url: string
+  /** 服务端估算的单句时长（秒，MP3 帧头；docs/44 P1-C）；缺失时前端走 metadata/定时兜底 */
+  duration?: number | null
 }
 
 export interface MetaBlockEvent {

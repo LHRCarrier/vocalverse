@@ -121,12 +121,30 @@ async function playTts(text: string) {
   }
 }
 
-function playChunk(url: string) {
+function playChunk(url: string, duration?: number | null) {
   const audio = new Audio(url)
   audioQueue.push(audio)
-  audio.onended = () => {
+  let advanced = false
+  const advance = () => {
+    if (advanced) return
+    advanced = true
     audioQueue.shift()?.play().catch(() => undefined)
   }
+  audio.onended = advance
+  // 兜底：ended 不触发时按时长定时推进（docs/44 P1-C；优先服务端估算，同 playTts 口径）
+  audio.addEventListener(
+    'loadedmetadata',
+    () => {
+      const ms =
+        Number.isFinite(audio.duration) && audio.duration > 0
+          ? audio.duration * 1000
+          : duration && duration > 0
+            ? duration * 1000
+            : 0
+      if (ms > 0) setTimeout(advance, Math.min(ms + 400, 15000))
+    },
+    { once: true },
+  )
   if (audioQueue.length === 1) audio.play().catch(() => undefined)
 }
 
@@ -201,7 +219,7 @@ function onSseEvent(e: SseStreamEvent) {
       last.text += e.text
       break
     case 'audio_chunk':
-      playChunk(e.url)
+      playChunk(e.url, e.duration)
       break
     case 'meta_block':
       last.coach = e.coach_note ?? null

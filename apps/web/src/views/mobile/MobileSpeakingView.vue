@@ -263,10 +263,13 @@ function replay(index: number, text: string) {
   void playTts(text, undefined, index)
 }
 
-function playChunk(url: string) {
+function playChunk(url: string, duration?: number | null) {
   const audio = new Audio(url)
   audioQueue.push(audio)
-  audio.onended = () => {
+  let advanced = false
+  const advance = () => {
+    if (advanced) return
+    advanced = true
     audioQueue.shift()?.play().catch(() => undefined)
     // 全部音频块播完 = 本回合语音完整听了一遍 → 提前解锁喇叭按钮（turn_end 兜底解锁，双保险）
     if (!audioQueue.length) {
@@ -274,6 +277,22 @@ function playChunk(url: string) {
       if (lastAssistant) lastAssistant.speakable = true
     }
   }
+  audio.onended = advance
+  // 兜底：部分环境 ended 不触发（headless/无音频设备）→ 按时长定时推进队列，防卡死；
+  // 优先服务端估算 duration（docs/44 P1-C），否则 audio.duration（与 playTts 同款兜底口径）
+  audio.addEventListener(
+    'loadedmetadata',
+    () => {
+      const ms =
+        Number.isFinite(audio.duration) && audio.duration > 0
+          ? audio.duration * 1000
+          : duration && duration > 0
+            ? duration * 1000
+            : 0
+      if (ms > 0) setTimeout(advance, Math.min(ms + 400, 15000))
+    },
+    { once: true },
+  )
   if (audioQueue.length === 1) audio.play().catch(() => undefined)
 }
 
@@ -356,7 +375,7 @@ function onSseEvent(e: SseStreamEvent) {
       currentAssistant.value.text += e.text
       break
     case 'audio_chunk':
-      playChunk(e.url)
+      playChunk(e.url, e.duration)
       break
     case 'meta_block':
       for (const hit of e.corpus_hits) {

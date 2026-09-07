@@ -25,7 +25,7 @@ from app.audio.base import ASRClient, LLMClient, ScorerClient, TTSClient
 from app.audio.fluency import compute_fluency_features
 from app.audio.textproc.normalize import normalize_for_tts
 from app.audio.textproc.sentence_splitter import StreamSentenceSplitter
-from app.audio.tts import atomic_write_cache, cached_audio_path, tts_cache_key
+from app.audio.tts import atomic_write_cache, cached_audio_path, mp3_duration_seconds, tts_cache_key
 from app.core.config import get_settings
 from app.db import get_session_factory
 from app.models import (
@@ -67,8 +67,14 @@ def _db():
     return get_session_factory()()
 
 
-async def _tts_url_from_bytes(tts: TTSClient, text: str, voice: str, rate: str) -> str | None:
-    """逐句合成并落盘，返回鉴权 URL；失败返回 None（无声字幕继续，docs/14 §3.2）。
+async def _tts_url_from_bytes(
+    tts: TTSClient, text: str, voice: str, rate: str
+) -> tuple[str | None, float | None]:
+    """逐句合成并落盘，返回 ``(鉴权 URL, 时长估算秒)``；失败 ``(None, None)``。
+
+    失败不再静默（docs/44 P1-C / vtts-04）：结构化日志 ``sentence no audio`` 记录
+    句文本与原因（字幕继续，docs/14 §3.2）；时长取自缓存/新合成音频的 MP3 帧头估算
+    （``mp3_duration_seconds``，纯函数绝不抛错）。
 
     P0-5 预合成缓存（docs/06 §8：开场/常用句，命名约定见 app/audio/tts.py）：
     命中直接复用；未命中合成后**原子写缓存**（tmp + os.replace，并发同句不产生脏缓存）。
@@ -88,9 +94,9 @@ async def _tts_url_from_bytes(tts: TTSClient, text: str, voice: str, rate: str) 
             data = await tts.synthesize(text, voice=voice, rate=rate)
             atomic_write_cache(cache_path, data)
     except Exception as exc:  # edge-tts 断网/缓存写盘失败等
-        logger.warning("tts failed: %s", exc)
-        return None
-    return save_audio_bytes(data)
+        logger.warning("sentence no audio: %r (reason: %s)", text, exc)
+        return None, None
+    return save_audio_bytes(data), mp3_duration_seconds(data)
 
 
 def save_audio_bytes(data: bytes) -> str:
@@ -108,14 +114,18 @@ def save_audio_bytes(data: bytes) -> str:
 
 
 async def _synth_sentence(
-    seq: int, line: str, tts: TTSClient, settings, pending: dict[int, str | None]
+    seq: int,
+    line: str,
+    tts: TTSClient,
+    settings,
+    pending: dict[int, tuple[str | None, float | None]],
 ) -> None:
     """单句合成任务（P0-5：每句独立任务，完成后按 seq 归位供主循环按序 drain）。
 
-    失败已由 _tts_url_from_bytes 内部降级为 None（字幕继续），此处不再吞异常。
+    失败已由 _tts_url_from_bytes 内部降级为 (None, None)（字幕继续 + 缺句日志，
+    docs/44 P1-C），此处不再吞异常。
     """
-    url = await _tts_url_from_bytes(tts, line, settings.tts_voice, settings.tts_rate)
-    pending[seq] = url
+    pending[seq] = await _tts_url_from_bytes(tts, line, settings.tts_voice, settings.tts_rate)
 
 
 def _persist_dialog_turn(
@@ -340,7 +350,7 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         runner = TurnRunner(llm)
         caught = False
         splitter = StreamSentenceSplitter()
-        pending_tts: dict[int, str | None] = {}
+        pending_tts: dict[int, tuple[str | None, float | None]] = {}
         next_tts_seq = 0
         next_emit = 0
         tts_tasks: list[asyncio.Task] = []  # 持有引用防 GC（create_task 生命周期）
@@ -361,11 +371,11 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                     _spawn(line)
                 # 非阻塞排空已完成的句子（乱序完成由 seq 归一，事件顺序恒为文本顺序）
                 while next_emit in pending_tts:
-                    url = pending_tts.pop(next_emit)
+                    url, duration = pending_tts.pop(next_emit)
                     next_emit += 1
                     if url:
                         emitted_urls.append(url)
-                        yield ev.AudioChunk(url=url)
+                        yield ev.AudioChunk(url=url, duration=duration)
         except Exception as exc:
             caught = True
             logger.warning("llm failed: %s", exc)
@@ -376,11 +386,11 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         if tts_tasks:
             await asyncio.gather(*tts_tasks, return_exceptions=True)
         while next_emit in pending_tts:
-            url = pending_tts.pop(next_emit)
+            url, duration = pending_tts.pop(next_emit)
             next_emit += 1
             if url:
                 emitted_urls.append(url)
-                yield ev.AudioChunk(url=url)
+                yield ev.AudioChunk(url=url, duration=duration)
         if caught:
             full_text = _fallback_reply(transcript)
             meta = MetaResult(reply=full_text, meta=None, ok=False)
@@ -747,11 +757,11 @@ async def _shadow_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
 
         if action == "start":
             yield ev.TurnStart(turn_index=turn_index, reference_text=sentence)
-            demo_url = await _tts_url_from_bytes(
+            demo_url, demo_duration = await _tts_url_from_bytes(
                 tts, sentence, settings.tts_voice, settings.tts_rate
             )
             if demo_url:
-                yield ev.AudioChunk(url=demo_url)
+                yield ev.AudioChunk(url=demo_url, duration=demo_duration)
             yield ev.TurnEnd(turn_index=turn_index, score_status="pending")
             await get_state_store().put(state)
             return

@@ -23,6 +23,63 @@ _DEFAULT_TIMEOUT_S = 30.0
 #: 合成失败重试次数（初试 + 重试 = 2；单发重试，参考 VS「明确失败而非循环」思路）。
 _MAX_ATTEMPTS = 2
 
+# ── MP3 时长估算（docs/44 P1-C / vtts-04）──────────────────────────────────────
+# 纯函数、绝不抛错：非 MP3 / 定位不到帧头 / 非法帧头 → None。
+# 适用 CBR（Microsoft edge-tts 默认 'audio-24khz-48kbitrate-mono-mp3' 为 CBR）；
+# VBR 文件为近似值，ID3v2 头被跳过。
+
+#: MPEG 版本 → 位率表（Layer III，单位 kbps；索引 0 = free，15 = 非法，不进表）。
+_MPEG_L3_BITRATES: dict[int, tuple[int, ...]] = {
+    3: (32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320),  # MPEG1
+    2: (8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160),  # MPEG2
+    0: (8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160),  # MPEG2.5
+}
+
+
+def mp3_duration_seconds(data: bytes) -> float | None:
+    """估算 MP3 音频时长（秒）。CBR 下精度 ≈±1 帧（6ms 级）；任何异常 → None。
+
+    计算：跳过 ID3v2 标签 → 定位首个合法同步帧（0xFFE + 版本/位率/采样率索引校验）→
+    ``剩余字节 × 8 / 位率``。不解析解码，零依赖、零 IO。
+    """
+    if not data:
+        return None
+    offset = 0
+    if data[:3] == b"ID3":
+        if len(data) < 10:
+            return None
+        size = (
+            ((data[6] & 0x7F) << 21)
+            | ((data[7] & 0x7F) << 14)
+            | ((data[8] & 0x7F) << 7)
+            | (data[9] & 0x7F)
+        )
+        offset = 10 + size
+        if offset >= len(data):
+            return None
+    i = offset
+    header: tuple[int, int, int] | None = None
+    limit = len(data) - 4
+    while i <= limit:
+        if data[i] == 0xFF and (data[i + 1] & 0xE0) == 0xE0:
+            version = (data[i + 1] >> 3) & 0x03  # 0b11=MPEG1, 0b10=MPEG2, 0b00=MPEG2.5
+            layer = (data[i + 1] >> 1) & 0x03  # 0b01 = Layer III
+            br_idx = (data[i + 2] >> 4) & 0x0F
+            sr_idx = (data[i + 2] >> 2) & 0x03
+            if version != 1 and layer == 1 and 0 < br_idx < 15 and sr_idx != 3:
+                header = (i, version, br_idx)
+                break
+        i += 1
+    if header is None:
+        return None
+    pos, version, br_idx = header
+    br_kbps = _MPEG_L3_BITRATES[version][br_idx - 1]
+    payload_bytes = len(data) - pos
+    if payload_bytes <= 0:
+        return None
+    duration = payload_bytes * 8.0 / (br_kbps * 1000.0)
+    return duration if duration > 0 else None
+
 
 class EdgeTTSClient(TTSClient):
     def __init__(
