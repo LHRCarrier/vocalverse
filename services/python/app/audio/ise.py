@@ -1,4 +1,9 @@
-"""讯飞 ISE 发音评测客户端（docs/06 §9.3 基线；并发信号量 2 由编排器控制，无 Key 时走 Fake）。
+"""讯飞 ISE 发音评测客户端（docs/06 §9.3 基线；并发信号量 2，无 Key 时走 Fake）。
+
+> docs/19 P1-4 / 审计 R-10：信号量此前**零实现**（此处文档自认"由编排器控制"，实际无代码）。
+> 修订：改为客户端内模块级 `asyncio.Semaphore(2)`（docs/06 §8：与 whisper 并发 2 一致），
+> 跨路由（/score、/turns、/placement 评测）统一生效，排队不雪崩。
+
 
 流式版接口（wss://ise-api.xfyun.cn/v2/open-ise，官方现行文档，2026-09-03 实测）：
 - 鉴权：url 查询参数 authorization/date/host（HMAC-SHA256，见 _ws_url）；
@@ -14,10 +19,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import json
-import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
@@ -29,19 +34,26 @@ from app.audio.base import ScorerClient, ScoreResult
 
 ISE_URL = "wss://ise-api.xfyun.cn/v2/open-ise"
 
+# docs/06 §8：模型侧信号量（ISE 并发 2，与 whisper 一致）
+_ISE_CONCURRENCY = 2
+_ISE_SEM = asyncio.Semaphore(_ISE_CONCURRENCY)
+
 # 音频帧大小：服务端校验 data.data（base64）≤ 26000 字符 → 原始 PCM 每帧 ≤ ~19KB
 _FRAME_BYTES = 19000
 
 
-def _to_pcm16(audio_bytes: bytes) -> bytes:
-    """任意音频容器 → 16k 单声道 s16le 裸 PCM（ISE 唯一接受格式）。"""
+async def _to_pcm16(audio_bytes: bytes, timeout_s: float = 15.0) -> bytes:
+    """任意音频容器 → 16k 单声道 s16le 裸 PCM（ISE 唯一接受格式）。
+
+    docs/19 P0-2：同步 subprocess 阻塞事件循环 → 改 async + 15s 超时（复用 asr 同款护栏）。
+    """
     with tempfile.NamedTemporaryFile(suffix=".in", delete=False) as tmp:
         tmp.write(audio_bytes)
         src = tmp.name
     pcm = src + ".pcm"
     try:
-        subprocess.run(
-            [
+        try:
+            proc = await asyncio.create_subprocess_exec(
                 _ffmpeg_bin(),
                 "-y",
                 "-i",
@@ -55,10 +67,19 @@ def _to_pcm16(audio_bytes: bytes) -> bytes:
                 "-f",
                 "s16le",
                 pcm,
-            ],
-            check=True,
-            capture_output=True,
-        )
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError(f"ffmpeg 未找到: {_ffmpeg_bin()}") from exc
+        try:
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_s)
+        except TimeoutError as exc:
+            proc.kill()
+            await proc.wait()
+            raise RuntimeError(f"ffmpeg 转码超时（{timeout_s}s）: {src}") from exc
+        if proc.returncode != 0:
+            raise RuntimeError(f"ffmpeg 转码失败（exit={proc.returncode}）: {stderr or b''}")
         return Path(pcm).read_bytes()
     finally:
         Path(src).unlink(missing_ok=True)
@@ -113,58 +134,60 @@ class ISEClient(ScorerClient):
     async def score(self, audio_bytes: bytes, reference: str, language: str = "en") -> ScoreResult:
         from websockets.asyncio.client import connect
 
-        pcm = _to_pcm16(audio_bytes)
-        if not pcm:
-            raise RuntimeError("ISE: 转码后音频为空")
-        ent = "cn_vip" if language == "zh" else "en_vip"
-        # 文本需带 UTF8 BOM 头（官方文档规定）；英文句子跟读题型（自由题 category=topic 可扩展）
-        text = "\ufeff" + reference
-        # 参数上传阶段（cmd=ssb）：业务参数 + 多维度分（rst=entirety 且 ise_unite=1）
-        business = {
-            "sub": "ise",
-            "ent": ent,
-            "category": "read_sentence",
-            "cmd": "ssb",
-            "text": text,
-            "tte": "utf-8",
-            "ttp_skip": True,
-            "rst": "entirety",
-            "ise_unite": "1",
-            "extra_ability": "multi_dimension",
-            "aue": "raw",  # 默认是讯飞定制 speex！裸 PCM 必须显式 raw（2026-09-03 实测 40007）
-            "auf": "audio/L16;rate=16000",
-        }
-        async with connect(self._ws_url(), open_timeout=10, close_timeout=5) as ws:
-            # 1) 参数帧
-            await ws.send(
-                json.dumps(
-                    {
-                        "common": {"app_id": self._app_id},
-                        "business": business,
-                        "data": {"status": 0, "data": ""},
-                    }
-                )
-            )
-            # 2) 音频帧（business 每帧带，cmd 切 auw + aus；仅 common 首帧，2026-09-03 实测）
-            for aus, status, chunk_b64 in _ise_frames(pcm):
+        # docs/06 §8 信号量护栏：限并发评测（转码 + 全量 ws 交互都在临界区内；排队不雪崩）
+        async with _ISE_SEM:
+            pcm = await _to_pcm16(audio_bytes)
+            if not pcm:
+                raise RuntimeError("ISE: 转码后音频为空")
+            ent = "cn_vip" if language == "zh" else "en_vip"
+            # 文本需带 UTF8 BOM 头（官方文档规定）；英文句子跟读题型（自由题 category=topic 可扩展）
+            text = "\ufeff" + reference
+            # 参数上传阶段（cmd=ssb）：业务参数 + 多维度分（rst=entirety 且 ise_unite=1）
+            business = {
+                "sub": "ise",
+                "ent": ent,
+                "category": "read_sentence",
+                "cmd": "ssb",
+                "text": text,
+                "tte": "utf-8",
+                "ttp_skip": True,
+                "rst": "entirety",
+                "ise_unite": "1",
+                "extra_ability": "multi_dimension",
+                "aue": "raw",  # 默认是讯飞定制 speex！裸 PCM 必须显式 raw（2026-09-03 实测 40007）
+                "auf": "audio/L16;rate=16000",
+            }
+            async with connect(self._ws_url(), open_timeout=10, close_timeout=5) as ws:
+                # 1) 参数帧
                 await ws.send(
                     json.dumps(
                         {
-                            "business": {**business, "cmd": "auw", "aus": aus},
-                            "data": {"status": status, "data": chunk_b64},
+                            "common": {"app_id": self._app_id},
+                            "business": business,
+                            "data": {"status": 0, "data": ""},
                         }
                     )
                 )
-            payload = await _recv_result(ws)
-        xml_text = payload.decode("utf-8", "replace")
-        parsed = _parse_ise({"code": 0, "data": {"ise_res": {"xml": xml_text}}})
-        return ScoreResult(
-            overall=parsed["overall"],
-            pronunciation=parsed["pron"],
-            fluency=parsed["flu"],
-            completeness=parsed["completeness"],
-            word_level=parsed["words"],
-        )
+                # 2) 音频帧（business 每帧带，cmd 切 auw + aus；仅 common 首帧，2026-09-03 实测）
+                for aus, status, chunk_b64 in _ise_frames(pcm):
+                    await ws.send(
+                        json.dumps(
+                            {
+                                "business": {**business, "cmd": "auw", "aus": aus},
+                                "data": {"status": status, "data": chunk_b64},
+                            }
+                        )
+                    )
+                payload = await _recv_result(ws)
+            xml_text = payload.decode("utf-8", "replace")
+            parsed = _parse_ise({"code": 0, "data": {"ise_res": {"xml": xml_text}}})
+            return ScoreResult(
+                overall=parsed["overall"],
+                pronunciation=parsed["pron"],
+                fluency=parsed["flu"],
+                completeness=parsed["completeness"],
+                word_level=parsed["words"],
+            )
 
 
 async def _recv_result(ws) -> bytes:

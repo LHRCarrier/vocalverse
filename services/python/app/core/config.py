@@ -3,11 +3,19 @@
 约定（见 docs/06 第 11 章）：
 - 根 .env（gitignored）+ 本目录 .env.example（占位符）
 - `APP_TESTING=true` 时注入 Fake 音频/LLM 客户端，CI 零真实 API Key
+- 密钥三档策略（docs/19 P0-9，组内拍板 2026-09-07）：testing → 固定测试值；
+  development → 缺值仅告警；production → 缺值启动即失败（公开仓库不出现可用密钥）。
 """
 
 from functools import lru_cache
+from warnings import warn
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# 测试档固定值（docs/19 P0-9：CI 零真实 Key，docs/06 §5/§6 纪律；仅 APP_TESTING=true 生效）
+TEST_JWT_SECRET = "vocalverse-test-jwt-secret-0123456789abcdef"
+TEST_SERVICE_TOKEN = "vocalverse-test-internal-service-token"
 
 
 class Settings(BaseSettings):
@@ -28,9 +36,10 @@ class Settings(BaseSettings):
     redis_required: bool = False  # False → 内存 fallback，省 Redis 也能起
 
     # 鉴权（Java 签发，Python 验签；内部调用 service-token）
-    jwt_secret: str = "vocalverse-dev-jwt-secret-0123456789abcdef"
+    # 默认空串 + 三档校验（_resolve_secrets；docs/19 P0-9：禁止仓库出现可用密钥）
+    jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
-    service_token: str = "change-me-internal-service-token"
+    service_token: str = ""
     java_base_url: str = "http://localhost:8080"
 
     # LLM
@@ -59,11 +68,14 @@ class Settings(BaseSettings):
     max_sing_seconds: int = 180
     max_dialog_seconds: int = 15  # 对话单轮录音上限（docs/14 §3.2）
     dialog_idle_seconds: int = 8  # 无录音救援触发（docs/14 §2.3）
-    # 限流（docs/06 §7：30 次/时；POC 失败回退两调用时提高至 60）
+    # 限流（docs/06 §7：30 次/时；POC 失败回退两调用时提高至 60 - 沿用值不变）
     llm_rate_per_hour: int = 30
     asr_rate_per_hour: int = 60
     ise_rate_per_hour: int = 60
     tts_rate_per_hour: int = 60
+    # SSE 心跳间隔（R-18 / 审计 R-18：协议上限 30s，取 15s 留一倍余量；
+    # 静默 ≥ 此值推 ': ping' 注释行，防中间代理断流/客户端误判死链；0=关闭心跳）
+    sse_heartbeat_seconds: float = 15.0
 
     # 音频保留（合规：默认 24h 清理）
     audio_ttl_hours: int = 24
@@ -136,6 +148,32 @@ class Settings(BaseSettings):
 
     # ---- 影子跟读测试台（test-only 前端联调页，DoD ④；默认关闭，生产禁止开启） ----
     shadow_preview_enabled: bool = False  # 开启时注册 /api/v1/shadow-preview/*
+
+    @model_validator(mode="after")
+    def _resolve_secrets(self) -> "Settings":
+        """密钥三档（docs/19 P0-9）：testing 固定测试值 / development 缺值告警 / production 强制。
+
+        - testing：回退固定测试值 → CI 零真实 Key（docs/06 §5/§6），本地无 Java 联调照常；
+        - development：缺值仅 warn（本地 .env 惯例提供,不改"缺 .env 也能起"体验；
+          注意：缺值鉴权将失败——config 不再静默给默认密钥）；
+        - production：缺值直接抛错（fail-fast,公开仓库不出现任何可用密钥）。
+        """
+        if self.testing:
+            if not self.jwt_secret:
+                object.__setattr__(self, "jwt_secret", TEST_JWT_SECRET)
+            if not self.service_token:
+                object.__setattr__(self, "service_token", TEST_SERVICE_TOKEN)
+        elif self.app_env == "production":
+            if not self.jwt_secret:
+                raise ValueError("APP_JWT_SECRET 必填：production 禁默认密钥（docs/19 P0-9）")
+            if not self.service_token:
+                raise ValueError("APP_SERVICE_TOKEN 必填：production 禁默认密钥（docs/19 P0-9）")
+        else:  # development / 其余
+            if not self.jwt_secret:
+                warn("APP_JWT_SECRET 未设置（development 档）：JWT 验签将失败", stacklevel=2)
+            if not self.service_token:
+                warn("APP_SERVICE_TOKEN 未设置（development 档）：内部委托将被拒", stacklevel=2)
+        return self
 
 
 @lru_cache

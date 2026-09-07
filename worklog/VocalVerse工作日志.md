@@ -3,6 +3,20 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 组员 PR 评审：PR#30（P0 加固收口）/ PR#31（会话安全增强 + 重听逐句化）
+
+- **PR#30 fix/p0-hardening → request-changes（1 阻断 + 7 建议）**：
+  - 已核查：CI 4 checks 全绿且 job steps 明细确认「Single-Writer 探针」步骤真实执行（非 0 jobs 静默失败）；错误码 40301/40401/42901 均已登记；worklog 署名/BUG 归档位置合规；契约三层对账一致；`X-Test-User-Id` 仅 testing 档生效（无生产冒充敞口）；
+  - 🔴 阻断项：`apps/web/src/audio/sse.ts` L86-90 —— `reader.read()` 拒绝时外层 `new Promise` 永不结算（拒绝处理器 `throw err` 只产生 unhandledRejection，timer 已清 → await 永久挂起）：SSE 中途断网/组件卸载 abort 后 onError/onClose 不触发、90s idle 兜底失效 —— R-18 想防的「断流后永久 busy」反而在断流路径变为现实（修复前 `await reader.read()` 会传播到外层 .catch）。已用 Node 最小复现验证（settled=false + unhandledRejection），非纸面推断；修复建议 + 前置失败测试已写入 PR comment；
+  - 建议 7 项：heartbeat_stream interval=0 忙循环（同算法复现 0.063s 产 1363 行 ping，与「0=关闭心跳」注释相悖）、`_persist_dialog_turn` 跨线程移交 SQLAlchemy Session（官方明确非线程安全）、complete 幂等短路晚于 LLM 摘要、post_turn 三桶无差别扣费（start 仅耗 LLM、hint/demo/abandon 实际零耗）与 free_chat「按实际消耗」口径不一致、nginx `/manage/internal` 无尾斜杠形式未拦、联调页豁免登记、demo/hint/abandon 分支同步 DB 写与「短事务化」范围确认；
+  - 亮点：P0-1~9 + R 项覆盖完整，Redis Lua 释放、越权 40401 口径、Testcontainers 安全网、P0-7 探针自测 7 例均核验通过。
+- **PR#31 feat/auth-session-security → comment（认可可合，5 建议）**：
+  - 已核查：CI 3 checks 绿（java verify 含 ContractSnapshotTest；Python 零改动故 python-ci 未触发，符合预期）；「修复前失败」两条断言成立；契约/d.ts 同步；App 线记录入安卓日志、Java/契约入主线（混合条目拆分正确）；docs/18 J1 登记；
+  - 建议：① MobileSpeakingView turn_end 解锁未守空文本（与 MobileFreeChatView 的 `if (reply)` 守卫不同；LLM 失败降级回合会出现空文本喇叭 → 重播空文本触发 /tts 422）——已挂行内 comment；② logout 吊销失败被静默吞掉建议 console.warn；③ access token 注销后 1h 内服务端仍有效登记为已知边界；④「记住我」纯客户端语义登记；⑤ 联调页豁免请组长确认登记；
+  - 合入关系：与 #30 同基础 main@28cfa96，`git merge-tree` 验证代码可自动合并（仅 worklog 置顶区冲突）→ 建议 #30 先合再合 #31，worklog 人工合并。
+
+—— 执行人：组长 LHRCarrier（AI 代审，2026-09-07）
+
 ## 2026-09-07 POST /auth/logout 登出撤销 + SecurityConfig 白名单收窄（配合前端「记住我」）
 
 - 触发：用户反馈「关闭重开仍登录」→ 拍板补安全短板：退出登录必须是**有效登出**（原仅前端 `clear()`，30 天滑动窗口内 refresh 仍可续命）；
@@ -16,7 +30,129 @@
 
 —— 执行人：Faust-sudo（AI 代工）
 
-## 2026-09-06 /auth/forgot 忘记密码（演示口径：工单闭环 + 防枚举 · 51 op）
+## 2026-09-07 提交与 PR：fix/p0-hardening（P0 全集+R-18+P0-7+asr_failed 修复，10 commits）
+
+- **分支**：`fix/p0-hardening`（自 main@28cfa96），PR 已创建（base main）；
+- **commit 拆分（代码/测试/文档分离，不 squash）**：
+  1. `fix(py)` P0-4/P0-9 鉴权限流·限流时序·密钥三档（含契约快照刷新）
+  2. `fix(py)` R-10/P0-2(audio) 信号量·ffmpeg 异步化
+  3. `fix(py)` P0-1 会话态切 Redis（分级降级）
+  4. `fix(py)` P0-3/P0-8/P0-2(practice)/P0-5/R-18 越权·幂等·短事务·边合成·心跳
+  5. `fix(web)` R-18 SSE 客户端 idle 超时
+  6. `fix(java)` P0-9 密钥 fail-fast（含 d.ts 漂移修复）
+  7. `fix(deploy)` 必填密钥·模型预下载·nginx 拦截·Dockerfile 护栏
+  8. `test(py)` P0 全套回归与集成安全网（Testcontainers PG/Redis）
+  9. `chore(ci)` P0-7 单写方探针 + CI 模型下载步骤
+  10. `docs(worklog)` 本记录 + BUG 实测归档
+- **提交前门禁**：pytest **230 passed, 1 skipped**（含 pg/redis 容器用例）；ruff/format 绿；`compose config` exit 0；5 份 workflow `yaml.safe_load` 通过；此前全量检测（三端 CI 等价 + 实机 12 项）全过；
+- **备注**：CI 触发路径 = PR 上 python-ci/java-ci/frontend-ci（pull_request）；docker-build 仅 push main 触发，合入后生效。
+
+—— 执行人：Faust-sudo（AI 代工整理）
+
+## 2026-09-07 BUG-0xx 修复：「管线提示 asr_failed」—— whisper 模型未预下载 / 容器到 HF 不可达（审计 R-11 欠账兑现）
+
+- **现象**：练习上传音频回合 → SSE `error code=asr_failed`；容器日志 `ConnectError: [Errno 111]`（模型每次尝试从 HF 下载、容器网络不可达、`HF_HUB_DISABLE_XET` 未设——POC 备注 401 坑、R-11 点名欠账：hf-cache 未挂/未预下载/冷加载 500MB 超健康窗口；此前实机冒烟只测过 action=start 无音频路径）；
+- **修复（按 R-11 预案「模型预下载进镜像」）**：① 本地 `curl --ssl-no-revoke` 下载 `Systran/faster-whisper-small` 四件套（model.bin 483MB）到 `services/python/.models-cache/huggingface/`（**权重红线不入库**，.gitignore 追加）；② Dockerfile `COPY` 进 `/app/models/whisper-small`；③ compose python-api `APP_ASR_MODEL=/app/models/whisper-small`（本地裸跑行为不变）；④ docker-build.yml 加 CI 构建前下载步骤（GHA 直连 HF + HF_HUB_DISABLE_XET=1，否则 push 后 CI build 因 COPY 缺文件失败；workflow 已 yaml.safe_load 校验）；
+- **验证**：重建镜像 → 容器 healthy 且无预热失败告警 → **真音频回合全序列通过**（user_transcript→text_delta×15→score_delta→audio_chunk×3→meta_block→turn_end，零 error）；本地 `WhisperModel(本地目录)` 加载 OK；
+- **踩坑（详见 BUG实测 归档）**：① 本机 Python SSL 证书链坏（uv 自带 CPython 无 local issuer；requests/httpx/huggingface_hub 全 `CERTIFICATE_VERIFY_FAILED`，curl `--ssl-no-revoke` 正常）——下载绕道 curl；② HF 仓库无 `preprocessor_config.json`（"Entry not found" 文本会被误存为脏文件）；③ 真音频热路径此前零实机覆盖（仅 Fake ASR 单测 + start 冒烟）。
+
+—— 执行人：Faust-sudo（AI 代工整理）
+
+## 2026-09-07 项目全量检测（P0 全集+R-18+P0-7 后终态 · 全项通过 · 可提交状态）
+
+- **Python**：`uv lock --check` / ruff / format（121 files）/ alembic 0009 单头 / **P0-7 探针 exit 0** / 契约对账 exit 0 / **pytest 230 passed, 1 skipped**（含 pg×2、redis×4 真容器）；
+- **Java**：`mvn verify` **BUILD SUCCESS**（48.7s；spotless 66 clean；38 tests 0 fail，含 ContractSnapshotTest）；
+- **前端**：gen:api ×2 幂等 / lint / typecheck / **vitest 77 passed** / build 绿；
+- **静态面**：compose config exit 0（含 P0-9 必填组）；5 份 workflow 本地 `yaml.safe_load` 全过；工作树 38 文件变更（+1386/−326）；
+- **实机冒烟 12 项全过**：网关基础 6 项（401/404 拦截均在）+ 注册/登录/me/LLM 200 + 练习回合 SSE（turn_start1/text_delta16/audio_chunk3/meta_block1/turn_end1，快流无 ping 符合 R-18 预期）+ Redis 会话 3 键 + 缓存/音频落盘；
+- **结论**：全项通过、无回归、可提交；剩余非 P0 登记项：defense/shadow DB 小段 to_thread、pg/redis 用例接 CI、DB 角色方案（M3）；**建议下一步按模块分批本地 commit（不 push）**；
+- **产物**：`local/full-audit-report-2026-09-07.md`。
+
+—— 执行人：Faust-sudo（AI 代工整理）
+
+## 2026-09-07 P0-7 写方唯一性 AST 探针落地（docs/10 §3.1 矩阵 · docs/19 P0-7 · 纯 CI 面 · P0 全集收口）
+
+- **探针**：`scripts/check_single_writer.py`（AST 精确版）——Java-owned 14 表白名单（docs/10 §3.1 总表：users/user_profiles/refresh_tokens/scenarios/songs/lrc/listening_materials/placement_questions/tickets/posts/post_comments/post_interactions/follows/post_likes 对应模型类）→ 文件级 import 映射 + `x = X(...)` 实例追踪 + 检查 `*.add(*`/`*.add_all(` 参数树（直接构造/实例变量/列表元素）→ 违规输出 `文件:行` + **退出码 1（CI 阻断,非告警）**；已知局限注释声明（不查批量 update/跨函数不追踪/flush 不单列）；
+- **豁免**：`app/db/seed*.py`（docs/11 Q-A15 拍板① 初始化器语义）；tests/、alembic/ 不扫描；
+- **CI**：python-ci 新增一步（docs/19 P0-7 守护必须硬门禁），workflow 已本地 `yaml.safe_load` 校验（AGENTS.md 踩坑 24/25 纪律）；
+- **验证**：**现有 app 全量零违规**（接入 CI 前提,实测通过）——此前担心"写方唯一性代码层已破"，实测 Python 侧对 Java-owned 表零 ORM 写（内部委托路径 placement→/internal/level 均在，config 探针守护）；自测 7 例（直接构造/变量追踪/add_all 违规必抓、Python-owned 写+只读 Java-owned 放行、seed 豁免、全量安全网）；pytest **230 passed, 1 skipped**；ruff/format 绿（121 files）；
+- **踩坑（环境级,已修）**：importlib `module_from_spec` 未注册进 `sys.modules` 时,Python 3.13 dataclasses `_is_type` 走 `sys.modules[cls.__module__].__dict__` → NoneType AttributeError —— 测试加载器必须先 `sys.modules[name] = mod` 再 exec_module（本机 anaconda 3.13 与 uv 3.12 均复现）;
+- **至此 P0 全集收口**：P0-1/2/3/4/5/7/8/9 + R-04/06/10/12/18 全部落地（剩余非 P0 项：defense/shadow DB 小段 to_thread、pg/redis 用例接 CI、DB 角色方案 M3 再议）。
+
+—— 执行人：Faust-sudo（AI 代工整理）
+
+## 2026-09-07 R-18 SSE 心跳落地（审计 R-18 · 拍板：心跳 15s / 前端超时 90s · P0-7 顺延）
+
+- **服务端（协议零新事件）**：`app/practice/events.py` 新增 `heartbeat_stream(inner, interval, serialize)`——`asyncio.wait(FIRST_COMPLETED)` 竞争「事件到达 vs 静默计时」；**关键设计**：静默超时**不取消**挂起的 `anext` 任务（`wait_for` 方案会以 CancelledError 杀死正在等待中的 LLM/ASR 协程——BaseException 且生成器不可恢复），仅取消除 sleep、yield 协议已登记的 `: ping` 注释行（docs/14 §3.3「每 ≤30s 推 `: ping`」此处才真正实现）；practice.py 与 free_chat.py 两处 SSE 热路径统一接线；间隔走新配置 `APP_SSE_HEARTBEAT_SECONDS`（默认 15s，协议上限 30s 的一倍余量；0=关闭）；
+- **前端（sse.ts）**：`openSseFetch` 每次 `reader.read()` 独立 90s idle 计时（**任何字节——含 `: ping` 注释行——到达即重置**）；超时 → `reader.cancel()` + `onError('SSE 空闲超时')` + `onClose`（调用方既有错误分支复用，不新增 UI）；
+- **测试**：后端 `test_heartbeat.py` 5 例（快流零 ping 透传 / 慢流 ping+继续 / 异常透传 / 结束收尾 / 默认 serialize）；前端 sse.test 新增 3 例（90s 无数据报错、**数据/心跳重置计时（10s+20s+80s 不超时→再 20s 超时）**、正常 EOF 仅 onClose）；
+- **验证**：pytest **223 passed, 1 skipped**（+5）；前端 lint/typecheck/**77 tests**/build 绿；ruff/format 绿；实机重建 python-api 后回合 SSE 事件完整（turn_start/text_delta15/audio_chunk3/meta_block/turn_end），快流无 ping 符合预期；契约快照零影响（注释行≠JSON 事件，SSE 本就不进 OpenAPI）；
+- **踩坑**：① `heartbeat_stream` 默认 serializer=sse_payload —— 若内部流已预序列化会二次序列化（free_chat 首版因此破，改为内部产出**事件对象**、由 wrapper 统一 serialize）；② 前端测试假 Response 必须带 `ok: true`（否则走错误分支）；③ 假 reader 的分支工厂若同步 resolve，三条 read 会挤在同一 tick，测不到"重置"（须按真实时序 setTimeout 分布）。
+
+—— 执行人：Faust-sudo（AI 代工整理）
+
+## 2026-09-07 P0 批次 0-3 后全栈回归 R2（三端门禁+契约对账+实机 · 1 处自引注释差异已修 · 全部通过）
+
+- **结果**：pytest **218 passed, 1 skipped**（含 pg/redis 容器用例）/ ruff+format 绿 / alembic 0009 单头；`mvn verify` **BUILD SUCCESS**（38 tests, 0 failures, spotless 66 clean）；前端 lint/typecheck/**74 tests**/build 绿、`gen:api` ×2 幂等；实机冒烟 11 项全过（含**练习回合 SSE：turn_start→text_delta×16→audio_chunk×3→meta_block→turn_end**、Redis 会话 4 键、TTS 缓存/音频落盘）；
+- **唯一发现（自引，非功能）**：`GET /api/v1/scenarios` 契约快照对账红 —— 批次 1 给 `list_scenarios` **docstring** 加了"P0-2 to_thread"一行 → FastAPI 将路由 docstring 写入 OpenAPI `description` → 文本级对账（CI 同口径）必红；**处置**：说明移入函数体注释、docstring 复原 → 对账 ok（exit 0）；**踩坑登记**：路由 docstring 属契约面，实现说明一律写代码注释；
+- **产物**：`local/regression-report-R2-2026-09-07.md`；后续建议（报告 §7）：A. P0-7 探针（0.5 天）→ B. R-18 SSE 心跳（1 天，前后端）→ C. defense/shadow DB 小段 → D. 集成用例接 CI。
+
+—— 执行人：Faust-sudo（AI 代工整理）
+
+## 2026-09-07 P0 批次四：边生成边合成（首声预算）+ orchestrator 落库短事务化（docs/19 P0-5/P0-2 · 审计 R-04 · 拍板：音频=流文本/仅运行时缓存/仅 dialog 段）
+
+- **P0-5（审计 R-04：逐句串行 + 等 LLM 全文结束 → 推算 6.1~7.6s 超 3~6s 预算）**：
+  - `StreamSentenceSplitter`（纯函数）——流内 `.!?`(`+ 后随空白/引号`) 立即出句、跨 chunk 安全、**无标点长句 >300 字符在词边界截断**、流末 `flush()` 闭合尾句、**纯标点句过滤**（"Wow!!" 不产出独立 "!"）；输入为 TurnRunner 泄漏门放行的纯正文（META 已剥离，拼接==权威 reply_text——一致性前提）；
+  - `_dialog_turn` 流循环内：出句即 `create_task(_synth_sentence)`（任务引用列表防 GC）→ 主循环**非阻塞按句序 drain** `AudioChunk`（乱序完成由 seq 归一；首声=ASR+首 token+1 句 TTS ≈3.5~4.5s）→ 流结束 flush+`gather` 排空；失败句跳过（字幕继续，docs/14 §3.2）；删除旧串行 TTS 块（`audio_urls` 改 `emitted_urls` 收集）；
+  - **预合成缓存接线**（`cached_audio_path` 定义后零调用）：`_tts_url_from_bytes` 查缓存→合成→**原子写缓存**（`tts.atomic_write_cache`：tmp+os.replace 防并发/半文件；key=sha1(voice|rate|text)，目录 `{audio_dir}/cache/tts` 随清理策略覆盖）——首遍后同句即时返回；
+- **P0-2 顺手兑现（dialog 热路径）**：落库段（user 消息+attempt+assistant 消息+commit）整段收进 `_persist_dialog_turn`（to_thread，**零 asyncio 依赖**：score 已 await、hits/fluency 线程外备齐）；`get_session_summary`/`get_rendered` 读库改 to_thread 预取；`state` 推进仍在异步侧（运行时态）；defense/shadow 小段按拍板未动（登记）；
+- **验证**：pytest **218 passed, 1 skipped**（+8 切分器用例；pg/redis 容器用例仍绿）；ruff/format 绿；**实机 SSE 事件序 `turn_start → text_delta×18 → audio_chunk×3（逐句按序） → meta_block → turn_end`**；缓存 4 条 + 音频落盘确认；
+- **踩坑**：① `Path` 忘记导入（TTS 缓存接线后任何合成即 NameError——靠 test_shadow 全回合抓到）；② `rstrip` 而非 `strip`——句尾引号会被边界匹配吞入句内（"Great job!  \""）；③ `tts_sentences` 移除引用后需确认无残留使用。
+
+—— 执行人：Faust-sudo（AI 代工整理）
+
+## 2026-09-07 P0 批次三：Testcontainers 安全网 + 会话态切 Redis + 同步 IO 短事务化（docs/19 P0-1/P0-2 · 审计 R-12/R-10 · 拍板：本地安全网/分级降级/安全子集）
+
+- **① Testcontainers 安全网（先行，dev 依赖 +testcontainers 4.15、uv.lock 更新）**：`tests/test_pg_integration.py`（marker pg）——真 PG(16-alpine) 跑 `alembic upgrade head` + **`alembic check` 零 diff**（docs/10 §7.1-6 「M2 接 PG 首日门禁」首次真正落地）+ 完整回合/重复 complete 幂等/越权 40401（抓 JSONB/timestamptz/唯一约束）；`tests/test_redis_state_store.py`（marker redis）——SETNX 互斥、Lua 比较删除、TTL、降级与严格模式。无 Docker 自动 skip，不破坏默认门禁；
+- **② P0-1 会话态切 Redis**：`state.py` 重构——`RedisStateStore`（`session:{id}` JSON EX 1800 + `lock:{id}` NX EX 60 + **Lua 比较删除**防错删他人锁）+ `MemoryStateStore` 保留为单测桩/降级后端 + `StateStore` 组合门面（接口不变，调用方零改动）；**降级按 `redis_required` 分级**（默认降级内存+60s 限频告警；严格模式抛错可感知），降级改 **协程工厂惰性化**（严格模式抛错时无 unawaited coroutine 警告）；
+- **③ P0-2 安全子集**：asr/ise 的 ffmpeg `subprocess.run` → `create_subprocess_exec` + **15s 超时强制 kill**（超时/非零/找不到均带可读错误；顺带移除两文件 subprocess 导入）；`app/db/__init__.py` PG 显式 `pool_size=20/max_overflow=10/pool_timeout=5`；路由层（`_require_session_owner`/`list_scenarios`/`get_report`/`get_audio` 归属/`complete_session` 调用）与 `create_session` 的同步 DB 移入 `to_thread` 短事务；**orchestrator 内 6 处内联 DB 段按拍板留待 P0-5 同批**；
+- **验证**：pytest **210 passed, 1 skipped**(pg×2 + redis×4 真容器跑通；新增 9 例)；ruff/format 绿；实机——python-api 重建 healthy、migrate 幂等(seed +0)、无 token /tts 401、**建会话后 `session:1` 出现在 compose Redis**（P0-1 端到端）；
+- **安全网首次抓到方言差异**：① testcontainers 4.15 PG URL 为 `postgresql+psycopg2://`（须归一为 +psycopg）；② 真 PG FK 强制（SQLite 不校验）——完整回合用例须先种 `users` 行（测试内修正，非代码缺陷）；③ legacy `RedisContainer` 无 `get_connection_url()`（手工拼 URL）；④ pytest-asyncio 每用例独立事件循环 → redis 连接绑定 loop（客户端改**函数级**、容器保持模块级）；
+- **待办登记**：pyproject/uv.lock 变更待审；pg/redis 标记用例接入 CI 留单独 PR（本次按拍板未动 workflow）。
+
+—— 执行人：Faust-sudo（AI 代工整理）
+
+## 2026-09-07 P0 批次回归测试（全栈门禁 + 实机冒烟 · 无回归 · 放行 Batch 2）
+
+- **范围**：Batch 0（鉴权限流/信号量/密钥三档）+ Batch 1（越权守卫/报告幂等）落地后全量回归，对齐三端 CI 命令 + 容器经网关冒烟；
+- **结果**：pytest **205 passed**（not gpu 口径）/ ruff+format 绿 / alembic 单头 0009 / Python 契约快照对账一致；`mvn verify` **BUILD SUCCESS**（spotless 66 clean；**38 tests, 0 failures**，含 ContractSnapshotTest）；前端 lint/typecheck/**74 tests**/build 全绿、`gen:api` 两次生成幂等；实机冒烟 8 项全过（重点：`/api/v1/tts` 无 token → **401**、`/manage/internal/level` → **404** 新拦截、注册/登录/me/带 token LLM 全 200）；
+- **环境告警（非代码）**：本机 `apps/web/node_modules` 缺 `@vue/test-utils`（package.json/lockfile 已声明）→ `pnpm install --frozen-lockfile` 补齐后全绿；CI 新鲜安装无影响；
+- **产物**：`local/regression-report-2026-09-07.md`（过程性报告，不入库）。
+
+—— 执行人：Faust-sudo（AI 代工整理）
+
+## 2026-09-07 P0 批次二：会话/报告越权守卫 + 报告幂等（docs/19 P0-3/P0-8 · 审计 R-05 · 拍板：短路+upsert 兜底/继续仅工作区）
+
+- **P0-3（三处越权）**：`post_turn` / `complete` 入口新增 `_require_session_owner()`（短 SELECT `sessions.id+user_id`，权威源=DB，不依赖 StateStore 键空间）——**优先于读音频/落盘/LLM 摘要/限流**；`get_report` 改为 `Report JOIN sessions`（Report 无 user_id 列，scope/scope_id 多态引用无 FK——docs/10 开放项 D-1；非 session 报告暂无可读场景→一律 40401）；越权响应统一 404/40401（docs/api/error-codes.md 40301 行登记口径「不泄露存在性」，未新增错误码）；
+- **P0-8（报告幂等）**：`complete_session` 重构——① 同键报告已存在（已完成会话再 complete）→ 短路返回既有 report_id（快照不动、不重算不覆写 sessions）；② 生成侧先查后更（docs/10 模型注记「重复计算=整行覆盖写」），并发/重复计算撞 `uq_reports_scope_period` 由覆盖写吸收，不再 500；
+- **测试**：新增 `test_report_ownership.py` 4 例（user2 读 user1 报告→40401 / user2 提交 turn→40401 / user2 complete→40401 / 重复 complete→200 同 report_id 且仅 1 行，修复前分别 200/200/200/500）；既有 `test_rate_limit_429`、`test_turn_rejects_empty_audio` 因「归属校验先于输入/限流」适配为真实会话（意图不变）；
+- **验证**：pytest **205 passed**（+4）；ruff check/format 绿；契约快照零新增 diff（无接口签名变化）；python-api 重建后 healthy + 无 token /tts 仍 401；仍仅工作区、未 commit/未推送；
+- **踩坑**：① 归属校验前置改变了校验顺序——凡"故意用不存在的会话测输入守卫/限流"的用例都必须改为真实会话；② `Report` 原为函数内局部 import，重构后须提升到模块级（`from app.models import Report`）。
+
+—— 执行人：Faust-sudo（AI 代工整理）
+
+## 2026-09-07 P0 止血批次开工：裸端点鉴权限流 + 信号量 + 密钥三档（docs/19 P0-4/P0-9 · 审计 R-06/R-10 · 拍板：三档策略/全链路统一扣减/仅工作区）
+
+- **范围(组内拍板 2026-09-07)**：Batch 0 = P0-4(语音裸端点鉴权+分桶限流+先校验后扣)+ P0-9(密钥三档 + nginx 拦 /manage/internal)+ R-10(whisper/ISE 信号量 2)——零迁移、不进 GitHub(先本地评审)；
+- **P0-4(审计 R-06)**：`audio.py` 四端点(`/asr /score /tts /llm/chat`)挂 `get_current_user_id`(401)+ 分桶 consume(429)；**先校验后扣额度**并**全链路统一**——`practice.py` 原先由 `_rl_*` 依赖先扣后校验，改为预检(状态/归属/输入)通过后再扣；`free_chat.py` 同步统一且 ASR 桶仅实际转写时扣(docs/19 P1-5 按实际消耗)；`placement.py` 已是参考实现(L76-83),未动;
+- **R-10(docs/06 §8)**：`asr.py`/`ise.py` 各加模块级 `asyncio.Semaphore(2)`(复核：此前全仓 0 个 Semaphore)+ Dockerfile `--limit-concurrency 10` 兜底;
+- **P0-9**：Python `config.py` 密钥**三档**(testing→固定测试值/development→缺值告警/production→缺值启动即失败)+ Java `application.yml` 去默认值 + `JwtService`/`SecurityConfig` 构造期 fail-fast(≥32 字节, docs/06 §11)+ compose 显式 `${JWT_SECRET:?required}` 四组 + nginx `location /manage/internal/ { return 404; }`;**顺带揪出真实隐患**:根 `.env` 缺 `APP_JWT_SECRET/APP_SERVICE_TOKEN`,Python 一直靠 config 默认值(恰好同值)才工作——已补两键(本地 gitignored),compose 改为必填后此口关闭;
+- **验证**：pytest **201 passed**(新增 4 例:生产档抛错/开发档告警/testing 回退/显式值不被覆盖 + audio 401 失败用例);ruff check+format 绿;`mvn verify` **BUILD SUCCESS**(spotless 66 files clean,测试全绿——测试档密钥走既有 `application-test.yml`,零 CI 改动);compose config 校验通过;契约快照待刷新(4 端点新增 header 参数,结构 diff 已核对);
+- **踩坑**：① pydantic-settings 下测试进程 env `APP_TESTING=true` 会让 production 用例走 testing 档——用例须显式 `testing=False`;② `.env`(GBK)非 UTF-8,常规文本工具读写会乱码,追加用 `Add-Content -Encoding Default`。
+
+—— 执行人：Faust-sudo（AI 代工整理）
+
+# 2026-09-06 /auth/forgot 忘记密码（演示口径：工单闭环 + 防枚举 · 51 op）
 
 - 背景：组长反馈 Sign Up 应真注册、Forgot password 也要做；注册复用既有 `/auth/register`（前端补注册表单、注册即登录）；
 - **forgot**：`POST /auth/forgot {username}`（public）→ 用户存在则落 `tickets(feedback / 密码重置申请 / open)`（工单写方 Java，管理员侧可见可处理）；**防枚举**：存在与否同响应文案；演示环境无邮件/短信通道（登记：真实重置需邮件/短信通道 + 一次性令牌，P2）；

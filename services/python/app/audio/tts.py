@@ -50,3 +50,24 @@ def cached_audio_path(cache_dir: Path, key: str) -> Path:
     """预合成缓存路径（开场白/常用句；demo 保底，docs/06 §8）。"""
     path = cache_dir / f"{key}.tts.mp3"
     return path
+
+
+def atomic_write_cache(path: Path, data: bytes) -> None:
+    """原子写缓存（tmp + os.replace）：并发同句合成/半文件都可防 —— 不产生脏缓存。
+
+    Windows/Linux 均原子；同 key 同参数 → 内容一致，重复覆盖无副作用（docs/19 P0-5 健壮性）。
+    """
+    import os
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    with open(tmp, "wb") as f:
+        f.write(data)
+    os.replace(tmp, path)
+
+
+def tts_cache_key(voice: str, rate: str, text: str) -> str:
+    """缓存键：voice/rate/文本归一（同一句不同参数互不串用）。"""
+    import hashlib
+
+    return hashlib.sha1(f"{voice}|{rate}|{text.strip()}".encode()).hexdigest()[:24]

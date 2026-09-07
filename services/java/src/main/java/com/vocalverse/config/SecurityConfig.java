@@ -35,6 +35,12 @@ public class SecurityConfig {
   private final String serviceToken;
 
   public SecurityConfig(JwtService jwt, @Value("${vocalverse.service-token}") String serviceToken) {
+    // docs/19 P0-9：service-token 缺失 → 启动即失败（fail-fast）：内部委托端点双端契约依赖同值，
+    // 空串会导致 /internal/** 全部 403 且难以定位（改由启动时显式报错）。
+    if (serviceToken == null || serviceToken.isBlank()) {
+      throw new IllegalStateException(
+          "vocalverse.service-token 未配置：检查 SERVICE_TOKEN 环境变量（docs/19 P0-9）");
+    }
     this.jwt = jwt;
     this.serviceToken = serviceToken;
   }
