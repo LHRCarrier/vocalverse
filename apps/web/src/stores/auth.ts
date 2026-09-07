@@ -28,12 +28,21 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem(TOKEN_KEY))
   const refreshToken = ref<string | null>(localStorage.getItem(REFRESH_KEY))
   const me = ref<MeView | null>(null)
+  /** 会话是否持久化（「记住我」；冷启动按 localStorage 反推：留有 refresh 凭证 = 曾勾选记住，2026-09-07） */
+  const remembered = ref(localStorage.getItem(REFRESH_KEY) !== null)
 
-  function persist(t: TokenResponse) {
+  function persist(t: TokenResponse, remember = true) {
     token.value = t.accessToken
     refreshToken.value = t.refreshToken
-    localStorage.setItem(TOKEN_KEY, t.accessToken)
-    localStorage.setItem(REFRESH_KEY, t.refreshToken)
+    remembered.value = remember
+    if (remember) {
+      localStorage.setItem(TOKEN_KEY, t.accessToken)
+      localStorage.setItem(REFRESH_KEY, t.refreshToken)
+    } else {
+      // 不记住：仅内存会话（关闭应用/页面即登出）；顺手清掉可能残留的旧持久化凭证
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(REFRESH_KEY)
+    }
     setAuthToken(t.accessToken)
   }
 
@@ -41,12 +50,13 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     refreshToken.value = null
     me.value = null
+    remembered.value = false
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(REFRESH_KEY)
     setAuthToken(null)
   }
 
-  async function login(username: string, password: string) {
+  async function login(username: string, password: string, remember = true) {
     const resp = await request<TokenResponse>(
       '/auth/login',
       {
@@ -56,11 +66,11 @@ export const useAuthStore = defineStore('auth', () => {
       },
       '/manage',
     )
-    persist(resp.data)
+    persist(resp.data, remember)
     await fetchMe()
   }
 
-  async function register(payload: Record<string, string>) {
+  async function register(payload: Record<string, string>, remember = true) {
     const resp = await request<TokenResponse>(
       '/auth/register',
       {
@@ -70,7 +80,7 @@ export const useAuthStore = defineStore('auth', () => {
       },
       '/manage',
     )
-    persist(resp.data)
+    persist(resp.data, remember)
     await fetchMe()
   }
 
@@ -110,7 +120,7 @@ export const useAuthStore = defineStore('auth', () => {
         },
         '/manage',
       )
-      persist(resp.data)
+      persist(resp.data, remembered.value)
       return true
     } catch {
       clear()
@@ -118,7 +128,21 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, refreshToken, me, login, register, forgotPassword, fetchMe, refresh, clear }
+  /** 登出：先服务端吊销该用户全部 refresh token（docs/18 §3-J1 · 2026-09-07 补：只清本地则 30 天窗口内仍可续命），再清本地。 */
+  async function logout() {
+    if (token.value) {
+      try {
+        await request('/auth/logout', { method: 'POST' }, '/manage')
+      } catch (err) {
+        // 吊销失败（网络/令牌已失效）不阻塞本地登出——但必须可观测（2026-09-07 评审：此前静默吞掉，
+        // 网络失败时服务端 token 未吊销、用户毫不知情）
+        console.warn('logout: 服务端吊销失败（本地已登出；refresh token 可能仍有效）', err)
+      }
+    }
+    clear()
+  }
+
+  return { token, refreshToken, me, remembered, login, register, forgotPassword, fetchMe, refresh, logout, clear }
 })
 
 /** 启动时恢复会话（路由守卫调用一次）。 */
@@ -129,5 +153,8 @@ export async function bootstrapAuth() {
   setAuthRefresher(() => store.refresh())
   if (store.token) {
     await store.refresh().catch(() => undefined)
+    // 恢复用户态：只换 token 不拉 /auth/me → 整页刷新后 me=null，UI 显示「未登录/同学」而接口
+    // 照常带 token 工作（2026-09-07 修复；login/register 均调 fetchMe，故登录后正常）
+    await store.fetchMe()
   }
 }

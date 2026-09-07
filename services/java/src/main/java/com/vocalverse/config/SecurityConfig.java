@@ -23,8 +23,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * 安全策略（docs/18 §3-J1）：/auth/** 开放；其余需 JWT；/internal/** 需 service-token （Python 侧回写委托，docs/06 §2.2
- * 内部 REST）。全部按**网关剥离 /manage 后**的路径匹配。
+ * 安全策略（docs/18 §3-J1）：公开白名单仅 login/register/refresh/forgot（原 /auth/** 全开放， 2026-09-07
+ * 收窄：/auth/logout、/auth/me 需 JWT —— logout 依 userId 吊销全部 refresh token）； 其余需 JWT；/internal/** 需
+ * service-token（Python 侧回写委托，docs/06 §2.2 内部 REST）。 全部按**网关剥离 /manage 后**的路径匹配。
  */
 @Configuration
 @EnableWebSecurity
@@ -57,7 +58,10 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(
                         "/api/v1/ping",
-                        "/auth/**",
+                        "/auth/login",
+                        "/auth/register",
+                        "/auth/refresh",
+                        "/auth/forgot",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
                         "/swagger-ui.html",

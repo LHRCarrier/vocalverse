@@ -20,7 +20,8 @@ function onDrawerNavigate(path: string) {
 
 function onDrawerLogout() {
   ui.closeDrawer()
-  auth.clear()
+  // 服务端吊销该用户全部 refresh token + 清本地（2026-09-07：原 clear() 只清本地，token 30 天仍可续命）
+  void auth.logout()
   // SPA 导航（整刷丢失过渡；body 背景由 router.afterEach 的 .is-login 类管理，2026-09-06 修退出后登录页错位）
   void router.push('/login')
 }

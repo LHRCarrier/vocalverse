@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -144,6 +145,21 @@ public class AuthController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no such user"))
             .getRole();
     return Envelope.ok(issue(token.getUserId(), role, request));
+  }
+
+  /**
+   * 登出（docs/18 §3-J1 · 2026-09-07 补安全短板）：吊销该用户全部未撤销的 refresh token。原「退出登录」 仅前端清 localStorage，30
+   * 天滑动窗口内旧 token 仍可续命；吊销后 /auth/refresh 立即 401。 需合法 access token（SecurityConfig 公开白名单仅
+   * login/register/refresh/forgot）。
+   */
+  @PostMapping("/logout")
+  public Envelope<Void> logout(
+      @org.springframework.web.bind.annotation.RequestAttribute("userId") Long userId) {
+    Instant now = Instant.now();
+    List<RefreshTokenEntity> tokens = refreshTokens.findByUserIdAndRevokedAtIsNull(userId);
+    tokens.forEach(t -> t.setRevokedAt(now));
+    refreshTokens.saveAll(tokens);
+    return Envelope.<Void>ok(null);
   }
 
   /**

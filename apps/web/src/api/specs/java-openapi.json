@@ -633,6 +633,24 @@
         }
       }
     },
+    "/auth/logout" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "logout",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/login" : {
       "post" : {
         "tags" : [ "auth-controller" ],

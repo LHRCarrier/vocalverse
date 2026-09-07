@@ -29,7 +29,7 @@ interface Bubble {
   role: 'assistant' | 'user'
   text: string
   chips?: Array<{ phrase: string }>
-  /** 有可播语音（喇叭按钮出现条件；开场白进页即启用，回合语音播完后自动解锁，2026-09-08） */
+  /** 有可播语音（喇叭按钮出现条件；开场白进页即启用，回合气泡在 turn_end 解锁且一直保留 → 每条 AI 话语都可重听，2026-09-07） */
   speakable?: boolean
 }
 
@@ -256,6 +256,10 @@ function replay(index: number, text: string) {
     playingBubble.value = null
     return
   }
+  // 重播优先：暂停并清空仍在播的回合流式音频队列，避免与手动重播叠音（2026-09-07；
+  // 队列清空后若本回合还有 chunk 未到，playChunk 会从 length=1 继续自动播，无残留）
+  audioQueue.forEach((a) => a.pause())
+  audioQueue.length = 0
   void playTts(text, undefined, index)
 }
 
@@ -264,7 +268,7 @@ function playChunk(url: string) {
   audioQueue.push(audio)
   audio.onended = () => {
     audioQueue.shift()?.play().catch(() => undefined)
-    // 全部音频块播完 = 本回合语音完整听了一遍 → 解锁喇叭按钮
+    // 全部音频块播完 = 本回合语音完整听了一遍 → 提前解锁喇叭按钮（turn_end 兜底解锁，双保险）
     if (!audioQueue.length) {
       const lastAssistant = [...bubbles.value].reverse().find((b) => b.role === 'assistant')
       if (lastAssistant) lastAssistant.speakable = true
@@ -373,11 +377,20 @@ function onSseEvent(e: SseStreamEvent) {
       void track('score_event', { sceneId: scenario.value?.id, payload: { pron: e.pronunciation, flu: e.fluency } })
       progress.addXp(15) // 完成一次回合练习 +15 XP（演示规则；M3 后端加权）
       break
-    case 'turn_end':
+    case 'turn_end': {
       scoreStatus.value = e.score_status === 'ok' ? scoreStatus.value : e.score_status
       currentTurn.value += 1
+      // 每条 AI 话语回合结束即解锁重听喇叭（docs/14 §3.2「awaiting_user 可选行动：…重听…」/§2.3 重听为用户主动动作；
+      // 2026-09-07 用户反馈：场景对话不能只有开场一句有按钮 —— 历史气泡保留标记，逐句可播，
+      // 与自由对话页 per-turn 解锁一致（MobileFreeChatView turn_end 同款））
+      const lastBubble = bubbles.value[bubbles.value.length - 1]
+      const target = currentAssistant.value ?? (lastBubble?.role === 'assistant' ? lastBubble : null)
+      // 空文本不解锁（2026-09-07 评审：LLM 失败降级走 fallback 不流式输出 → 回合气泡无文本仍会出现
+      // 空喇叭 → 点击重播空文本触发 /tts 422；与 MobileFreeChatView 的 `if (reply)` 守卫一致）
+      if (target?.text?.trim()) target.speakable = true
       phase.value = 'ready'
       break
+    }
     case 'session_end':
       phase.value = 'done'
       summaryText.value = e.summary ?? '完成！'

@@ -17,6 +17,18 @@
 
 —— 执行人：组长 LHRCarrier（AI 代审，2026-09-07）
 
+## 2026-09-07 POST /auth/logout 登出撤销 + SecurityConfig 白名单收窄（配合前端「记住我」）
+
+- 触发：用户反馈「关闭重开仍登录」→ 拍板补安全短板：退出登录必须是**有效登出**（原仅前端 `clear()`，30 天滑动窗口内 refresh 仍可续命）；
+- 实现（Java）：
+  1. `AuthController.logout`：`POST /auth/logout`（需合法 access token，无 Body）→ 吊销该用户**全部**未撤销 refresh token（`RefreshTokenRepository.findByUserIdAndRevokedAtIsNull` + 置 `revoked_at` 后 `saveAll`；`Envelope.<Void>ok(null)`）；
+  2. `SecurityConfig`：`/auth/**` 全开放 → 公开白名单**仅** `login/register/refresh/forgot`；`/auth/logout`、`/auth/me` 落入 `anyRequest().authenticated()`；**匿名访问受保护端点 = Spring Security 6 默认 403**（非 401；401 仅来自 ServiceTokenFilter 显式 sendError 与 ResponseStatusException）——测试断言按实际行为写并注释说明；
+  3. `AuthFlowTest.logoutRevokesAllRefreshTokens`：注册 + 再登录产生两份 refresh → logout 后**两份全部失效**（含未参与本次登出的注册期 token）+ 无令牌 403；
+- 契约：springdoc 快照 `apps/web/src/api/specs/java-openapi.json` 经 `CONTRACT_SNAPSHOT_GENERATE=1` 重建（新增 `/auth/logout` 路径）；`pnpm gen:api` 同步 `java-api.d.ts`（+36 行）；docs/18 J1 行补 logout 登记；
+- 验证：`mvn verify` 全绿（含 ContractSnapshotTest 契约对账、AuthFlowTest 5 例）；前端配套（记住我/退出接线/测试）见安卓日志同日期条；Python 零改动（`/auth` 全走 Java）；
+- 边界：登出后旧 refresh 立即 401，「30 天窗口可续命」关闭；登录限流、演示账号弱密码（demo123456）为已知项（安全评审意见，未在本轮范围，建议答辩前处理）。
+
+—— 执行人：Faust-sudo（AI 代工）
 
 ## 2026-09-07 提交与 PR：fix/p0-hardening（P0 全集+R-18+P0-7+asr_failed 修复，10 commits）
 
@@ -139,7 +151,8 @@
 - **踩坑**：① pydantic-settings 下测试进程 env `APP_TESTING=true` 会让 production 用例走 testing 档——用例须显式 `testing=False`;② `.env`(GBK)非 UTF-8,常规文本工具读写会乱码,追加用 `Add-Content -Encoding Default`。
 
 —— 执行人：Faust-sudo（AI 代工整理）
-## 2026-09-06 /auth/forgot 忘记密码（演示口径：工单闭环 + 防枚举 · 51 op）
+
+# 2026-09-06 /auth/forgot 忘记密码（演示口径：工单闭环 + 防枚举 · 51 op）
 
 - 背景：组长反馈 Sign Up 应真注册、Forgot password 也要做；注册复用既有 `/auth/register`（前端补注册表单、注册即登录）；
 - **forgot**：`POST /auth/forgot {username}`（public）→ 用户存在则落 `tickets(feedback / 密码重置申请 / open)`（工单写方 Java，管理员侧可见可处理）；**防枚举**：存在与否同响应文案；演示环境无邮件/短信通道（登记：真实重置需邮件/短信通道 + 一次性令牌，P2）；
