@@ -1,0 +1,136 @@
+{
+  "schema": "vocalverse-sse-events-v1",
+  "cases": [
+    {
+      "name": "turn_start",
+      "payload": "data: {\"type\": \"turn_start\", \"turn_index\": 1, \"reference_text\": \"Hi there!\"}\n\n",
+      "event": {
+        "type": "turn_start",
+        "turn_index": 1,
+        "reference_text": "Hi there!"
+      }
+    },
+    {
+      "name": "user_transcript",
+      "payload": "data: {\"type\": \"user_transcript\", \"turn_index\": 1, \"text\": \"Good morning\"}\n\n",
+      "event": {
+        "type": "user_transcript",
+        "turn_index": 1,
+        "text": "Good morning"
+      }
+    },
+    {
+      "name": "text_delta",
+      "payload": "data: {\"type\": \"text_delta\", \"text\": \"Hello\"}\n\n",
+      "event": {
+        "type": "text_delta",
+        "text": "Hello"
+      }
+    },
+    {
+      "name": "audio_chunk_plain",
+      "payload": "data: {\"type\": \"audio_chunk\", \"url\": \"/api/v1/audio/a.mp3\"}\n\n",
+      "event": {
+        "type": "audio_chunk",
+        "url": "/api/v1/audio/a.mp3"
+      }
+    },
+    {
+      "name": "audio_chunk_with_duration",
+      "payload": "data: {\"type\": \"audio_chunk\", \"url\": \"/api/v1/audio/b.mp3\", \"duration\": 1.25}\n\n",
+      "event": {
+        "type": "audio_chunk",
+        "url": "/api/v1/audio/b.mp3",
+        "duration": 1.25
+      }
+    },
+    {
+      "name": "meta_block_min",
+      "payload": "data: {\"type\": \"meta_block\", \"corpus_hits\": [], \"difficulty_delta\": 0, \"conclude\": false}\n\n",
+      "event": {
+        "type": "meta_block",
+        "corpus_hits": [],
+        "difficulty_delta": 0,
+        "conclude": false
+      }
+    },
+    {
+      "name": "meta_block_full",
+      "payload": "data: {\"type\": \"meta_block\", \"grammar\": {\"score\": 92}, \"coach_note\": \"Nice and clear!\", \"corpus_hits\": [{\"phrase\": \"I would like a coffee\", \"state\": \"ok\"}], \"difficulty_delta\": 0, \"conclude\": false, \"content\": {\"score\": 88, \"note\": \"On-topic\"}, \"vocab\": {\"score\": 84, \"note\": \"Good variety\"}}\n\n",
+      "event": {
+        "type": "meta_block",
+        "grammar": {
+          "score": 92
+        },
+        "coach_note": "Nice and clear!",
+        "corpus_hits": [
+          {
+            "phrase": "I would like a coffee",
+            "state": "ok"
+          }
+        ],
+        "difficulty_delta": 0,
+        "conclude": false,
+        "content": {
+          "score": 88,
+          "note": "On-topic"
+        },
+        "vocab": {
+          "score": 84,
+          "note": "Good variety"
+        }
+      }
+    },
+    {
+      "name": "score_delta",
+      "payload": "data: {\"type\": \"score_delta\", \"turn_index\": 2, \"pronunciation\": 88.0, \"fluency\": 86.0, \"grammar\": 85.0}\n\n",
+      "event": {
+        "type": "score_delta",
+        "turn_index": 2,
+        "pronunciation": 88.0,
+        "fluency": 86.0,
+        "grammar": 85.0
+      }
+    },
+    {
+      "name": "error",
+      "payload": "data: {\"type\": \"error\", \"code\": \"llm_failed\", \"recoverable\": true}\n\n",
+      "event": {
+        "type": "error",
+        "code": "llm_failed",
+        "recoverable": true
+      }
+    },
+    {
+      "name": "turn_end_authoritative",
+      "payload": "data: {\"type\": \"turn_end\", \"turn_index\": 1, \"score_status\": \"ok\", \"expected_turn\": 1}\n\n",
+      "event": {
+        "type": "turn_end",
+        "turn_index": 1,
+        "score_status": "ok",
+        "expected_turn": 1
+      }
+    },
+    {
+      "name": "turn_end_legacy_no_expected",
+      "payload": "data: {\"type\": \"turn_end\", \"turn_index\": 1, \"score_status\": \"pending\"}\n\n",
+      "event": {
+        "type": "turn_end",
+        "turn_index": 1,
+        "score_status": "pending"
+      }
+    },
+    {
+      "name": "session_end",
+      "payload": "data: {\"type\": \"session_end\", \"summary\": \"Done\", \"report_id\": 5, \"metrics\": {\"turn_count\": 2}}\n\n",
+      "event": {
+        "type": "session_end",
+        "summary": "Done",
+        "report_id": 5,
+        "metrics": {
+          "turn_count": 2
+        }
+      }
+    }
+  ]
+}
