@@ -3,6 +3,21 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 TTS 链路整改 P0-B：引擎生命周期契约（is_available/ensure_ready/unload）+ 单发重试/超时 + provider 分派
+
+- **背景**：对抗拷问 vtts-01——`TTSClient` ABC 只有 `synthesize`（base.py:58-65），`get_tts_client` 恒返 EdgeTTSClient（base.py:116-124），无 is_available/ensure_ready/unload；edge-tts 断网/受限/改协议时整链静默（orchestrator.py 降级为 None），无超时/熔断/重试（docs/audit:128）。
+- **改动**：
+  - `app/audio/base.py` `TTSClient` 增 3 个**默认实现**的方法：`is_available()->(bool,str)`（默认 True）、`ensure_ready()`/`unload()`（默认 no-op）——向后兼容，子类/`FakeTTSClient` 无需改即兼容。
+  - `app/audio/tts.py` `EdgeTTSClient`：`is_available`(edge_tts 可导入)、`ensure_ready`/`unload`(no-op)；`synthesize` 加**超时**（默认 30s + 可注入）+ **单发重试**（初试+重试=2，参考 VS「明确失败而非循环」），失败明确上抛 `RuntimeError`（不再静默）。
+  - `app/audio/tts.py` 新增 `AzureNotWiredClient` 占位：`is_available()==(False,"Azure TTS 未接线（见 docs/44 P0-C）")`、`synthesize` 抛未接线错误——让 config 里 `tts_provider='azure'` 的「存在即切」承诺消失（docs/audit:135 K02）。
+  - `app/audio/base.py` `get_tts_client` 按 `settings.tts_provider` 分派：`edge`→EdgeTTSClient、`azure`→AzureNotWiredClient（未接线显式报错，不静默用 edge）。
+  - `app/api/routes/audio.py` `/tts`：合成前 `client.is_available()` 预检，不可用返回 503 可读错误而非 500。
+- **验证**：`pytest tests/test_tts_client.py` 8 passed（is_available/重试后上抛/超时不挂起/Azure 未接线/工厂分派）；全量 `pytest -q` **260 passed, 4 skipped**；`ruff check` + `ruff format --check` 全绿。
+- **踩坑**：`/tts` 预检局部变量命名用 `ok` 会遮蔽 response 辅助函数 `from app.core.response import ok`，导致 `TypeError: 'bool' object is not callable`——已改为 `available`（命名避开 response helper）。
+- **待办（下步）**：P0-C 接线 Azure（引 azure-cognitiveservices-speech）；P1-C 缺句上报/duration；P1-B 缓存键/过期。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-07）
+
 ## 2026-09-07 TTS 链路整改 P1-A：文本归一化（缩写展开 / 数字→单词 / 零宽与重复标点清理）
 
 - **背景**：对抗拷问 vtts-05——LLM 原文直接喂 edge-tts（orchestrator.py:397-400），`50%`、`3.5`、`Dr.`、`U.S.`、网址、重复标点等被读错/读怪；且全仓无任何归一化（num2words/缩写展开/零宽清理均为零命中）。

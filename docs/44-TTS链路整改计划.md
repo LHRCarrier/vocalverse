@@ -62,16 +62,16 @@
 - **风险/回退**：低。真 `TTSProbe` 无关，纯字符串逻辑。回归失败则回退到 no-op（不切=整段合成），保持正确性优先于细分。
 - **建议 PR**：纯 Python + 测试，1 PR，`chore(test) + fix(tts)`。
 
-### P0-B · vtts-01 引擎生命周期：is_available / ensure_ready / unload + provider 分派
+### P0-B · vtts-01 引擎生命周期：is_available / ensure_ready / unload + provider 分派（✅ 已实现）
 
 - **目标**：TTS 不再是「静默单点」；至少能**提前探测 + 明确降级**。
-- **改什么**：`services/python/app/audio/base.py:58-65`（`TTSClient`）`get_tts_client:116-124`；`services/python/app/audio/tts.py`；`core/config.py:54-57`。
+- **改什么（已实现）**：`services/python/app/audio/base.py`（`TTSClient` 增 3 方法 + `get_tts_client` 分派）；`services/python/app/audio/tts.py`（`EdgeTTSClient` is_available/超时/单发重试 + `AzureNotWiredClient` 占位）；`core/config.py:54-57`（保留，已有 provider 字段）。
 - **怎么做（借鉴自写）**：
-  1. `TTSClient` 增：`is_available() -> tuple[bool, str]`（默认 True+""）、`ensure_ready()`（默认 no-op）、`unload()`（默认 no-op）；`synthesize` 保持（backward compatible，所有子类/`FakeTTSClient` 无需改即兼容——都是默认实现）。
-  2. `get_tts_client` 按 `settings.tts_provider` 分派：`edge`→`EdgeTTSClient`、`azure`→`AzureTTSClient`（P0-C 实现，未实现时报 `is_available=False`+安装/配置提示，与 VS `is_available` 三态一致）。
-  3. `EdgeTTSClient`：加**超时 + 单发重试**（参考 VS `_retry_once_with_fresh_hf_client` 的"单发重试+明确失败"思想），超时/异常由 `_tts_url_from_bytes` 返回 `None` 并**打「该句无音频」日志**（不是静默）。
-  4. `/api/v1/tts` 与对话热路径在调用前**先查 `is_available()`**，不可用返回可读错误而非 500。
-- **验收**：`FakeTTSClient` 派生场景下：`is_available=False` → orchestration 返回可读错误/降级（非静默）；`get_tts_client` 在 `tts_provider="azure"` 且无实现时返回 `(False,"azure not wired")` 不崩溃。
+  1. `TTSClient` 增：`is_available() -> tuple[bool, str]`（默认 True+""）、`ensure_ready()`（默认 no-op）、`unload()`（默认 no-op）；`synthesize` 保持（backward compatible，子类/`FakeTTSClient` 无需改即兼容）。✅
+  2. `get_tts_client` 按 `settings.tts_provider` 分派：`edge`→`EdgeTTSClient`、`azure`→`AzureNotWiredClient`（未接线显式报 `is_available=False`+可读原因，不静默用 edge）。✅
+  3. `EdgeTTSClient`：加**超时 + 单发重试**，失败明确上抛（不再静默）。✅
+  4. `/api/v1/tts` 在调用前**先查 `is_available()`**，不可用返回 503 可读错误而非 500。✅（对话热路径已由 `_tts_url_from_bytes` 异常→None 降级）
+- **验收（已达成）**：`FakeTTSClient` 派生下 `is_available=False` → `/tts` 503；`get_tts_client(provider=azure)` 返回 `(False,"未接线")` 不崩溃。
 - **风险/回退**：中。ABC 增加方法是**向后兼容**（默认实现），不改子类签名 → 低破坏；若动静大，先只加 `is_available` 不加 `ensure_ready/unload`。
 - **建议 PR**：`feat(tts): lifecycle + provider dispatch`，含 `FakeTTSClient` 适配 + 测试。
 
