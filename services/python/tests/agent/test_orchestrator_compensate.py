@@ -83,4 +83,7 @@ async def test_dialog_turn_missing_meta_goes_through_compensation() -> None:
     assert metas, "应产出 MetaBlock"
     # 接线证据：补偿调用返回的 coach_note（未接线时此值为 None → 测试必红）
     assert metas[0].coach_note == "Nice!"
-    assert any(h.get("phrase") == "I'd like a coffee, please." for h in metas[0].corpus_hits)
+    # 2026-09-07 收紧语义：LLM 兜底命中默认关闭（meta_llm_hits_enabled=False）——
+    # 用户实测「没说过的短语被标已使用」= LLM 兜底无条件追加的幻觉；本用例锁：
+    # 规则通道（词序包含）不命中时，LLM 兜底**不得**混入标注（宁可漏不误）。
+    assert metas[0].corpus_hits == []

@@ -30,7 +30,8 @@ def _meta(
 
 
 def test_hits_rule_authority_with_llm_tail() -> None:
-    # 规则命中 "I'd like a coffee, please."（达意）+ LLM 补充一个语义等价短语
+    # 规则命中 "I'd like a coffee, please."（达意）；LLM 兜底默认**关闭**（2026-09-07 收紧：
+    # 用户实测「没说过的短语被标已使用」= 兜底无条件追加的幻觉，default=False 宁漏勿误）
     m = _meta(
         grammar={"score": 90, "errors": []},
         hits=[{"phrase": "Could I get one to go?", "state": "fix"}],
@@ -39,7 +40,12 @@ def test_hits_rule_authority_with_llm_tail() -> None:
     phrases = [h["phrase"] for h in hits]
     assert "I'd like a coffee, please." in phrases
     assert hits[0]["state"] == "ok"  # 规则命中且无致命语法错
-    assert len(hits) == 2  # 规则 1 + LLM 补充 1
+    assert len(hits) == 1  # 默认：仅规则命中（LLM 兜底不混入）
+    # 显式开启后：规则 1 + LLM 补充 1
+    hits_on = ex.apply_hits(
+        "I'd like a coffee please", _CORPUS, m, "normal", [], llm_hits_enabled=True
+    )
+    assert len(hits_on) == 2
 
 
 def test_hits_voided_on_rescue_actions() -> None:

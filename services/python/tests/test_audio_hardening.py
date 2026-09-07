@@ -98,16 +98,24 @@ def test_transcribe_enables_vad_and_flags_no_speech(monkeypatch) -> None:
             pass
 
         def transcribe(
-            self, path, language=None, beam_size=None, word_timestamps=None, vad_filter=None
+            self,
+            path,
+            language=None,
+            beam_size=None,
+            word_timestamps=None,
+            vad_filter=None,
+            condition_on_previous_text=None,
         ):
             captured["vad"] = vad_filter
             captured["word_ts"] = word_timestamps
+            captured["cond_prev"] = condition_on_previous_text
             return iter([_Seg()]), _Info()
 
     _install_fake_whisper(monkeypatch, _Model)
     res = asr_mod.FasterWhisperClient().transcribe_sync("x.wav")
     assert captured["vad"] is True  # Silero VAD 一行兑现（docs/06 §8:116 承诺）
     assert captured["word_ts"] is True  # 词级时间戳保留
+    assert captured["cond_prev"] is False  # 幻觉抑制已接线（2026-09-07）
     assert res.no_speech is True  # no_speech_prob>0.7 且空转写 → 判别位
 
 

@@ -42,7 +42,13 @@ class _FakeModel:
         self.calls: list[dict] = []
 
     def transcribe(
-        self, wav_path, language="en", beam_size=5, word_timestamps=False, vad_filter=False
+        self,
+        wav_path,
+        language="en",
+        beam_size=5,
+        word_timestamps=False,
+        vad_filter=False,
+        condition_on_previous_text=False,
     ):
         self.calls.append(
             {
@@ -51,6 +57,7 @@ class _FakeModel:
                 "beam_size": beam_size,
                 "word_timestamps": word_timestamps,
                 "vad_filter": vad_filter,  # vasr-07：断言 VAD 已接线
+                "condition_on_previous_text": condition_on_previous_text,  # 幻觉抑制
             }
         )
 
