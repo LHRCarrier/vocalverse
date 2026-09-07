@@ -6,6 +6,7 @@ defense_profiles / events / placements 均为 **Python 写**；users 只读。
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import UTC, datetime
@@ -16,6 +17,7 @@ from app.db import get_session_factory
 from app.models import (
     Attempt,
     DefenseProfile,
+    Report,
     Scenario,
     ScenarioMessage,
     ShadowMaterial,
@@ -51,6 +53,31 @@ async def create_session(
     turn_limit: int | None,
     shadow_material_id: int | None = None,
 ) -> DbSession:
+    """docs/19 P0-2：同步 DB 写入收进 to_thread 短事务（async 上下文不阻塞事件循环）。"""
+    session, state = await asyncio.to_thread(
+        _create_session_sync,
+        user_id,
+        kind,
+        scenario_id,
+        profile_id,
+        difficulty,
+        turn_limit,
+        shadow_material_id,
+    )
+    await get_state_store().put(state)
+    return session
+
+
+def _create_session_sync(
+    user_id: int,
+    kind: str,
+    scenario_id: int | None,
+    profile_id: int | None,
+    difficulty: int | None,
+    turn_limit: int | None,
+    shadow_material_id: int | None = None,
+) -> tuple[DbSession, SessionState]:
+    """同步实现（线程池内执行）：建会话 + 开场白落库，返回 (session, state) 供异步侧 put。"""
     db = get_session_factory()()
     scenario = None  # dialog 分支赋值；defense/shadow 为 None（2026-09-04 修复未曾覆盖的
     # UnboundLocalError——此前 defense 建会话同样会踩中，只是无测试覆盖）
@@ -125,8 +152,7 @@ async def create_session(
             )
             state.next_seq += 1
         db.commit()
-        await get_state_store().put(state)
-        return session
+        return session, state
     finally:
         db.close()
 
@@ -139,6 +165,12 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
 
     sessions 只存事实（completed_at/turn_count/duration_s）；完成率口径在报表层 re-play
     （5 轮或 2min / 答满 assigned_turns 或 2min——docs/14 §7）。
+
+    P0-8 幂等（docs/19 P0-8，拍板 2026-09-07「短路 + upsert 兜底」）：
+    1. 已存在同键报告（已完成会话再 complete）→ 短路返回既有 report_id（快照不动），
+       不再重算、不再覆写 sessions；
+    2. 生成侧先查后更（docs/10 模型注记「重复计算=整行覆盖写（upsert），不产生重复行」）：
+       并发/重复计算撞 uq_reports_scope_period 由覆盖写吸收，不再 500。
     """
     db = get_session_factory()()
     try:
@@ -146,6 +178,23 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
         if session is None:
             raise HTTPException(status_code=404, detail="session not found")
         now = datetime.now(UTC)
+        period_start = (session.started_at or now).date()
+        period_end = period_start
+
+        def _report_key():
+            return (
+                Report.report_type == "session_report",
+                Report.scope == "session",
+                Report.scope_id == session.id,
+                Report.period_start == period_start,
+                Report.period_end == period_end,
+            )
+
+        # ---- 1) 短路：已完成会话（同键报告已存在）→ 快照幂等返回 ----
+        existing = db.execute(select(Report).where(*_report_key())).scalar_one_or_none()
+        if existing is not None:
+            return int(existing.id)
+
         session.completed_at = now
         session.status = SessionStatus.COMPLETED
         msgs = list(
@@ -169,46 +218,51 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
         semantic = _semantic_summary(msgs)  # ③ 语义子分聚合（不进量化总分，docs/07 Q38）
         summary = summary_text or f"会话完成：{len(user_msgs)} 轮口头交流。"
 
-        from app.models import Report
-
-        report = Report(
-            report_type="session_report",
-            scope="session",
-            scope_id=session.id,
-            period_start=(session.started_at or now).date(),
-            period_end=(session.started_at or now).date(),
-            metrics={
-                "summary": summary,
-                "coverage": coverage,
-                "semantic": semantic,  # ③ 语义子分（content/vocab；不进总分，展示口径）
-                "kind": session.kind,
-                "assigned_turns": session.assigned_turns,
-                "user_turn_count": len(user_msgs),
-                "duration_s": session.duration_s,
-                "suggestions": _suggestions(attempts, coverage),
-                "attempts": [
-                    {
-                        "id": a.id,
-                        "kind": a.kind,
-                        "transcript": a.transcript,
-                        "pronunciation": _f(a.pron_score),
-                        "fluency": _f(a.flu_score),
-                        "grammar": _f(a.gram_score),
-                        "overall": _f(a.overall_score),
-                        "wpm": _f(a.wpm),  # 语速辅助指标（docs/07 Q30）
-                        # 流利度时间戳特征（wpm/停顿/语速构成，docs/06 §9.3；无数据时缺省）
-                        "fluency_features": (a.details or {}).get("fluency"),
-                        "details": a.details or {},
-                        "error_present": bool(a.error),
-                    }
-                    for a in attempts
-                ],
-            },
-        )
+        metrics = {
+            "summary": summary,
+            "coverage": coverage,
+            "semantic": semantic,  # ③ 语义子分（content/vocab；不进总分，展示口径）
+            "kind": session.kind,
+            "assigned_turns": session.assigned_turns,
+            "user_turn_count": len(user_msgs),
+            "duration_s": session.duration_s,
+            "suggestions": _suggestions(attempts, coverage),
+            "attempts": [
+                {
+                    "id": a.id,
+                    "kind": a.kind,
+                    "transcript": a.transcript,
+                    "pronunciation": _f(a.pron_score),
+                    "fluency": _f(a.flu_score),
+                    "grammar": _f(a.gram_score),
+                    "overall": _f(a.overall_score),
+                    "wpm": _f(a.wpm),  # 语速辅助指标（docs/07 Q30）
+                    # 流利度时间戳特征（wpm/停顿/语速构成，docs/06 §9.3；无数据时缺省）
+                    "fluency_features": (a.details or {}).get("fluency"),
+                    "details": a.details or {},
+                    "error_present": bool(a.error),
+                }
+                for a in attempts
+            ],
+        }
         # 摘要双轨落库（docs/26 §10.3①）：收尾最终总结写入 sessions.summary
         session.summary = summary
         session.summary_updated_at = now
-        db.add(report)
+        # ---- 2) upsert 兜底：先查后更（docs/10「整行覆盖写」；撞唯一约束由覆盖写吸收） ----
+        report = db.execute(select(Report).where(*_report_key())).scalar_one_or_none()
+        if report is None:
+            report = Report(
+                report_type="session_report",
+                scope="session",
+                scope_id=session.id,
+                period_start=period_start,
+                period_end=period_end,
+                metrics=metrics,
+            )
+            db.add(report)
+        else:
+            report.metrics = metrics
+            report.computed_at = now
         db.commit()
         _post_session_skills(db, session)
         _post_session_checkin(db, session)

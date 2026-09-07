@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import time
@@ -51,35 +52,45 @@ class SessionCreate(BaseModel):
 @router.get("/scenarios")
 async def list_scenarios(user_id: int = Depends(get_current_user_id)):
     """预置场景列表（读侧；写侧归 Java 管理端，Python 只读——docs/10 §3）。"""
+    # docs/19 P0-2：查询收进 to_thread（短事务，不阻塞事件循环）
+    # 注意：路由 docstring 会进入 OpenAPI description（契约快照为文本级对账）——
+    # 实现说明一律写代码注释，不动 docstring（2026-09-07 踩坑，见工作日志）
     from sqlalchemy import select
 
     from app.models import Scenario
     from app.models.base import ContentStatus
 
-    db = get_session_factory()()
-    try:
-        rows = db.execute(
-            select(Scenario)
-            .where(Scenario.status == ContentStatus.PUBLISHED)
-            .order_by(Scenario.scene_type, Scenario.difficulty)
-        ).scalars()
-        return ok(
-            [
-                {
-                    "id": s.id,
-                    "title": s.title,
-                    "scene_type": s.scene_type,
-                    "difficulty": s.difficulty,
-                    "description": s.description,
-                    "opening_line": s.opening_line,
-                    "target_corpus": s.target_corpus,
-                    "estimated_turns": s.estimated_turns,
-                }
-                for s in rows
-            ]
-        )
-    finally:
-        db.close()
+    def _q():
+        db = get_session_factory()()
+        try:
+            return (
+                db.execute(
+                    select(Scenario)
+                    .where(Scenario.status == ContentStatus.PUBLISHED)
+                    .order_by(Scenario.scene_type, Scenario.difficulty)
+                )
+                .scalars()
+                .all()
+            )
+        finally:
+            db.close()
+
+    rows = await asyncio.to_thread(_q)
+    return ok(
+        [
+            {
+                "id": s.id,
+                "title": s.title,
+                "scene_type": s.scene_type,
+                "difficulty": s.difficulty,
+                "description": s.description,
+                "opening_line": s.opening_line,
+                "target_corpus": s.target_corpus,
+                "estimated_turns": s.estimated_turns,
+            }
+            for s in rows
+        ]
+    )
 
 
 @router.post("/sessions")
@@ -108,18 +119,6 @@ async def post_session(
     )
 
 
-async def _rl_asr(user_id: int = Depends(get_current_user_id)) -> None:
-    await consume("asr", bucket_limits()["asr"], user_id)
-
-
-async def _rl_ise(user_id: int = Depends(get_current_user_id)) -> None:
-    await consume("ise", bucket_limits()["ise"], user_id)
-
-
-async def _rl_llm(user_id: int = Depends(get_current_user_id)) -> None:
-    await consume("llm", bucket_limits()["llm"], user_id)
-
-
 @router.post("/sessions/{session_id}/turns")
 async def post_turn(
     session_id: int,
@@ -127,14 +126,13 @@ async def post_turn(
     action: str = Form("normal"),
     expected_turn: int | None = Form(default=None),
     user_id: int = Depends(get_current_user_id),
-    _a: None = Depends(_rl_asr),
-    _s: None = Depends(_rl_ise),
-    _l: None = Depends(_rl_llm),
 ):
     """回合主入口：multipart 音频 + action → SSE 事件流（docs/14 §3.3）。
 
     预检（状态/锁）放流外：失败返回 JSON 409/404；流内错误以 error 事件呈现。
     """
+    # P0-3：归属校验最先做——不拥有 → 40401（不泄露存在性），且不读音频/不落盘/不耗配额
+    await _require_session_owner(session_id, user_id)
     settings = get_settings()
     data = await audio.read() if audio is not None else None
     if data is not None:
@@ -159,14 +157,21 @@ async def post_turn(
     if audio is None and action not in ("start", "hint", "demo", "abandon"):
         raise BizError(http_status=422, code=42202, message="audio required for this action")
 
+    # 分桶限流：预检（归属/状态/输入）通过后再扣额度——修复审计 R-06「先扣后校验」；
+    # 桶 = ASR/ISE/LLM 各计 1（docs/06 §7 按子资源分桶，/turns 不单计）。
+    limits = bucket_limits()
+    await consume("asr", limits["asr"], user_id)
+    await consume("ise", limits["ise"], user_id)
+    await consume("llm", limits["llm"], user_id)
+
     orchestrator = get_orchestrator()
 
     async def event_stream():
         try:
-            async for event in orchestrator.run(
-                session_id, user_id, data, action, expected_turn, audio_url
-            ):
-                yield ev.sse_payload(event)
+            core = orchestrator.run(session_id, user_id, data, action, expected_turn, audio_url)
+            # R-18：心跳包装（静默 ≥15s 推 ': ping' 注释行；不取消内部流，见 events.py）
+            async for payload in ev.heartbeat_stream(core, settings.sse_heartbeat_seconds):
+                yield payload
         except OrchestratorError as exc:
             yield ev.sse_payload(ev.StreamError(code=str(exc.status_code), recoverable=False))
         except Exception as exc:  # 管线异常：流内交给前端，节奏优先
@@ -182,10 +187,37 @@ async def complete(
     session_id: int,
     user_id: int = Depends(get_current_user_id),
 ):
+    # P0-3：归属校验先于 LLM 摘要（越权请求不消耗 LLM 配额；
+    # docs/api/error-codes.md 40301 行登记口径：越权按资源不存在处理）
+    await _require_session_owner(session_id, user_id)
     llm = get_llm_client()
     summary = await _summary_for(llm, session_id)
-    report_id = complete_session(session_id, llm, summary)
+    report_id = await asyncio.to_thread(complete_session, session_id, llm, summary)
     return ok({"report_id": report_id, "summary": summary})
+
+
+async def _require_session_owner(session_id: int, user_id: int) -> None:
+    """docs/19 P0-3（审计 R-05 越权）：turn/complete 前校验会话归属。
+
+    权威源 = sessions.user_id（DB，Alembic 真源）；StateStore 按 session_id 键存运行时
+    状态、不含归属概念，故每轮预检做一次短 SELECT。
+    docs/19 P0-2：同步 DB 查询收进 to_thread（预检不阻塞事件循环）。
+    响应语义：越权统一按资源不存在处理（docs/api/error-codes.md 40301 行登记口径：
+    不泄露存在性）→ 404/40401。
+    """
+
+    def _belongs() -> bool:
+        db = get_session_factory()()
+        try:
+            row = db.execute(
+                select(DbSession.id).where(DbSession.id == session_id, DbSession.user_id == user_id)
+            ).first()
+            return row is not None
+        finally:
+            db.close()
+
+    if not await asyncio.to_thread(_belongs):
+        raise BizError(http_status=404, code=40401, message="session not found or expired")
 
 
 async def _summary_for(llm, session_id: int) -> str:
@@ -209,23 +241,37 @@ async def get_report(
     report_id: int,
     user_id: int = Depends(get_current_user_id),
 ):
-    db = get_session_factory()()
-    try:
-        report = db.get(Report, report_id)
-        if report is None:
-            raise BizError(http_status=404, code=40401, message="report not found")
-        return ok(
-            {
-                "id": report.id,
-                "report_type": report.report_type,
-                "scope": report.scope,
-                "scope_id": report.scope_id,
-                "metrics": report.metrics,
-                "computed_at": report.computed_at.isoformat(),
-            }
-        )
-    finally:
-        db.close()
+    # P0-3（审计 R-05）：报告归属 = 经 sessions 校验（Report 无 user_id 列，scope/scope_id
+    # 多态引用无 FK——docs/10 开放项 D-1）；非 session 报告当前无读取场景 → 一律 40401。
+    # 越权按"资源不存在"处理（docs/api/error-codes.md 40301 行登记口径，不泄露存在性）。
+    # docs/19 P0-2：查询走 to_thread（短事务，不阻塞事件循环）。
+    def _q():
+        db2 = get_session_factory()()
+        try:
+            return db2.execute(
+                select(Report)
+                .join(
+                    DbSession,
+                    (Report.scope == "session") & (DbSession.id == Report.scope_id),
+                )
+                .where(Report.id == report_id, DbSession.user_id == user_id)
+            ).scalar_one_or_none()
+        finally:
+            db2.close()
+
+    report = await asyncio.to_thread(_q)
+    if report is None:
+        raise BizError(http_status=404, code=40401, message="report not found")
+    return ok(
+        {
+            "id": report.id,
+            "report_type": report.report_type,
+            "scope": report.scope,
+            "scope_id": report.scope_id,
+            "metrics": report.metrics,
+            "computed_at": report.computed_at.isoformat(),
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -245,23 +291,28 @@ async def get_audio(
             path.unlink(missing_ok=True)  # 惰性清理
         raise BizError(http_status=410, code=41001, message="audio expired")
     # 归属校验：attempts / scenario_messages 任一引用即可
+    # docs/19 P0-2：归属查询走 to_thread（短事务，不阻塞事件循环；文件流不受影响）
     url = f"/api/v1/audio/{name}"
-    db = get_session_factory()()
-    try:
-        owned = (
-            db.execute(
-                select(Attempt.id).where(Attempt.audio_url == url, Attempt.user_id == user_id)
-            ).first()
-            or db.execute(
-                select(ScenarioMessage.id)
-                .join(DbSession, DbSession.id == ScenarioMessage.session_id)
-                .where(ScenarioMessage.audio_url == url, DbSession.user_id == user_id)
-            ).first()
-        )
-        if owned is None:
-            raise BizError(http_status=403, code=40301, message="not your audio")
-    finally:
-        db.close()
+
+    def _owns() -> bool:
+        db = get_session_factory()()
+        try:
+            owned = (
+                db.execute(
+                    select(Attempt.id).where(Attempt.audio_url == url, Attempt.user_id == user_id)
+                ).first()
+                or db.execute(
+                    select(ScenarioMessage.id)
+                    .join(DbSession, DbSession.id == ScenarioMessage.session_id)
+                    .where(ScenarioMessage.audio_url == url, DbSession.user_id == user_id)
+                ).first()
+            )
+            return owned is not None
+        finally:
+            db.close()
+
+    if not await asyncio.to_thread(_owns):
+        raise BizError(http_status=403, code=40301, message="not your audio")
 
     async def _file_stream():
         with open(path, "rb") as f:
