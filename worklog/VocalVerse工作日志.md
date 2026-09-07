@@ -3,6 +3,21 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 组员 PR 评审：PR#30（P0 加固收口）/ PR#31（会话安全增强 + 重听逐句化）
+
+- **PR#30 fix/p0-hardening → request-changes（1 阻断 + 7 建议）**：
+  - 已核查：CI 4 checks 全绿且 job steps 明细确认「Single-Writer 探针」步骤真实执行（非 0 jobs 静默失败）；错误码 40301/40401/42901 均已登记；worklog 署名/BUG 归档位置合规；契约三层对账一致；`X-Test-User-Id` 仅 testing 档生效（无生产冒充敞口）；
+  - 🔴 阻断项：`apps/web/src/audio/sse.ts` L86-90 —— `reader.read()` 拒绝时外层 `new Promise` 永不结算（拒绝处理器 `throw err` 只产生 unhandledRejection，timer 已清 → await 永久挂起）：SSE 中途断网/组件卸载 abort 后 onError/onClose 不触发、90s idle 兜底失效 —— R-18 想防的「断流后永久 busy」反而在断流路径变为现实（修复前 `await reader.read()` 会传播到外层 .catch）。已用 Node 最小复现验证（settled=false + unhandledRejection），非纸面推断；修复建议 + 前置失败测试已写入 PR comment；
+  - 建议 7 项：heartbeat_stream interval=0 忙循环（同算法复现 0.063s 产 1363 行 ping，与「0=关闭心跳」注释相悖）、`_persist_dialog_turn` 跨线程移交 SQLAlchemy Session（官方明确非线程安全）、complete 幂等短路晚于 LLM 摘要、post_turn 三桶无差别扣费（start 仅耗 LLM、hint/demo/abandon 实际零耗）与 free_chat「按实际消耗」口径不一致、nginx `/manage/internal` 无尾斜杠形式未拦、联调页豁免登记、demo/hint/abandon 分支同步 DB 写与「短事务化」范围确认；
+  - 亮点：P0-1~9 + R 项覆盖完整，Redis Lua 释放、越权 40401 口径、Testcontainers 安全网、P0-7 探针自测 7 例均核验通过。
+- **PR#31 feat/auth-session-security → comment（认可可合，5 建议）**：
+  - 已核查：CI 3 checks 绿（java verify 含 ContractSnapshotTest；Python 零改动故 python-ci 未触发，符合预期）；「修复前失败」两条断言成立；契约/d.ts 同步；App 线记录入安卓日志、Java/契约入主线（混合条目拆分正确）；docs/18 J1 登记；
+  - 建议：① MobileSpeakingView turn_end 解锁未守空文本（与 MobileFreeChatView 的 `if (reply)` 守卫不同；LLM 失败降级回合会出现空文本喇叭 → 重播空文本触发 /tts 422）——已挂行内 comment；② logout 吊销失败被静默吞掉建议 console.warn；③ access token 注销后 1h 内服务端仍有效登记为已知边界；④「记住我」纯客户端语义登记；⑤ 联调页豁免请组长确认登记；
+  - 合入关系：与 #30 同基础 main@28cfa96，`git merge-tree` 验证代码可自动合并（仅 worklog 置顶区冲突）→ 建议 #30 先合再合 #31，worklog 人工合并。
+
+—— 执行人：组长 LHRCarrier（AI 代审，2026-09-07）
+
+
 ## 2026-09-07 提交与 PR：fix/p0-hardening（P0 全集+R-18+P0-7+asr_failed 修复，10 commits）
 
 - **分支**：`fix/p0-hardening`（自 main@28cfa96），PR 已创建（base main）；
@@ -124,7 +139,6 @@
 - **踩坑**：① pydantic-settings 下测试进程 env `APP_TESTING=true` 会让 production 用例走 testing 档——用例须显式 `testing=False`;② `.env`(GBK)非 UTF-8,常规文本工具读写会乱码,追加用 `Add-Content -Encoding Default`。
 
 —— 执行人：Faust-sudo（AI 代工整理）
-
 ## 2026-09-06 /auth/forgot 忘记密码（演示口径：工单闭环 + 防枚举 · 51 op）
 
 - 背景：组长反馈 Sign Up 应真注册、Forgot password 也要做；注册复用既有 `/auth/register`（前端补注册表单、注册即登录）；
