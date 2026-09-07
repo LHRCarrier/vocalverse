@@ -35,6 +35,22 @@ if (-not $env:HF_HOME) { $env:HF_HOME = Join-Path $Root "data\models" }
 if (-not $env:HF_HUB_OFFLINE) { $env:HF_HUB_OFFLINE = "1" }
 if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 
+# 根 .env 注入（2026-09-07 部署踩坑：Java application.yml 用 `${JWT_SECRET:}`，方式 B 本地
+# 的 Maven 子进程不读 .env —— 无键时 JwtService P0-9 fail-fast 拒绝启动（8080 起不来），
+# 而 Python 侧 pydantic-settings 自己读 .env 故不受影响）。setdefault 语义：仅未显式设置时注入。
+$EnvFile = Join-Path $Root ".env"
+if (Test-Path $EnvFile) {
+    Get-Content $EnvFile | ForEach-Object {
+        # TrimStart(BOM)：Windows 记事本保存的 .env 首行带 BOM，直接匹配会把 BOM 并进键名
+        if ($_ -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$') {
+            $name = $matches[1].TrimStart([char]0xFEFF)
+            if (-not (Test-Path "env:$name")) {
+                Set-Item -Path "env:$name" -Value $matches[2].Trim('"').Trim("'")
+            }
+        }
+    }
+}
+
 function Get-PortPid([int]$Port) {
     $c = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
     if ($c) { [int[]]$c.OwningProcess | Select-Object -Unique } else { @() }
