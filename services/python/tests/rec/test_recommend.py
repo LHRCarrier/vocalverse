@@ -94,7 +94,7 @@ def _mk_mastery(user_id: int, scene_id: int, status: str, days_ago: int | None) 
         db.close()
 
 
-def test_l2_user_no_l4() -> None:
+async def test_l2_user_no_l4() -> None:
     """C1/C8：L2 用户推荐只含 [L2,L3]，无 L4 无 L1。"""
     uid = _mk_user(_L2, ["coffee"])
     _mk_scene("a", 2, _L2, ["coffee"])
@@ -103,7 +103,7 @@ def test_l2_user_no_l4() -> None:
     _mk_scene("d", 4, _L4, ["coffee"])
     db = get_session_factory()()
     try:
-        items = recommend_scenes(uid, limit=6, db=db)
+        items = await recommend_scenes(uid, limit=6, db=db)
         assert items, "应有推荐"
         assert all(it["diff_level"] in {_L2, _L3} for it in items)
         assert all(it["content_type"] == "scene" for it in items)
@@ -111,7 +111,7 @@ def test_l2_user_no_l4() -> None:
         db.close()
 
 
-def test_mastered_item_last() -> None:
+async def test_mastered_item_last() -> None:
     """C9：已掌握场景排在同档未掌握之后。"""
     uid = _mk_user(_L2, ["coffee"])
     a = _mk_scene("mastered", 2, _L2, ["coffee"])
@@ -119,7 +119,7 @@ def test_mastered_item_last() -> None:
     _mk_mastery(uid, a, "mastered", days_ago=30)
     db = get_session_factory()()
     try:
-        items = recommend_scenes(uid, limit=2, db=db)
+        items = await recommend_scenes(uid, limit=2, db=db)
         order = [it["title"] for it in items]
         assert order.index("fresh") < order.index("mastered")  # 未掌握在前
         assert items[-1]["mstatus"] == "mastered"
@@ -127,7 +127,7 @@ def test_mastered_item_last() -> None:
         db.close()
 
 
-def test_cold_user_zero_profile() -> None:
+async def test_cold_user_zero_profile() -> None:
     """C7：零 skill/profile 用户回退权威档 → 返回默认列表（不抛、非空或空态）。"""
     db = get_session_factory()()
     try:
@@ -141,13 +141,13 @@ def test_cold_user_zero_profile() -> None:
     # 无 user_skill_state/user_profiles（未定档）→ resolve_level=L1 → 返回 L1 场景
     db = get_session_factory()()
     try:
-        items = recommend_scenes(uid, limit=3, db=db)
+        items = await recommend_scenes(uid, limit=3, db=db)
         assert len(items) == 1 and items[0]["title"] == "any"
     finally:
         db.close()
 
 
-def test_l4_review_slot() -> None:
+async def test_l4_review_slot() -> None:
     """C3：L4 用户主窗无 L4，复习席补 L3 已练且 ≥7 天未练的素材。"""
     uid = _mk_user(_L4, ["coffee"])
     _mk_scene("l3stale", 3, _L3, ["coffee"])  # 已练很久 → 复习席
@@ -155,7 +155,7 @@ def test_l4_review_slot() -> None:
     _mk_scene("l4new", 4, _L4, ["coffee"])  # 主窗 L4 素材（占位）
     db = get_session_factory()()
     try:
-        items = recommend_scenes(uid, limit=6, db=db)
+        items = await recommend_scenes(uid, limit=6, db=db)
         # 主窗 {L4}（L4 用户），复习席补 L3（已练 >7 天）
         titles = [it["title"] for it in items]
         assert "L4" in {it["diff_level"] for it in items}
@@ -164,11 +164,13 @@ def test_l4_review_slot() -> None:
         db.close()
 
 
-def test_impression_logged_when_own_session() -> None:
+async def test_impression_logged_when_own_session() -> None:
     """C5：自有会话路径（db=None）写曝光埋点 events.recommend_impression。"""
     uid = _mk_user(_L2, ["coffee"])
     _mk_scene("x", 2, _L2, ["coffee"])
-    recommend_scenes(uid, limit=3)  # db=None → 自有 session，写 Event + Redis（testing→None 跳过）
+    await recommend_scenes(
+        uid, limit=3
+    )  # db=None → 自有 session，写 Event + Redis（testing→None 跳过）
     db = get_session_factory()()
     try:
         e = (
@@ -187,7 +189,7 @@ def test_impression_logged_when_own_session() -> None:
         db.close()
 
 
-def test_scene_type_cap_holds_across_expansion() -> None:
+async def test_scene_type_cap_holds_across_expansion() -> None:
     """C10：同 scene_type ≤2 在「主窗+扩档」组成的最终列表上也成立。
 
     主窗 {L2,L3} 已被 2 个 cafe 占满；扩档 L1 再来一个 cafe 不得把 cafe 撑到 3（此前
@@ -199,7 +201,7 @@ def test_scene_type_cap_holds_across_expansion() -> None:
     _mk_scene("cafeL1", 1, "L1", ["coffee"])  # L1 属扩档带（主窗为 {L2,L3}），独占第 3 条 cafe
     db = get_session_factory()()
     try:
-        items = recommend_scenes(uid, limit=6, db=db)
+        items = await recommend_scenes(uid, limit=6, db=db)
         titles = [it["title"] for it in items]
         # 演示 `_mk_scene` 固定 scene_type=cafe；主窗已 2 条 cafe，扩档不得再加第 3 条
         assert titles.count("cafeA") + titles.count("cafeB") + titles.count("cafeL1") <= 2
