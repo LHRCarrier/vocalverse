@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 from pathlib import Path
 
@@ -192,8 +193,109 @@ def atomic_write_cache(path: Path, data: bytes) -> None:
     os.replace(tmp, path)
 
 
-def tts_cache_key(voice: str, rate: str, text: str) -> str:
-    """缓存键：voice/rate/文本归一（同一句不同参数互不串用）。"""
+@functools.lru_cache(maxsize=1)
+def _edge_tts_version() -> str:
+    """edge-tts 包版本（缓存键维度之一：升级引擎后旧音频失效重取）。"""
+    try:
+        from importlib.metadata import version as _pkg_version
+
+        return _pkg_version("edge-tts")
+    except Exception:  # pragma: no cover - 环境未装（轻量测试走 Fake）
+        return "unknown"
+
+
+def tts_cache_key(
+    voice: str,
+    rate: str,
+    text: str,
+    *,
+    provider: str = "edge",
+    engine_version: str | None = None,
+) -> str:
+    """缓存键：provider/引擎版本/voice/rate/文本归一（docs/44 P1-B）。
+
+    任一维度变化 → 键变化 → 重取：换音色、升 edge-tts 版本、切 provider 都不命中陈旧音频；
+    旧键（无 provider/版本维度）缓存随 TTL/容量裁剪自然淘汰。
+    """
     import hashlib
 
-    return hashlib.sha1(f"{voice}|{rate}|{text.strip()}".encode()).hexdigest()[:24]
+    ver = engine_version or (_edge_tts_version() if provider == "edge" else "unknown")
+    return hashlib.sha1(f"{provider}|{ver}|{voice}|{rate}|{text.strip()}".encode()).hexdigest()[:24]
+
+
+def cache_is_fresh(path: Path, ttl_s: int) -> bool:
+    """缓存是否新鲜（存在且 mtime 距今 ≤ TTL；docs/44 P1-B）。"""
+    import os
+    import time as _time
+
+    if ttl_s <= 0 or not path.exists():
+        return False
+    try:
+        return _time.time() - os.path.getmtime(path) <= ttl_s
+    except OSError:  # pragma: no cover - 竞态删除
+        return False
+
+
+def prune_tts_cache(cache_dir: Path, max_bytes: int, *, min_keep: int = 16) -> int:
+    """容量裁剪：总大小超限时按 mtime 从旧到新删除（docs/44 P1-B）。
+
+    至少保留 ``min_keep`` 个新文件（防高频句被误删互踢）；删除失败静默继续；
+    返回删除的文件数（0 = 未裁剪 / 无法统计）。
+    """
+    import time as _time
+
+    files: list[tuple[float, Path]] = []
+    total = 0
+    try:
+        for p in cache_dir.iterdir():
+            if not p.is_file():
+                continue
+            try:
+                size = p.stat().st_size
+            except OSError:  # pragma: no cover - 竞态删除
+                continue
+            files.append((_time.time() - p.stat().st_mtime, p))
+            total += size
+    except OSError:
+        return 0
+    if total <= max_bytes or len(files) <= min_keep:
+        return 0
+    removed = 0
+    for _, p in sorted(files, key=lambda t: (-t[0], t[1])):  # 最旧在前
+        if total <= max_bytes or len(files) - removed <= min_keep:
+            break
+        try:
+            sz = p.stat().st_size
+            p.unlink(missing_ok=True)
+            total -= sz
+            removed += 1
+        except OSError:  # pragma: no cover - 竞态删除
+            continue
+    return removed
+
+
+async def tts_synthesize_cached(
+    tts: TTSClient,
+    text: str,
+    voice: str,
+    rate: str,
+    *,
+    provider: str = "edge",
+) -> bytes:
+    """预合成缓存读/写（docs/44 P1-B 统一出入口：对话热路径与 /tts 共用）。
+
+    - 命中（新鲜）→ 返回缓存字节，不再触碰引擎；
+    - 未命中/过期 → 合成 + 原子写 + 容量裁剪（TTL 由 settings.tts_cache_ttl_s 控制）；
+    - 失败上抛（调用方决定降级：热路径记「sentence no audio」、/tts 返回 502）。
+    """
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    cache_dir = Path(settings.audio_dir) / "cache" / "tts"
+    path = cached_audio_path(cache_dir, tts_cache_key(voice, rate, text, provider=provider))
+    if cache_is_fresh(path, settings.tts_cache_ttl_s):
+        return path.read_bytes()
+    data = await tts.synthesize(text, voice=voice, rate=rate)
+    atomic_write_cache(path, data)
+    prune_tts_cache(cache_dir, settings.tts_cache_max_mb * 1024 * 1024)
+    return data

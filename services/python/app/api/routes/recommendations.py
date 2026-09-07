@@ -22,7 +22,7 @@ async def recommendations(
 ):
     """推荐列表。type=scene 返回场景，type=shadow 返回影子跟读；limit 覆盖默认条数。"""
     if type == "scene":
-        items = recommend_scenes(user_id, limit)
+        items = await recommend_scenes(user_id, limit)
     else:
-        items = recommend_shadow(user_id, limit)
+        items = await recommend_shadow(user_id, limit)
     return ok({"type": type, "items": items})

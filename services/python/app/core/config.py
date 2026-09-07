@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     asr_rate_per_hour: int = 60
     ise_rate_per_hour: int = 60
     tts_rate_per_hour: int = 60
+    # TTS 预合成缓存（docs/44 P1-B）：每键 TTL 与容量上限（写入时按 mtime 裁剪最旧）。
+    # TTL 默认 24h 与 audio_ttl_hours 同窗；容量兜底防长时间运行/多参数组合撑爆磁盘。
+    tts_cache_ttl_s: int = 86400
+    tts_cache_max_mb: int = 512
     # SSE 心跳间隔（R-18 / 审计 R-18：协议上限 30s，取 15s 留一倍余量；
     # 静默 ≥ 此值推 ': ping' 注释行，防中间代理断流/客户端误判死链；0=关闭心跳）
     sse_heartbeat_seconds: float = 15.0

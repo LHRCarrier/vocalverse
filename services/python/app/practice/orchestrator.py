@@ -14,7 +14,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-from pathlib import Path
 
 from app.agent.domains.learner import get_rendered
 from app.agent.domains.summarizer import SummarizerService, get_session_summary
@@ -25,7 +24,7 @@ from app.audio.base import ASRClient, LLMClient, ScorerClient, TTSClient
 from app.audio.fluency import compute_fluency_features
 from app.audio.textproc.normalize import normalize_for_tts
 from app.audio.textproc.sentence_splitter import StreamSentenceSplitter
-from app.audio.tts import atomic_write_cache, cached_audio_path, mp3_duration_seconds, tts_cache_key
+from app.audio.tts import mp3_duration_seconds, tts_synthesize_cached
 from app.core.config import get_settings
 from app.db import get_session_factory
 from app.models import (
@@ -76,23 +75,16 @@ async def _tts_url_from_bytes(
     句文本与原因（字幕继续，docs/14 §3.2）；时长取自缓存/新合成音频的 MP3 帧头估算
     （``mp3_duration_seconds``，纯函数绝不抛错）。
 
-    P0-5 预合成缓存（docs/06 §8：开场/常用句，命名约定见 app/audio/tts.py）：
-    命中直接复用；未命中合成后**原子写缓存**（tmp + os.replace，并发同句不产生脏缓存）。
-    缓存目录 = {audio_dir}/cache/tts（随 audio_dir 一同被 24h/测试清理策略覆盖）。
+    缓存（docs/44 P1-B）：统一走 ``tts_synthesize_cached`` —— 键含 provider/引擎版本/
+    voice/rate/文本，TTL + 容量裁剪（默认 24h / 512MB）；与 /tts 路由同一出入口。
     """
     # 文本前处理（docs/44 P1-A）：归一化在**缓存键前**，保证缓存键与合成文本一致；
     # 幂等、绝不抛错（异常回退原文）。
     text = normalize_for_tts(text, language="en")
-    settings = get_settings()
-    cache_path = cached_audio_path(
-        Path(settings.audio_dir) / "cache" / "tts", tts_cache_key(voice, rate, text)
-    )
     try:
-        if cache_path.exists():
-            data = cache_path.read_bytes()
-        else:
-            data = await tts.synthesize(text, voice=voice, rate=rate)
-            atomic_write_cache(cache_path, data)
+        data = await tts_synthesize_cached(
+            tts, text, voice, rate, provider=(get_settings().tts_provider or "edge")
+        )
     except Exception as exc:  # edge-tts 断网/缓存写盘失败等
         logger.warning("sentence no audio: %r (reason: %s)", text, exc)
         return None, None
@@ -291,7 +283,7 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             # 用户结束：跳过本轮管线，直接收尾 → 报告（docs/14 §3.2 concluding）
             db.commit()  # 释放本 turn 事务，再进入 complete_session（嵌套 Session 共享连接安全）
             summary = await _conclude_summary(llm, state.digest)
-            report_id = complete_session(state.session_id, llm, summary)
+            report_id = await asyncio.to_thread(complete_session, state.session_id, llm, summary)
             state.state = "completed"
             await get_state_store().put(state)
             yield ev.SessionEnd(
@@ -533,7 +525,7 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         limit = session.assigned_turns or 8
         if _meta_executor.should_conclude(meta, turn_index, limit, action):
             summary = await _conclude_summary(llm, state.digest, session_id=int(state.session_id))
-            report_id = complete_session(state.session_id, llm, summary)
+            report_id = await asyncio.to_thread(complete_session, state.session_id, llm, summary)
             state.state = "completed"
             await get_state_store().put(state)
             yield ev.SessionEnd(
@@ -645,7 +637,7 @@ async def _defense_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         yield ev.TurnEnd(turn_index=turn_index, score_status="ok" if lang else "unavailable")
         if done:
             summary = f"答辩练习完成，共 {len(state.answered)} 题。"
-            report_id = complete_session(state.session_id, llm, summary)
+            report_id = await asyncio.to_thread(complete_session, state.session_id, llm, summary)
             state.state = "completed"
             await get_state_store().put(state)
             yield ev.SessionEnd(
@@ -873,7 +865,7 @@ async def _shadow_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
 
         if conclude:
             summary = f"影子跟读完成，共 {len(sentences)} 句。"
-            report_id = complete_session(state.session_id, llm, summary)
+            report_id = await asyncio.to_thread(complete_session, state.session_id, llm, summary)
             state.state = "completed"
             await get_state_store().put(state)
             yield ev.SessionEnd(

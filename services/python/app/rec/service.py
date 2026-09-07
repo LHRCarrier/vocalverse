@@ -246,23 +246,38 @@ def _impression(db: Session, user_id: int, content_type: str, items: list[dict],
     )
 
 
-def _cache_get(key: str):
+async def _cache_get(key: str):
+    """Redis 读缓存（真实 await；json.loads 在 try 内 —— 生产态坏值降级为未命中）。
+
+    ⚠️ 历史缺陷（grill py-01）：旧实现对 ``redis.asyncio`` 客户端 ``r.get()`` 未 await，
+    ``json.loads(<coroutine>)`` 在 try 外抛 TypeError → 生产态 /recommendations 直接 500，
+    且测试态 get_redis() 恒 None（CONFTEST APP_TESTING=true）使 CI 完全不可见。
+    """
     r = get_redis()
     if r is None:
         return None
     try:
-        val = r.get(key)
+        val = await r.get(key)
+        return json.loads(val) if val else None
     except Exception:
         return None
-    return json.loads(val) if val else None
 
 
-def _cache_set(key: str, value, ttl_s: int) -> None:
+async def _cache_set(key: str, value, ttl_s: int) -> None:
     r = get_redis()
     if r is None:
         return
     with contextlib.suppress(Exception):
-        r.set(key, json.dumps(value, ensure_ascii=False), ex=ttl_s)
+        await r.set(key, json.dumps(value, ensure_ascii=False), ex=ttl_s)
+
+
+async def invalidate_recommendation_cache(user_id: int) -> None:
+    """主动失效（local/32 A-2.4）：水平/掌握度/难度变更后调用。真实 await 删除。"""
+    r = get_redis()
+    if r is None:
+        return
+    with contextlib.suppress(Exception):
+        await r.delete(f"rec:{user_id}:scene", f"rec:{user_id}:shadow")
 
 
 def _clean(items: list[dict], ctype: str) -> list[dict]:
@@ -281,18 +296,15 @@ def _clean(items: list[dict], ctype: str) -> list[dict]:
     ]
 
 
-def _recommend(user_id: int, ctype: str, limit: int, db: Session | None) -> list[dict]:
-    cfg = get_settings()
+def _recommend_impl(user_id: int, ctype: str, limit: int, db: Session | None) -> list[dict]:
+    """同步 ORM 核心（推荐计算 + 曝光写库；不含 Redis 缓存——见 ``_recommend_cached``）。
+
+    db=None 时自建会话并负责提交/关闭；消息写方唯一性：只写 events（曝光，必须成功才记）。
+    """
     own = db is None
     session = db if db is not None else get_session_factory()()
     try:
         lvl = resolve_level(session, user_id)
-        key = None
-        if own:
-            key = f"rec:{user_id}:{ctype}"
-            cached = _cache_get(key)
-            if cached is not None:
-                return cached
         tags = _user_tags(session, user_id)
         cands = _rank(_candidates(session, user_id, ctype, _effective_levels(lvl)), lvl, tags)
         counts: dict[str, int] = {}
@@ -318,33 +330,44 @@ def _recommend(user_id: int, ctype: str, limit: int, db: Session | None) -> list
         if own:
             _impression(session, user_id, ctype, items, lvl)
             session.commit()
-            _cache_set(key, out, cfg.rec_cache_ttl_s)
         return out
     finally:
         if own:
             session.close()
 
 
-def recommend_scenes(
+async def _recommend_cached(user_id: int, ctype: str, limit: int) -> list[dict]:
+    """异步入口：缓存读（命中即返）→ ORM 重活进 ``asyncio.to_thread`` → 缓存写。
+
+    只对「无外部 Session」的调用方生效（路由缺省路径）；测试/内部传入 db 时走同步 impl。
+    """
+    import asyncio
+
+    cfg = get_settings()
+    key = f"rec:{user_id}:{ctype}"
+    cached = await _cache_get(key)
+    if cached is not None:
+        return cached
+    items = await asyncio.to_thread(_recommend_impl, user_id, ctype, limit, None)
+    await _cache_set(key, items, cfg.rec_cache_ttl_s)
+    return items
+
+
+async def recommend_scenes(
     user_id: int, limit: int | None = None, db: Session | None = None
 ) -> list[dict]:
-    """场景推荐（主窗 [L,L+1] + 扩档 + 复习席 + 曝光埋点）。"""
+    """场景推荐（主窗 [L,L+1] + 扩档 + 复习席 + 曝光埋点；Redis 缓存读热路径）。"""
     cfg = get_settings()
-    return _recommend(user_id, "scene", limit or cfg.rec_limit_scenes, db)
+    if db is not None:
+        return _recommend_impl(user_id, "scene", limit or cfg.rec_limit_scenes, db)
+    return await _recommend_cached(user_id, "scene", limit or cfg.rec_limit_scenes)
 
 
-def recommend_shadow(
+async def recommend_shadow(
     user_id: int, limit: int | None = None, db: Session | None = None
 ) -> list[dict]:
     """影子跟读推荐（同规则，无 scene_type 多样性，复习席取 1）。"""
     cfg = get_settings()
-    return _recommend(user_id, "shadow", limit or cfg.rec_limit_shadow, db)
-
-
-def invalidate_recommendation_cache(user_id: int) -> None:
-    """主动失效（local/32 A-2.4）：update_user_level / mastery / 难度变更后调用。"""
-    r = get_redis()
-    if r is None:
-        return
-    with contextlib.suppress(Exception):
-        r.delete(f"rec:{user_id}:scene", f"rec:{user_id}:shadow")
+    if db is not None:
+        return _recommend_impl(user_id, "shadow", limit or cfg.rec_limit_shadow, db)
+    return await _recommend_cached(user_id, "shadow", limit or cfg.rec_limit_shadow)
