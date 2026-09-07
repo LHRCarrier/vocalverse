@@ -26,6 +26,7 @@ dependencies = [
     "scikit-learn>=1.5",
     # ML 训练（仅 CPU 推理；训练在云 GPU 独立环境）
     "torch>=2.4",
+    "num2words>=0.5",
 ]
 
 [dependency-groups]

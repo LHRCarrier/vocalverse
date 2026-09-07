@@ -23,6 +23,7 @@ from app.agent.runtime.meta_executor import MetaExecutor, compensate_meta
 from app.agent.runtime.turn_runner import TurnRunner
 from app.audio.base import ASRClient, LLMClient, ScorerClient, TTSClient
 from app.audio.fluency import compute_fluency_features
+from app.audio.textproc.normalize import normalize_for_tts
 from app.audio.textproc.sentence_splitter import StreamSentenceSplitter
 from app.audio.tts import atomic_write_cache, cached_audio_path, tts_cache_key
 from app.core.config import get_settings
@@ -73,6 +74,9 @@ async def _tts_url_from_bytes(tts: TTSClient, text: str, voice: str, rate: str) 
     命中直接复用；未命中合成后**原子写缓存**（tmp + os.replace，并发同句不产生脏缓存）。
     缓存目录 = {audio_dir}/cache/tts（随 audio_dir 一同被 24h/测试清理策略覆盖）。
     """
+    # 文本前处理（docs/44 P1-A）：归一化在**缓存键前**，保证缓存键与合成文本一致；
+    # 幂等、绝不抛错（异常回退原文）。
+    text = normalize_for_tts(text, language="en")
     settings = get_settings()
     cache_path = cached_audio_path(
         Path(settings.audio_dir) / "cache" / "tts", tts_cache_key(voice, rate, text)

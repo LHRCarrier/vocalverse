@@ -31,6 +31,7 @@ from app.audio.base import (
     get_scorer_client,
     get_tts_client,
 )
+from app.audio.textproc.normalize import normalize_for_tts
 from app.audio.upload import validate_audio_bytes
 from app.core.auth import get_current_user_id
 from app.core.config import Settings, get_settings
@@ -86,6 +87,9 @@ async def tts(
 ) -> Envelope[TTSResult]:
     if not text.strip():
         raise HTTPException(status_code=422, detail="text required")
+    # 文本前处理（docs/44 P1-A）：归一化在**合成前**（幂等、绝不抛错），
+    # 与对话热路径 _tts_url_from_bytes 同一 choke point。
+    text = normalize_for_tts(text, language="en")
     # docs/19 P0-4 / R-06：TTS 桶此前漏计（限流只覆盖 /turns 依赖），此处接线且先校验后扣
     await consume("tts", settings.tts_rate_per_hour, user_id)
     audio_bytes = await client.synthesize(text, voice=voice, rate=rate)
