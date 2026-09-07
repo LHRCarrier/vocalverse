@@ -3,6 +3,18 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 真链路体验修复：假「已使用」批注 / 幻觉转写 / 后续音频不自动播 · 33 op
+
+- **用户实测三连**：① 没说过的短语被标「已使用」；② 转写 "Uh, I heard, uh, Juicy, uh, or…"（whisper 幻觉）；③ 口语页只有开场白自动播、后续回合音频不自动播 + 需求改为「听完语音再显示重播按钮」；
+- **① 假批注（根因：LLM 兜底无条件追加）**：`MetaExecutor.apply_hits` = 规则通道（词序包含，权威） + **LLM `meta.corpus_hits` 无校验追加**——真实 DeepSeek 上线后宽松判定（读着转写+台词就标命中）→ 用户没说的话也「已使用」。修复：**默认关闭 LLM 兜底**（`config.meta_llm_hits_enabled=False`，`apply_hits(llm_hits_enabled=…)`），命中 = 纯规则（宁漏勿误）；语义级命中需显式开启。测试同步收紧（test_meta_executor 默认 1 条/开启 2 条、compensate 用例断言兜底不混入）；
+- **② 幻觉抑制**：`transcribe` 增 `condition_on_previous_text=False`（默认 True 会顺着上文幻觉延续）+ VAD 已接线；测试断言两参数；
+- **③ 播放器重构（MobileSpeakingView）**：旧「每 chunk 一个 Audio + loadedmetadata 定时器」存在竞态（同内容 mp3 缓存复用同 URL → metadata 提前就绪 → 定时器先于 onended 抢跑 shift → 后续句子不自动播/叠音）；重写为**单元素 speaker + 串行 pump 队列**（ended 驱动严格有序；元素在点「开始」手势链中解锁后，后续回合 play() 复用同一元素，顺带规避移动端 autoplay 对新元素的收紧）——playTts/replay/playChunk 全部收敛到 speaker；**解锁语义按用户需求改为「本回合有 audio_chunk → 播完才显示重播按钮（+8s 兜底）；无音频块 → turn_end 立即解锁」**（MVP 测试锁定无音频语义不变）；
+- **验证**：后端全量 `pytest -q` **297 passed** + ruff 全绿；前端 lint/typecheck/**vitest 全绿（MobileSpeakingView 3 例：回合结束解锁/重听命中文本/空文本不解锁）**/build 全绿；uvicorn --reload 已热加载（无需重启）；
+- **评分真实性说明（用户怀疑）**：① 评分 = **真实讯飞 ISE**（如今 60.81082/70.37372 这类随机小数；Fake 桩固定 88/90/86/85 已在上批隔离——dev 用 Fake 时带 `is_fake` 标识+告警、生产 fail-fast 不可用）；② **流利度**由 whisper 词级时间戳派生——幻觉词（"Uh, I heard, uh"）会拉低 wpm/停顿分 → 本次幻觉抑制后应回升；③ 自证：录一句标准 "I'd like a coffee, please." → 发音/流利度应显著高于当前值。
+- **登记**：docs/14 §3.5（双通道收紧说明）；安卓日志（播放器重构+重听解锁时机 UI 变更）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-07）
+
 ## 2026-09-07 真链路收口：whisper 本地直载 + 大模型评估 + FakeLLM 判定 · 61 op
 
 - **背景**：用户拍板真链路（ASR 真实转写）；被墙环境下 HF 缓存「完整性校验」反复拦截（缺 `.gitattributes`/`README.md` 即拒绝、联网又是 ConnectTimeout）；
