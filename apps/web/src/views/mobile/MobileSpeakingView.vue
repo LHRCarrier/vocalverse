@@ -73,11 +73,63 @@ const playingBubble = ref<number | null>(null)
 let replayAudio: HTMLAudioElement | null = null
 
 const recorder = new VoiceRecorder()
-const audioQueue: HTMLAudioElement[] = []
 let abort = new AbortController()
 const sheetOpen = ref(false)
 
 const { createUrl, revokeUrl, releaseAll } = useBlobAudio()
+
+// ── 单元素串行播音器（2026-09-07 重构）──────────────────────────────────────────
+// 旧实现「每 chunk 一个 Audio + 各自 loadedmetadata 定时器」存在竞态：同内容 mp3（缓存
+// 复用同 URL）的 metadata 会提前就绪 → 定时器先于 onended 抢跑 shift，后续句子不自动播/
+// 叠音。单元素 + ended 驱动严格串行；且元素在用户手势链（点「开始」→ 开场白）中解锁后，
+// 后续回合的 play() 复用同一元素，规避移动端 autoplay 对新元素收紧的差异。
+const speaker = new Audio()
+let queue: string[] = []
+let pumping = false
+let turnUnlockTimer: ReturnType<typeof setTimeout> | null = null
+let turnAudioChunks = 0  // 本回合收到的 audio_chunk 数：0 → turn_end 立即解锁；>0 → 播完才解锁
+
+function maybeUnlockTurn() {
+  if (pumping || queue.length) return
+  const lastAssistant = [...bubbles.value].reverse().find((b) => b.role === 'assistant')
+  if (lastAssistant && !lastAssistant.speakable) lastAssistant.speakable = true
+}
+
+function pump() {
+  if (pumping) return
+  const url = queue.shift()
+  if (!url) return
+  pumping = true
+  speaker.src = url
+  speaker.onended = () => {
+    pumping = false
+    pump()
+    maybeUnlockTurn()
+  }
+  // autoplay 被拒/环境不支持：跳过继续，绝不卡队列（用户可手动重听）
+  speaker.play().catch(() => {
+    pumping = false
+    pump()
+    maybeUnlockTurn()
+  })
+}
+
+function queueChunk(url: string) {
+  queue.push(url)
+  pump()
+}
+
+/** 打断/清空播音器（切场景、重听、卸载） */
+function flushSpeaker() {
+  speaker.pause()
+  speaker.onended = null
+  pumping = false
+  queue = []
+  if (turnUnlockTimer != null) {
+    clearTimeout(turnUnlockTimer)
+    turnUnlockTimer = null
+  }
+}
 
 onMounted(async () => {
   // 无 sceneId（口语 Tab/中央 + 直达）→ 先让用户选场景；带 sceneId（场景选择/自由对话切换）→ 直接开工
@@ -92,7 +144,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   abort.abort()
-  audioQueue.forEach((a) => a.pause())
+  flushSpeaker()
   replayAudio?.pause()
   releaseAll()
 })
@@ -114,8 +166,7 @@ watch(
 function resetChatState() {
   abort.abort()
   abort = new AbortController()
-  audioQueue.forEach((a) => a.pause())
-  audioQueue.length = 0
+  flushSpeaker()
   replayAudio?.pause()
   replayAudio = null
   if (recorder.state === 'recording') recorder.cancel()
@@ -198,7 +249,7 @@ function playOpening() {
   }
 }
 
-/** 播放/重听 TTS；onDone = 播完回调（重听按钮出现条件）；index = 重听播放态记录 */
+/** 播放/重听 TTS（单元素 speaker；onDone = 播完回调；index = 重听播放态记录） */
 async function playTts(text: string, onDone?: () => void, index?: number) {
   let done = false
   const doneOnce = () => {
@@ -214,9 +265,11 @@ async function playTts(text: string, onDone?: () => void, index?: number) {
       doneOnce()
       return
     }
+    // 重听 = 打断当前回合队列并接管 speaker（互斥，避免叠音）
+    flushSpeaker()
     const url = createUrl(blob)
-    const audio = new Audio(url)
-    audio.onended = () => {
+    speaker.src = url
+    const finish = () => {
       revokeUrl(url)
       if (index != null && playingBubble.value === index) {
         playingBubble.value = null
@@ -224,22 +277,28 @@ async function playTts(text: string, onDone?: () => void, index?: number) {
       }
       doneOnce()
     }
-    // 兜底：ended 事件在部分环境（headless/无音频设备）可能不触发 —— 按时长定时 + 15s 硬上限标记播完
-    audio.addEventListener(
+    speaker.onended = () => {
+      pumping = false
+      finish()
+    }
+    // 兜底：ended 事件在部分环境（headless/无音频设备）可能不触发 —— 按时长定时 + 15s 硬上限
+    speaker.addEventListener(
       'loadedmetadata',
       () => {
-        const ms = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration * 1000 + 400 : 8000
-        setTimeout(doneOnce, Math.min(ms, 15000))
+        const ms =
+          Number.isFinite(speaker.duration) && speaker.duration > 0
+            ? speaker.duration * 1000 + 400
+            : 8000
+        setTimeout(finish, Math.min(ms, 15000))
       },
       { once: true },
     )
-    setTimeout(doneOnce, 15000)
     if (index != null) {
       replayAudio?.pause()
-      replayAudio = audio
+      replayAudio = speaker
       playingBubble.value = index
     }
-    await audio.play().catch(() => {
+    speaker.play().then(doneOnce).catch(() => {
       // autoplay 被拒/环境不支持：视为可重听入口已可用（用户点击时再播）
       if (index != null) {
         playingBubble.value = null
@@ -260,44 +319,13 @@ function replay(index: number, text: string) {
     playingBubble.value = null
     return
   }
-  // 重播优先：暂停并清空仍在播的回合流式音频队列，避免与手动重播叠音（2026-09-07；
-  // 队列清空后若本回合还有 chunk 未到，playChunk 会从 length=1 继续自动播，无残留）
-  audioQueue.forEach((a) => a.pause())
-  audioQueue.length = 0
+  flushSpeaker()
   void playTts(text, undefined, index)
 }
 
-function playChunk(url: string, duration?: number | null) {
-  const audio = new Audio(url)
-  audioQueue.push(audio)
-  let advanced = false
-  const advance = () => {
-    if (advanced) return
-    advanced = true
-    audioQueue.shift()?.play().catch(() => undefined)
-    // 全部音频块播完 = 本回合语音完整听了一遍 → 提前解锁喇叭按钮（turn_end 兜底解锁，双保险）
-    if (!audioQueue.length) {
-      const lastAssistant = [...bubbles.value].reverse().find((b) => b.role === 'assistant')
-      if (lastAssistant) lastAssistant.speakable = true
-    }
-  }
-  audio.onended = advance
-  // 兜底：部分环境 ended 不触发（headless/无音频设备）→ 按时长定时推进队列，防卡死；
-  // 优先服务端估算 duration（docs/44 P1-C），否则 audio.duration（与 playTts 同款兜底口径）
-  audio.addEventListener(
-    'loadedmetadata',
-    () => {
-      const ms =
-        Number.isFinite(audio.duration) && audio.duration > 0
-          ? audio.duration * 1000
-          : duration && duration > 0
-            ? duration * 1000
-            : 0
-      if (ms > 0) setTimeout(advance, Math.min(ms + 400, 15000))
-    },
-    { once: true },
-  )
-  if (audioQueue.length === 1) audio.play().catch(() => undefined)
+/** 回合流式音频块（单元素排队，顺序播放；播完自动解锁该轮重听按钮） */
+function playChunk(url: string) {
+  queueChunk(url)
 }
 
 async function startRecording() {
@@ -379,7 +407,8 @@ function onSseEvent(e: SseStreamEvent) {
       currentAssistant.value.text += e.text
       break
     case 'audio_chunk':
-      playChunk(e.url, e.duration)
+      turnAudioChunks += 1
+      playChunk(e.url)
       break
     case 'meta_block':
       for (const hit of e.corpus_hits) {
@@ -404,14 +433,25 @@ function onSseEvent(e: SseStreamEvent) {
       scoreStatus.value = e.score_status === 'ok' ? scoreStatus.value : e.score_status
       // R-13：权威轮次纠偏（服务端回带 expected_turn；断线/刷新后不再靠乐观计数撞 40903）
       currentTurn.value = e.expected_turn ?? currentTurn.value + 1
-      // 每条 AI 话语回合结束即解锁重听喇叭（docs/14 §3.2「awaiting_user 可选行动：…重听…」/§2.3 重听为用户主动动作；
-      // 2026-09-07 用户反馈：场景对话不能只有开场一句有按钮 —— 历史气泡保留标记，逐句可播，
-      // 与自由对话页 per-turn 解锁一致（MobileFreeChatView turn_end 同款））
+      // 2026-09-07 用户反馈重构「听取后才显示重播按钮」：本回合音频**队列播放完**才解锁
+      // （maybeUnlockTurn，advance/pump 收尾时触发）；8s 兜底解锁防播放环节异常卡死，
+      // 空文本不解锁（LLM 失败降级 → 重播空文本会触发 /tts 422，同上版注释）。
       const lastBubble = bubbles.value[bubbles.value.length - 1]
       const target = currentAssistant.value ?? (lastBubble?.role === 'assistant' ? lastBubble : null)
-      // 空文本不解锁（2026-09-07 评审：LLM 失败降级走 fallback 不流式输出 → 回合气泡无文本仍会出现
-      // 空喇叭 → 点击重播空文本触发 /tts 422；与 MobileFreeChatView 的 `if (reply)` 守卫一致）
-      if (target?.text?.trim()) target.speakable = true
+      if (target?.text?.trim()) {
+        // 有音频块 → 播完才解锁（maybeUnlockTurn 在 pump 收尾调用）+ 8s 兜底防播放异常卡死；
+        // 无音频块（LLM 仅字幕/降级）→ 立即解锁（重听 = 点击时实时合成，无需等播）
+        if (turnAudioChunks === 0) {
+          maybeUnlockTurn()
+        } else {
+          if (turnUnlockTimer != null) clearTimeout(turnUnlockTimer)
+          turnUnlockTimer = setTimeout(() => {
+            turnUnlockTimer = null
+            maybeUnlockTurn()
+          }, 8000)
+        }
+      }
+      turnAudioChunks = 0
       phase.value = 'ready'
       break
     }
