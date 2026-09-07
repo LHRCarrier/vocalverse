@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 部署踩坑：JWT_SECRET 未注入导致 Java :8080 启动失败（dev-up.ps1 补 .env 注入）
+
+- **现象**：`.\scripts\dev-up.ps1 start` → python/vite 健康 True，java False；`local/dev-logs/java-8080.out.log` 尾：`Caused by: java.lang.IllegalStateException: vocalverse.jwt.secret 未配置或过短（≥32 字节）：检查 JWT_SECRET 环境变量（docs/19 P0-9）`（JwtService.java:29 fail-fast）；
+- **根因**：方式 B 本地链路——Java `application.yml:25` 用 `${JWT_SECRET:}`（环境变量，缺省空），而 `dev-up.ps1` 只注入 HF_* 三个变量，**从不加载根 `.env`**；Maven 子进程不读 .env → `JWT_SECRET` 为空 → P0-9 早抛。此前能跑是因为 shell 会话里手工 export 过；干净会话（PowerShell 重开）必现。Python 侧不受影响（pydantic-settings 自读 `.env`）；
+- **修复**：`scripts/dev-up.ps1` 启动前按 setdefault 语义（仅未显式设置时）注入根 `.env` 全部键（附件：BOM 防护 TrimStart(0xFEFF)——记事本保存的 .env 首行带 BOM 会把 BOM 并进键名）；`Parser::ParseFile` 校验语法过；
+- **验证**：解析器语法校验 OK；键匹配逻辑 dry-run 验证；重跑 `dev-up stop → start` 后 java 应 healthy（JWT_SECRET 42 字节 ≥32 达标）；
+- **登记**：本条目（AI 代工，部署/脚本类归主线日志）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-07）
+
 ## 2026-09-07 跨端收尾：R-13 权威轮次 + SSE 协议 golden 双端护栏 · 31 op
 
 - **R-13（va-arch-09，P1·S）**：`events.py TurnEnd` 增 `expected_turn`（服务端权威：本回合完成后 `state.current_turn`，即下一轮应提交的 `expected_turn`）；orchestrator **6 处 TurnEnd 发射点**全部回带（对话/轻回合/demo-hint/辩护/影子）；前端三处采纳——`MobileSpeakingView`/`PracticeView` 的 `currentTurn` 与 `DefenseView` 的 `questionIndex` 改为 **`e.expected_turn ?? 乐观值`**（乐观推进保留、服务端纠偏兜底）——断线/刷新后不再靠前端计数撞 40903「重来」；
