@@ -111,17 +111,17 @@
 - **风险/回退**：低。只动键与命中逻辑。
 - **建议 PR**：`fix(tts): cache key + ttl + reuse on /tts`。
 
-### P1-C · vtts-04 拼接：缺句上报 + AudioChunk 带 duration
+### P1-C · vtts-04 拼接：缺句上报 + AudioChunk 带 duration（✅ 已实现，2026-09-07）
 
 - **目标**：句失败**不再静默**；前端有能力做 Gap-less 排播。
-- **改什么**：`orchestrator.py:112-132`（`_tts_url_from_bytes` 失败分支加日志/上报）、`events.py:40-42`（`AudioChunk` 增 `duration` 可选字段）。
+- **改什么**：`orchestrator.py`（`_tts_url_from_bytes` 失败分支结构化日志「sentence no audio」+ 返回 (url, duration) 元组）、`events.py`（`AudioChunk` 增 `duration: float | None`，`exclude_none` 旧端兼容）、`app/audio/tts.py`（新增纯函数 `mp3_duration_seconds`：MPEG 帧头估算，字跳 ID3v2，绝不抛错）、前端 `sse-types.ts` + 两处 `playChunk`（`MobileSpeakingView`/`PracticeView`：ended 不触发时按时长定时推进队列，优先服务端 duration）。
 - **怎么做（借鉴自写 + 待评估项）**：
-  1. `_tts_url_from_bytes` 失败：`logger.warning("sentence no audio: %r", text)` + 埋点 `events`（vs VS `report_dropped_chunks` 思路）。
-  2. `AudioChunk` 加 `duration: float | None`（edge-tts 单句时长近似可得），前端据此做连续播放。
+  1. `_tts_url_from_bytes` 失败：`logger.warning("sentence no audio: %r (reason: %s)", text, exc)`（vs VS `report_dropped_chunks` 思路；server 事件埋点未做——`EventTypes` 白名单无失败类，登记为看板化时再扩）。
+  2. `AudioChunk` 加 `duration: float | None`（edge-tts 单句时长 ≈CBR 时估算，精度 ±6ms/帧）。
   3. **crossfade 本轮不做**（见 §6 待评估）：对话短句+网络 TTS 价值低，且需 mp3→PCM 解码在服务端拼接，成本高。
-- **验收**：单测模拟一次合成失败 → 触达日志/埋点，且不 crash。
-- **风险/回退**：低。
-- **建议 PR**：`fix(tts): report dropped sentences + duration`。
+- **验收**：`tests/test_audio_chunk_duration.py` 8 passed（纯函数估算/ID3 跳过/坏数据 None/契约序列化/失败上报 (None,None)+日志/成功返回 url+duration）；全量 pytest 绿 + ruff 全绿；前端 sse.test.ts 增 duration 透传用例。
+- **风险/回退**：低。duration 为可选字段（`exclude_none`），旧端忽略；队列兜底定时器单次触发（guard + 15s 上限），不会双推进。
+- **建议 PR**：`fix(tts): report dropped sentences + duration`（code/test/docs 分 3 commit）。
 
 ### P1-D · vtts-07 输出封装：/tts 统一 URL + 响度归一
 

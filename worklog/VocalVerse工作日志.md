@@ -3,6 +3,22 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 TTS 链路整改 P1-C：缺句显式上报 + AudioChunk.duration（帧头估算）· 48 op
+
+- **背景**：对抗拷问 vtts-04——句合成失败仅内部降级 None（素材静默丢句），前端无时长信息做 Gap-less 排播；docs/44 P1-C 定稿（借鉴 VS `report_dropped_chunks` 思路）；
+- **后端**：
+  - `app/audio/tts.py` 新增纯函数 `mp3_duration_seconds(data)->float|None`：MPEG 帧头位率换算 CBR 时长（跳 ID3v2、绝不抛错、非 MP3/坏数据 → None）；零依赖零 IO；
+  - `app/practice/events.py` `AudioChunk` 增可选 `duration`（`exclude_none` 序列化 → 旧端兼容）；
+  - `app/practice/orchestrator.py` `_tts_url_from_bytes` 改返 `(url, duration)` 元组；失败分支结构化日志 **`sentence no audio: %r (reason: %s)`**（缺句显式上报）；drain 两处 + 影子示范（:750）均透传 duration；
+- **前端**（`sse-types.ts` + `MobileSpeakingView.playChunk` + `PracticeView.playChunk`）：`audio_chunk` 透传 duration；队列推进加「ended 不触发兜底」（loadedmetadata 定时单次推进，优先服务端 duration，15s 硬上限）——与 playTts 既有「时长兜底」口径一致；
+- **测试**：`tests/test_audio_chunk_duration.py` 8 例（纯函数估算/ID3 跳过/坏数据 None/契约序列化/失败 (None,None)+日志/成功 url+duration）；前端 sse.test.ts 增 duration 透传 + 旧端兼容用例；
+- **门禁**：Python `pytest -q` **268 passed / 4 skipped**（260+8）、`ruff check`+`format --check` 全绿（127 文件）；前端 `lint/typecheck/test:run`（**90 passed**）+ `build` 全绿；
+- **踩坑**：① 自造 MP3 帧 byte1 位率索引对不上 MPEG2 L3 表（48kbps 是 idx 6 非 5）→ 时长差 20%；frame sync 需 11 位（byte1 高 3 位=111），初版 0x27 被解析器正确拒绝——修正为 0xF3/0x64；② `_tts_url_from_bytes` 改元组返回后，`pending_tts` 与影子示范调用点需同步解包（编译期类型已拦）；
+- **登记**：docs/14 §3.3（audio_chunk 行 + duration?）、docs/44 P1-C 标 ✅（含验收/风险）、README 无新文件不需索引行；
+- **待跟进**：server 事件埋点未做（`EventTypes` 白名单无失败类 → 登记看板化再扩）；crossfade 维持「本轮不做」（§6 待评估）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-07）
+
 ## 2026-09-07 TTS 链路整改 P0-B：引擎生命周期契约（is_available/ensure_ready/unload）+ 单发重试/超时 + provider 分派
 
 - **背景**：对抗拷问 vtts-01——`TTSClient` ABC 只有 `synthesize`（base.py:58-65），`get_tts_client` 恒返 EdgeTTSClient（base.py:116-124），无 is_available/ensure_ready/unload；edge-tts 断网/受限/改协议时整链静默（orchestrator.py 降级为 None），无超时/熔断/重试（docs/audit:128）。
