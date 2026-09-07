@@ -27,13 +27,22 @@ class MetaExecutor:
         meta: MetaResult,
         action: str,
         grammar_errors: list,
+        llm_hits_enabled: bool = False,
     ) -> list[dict]:
-        """O(1) 命中合并（规则权威 + LLM 兜底）；非 normal/retry 轮 → 作废（返回 []）。"""
+        """O(1) 命中合并（规则权威 + 可选 LLM 兜底）；非 normal/retry 轮 → 作废（返回 []）。
+
+        2026-09-07 收紧（用户实测：没说过的短语被标「已使用」= LLM 兜底无条件追加的幻觉）：
+        规则通道（``match_rule``，词序包含）为唯一默认来源；LLM 的 ``meta.corpus_hits``
+        只在 ``llm_hits_enabled=True`` 时追加（config ``meta_llm_hits_enabled``，默认关）。
+        语义：**宁漏勿误** —— 漏标只影响覆盖度展示，误标直接伤害用户信任。
+        """
         if action not in ("normal", "retry"):
             return []
         rule_hits = match_rule(transcript, corpus)
         grammar_ok = self.grammar_ok(meta, grammar_errors)
         hits = [{"phrase": p, "state": "ok" if grammar_ok else "fix"} for p in rule_hits]
+        if not llm_hits_enabled:
+            return hits
         seen = set(rule_hits)
         for h in meta.corpus_hits or []:
             phrase = h.get("phrase") if isinstance(h, dict) else h

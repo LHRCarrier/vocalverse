@@ -61,6 +61,10 @@ class FasterWhisperClient(ASRClient):
             beam_size=5,
             word_timestamps=True,
             vad_filter=True,
+            # 2026-09-07 真链路实测：whisper-small 被噪声/口音干扰时会幻觉重复
+            # （"Uh, I heard, uh, …"）并顺着上文延续（condition_on_previous_text=True 默认）。
+            # 关掉 = 每段独立解码，幻觉大幅抑制（与 VAD 配合，无声段判别也更干净）。
+            condition_on_previous_text=False,
         )
         segments = list(segments)
         text = "".join(s.text for s in segments).strip()

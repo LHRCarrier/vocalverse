@@ -429,8 +429,16 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         if not reply:
             reply = _fallback_reply(transcript)
 
-        # 4) 命中（MetaExecutor：规则权威 + LLM 兜底；retry/hint/demo 作废——docs/26 §⑤）
-        hits = _meta_executor.apply_hits(transcript, corpus, meta, action, last_errors)
+        # 4) 命中（MetaExecutor：规则权威 +（默认关闭的）LLM 兜底；retry/hint/demo 作废
+        #    ——docs/26 §⑤）
+        hits = _meta_executor.apply_hits(
+            transcript,
+            corpus,
+            meta,
+            action,
+            last_errors,
+            llm_hits_enabled=settings.meta_llm_hits_enabled,
+        )
 
         # 6) 后置元数据 + 迟到的评分徽章
         grammar = _meta_executor.effective_grammar(meta, last_errors)
