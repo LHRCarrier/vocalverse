@@ -87,6 +87,10 @@ async def tts(
 ) -> Envelope[TTSResult]:
     if not text.strip():
         raise HTTPException(status_code=422, detail="text required")
+    # 引擎可用性预检（docs/44 P0-B）：先探测再合成，不可用返回可读错误而非 500。
+    available, reason = client.is_available()
+    if not available:
+        raise HTTPException(status_code=503, detail=f"tts unavailable: {reason}")
     # 文本前处理（docs/44 P1-A）：归一化在**合成前**（幂等、绝不抛错），
     # 与对话热路径 _tts_url_from_bytes 同一 choke point。
     text = normalize_for_tts(text, language="en")

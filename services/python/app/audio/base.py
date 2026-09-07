@@ -56,13 +56,29 @@ class ASRClient(abc.ABC):
 
 
 class TTSClient(abc.ABC):
-    """语音合成接口（默认 edge-tts，Azure 备胎）。"""
+    """语音合成接口（默认 edge-tts，Azure 备胎）。
+
+    生命周期契约（docs/44 P0-B）：带默认实现，子类/``FakeTTSClient`` 无需覆写即兼容。
+    调用方应先 ``is_available()`` 再 ``synthesize``，不可用时给出可读降级而非静默/500。
+    """
 
     @abc.abstractmethod
     async def synthesize(
         self, text: str, voice: str = "en-US-JennyNeural", rate: str = "+0%"
     ) -> bytes:
         raise NotImplementedError
+
+    def is_available(self) -> tuple[bool, str]:
+        """引擎能否在当前环境运行。默认 (True, "")；子类可报 (False, 可读原因)。"""
+        return True, ""
+
+    def ensure_ready(self) -> None:
+        """预热模型/连接（阻塞，LOAD 预算与 GENERATE 预算分离）。默认 no-op。"""
+        return None
+
+    def unload(self) -> None:
+        """释放引擎持有资源（模型/连接/显存）。默认 no-op，幂等。"""
+        return None
 
 
 class ScorerClient(abc.ABC):
@@ -119,6 +135,14 @@ def get_tts_client() -> TTSClient:
         from app.audio.stubs import FakeTTSClient
 
         return FakeTTSClient()
+
+    provider = (settings.tts_provider or "edge").lower()
+    if provider == "azure":
+        # docs/44 P0-C：Azure 备胎尚未接线。返回一个显式「未接线」客户端，
+        # 让其 is_available()==(False, 可读原因) —— 调用方可据此干净降级，而非 500/静默用 edge。
+        from app.audio.tts import AzureNotWiredClient
+
+        return AzureNotWiredClient()
     from app.audio.tts import EdgeTTSClient
 
     return EdgeTTSClient(voice=settings.tts_voice, rate=settings.tts_rate)

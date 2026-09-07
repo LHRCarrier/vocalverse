@@ -3,28 +3,56 @@
 - 逐句合成（POC-1 实测：单句 ≈1.34s 网络往返 —— 见 docs/06 §8 延迟表，
   因此设计为「首句到达即合成 + 后续句并发预热」，并配合开场/常用句预合成缓存）；
 - 延迟导入 edge_tts（保持轻量测试环境可用）。
+- 生命周期（docs/44 P0-B）：``is_available`` 提前探测 + ``synthesize`` 超时/单发重试，
+  edge-tts 受限/改协议/断网时不静默、不挂死，失败明确上抛供调用方降级。
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 
 from app.audio.base import TTSClient
 
+logger = logging.getLogger("vocalverse.tts")
+
+#: 单句合成超时（秒）。edge-tts 断网/受限时防挂死（docs/audit:128 「无超时/熔断/重试」→ 补上）。
+_DEFAULT_TIMEOUT_S = 30.0
+
+#: 合成失败重试次数（初试 + 重试 = 2；单发重试，参考 VS「明确失败而非循环」思路）。
+_MAX_ATTEMPTS = 2
+
 
 class EdgeTTSClient(TTSClient):
-    def __init__(self, voice: str = "en-US-JennyNeural", rate: str = "+0%"):
+    def __init__(
+        self,
+        voice: str = "en-US-JennyNeural",
+        rate: str = "+0%",
+        timeout_s: float = _DEFAULT_TIMEOUT_S,
+    ):
         self._voice = voice
         self._rate = rate
+        self._timeout_s = timeout_s
 
-    async def synthesize(
-        self, text: str, voice: str = "en-US-JennyNeural", rate: str = "+0%"
-    ) -> bytes:
+    def is_available(self) -> tuple[bool, str]:
         try:
-            import edge_tts
-        except ImportError as exc:  # pragma: no cover - 环境未装（轻量测试走 Fake）
-            raise RuntimeError("edge-tts 未安装（生产镜像已含；轻量环境请用 Fake）") from exc
+            import edge_tts  # noqa: F401
+
+            return True, "ready"
+        except Exception as exc:  # pragma: no cover - 轻量测试环境走 Fake
+            return False, f"edge-tts import failed: {exc}"
+
+    def ensure_ready(self) -> None:
+        # edge-tts 无本地模型/预热；连接惰性建立，无需 LOAD 预算分离。
+        return None
+
+    def unload(self) -> None:
+        # edge-tts 是网络客户端，无进程内模型可释放；保持契约幂等 no-op。
+        return None
+
+    async def _stream_audio(self, text: str, voice: str, rate: str) -> bytes:
+        import edge_tts
 
         communicate = edge_tts.Communicate(text, voice or self._voice, rate=rate or self._rate)
         chunks: list[bytes] = []
@@ -34,6 +62,47 @@ class EdgeTTSClient(TTSClient):
         if not chunks:
             raise RuntimeError(f"edge-tts 返回空音频: {text[:40]!r}")
         return b"".join(chunks)
+
+    async def synthesize(
+        self, text: str, voice: str = "en-US-JennyNeural", rate: str = "+0%"
+    ) -> bytes:
+        last: Exception | None = None
+        for attempt in range(1, _MAX_ATTEMPTS + 1):
+            try:
+                return await asyncio.wait_for(
+                    self._stream_audio(text, voice or self._voice, rate or self._rate),
+                    timeout=self._timeout_s,
+                )
+            except Exception as exc:  # noqa: BLE001 — 网络/受限/超时均可单发重试
+                last = exc
+                logger.warning(
+                    "edge-tts 合成失败 (attempt %d/%d): %s | %r",
+                    attempt,
+                    _MAX_ATTEMPTS,
+                    exc,
+                    text[:40],
+                )
+        raise RuntimeError(
+            f"edge-tts 合成失败（已重试 {_MAX_ATTEMPTS} 次）: {text[:40]!r}"
+        ) from last
+
+
+class AzureNotWiredClient(TTSClient):
+    """Azure 备胎占位（docs/44 P0-C）：显式报告未接线，调用方据此干净降级。
+
+    config 里 ``tts_provider='azure'``/``azure_tts_key`` 有字段但无实现（docs/audit:135 K02）——
+    本类让「存在即切」不再是承诺：``is_available()`` 返回可读原因，
+    ``synthesize`` 抛明确的未接线错误。
+    P0-C 接线 azure-cognitiveservices-speech 后替换为真实 ``AzureTTSClient``。
+    """
+
+    def is_available(self) -> tuple[bool, str]:
+        return False, "Azure TTS 未接线（见 docs/44 P0-C）"
+
+    async def synthesize(
+        self, text: str, voice: str = "en-US-JennyNeural", rate: str = "+0%"
+    ) -> bytes:
+        raise RuntimeError("Azure TTS 未接线（见 docs/44 P0-C）")
 
 
 async def synthesize_concurrent(
