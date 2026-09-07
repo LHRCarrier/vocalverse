@@ -3,6 +3,18 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 性能拷问 P0 两连 + P1-B：推荐缓存 500 修复 / SSE 收尾同步解堵 / TTS 缓存确定性 · 67 op
+
+- **背景**：上轮「性能拷问×审查」3 个 P0 + 1 个 P1 一并落地（组长裁决），全部按 code/test/docs 三 commit；
+- **P0 · py-01 推荐缓存生产态 500（最痛）**：`rec/service.py` 旧 `_cache_get` 对 `redis.asyncio` 的 `r.get()` 未 await → `json.loads(<coroutine>)` 在 try **外**抛 TypeError（比"静默失效"更糟）；`_cache_set`/`invalidate` 同样从不 await（缓存零实现）。修复：三函数改 async+真 await+`json.loads` 入 try；`_recommend` 拆为**同步纯 ORM 核心** `_recommend_impl` + `asyncio.to_thread` 包装 `_recommend_cached`（db 注入路径保持同步，测试/内部调用零破坏）；`recommend_scenes/recommend_shadow` 改 async（路由 await）；**回归锁**：新 `tests/rec/test_recommend_redis_cache.py` 3 例（fakeredis 模拟生产 redis.asyncio：命中不重算+返回值确为 JSON 反序列化结果（若仍是协程必 TypeError，即日志缺陷回归锁）/invalidate 后重算）/redis 不可用降级重算不 500）——**新增 dev 依赖 fakeredis>=2.26**；
+- **P0 · py-02 SSE 收尾同步解堵**：`orchestrator.py` 4 处 `complete_session(...)`（对话收尾/abandon/辩护/影子，:287/:529/:641/:869）改为 `await asyncio.to_thread(...)`（对齐路由层 practice.py:205 P0-2 纪律；`complete_session` 自建自关 Session，线程安全；同步 httpx 3s 也被移出事件循环）；
+- **P1-B · TTS 缓存确定性（vtts-06）**：键扩为 `sha1(provider|engine_version|voice|rate|text)`（edge-tts 包版本经 importlib.metadata 入键，升级引擎/换音色/切 provider 不命中陈旧音频）；新增 `cache_is_fresh`（mtime TTL，config `tts_cache_ttl_s=86400`）、`prune_tts_cache`（容量 `tts_cache_max_mb=512` 按 mtime 裁剪最旧，min_keep=16 防高频句互踢）、统一出入口 `tts_synthesize_cached`；`orchestrator._tts_url_from_bytes` 与 `/tts` 路由共用（/tts 不再每次现合成；桶 consume 仍按端点限流计数）。**不搬 VS 内容寻址确定性**（edge-tts 在线非确定，前提不成立，va-arch-07）；
+- **验证**：`tests/test_tts_cache.py` 9 例 + 全量 `pytest -q` 绿（新增 12 例）；`ruff check`+`format` 全绿；既有 `test_recommend.py`/`test_seed_recommend.py` 因 API 转 async 同步改 await（db 注入路径行为不变）；
+- **踩坑**：① async 函数即使 db 分支也返回协程——同步测试全炸，逐处 `async def + await`；② `prune_tts_cache` 默认 min_keep=16 在 3 文件小目录下永不裁剪（测试暴露），测试传 min_keep=1 校验语义；③ fps 位率索引（沿用 P1-C 踩坑，本批无新 MPEG 帧）；
+- **登记**：docs/44 P1-B ✅；本轮 fe-01（App 播放资源泄漏）记录见 `worklog/安卓开发日志.md`。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-07）
+
 ## 2026-09-07 TTS 链路整改 P1-C：缺句显式上报 + AudioChunk.duration（帧头估算）· 48 op
 
 - **背景**：对抗拷问 vtts-04——句合成失败仅内部降级 None（素材静默丢句），前端无时长信息做 Gap-less 排播；docs/44 P1-C 定稿（借鉴 VS `report_dropped_chunks` 思路）；

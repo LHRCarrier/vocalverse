@@ -99,16 +99,13 @@
 - **风险/回退**：低。纯函数、可回退（异常回退原文）。走 `textproc/` 独立模块，不对 `TTSClient` 动刀。
 - **建议 PR**：`feat(tts): text normalization`（含 num2words 依赖 + 纯函数测试）。已按此实现。
 
-### P1-B · vtts-06 缓存确定性：键扩容 + TTL + /tts 复用
+### P1-B · vtts-06 缓存确定性：键扩容 + TTL + /tts 复用（✅ 已实现，2026-09-07）
 
 - **目标**：不命中陈旧音色；`/tts` 与热路径缓存语义一致。
-- **改什么**：`audio/tts.py:69-73`（key）、`:49-52`（path）、`orchestrator.py:120-128`；`routes/audio.py:91-92`。
-- **怎么做（借鉴自写）**：
-  1. 键扩成 `sha1(provider|engine_version|voice|rate|text)`（加 provider + 依赖版本 + 采样率外部戳，参考 VS `segment_cache_key` 把「影响成品的维度」都进键）。
-  2. 加 TTL（如 24h）或进程重启清空：`cached_audio_path` 检查 mtime 过期即重取。
-  3. `/tts` 复用同一缓读取数（现为每次现合成，见 `audio.py:91`）。
-- **验收**：同参数两次 → 命中；改 provider/版本 → key 变化 → 重取；跨 TTL → 失效。
-- **风险/回退**：低。只动键与命中逻辑。
+- **改什么（已实现）**：`audio/tts.py` 键扩为 `sha1(provider|engine_version|voice|rate|text)`（provider + edge-tts 包版本入键，升级引擎/换音色/切 provider 都不命中陈旧音频）；新增 `cache_is_fresh`（mtime TTL，默认 24h 与 audio_ttl_hours 同窗）、`prune_tts_cache`（容量上限默认 512MB，按 mtime 裁剪最旧，min_keep=16 防高频句互踢）；新增统一出入口 `tts_synthesize_cached`（命中/合成/原子写/裁剪一体）；`orchestrator._tts_url_from_bytes` 与 `routes/audio.py /tts` 共用之（`/tts` 不再每次现合成；桶 `consume` 仍是端点限流，命中亦计数防滥用）。config 新增 `tts_cache_ttl_s=86400` / `tts_cache_max_mb=512`。
+- **怎么做（借鉴自写）**：键维度参考 VS `segment_cache_key`（影响成品的维度都进键），TTL/裁剪为本仓自有实现；**不搬 VS 的确定性种子/内容寻址字节一致**（edge-tts 在线非确定，前提不成立，va-arch-07）。
+- **验收（已达成）**：`tests/test_tts_cache.py` 9 例（键五维变化各自变键/确定性/新鲜度 mtime/裁剪越过上限删最旧/min_keep 保底/命中不触引擎/跨 TTL 重取）。
+- **风险/回退**：低。只动键与命中逻辑；旧键缓存随 TTL/容量裁剪自然淘汰。
 - **建议 PR**：`fix(tts): cache key + ttl + reuse on /tts`。
 
 ### P1-C · vtts-04 拼接：缺句上报 + AudioChunk 带 duration（✅ 已实现，2026-09-07）
