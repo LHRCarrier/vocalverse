@@ -212,6 +212,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/forgot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["forgot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets": {
         parameters: {
             query?: never;
@@ -843,6 +859,15 @@ export interface components {
         LoginRequest: {
             username: string;
             password: string;
+        };
+        ForgotRequest: {
+            username: string;
+        };
+        EnvelopeString: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: string;
         };
         CreateTicket: {
             kind: string;
@@ -1750,6 +1775,30 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["EnvelopeTokenResponse"];
+                };
+            };
+        };
+    };
+    forgot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForgotRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeString"];
                 };
             };
         };
