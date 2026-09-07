@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 音频回放 403 根因修复：TTS 输出独立 tts/ 前缀（免归属校验）· 21 op
+
+- **现象链**（用户网络面板逐步实锤）：401（原生 `<audio>` 不带 Bearer → `loadAudioBlob` 修复）→ **403 Forbidden**（归属校验 `Attempt/ScenarioMessage.audio_url` 引用；流式多句音频只有 `emitted_urls[0]` 落库，其余 chunk 无引用 → 40301）；
+- **修复**：① `save_tts_audio_bytes`（orchestrator）——AI TTS 输出改存 `data/audio/tts/{sha}.mp3`、URL 前缀 `/api/v1/audio/tts/`；② 新增独立路由 `GET /api/v1/audio/tts/{name}`（登录+未过期即放行，**免归属**——TTS 为会话内生成物非隐私录音；用户录音 `/audio/{name}` 归属校验保持）；③ **踩坑（404）**：`/audio/tts/{name}` 是双段路径，`/audio/{name}` 单段参数不匹配 → 路由独立（第一次改法合并进 get_audio 校验后 404：FastAPI path 参数不含 `/`）；
+- **前端**：`loadAudioBlob`（上一条）带 Bearer 拉 blob 播放——401/403 双根因闭环（docs/21 R-5 目标态「签名 URL 或 Blob」，本轮落地 Blob 方案）；
+- **验证**：`tests/test_audio_chunk_duration.py` 增 2 例（tts/ 前缀放行 200 / 普通名无归属 403 保持）+ 全量 `pytest -q` **299 passed** + ruff 全绿；docs/14 §6.2 登记新端点；
+- **登记**：本文档 + 安卓日志（根因更正：401→403 链，竞态为次因）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-07）
+
 ## 2026-09-07 真链路体验修复：假「已使用」批注 / 幻觉转写 / 后续音频不自动播 · 33 op
 
 - **用户实测三连**：① 没说过的短语被标「已使用」；② 转写 "Uh, I heard, uh, Juicy, uh, or…"（whisper 幻觉）；③ 口语页只有开场白自动播、后续回合音频不自动播 + 需求改为「听完语音再显示重播按钮」；
