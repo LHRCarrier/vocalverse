@@ -133,8 +133,10 @@ export const useAuthStore = defineStore('auth', () => {
     if (token.value) {
       try {
         await request('/auth/logout', { method: 'POST' }, '/manage')
-      } catch {
-        /* 吊销失败（网络/令牌已失效）不阻塞本地登出；clear() 兜底 */
+      } catch (err) {
+        // 吊销失败（网络/令牌已失效）不阻塞本地登出——但必须可观测（2026-09-07 评审：此前静默吞掉，
+        // 网络失败时服务端 token 未吊销、用户毫不知情）
+        console.warn('logout: 服务端吊销失败（本地已登出；refresh token 可能仍有效）', err)
       }
     }
     clear()

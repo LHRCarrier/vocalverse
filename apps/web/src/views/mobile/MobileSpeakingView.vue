@@ -385,7 +385,9 @@ function onSseEvent(e: SseStreamEvent) {
       // 与自由对话页 per-turn 解锁一致（MobileFreeChatView turn_end 同款））
       const lastBubble = bubbles.value[bubbles.value.length - 1]
       const target = currentAssistant.value ?? (lastBubble?.role === 'assistant' ? lastBubble : null)
-      if (target) target.speakable = true
+      // 空文本不解锁（2026-09-07 评审：LLM 失败降级走 fallback 不流式输出 → 回合气泡无文本仍会出现
+      // 空喇叭 → 点击重播空文本触发 /tts 422；与 MobileFreeChatView 的 `if (reply)` 守卫一致）
+      if (target?.text?.trim()) target.speakable = true
       phase.value = 'ready'
       break
     }
