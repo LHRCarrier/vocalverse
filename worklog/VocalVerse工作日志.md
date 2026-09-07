@@ -3,6 +3,17 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-07 真链路收口：whisper 本地直载 + 大模型评估 + FakeLLM 判定 · 61 op
+
+- **背景**：用户拍板真链路（ASR 真实转写）；被墙环境下 HF 缓存「完整性校验」反复拦截（缺 `.gitattributes`/`README.md` 即拒绝、联网又是 ConnectTimeout）；
+- **修复（dev-up.ps1）**：① HF_HOME 改为**默认缓存存在时不注入**（此前无条件注入 `data\models`（不存在）→ 绕开已下载模型，2026-09-07 同日第二次此因误判）；② 新增**本地模型直载**：扫描默认缓存 faster-whisper-small 快照（含 model.bin）→ `APP_ASR_MODEL=<快照目录>`，faster-whisper 本地路径加载，**完全绕过 HF 缓存校验/网络**；
+- **VoiceStudio 大模型评估（用户提供 F:\...\OmniVoiceStudio-Data\data\models）**：`Systran/faster-whisper-large-v3`（2.9GB）**可直载可用**（已实测：config/tokenizer.json/vocabulary.json 齐全，转写文本正确），但 **CPU int8 RTF≈5.58**（5.78s 音频 → 32s）——不满足对话「3~5s 反馈」，**不默认启用**；登记为「精听/离线素材标注」可复用资产（显式 `APP_ASR_MODEL=<snapshots/<rev>>` 即切）。`deepdml/faster-whisper-large-v3-turbo-ct2`（1.5GB）**缺 tokenizer 不可用**；sherpa-onnx-whisper-tiny 为 onnx 格式（faster-whisper 不支持）；其余为 OmniVoice/VoxCPM/GPT-SoVITS/CosyVoice 等 TTS 模型（本仓不涉及）；
+- **「两个场景回复一样」判定**：根 `.env` `APP_DEEPSEEK_API_KEY = [len 0]`（空）→ `get_llm_client` 走 **FakeLLMClient**（stubs.py 流式固定输出「Of course! Would you like it hot or iced? That will be four dollars, please.」——两张截图完全一致即为该桩句）。**不是故障，是 Key 未配置**：将 DeepSeek API Key 填入根 `.env` 的 `APP_DEEPSEEK_API_KEY` 后**重启 python 服务**（get_settings 为进程级缓存，--reload 不监控 .env）即可回复真实多样；
+- **验证**：small 直载后服务恢复（用户截图：真实 ASR 转写「I want you some coffee」+ 真实 ISE 评分 60.24/73.73 + TTS 播报）；端到端冒烟（edge-tts→ffmpeg imageio 二进制→真实 whisper small+VAD：转写 100% 正确、duration=5.78s、no_speech=False）；全量 `pytest -q` 297 passed + ruff 全绿；
+- **登记**：本条目；README「文档索引」无新文件不需登记。真链路链路现状：ASR 真（small·本地直载）/ ISE 真（app_id+key+secret 在 .env）/ TTS 真（edge-tts）/ LLM **仍假**（待 DeepSeek Key）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-07）
+
 ## 2026-09-07 回归修复：口语/自由说 ASR 全挂（uvicorn --reload 事件循环 + ffmpeg 依赖剪枝）
 
 - **现象**：口语页「管线提示: asr_failed」、自由说「自由对话提示: internal」（两页首步都是 ASR）；`local/dev-logs/python-8000.err.log` 铁证 —— `raise NotImplementedError`（asyncio/subprocess.py → base_events.py:528 `_make_subprocess_transport`）；
