@@ -12,6 +12,7 @@ import { track } from '@/api/events'
 import { createSession, fetchScenarios, streamTurn, tts, type ScenarioItem } from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
+import { useBlobAudio } from '@/composables/useBlobAudio'
 import { useP5Wave } from '@/composables/useP5Wave'
 import { useTurnTimers } from '@/composables/useTurnTimers'
 
@@ -51,6 +52,8 @@ useP5Wave(waveRef, { height: 110 })
 
 const DIFFICULTY_LABEL: Record<number, string> = { 1: 'L1', 2: 'L2', 3: 'L3', 4: 'L4' }
 
+const { createUrl, revokeUrl, releaseAll } = useBlobAudio()
+
 onMounted(async () => {
   await boot()
 })
@@ -59,6 +62,7 @@ onUnmounted(() => {
   abort.abort()
   audioQueue.forEach((a) => a.pause())
   clearAll()
+  releaseAll()
 })
 
 async function boot() {
@@ -112,9 +116,9 @@ function firstCorpusPhrase(): string | null {
 async function playTts(text: string) {
   try {
     const blob = await tts(text)
-    const url = URL.createObjectURL(blob)
+    const url = createUrl(blob)
     const audio = new Audio(url)
-    audio.onended = () => URL.revokeObjectURL(url)
+    audio.onended = () => revokeUrl(url)
     await audio.play()
   } catch {
     /* 无声字幕继续 */

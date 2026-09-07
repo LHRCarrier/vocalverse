@@ -14,6 +14,7 @@ import { track } from '@/api/events'
 import { createSession, fetchScenarios, streamTurn, tts, type ScenarioItem } from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
+import { useBlobAudio } from '@/composables/useBlobAudio'
 
 import IconSelector from '~icons/tabler/selector'
 
@@ -76,6 +77,8 @@ const audioQueue: HTMLAudioElement[] = []
 let abort = new AbortController()
 const sheetOpen = ref(false)
 
+const { createUrl, revokeUrl, releaseAll } = useBlobAudio()
+
 onMounted(async () => {
   // 无 sceneId（口语 Tab/中央 + 直达）→ 先让用户选场景；带 sceneId（场景选择/自由对话切换）→ 直接开工
   // 注意：params 缺省可能为 undefined 或 ''，两种都要判（2026-09-05 踩坑：'' 时被误放进场 → 未选场景先出题）
@@ -91,6 +94,7 @@ onUnmounted(() => {
   abort.abort()
   audioQueue.forEach((a) => a.pause())
   replayAudio?.pause()
+  releaseAll()
 })
 
 /* 功能行「场景选择」/空态 CTA：页内切场景 = 重置状态后重新开工；:id → 无 id 回退到选场景态 */
@@ -210,10 +214,10 @@ async function playTts(text: string, onDone?: () => void, index?: number) {
       doneOnce()
       return
     }
-    const url = URL.createObjectURL(blob)
+    const url = createUrl(blob)
     const audio = new Audio(url)
     audio.onended = () => {
-      URL.revokeObjectURL(url)
+      revokeUrl(url)
       if (index != null && playingBubble.value === index) {
         playingBubble.value = null
         replayAudio = null

@@ -18,8 +18,10 @@ import {
 } from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
+import { useBlobAudio } from '@/composables/useBlobAudio'
 
 const router = useRouter()
+const { createUrl, revokeUrl, releaseAll } = useBlobAudio()
 
 const form = ref({
   title: '基于大模型的 AI 口语训练平台设计与实现',
@@ -60,6 +62,7 @@ recorder.onStop = (blob, _mime, durationMs) => {
 
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
+  releaseAll()
 })
 
 async function submit() {
@@ -129,7 +132,14 @@ function onSseEvent(e: SseStreamEvent) {
         answerLevel.value = null
         hitInfo.value = ''
         coach.value = null
-        void tts(e.question).then((blob) => new Audio(URL.createObjectURL(blob)).play()).catch(() => undefined)
+        void tts(e.question)
+          .then((blob) => {
+            const url = createUrl(blob)
+            const audio = new Audio(url)
+            audio.onended = () => revokeUrl(url)
+            void audio.play()
+          })
+          .catch(() => undefined)
       }
       break
     case 'turn_end':

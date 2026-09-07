@@ -13,6 +13,7 @@ import { track } from '@/api/events'
 import { streamFreeChat, tts, type FreeChatMsg } from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
+import { useBlobAudio } from '@/composables/useBlobAudio'
 import { useAuthStore } from '@/stores/auth'
 import { useProgressStore } from '@/stores/progress'
 import { useUiStore } from '@/stores/ui'
@@ -61,6 +62,7 @@ let replayAudio: HTMLAudioElement | null = null
 let autoPlayToken = 0 // 回合自增：mounted 时递增，旧回合的播放回调失效
 
 const recorder = new VoiceRecorder()
+const { createUrl, revokeUrl, releaseAll } = useBlobAudio()
 let abort = new AbortController() // let：新对话后重建（abort 过的 signal 不能复用，2026-09-05）
 
 onMounted(() => {
@@ -72,6 +74,7 @@ onUnmounted(() => {
   autoPlayToken += 1
   replayAudio?.pause()
   replayAudio = null
+  releaseAll()
 })
 
 watch(
@@ -216,10 +219,10 @@ async function playTts(text: string, index: number) {
       finish()
       return
     }
-    const url = URL.createObjectURL(blob)
+    const url = createUrl(blob)
     const audio = new Audio(url)
     audio.onended = () => {
-      URL.revokeObjectURL(url)
+      revokeUrl(url)
       finish()
     }
     audio.addEventListener('loadedmetadata', () => {
