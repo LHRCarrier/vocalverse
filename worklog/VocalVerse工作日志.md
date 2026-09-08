@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 Java P1 批 ③：J-04 软删评论通知复活（findMine 补 c.status='visible'）· 6 op
+
+- **背景**：review-java.json（java-04，确认）——`PostCommentRepository.findMine`（:41-45）WHERE 只过滤父帖 status，**未过滤评论自身 c.status**；schema 定义 post_comments.status 三态（visible/hidden/deleted，0007_community_s1.py:186）→ 软删/隐藏评论仍进入通知聚合并推给作者，点击无法定位，软删约束被绕过。对照 comments() 展示路径 page() 已过滤 `c.status='visible'`（口径不一致）；
+- **修复（code）**：findMine JPQL 补 `c.status = 'visible'`（展示/通知两路状态口径对齐）；互动无 status 字段（物理删行），PostInteractionRepository.findMine 无需改（核查过）；
+- **测试（test）**：`CommunitySocialTest` 增 `notifications_exclude_softdeleted_comments`：发评论 → 通知含 1 条 → 评论置 deleted → 通知 0 条；再发第二条置 hidden → 同样 0 条。**改前失败证据**：stash 修复后实跑 → 断言红（软删评论仍在通知，:303）；改后 CommunitySocialTest 6 例全绿；
+- **登记**：docs/41 §1（互动通知数据源补「评论仅可见态」+ J-04 注）+ §3（测试清单 5→6 例）+ 工作日志。
+- **门禁**：子集 6 例绿；全量在批次收尾统一跑。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-08）
+
 ## 2026-09-08 Java P1 批 ②：J-02 禁用即时生效（JwtAuthFilter 查 users.status → 401）· 9 op
 
 - **背景**：review-java.json（java-02，确认）——JwtAuthFilter 只验签不查 users.status（application.yml access-ttl=3600），管理端禁用（AdminUserController.updateStatus 只落 users.status）后，已签发 token **最长 1 小时仍可访问全部受保护端点**；Java 侧与 Python 侧同缺口（docs/19 P1-10 登记）。无告警/无黑名单/无二次鉴权；
