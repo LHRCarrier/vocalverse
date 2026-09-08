@@ -40,7 +40,11 @@ const group = computed<null | 'community' | 'learn'>(() => {
     p === '/m/notes' ||
     p.startsWith('/m/chat') ||
     p === '/m/free-chat' ||
-    p === '/m/sing'
+    p === '/m/sing' ||
+    /* 读书域（docs/45 §6）：书架/书详情/生词本属学习组；阅读器保持沉浸（null） */
+    p === '/m/bookshelf' ||
+    p.startsWith('/m/books/') ||
+    p === '/m/vocab'
   ) {
     return 'learn'
   }

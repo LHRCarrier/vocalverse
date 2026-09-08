@@ -78,7 +78,7 @@ describe('MobileTabBar（双场景分组）', () => {
 })
 
 describe('MobileLearnView（我的学习 · v4 画像总览 2026-09-09）', () => {
-  it('渲染欢迎定位 + 识别行 + 热力图 + 4 模块列表', async () => {
+  it('渲染欢迎定位 + 识别行 + 热力图 + 6 模块列表（读书域并入 2026-09-10）', async () => {
     await router.push('/m/learn')
     await router.isReady()
     const wrapper = mount(MobileLearnView, { global: { plugins: [router] } })
@@ -86,11 +86,11 @@ describe('MobileLearnView（我的学习 · v4 画像总览 2026-09-09）', () =
     expect(text).toContain('Hi') // 欢迎定位行
     expect(text).toContain('LV3')
     expect(text).toContain('XP')
-    // 4 个模块
-    for (const m of ['我的单词', '社区足迹', '我的发音', '练习情况']) {
+    // 6 个模块（我的单词/书房 为读书域入口，docs/45）
+    for (const m of ['我的单词', '书房', '社区足迹', '我的发音', '练习情况']) {
       expect(text).toContain(m)
     }
-    expect(text).toContain('收录 24 词')
+    expect(text).toContain('阅读查词即收')
     expect(text).toContain('发音 82 · 流利 78 · 语法 85')
     // 热力图 = 12 周 × 7 天 = 84 格；无图例/切换
     expect(wrapper.findAll('.u-learn-heat__cell').length).toBe(12 * 7)
@@ -101,13 +101,13 @@ describe('MobileLearnView（我的学习 · v4 画像总览 2026-09-09）', () =
     expect(text).not.toContain('薄弱音素')
   })
 
-  it('模块点击跳转 /m/learn/:module', async () => {
+  it('模块点击跳转（我的单词 → /m/vocab 读书域名入口）', async () => {
     await router.push('/m/learn')
     await router.isReady()
     const wrapper = mount(MobileLearnView, { global: { plugins: [router] } })
-    await wrapper.findAll('.u-learn-module')[2].trigger('click')
+    await wrapper.findAll('.u-learn-module')[0].trigger('click')
     await flushPromises()
-    expect(router.currentRoute.value.path).toBe('/m/learn/speaking')
+    expect(router.currentRoute.value.path).toBe('/m/vocab')
   })
 
   it('热力图：点格 → 右下角经验更新', async () => {

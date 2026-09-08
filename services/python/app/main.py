@@ -24,6 +24,8 @@ from app.api.routes import (
     health,
     placement,
     practice,
+    reading,
+    reading_tts,
     recommendations,
 )
 from app.core.config import get_settings
@@ -84,6 +86,15 @@ async def lifespan(app: FastAPI):
     from app.audio.warmup import schedule_startup_warmup
 
     app.state.tts_warm_task = schedule_startup_warmup()
+    # 听书任务孤儿清扫（docs/45 §5.2：进程崩溃残留 running/queued → failed，不假转圈）
+    from app.reading import orchestrator as reading_orchestrator
+
+    try:
+        swept = reading_orchestrator.sweep_orphans()
+        if swept:
+            logger.info("听书预合成任务孤儿清扫完成：%s 个", swept)
+    except Exception as exc:  # 数据库未就绪等：仅告警不阻塞启动
+        logger.warning("听书任务孤儿清扫跳过（%s）", exc)
     yield
     logger.info("vocalverse python-api stopped")
 
@@ -120,6 +131,8 @@ app.include_router(defense.router)
 app.include_router(placement.router)
 app.include_router(events.router)
 app.include_router(recommendations.router)
+app.include_router(reading.router)  # 读书域（docs/45：书架/查词/生词/批注/进度/音色）
+app.include_router(reading_tts.router)  # 听书（单句音频/预合成 SSE/任务）
 # Agent Lab（test-only 测试台；默认关闭，开启才注册 → 404；删除无影响，见 agent_lab.py 删除清单）
 if get_settings().agent_lab_enabled:
     from app.api.routes import agent_lab

@@ -3,6 +3,42 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 登录偶发 40904 热修复：refresh token 加 UUID 随机因子（组长手机端实测复现 → 修复 + 回归测试 + 真机链路验证）· 3 op
+
+- **复现**：手机（WebView → 5173）登录 `xiaoqing` 报红字「数据冲突：唯一键或约束（重复提交/并发写入）」（Java 40904）。
+- **根因**（既有并发竞态，非读书域引入）：`AuthController.issue()` 的 refresh = `jwt.generateAccessToken(...) + "-" + System.currentTimeMillis()`；而 JwtService 令牌 payload 仅 {sub, role, iat, exp}（秒级精度、无随机字段）→ **同一毫秒**双登录/双刷新（双击/WebView 双请求）产出相同 refresh 串 → SHA-256 相同 → 撞 `uq_refresh_tokens_token_hash` → DataIntegrityViolation → 40904。报错发生在密码校验之后，说明 xiaoqing 密码本身正确。
+- **修复（code 独立提交）**：`AuthController.buildRefreshToken(jwtToken, nowMillis)` 追加 `UUID.randomUUID()`（refresh 为不透明串、服务端只存哈希，格式变更零兼容影响）；抽 package-private 纯静态便于确定性测试。
+- **测试（test 独立提交）**：`RefreshTokenUniquenessTest`（同输入两次构造 → 断言不同；修复前同输入必同串 → 红）；`mvn -Dtest=RefreshTokenUniquenessTest,AuthFlowTest test` 6 passed + `spotless:check` 通过。
+- **验证**：重建并重启本机 Java（8080；从根 .env 注入 JWT_SECRET/SERVICE_TOKEN——Maven 子进程不读 .env，手动起服务易漏 P0-9 fail-fast）→ 连续两次 POST /auth/login（demoadult）均 code=0 且 refreshToken 互异、含 `-\d+-<uuid>` 后缀 → 手机端可重试登录。
+- **踩坑**（已归档 `worklog/BUG实测/登录-并发refresh-token撞唯一键.md`）：①去重键必须随机源，不可用「无随机令牌+时间戳」拼串；②40904 映射面宽（任何 DataIntegrityViolation），排查看 Java 栈；③本地起 Java 记得 root .env 的 JWT_SECRET/SERVICE_TOKEN。
+- **门禁**：Java 子集 6 passed + spotless 绿；Python/前端零改动。未 push（分支 feat/novel-reading-main）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 读书域迁移 0010 热修复：`_bigint_pk()` 补 `primary_key=True`（组长实跑复现 → 修复 + 真 PG 验证）· 3 op
+
+- **复现**：组长本机 `uv run alembic upgrade head` → `psycopg.errors.InvalidForeignKey: no unique constraint matching given keys for referenced table "books"`（建 book_chapters 时 FK 引用 books(id) 被拒；迁移事务回滚后 seed 报 `relation "books" does not exist` 为连锁）。
+- **根因**：`alembic/versions/0010_reading.py::_bigint_pk()` 漏 `primary_key=True` → books.id 为普通 BIGINT；PG 对 FK 引用列要求 UNIQUE/PK。模型侧 `base.py::bigint_pk()` 有主键，故 **SQLite 单测（create_all）与离线 SQL 渲染（test_alembic_offline_pg_render 只拼串）都不暴露 → CI 绿真库红**。
+- **修复（code 独立提交）**：辅助函数补 `primary_key=True`（8 表共享一处修复）；**回归守卫**（test 独立提交）：`test_models.py` 的离线渲染断言后追加逐表检查——抽取每张读书域表的 CREATE 块断言含 `PRIMARY KEY`（修复前必失败；`READING_TABLES` 常量 8 表）。
+- **验证（真 PG16 容器）**：`upgrade head` ✅（原错消除）→ `alembic check` ✅ 零漂移 → `downgrade 0009` + `upgrade head` 往返 ✅ → `seed_reading` ✅（books 3 / dictionary 10,612 / forms 11,501）→ `pg_tables` 8 表齐 → pytest 全量 **366 passed / 4 skipped**。
+- **踩坑（已归档 `worklog/BUG实测/读书域迁移0010-PK缺失.md`）**：①离线渲染 ≠ 可执行验证——新建表迁移合入前必须在真 PG 跑 upgrade+downgrade 往返；②迁移辅助函数与模型辅助函数必须同构（base.py::bigint_pk 即为范本）；③seed 报「表不存在」先查 `alembic current`，别先改 seed。
+- **门禁**：ruff/format 全绿、pytest 366 passed；前端零改动。未 push（分支 feat/novel-reading-main）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 读书域（英文小说阅读）· 后端 + 契约 + 文档（组长午间委托 AI 全自动闭环：需求→四官拷问→实现→测试→文档，分支 feat/novel-reading-main，未 push）· 多 op
+
+- **背景与需求（组长口述 + 截图）**：加「书籍」功能——纯文本阅读、听书（参考 https://github.com/debpalash/VoiceStudio；语音模型可选用 `F:\WorkingL\VoiceStudio\OmniVoiceStudio-Data\data\models`）、点击选词看释义（截图形态：音标+释义+加入生词本+外链）、笔记/生词/划词/批注；**前端只做移动端**；全自动闭环（需求→设计→子代理拷问[数据模型/业务逻辑联动/模块设计/UI-UX]→实现）；新分支不 push。
+- **侦察**：VoiceStudio 0.5.1 本机源码复核（`F:\WorkingL\VoiceStudio\OmniVoiceStudio-Data\env\project`——**AGPL-3.0-only**，只借思路：jobs 状态机/进度事件/内容寻址缓存/句级对齐；`/v1/audio/speech` :3900 无鉴权仅 loopback）；本地模型能力清单（**KittenTTS mini 0.8**＝78MB ONNX/CPU 实时/8 英文音色/Apache-2.0 → 本地引擎选型；OmniVoice **CC-BY-NC 禁商用**；CosyVoice3/VoxCPM2 需 GPU；GPT-SoVITS 中文优先）。既有基建：`textproc/sentence_splitter`（分句）、`tts_cache_key/tts_synthesize_cached`（缓存）、SSE helper（practice/events.py + 前端 openSseFetch）、`loadAudioBlob/useBlobAudio`（音频管道）、Agent Lab 式联调页范式。
+- **四官拷问（6 子代理并行，docs/46 C-1…C-10 裁决）**：数据模型 V-1…V-20（**P0：content_version 版本守卫**——文本修订后批注/进度不静默错位；events.event_type 硬编码 CHECK 需扩值；tts_tasks.error 用 jsonb 对齐惯例；+ dictionary_forms 词形反向索引——"inventions"→"invention"）；业务逻辑 B-1…B-22（**只扣真实合成**·命中缓存 0 扣·prepare 按章扣 1；按 provider 分缓存目录防 wav/mp3 混标；埋点四处同步；SSE 独立协议 task_start→sentence_progress*→task_done + 快照兜底）；模块工程 M-1…M-18（reading/ 三件套；迁移 0010 一次 8 表；契约 21→41 ops；**联调页 A 落法**＝ReadingPreview 直调真路由，CommunityPreview 前例，无 test-only 端点；前端 fe-08 行数门禁——阅读器拆 5 composables + 3 弹层组件，不进灰名单）；UI-UX U-1…U-22（**设计语言定 u-*（当前 14 页实况）**，新类 u-rd-*/u-bs-*/u-bd-*/u-vb-* 前缀；词卡＝底部 sheet；生词本 /m/vocab 唯一入口；TabBar group 增补；正文衬线豁免）。
+- **实现（code）**：`app/models/reading.py` 8 表（books/book_chapters/dictionary_entries/dictionary_forms/user_reading_progress/user_vocabulary/reading_annotations/tts_tasks）+ 迁移 `0010_reading.py`（0007 双方言风格 + events CHECK 扩 5 值，0006 NOT VALID 姿势）；`app/reading/`（split 纯函数[服务端权威句切分+offset 坐标系]/normalize[词归一化]/service[DB 函数组]/tts_cache[provider 分目录]/tts_client[DI·auto=edge|kitten]/orchestrator[asyncio 后台任务+进度+取消+启动扫孤儿]/events[SSE 模型]）；`app/audio/tts_local.py`（KittenTTSClient：lazy import、三要素探测、24kHz wav 输出）；`routes/reading.py` + `routes/reading_tts.py`（20 op；音频端点裸流 audio/mpeg|wav；prepare SSE 经 heartbeat_stream）；`seed_reading.py`（公版书 3 本：Alice 12 章/傲慢与偏见 49 章/绿野仙踪 24 章，`data/seed/reading_books.json` 916KB；ECDICT 子集 10,612 行 2.4MB `data/seed/ecdict_subset.csv`）；config 增 reading_tts_provider/rate 600/voice_models_dir；pyproject optional `local-tts`（kittentts）。
+- **测试（test）**：新 45 例（split/normalize 纯函数·service 词形/幂等/越界/归属·routes 四件套·tts 缓存命中 0 扣/SSE 序列/快照/取消/sweep）；修复前必失败（全新实现全红→绿）；基线用例同步（事件 15→20 类断言、EXPECTED_TABLES +8）；全量 **366 passed / 5 skipped**（基线 318+7）；契约快照 `app.openapi()` 离线导出 + `pnpm gen:api`（零手改）；冒烟 `services/python/data/smoke_reading.py`（建表+种子+全端点：lookup 词形解析/vocab 幂等/批注 45004/进度/segment 缓存命中/voices 全通）。
+- **踩坑（供复盘）**：① `body.get('start_offset') or -1` 把 0 变 -1（falsy 短路）→ 45004 假阳性；② orchestrator `_update_task` 签名缺 `total` 参数 → SSE 卡死（**任务级异常被通用 except 兜住但事件未发**——测试要断言「终态必达」；另修复「消费方在任务瞬时完成后按 id 取队列拿空队列」竞态：`start_task` 返回队列引用）；③ 测试 `iter_lines(decode_unicode=True)` 与 httpx 版本不兼容；④ `:memory:` StaticPool 下 Session 跨线程（loop↔to_thread）在既有 practice 语义内可用（创建/关闭在 loop、查询在 worker，勿在 loop 线程操作查询结果）；⑤ **日志更新教训：工作日志必须「先读全量 + edit 置顶插入」，禁止整文件 write 覆盖**（本批曾误用 write 覆盖两条日志，已 `git checkout` 无损恢复并按正确姿势重写）。
+- **文档（docs）**：docs/45 设计定稿 + docs/46 四官合流 + docs/10（写方矩阵 +8 表 + 30→38 口径更正）+ docs/21（ops 21→41、限流表 reading_tts、§1.1 例外）+ docs/api/error-codes.md（45001~45007 先登记）+ docs/06 §18 登记（provider 链/桶/事件/合规）+ README（功能行/演进方向①落地标注/文档索引 45-46/仓库结构/能测清单）；UI 部分记录见 `worklog/安卓开发日志.md`（2026-09-10 读书域前端）。
+- **门禁**：Python ruff+format 全绿、pytest **366 passed**；前端 lint/typecheck/test **129 passed**/build 全绿、check-bundle ✓（preview 树零体积含 ReadingPreview 剔除断言）；单写探针/功能位对账零改动。**未 push**（组长验收后推）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-09 fe-09：vite 构建拆分（manualChunks）+ 包体积门禁（组长继续遗留项）· 2 op
 
 - **背景**：fe-09（治理 P2 遗留，组长继续）——vite manualChunks + CI 断言产物不含 preview/p5/echarts 模块；此前无任何包体积门禁（preview 树生产剔除/懒加载拆分全靠约定无人验证）。

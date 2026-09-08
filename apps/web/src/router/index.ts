@@ -76,6 +76,27 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/mobile/MobileNotesView.vue'),
     meta: { title: '笔记', requiresAuth: true },
   },
+  /* ---- 读书域（docs/45 · 书架/书详情/阅读器/生词本；阅读器沉浸无底栏） ---- */
+  {
+    path: '/m/bookshelf',
+    component: () => import('@/views/mobile/MobileBookshelfView.vue'),
+    meta: { title: '书房', requiresAuth: true },
+  },
+  {
+    path: '/m/books/:bookId',
+    component: () => import('@/views/mobile/MobileBookDetailView.vue'),
+    meta: { title: '书籍详情', requiresAuth: true },
+  },
+  {
+    path: '/m/reader/:chapterId',
+    component: () => import('@/views/mobile/MobileReaderView.vue'),
+    meta: { title: '阅读', requiresAuth: true },
+  },
+  {
+    path: '/m/vocab',
+    component: () => import('@/views/mobile/MobileVocabView.vue'),
+    meta: { title: '生词本', requiresAuth: true },
+  },
 
   {
     path: '/',

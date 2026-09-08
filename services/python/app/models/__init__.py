@@ -24,6 +24,16 @@ from .defense import DefenseProfile
 from .difficulty import MaterialDifficulty
 from .mastery import UserCorpusMastery, UserMastery
 from .practice import Attempt, Score, Session, SingAttempt
+from .reading import (
+    Book,
+    BookChapter,
+    DictionaryEntry,
+    DictionaryForm,
+    ReadingAnnotation,
+    TtsTask,
+    UserReadingProgress,
+    UserVocabulary,
+)
 from .skill import UserSkillState
 from .tickets import Ticket
 from .usage import UsageLog
@@ -51,6 +61,15 @@ __all__ = [
     "Attempt",
     "Score",
     "SingAttempt",
+    # 读书域（docs/45 · Python 写方；Java 零改动）
+    "Book",
+    "BookChapter",
+    "DictionaryEntry",
+    "DictionaryForm",
+    "UserReadingProgress",
+    "UserVocabulary",
+    "ReadingAnnotation",
+    "TtsTask",
     # 社区域（Java 写方 · Python 只读映射，docs/37 §3）
     "Post",
     "PostComment",
