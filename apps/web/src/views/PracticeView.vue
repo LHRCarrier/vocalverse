@@ -10,7 +10,14 @@ import { NButton, NCard, NProgress, NTag } from 'naive-ui'
 
 import { track } from '@/api/events'
 import { loadAudioBlob } from '@/api/client'
-import { createSession, fetchScenarios, streamTurn, tts, type ScenarioItem } from '@/api/practice'
+import {
+  createSession,
+  fetchScenarios,
+  fetchSessionRestore,
+  streamTurn,
+  tts,
+  type ScenarioItem,
+} from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 import { useBlobAudio } from '@/composables/useBlobAudio'
@@ -67,6 +74,12 @@ onUnmounted(() => {
 })
 
 async function boot() {
+  // R-13 断线重连：URL 带 ?session=<id>（刷新/重开页面）→ 恢复而非新建
+  const resumeId = Number(route.query.session)
+  if (Number.isInteger(resumeId) && resumeId > 0) {
+    await resume(resumeId)
+    return
+  }
   try {
     const scenes = await fetchScenarios()
     const sceneId = Number(route.params.sceneId)
@@ -90,6 +103,37 @@ async function boot() {
     }
     phase.value = 'ready'
     armRescueTimer()
+  } catch (e) {
+    errorMsg.value = (e as Error).message
+    phase.value = 'done'
+  }
+}
+
+/** R-13 断线重连（GET /sessions/{id}）：重建消息/轮次；已完成会话直接跳报告页 */
+async function resume(restoreId: number) {
+  try {
+    const r = await fetchSessionRestore(restoreId)
+    if (r.status === 'completed' && r.report_id) {
+      router.push(`/report/${r.report_id}`)
+      return
+    }
+    sessionId.value = r.id
+    assignedTurns.value = r.assigned_turns ?? 8
+    currentTurn.value = r.next_expected_turn
+    bubbles.value = r.messages
+      .filter((m) => m.role !== 'system' && m.content)
+      .map((m) => ({ role: m.role as Bubble['role'], text: m.content }))
+    errorMsg.value = null
+    phase.value = 'ready'
+    armRescueTimer()
+    // 标题/语料依赖场景信息：按 URL sceneId 查找（恢复 URL 保留原场景，失败不阻断对话继续）
+    try {
+      const scenes = await fetchScenarios()
+      const sceneId = Number(route.params.sceneId)
+      scenario.value = scenes.find((s) => s.id === sceneId) ?? scenes[0] ?? null
+    } catch {
+      scenario.value = null
+    }
   } catch (e) {
     errorMsg.value = (e as Error).message
     phase.value = 'done'

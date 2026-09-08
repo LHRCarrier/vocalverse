@@ -25,6 +25,35 @@ export interface SessionCreated {
   assigned_turns?: number | null
 }
 
+/** R-13 会话恢复：断线/刷新后据此重建对话 UI 与轮次（服务端权威） */
+export interface RestoredMessage {
+  seq: number
+  role: 'system' | 'user' | 'assistant'
+  content: string
+  audio_url?: string | null
+  origin?: string | null
+  action?: string | null
+  created_at?: string | null
+}
+
+export interface SessionRestore {
+  id: number
+  kind: string
+  status: 'active' | 'completed' | 'abandoned'
+  assigned_turns?: number | null
+  state: string
+  current_turn: number
+  next_seq: number
+  next_expected_turn: number
+  report_id?: number | null
+  messages: RestoredMessage[]
+}
+
+export async function fetchSessionRestore(sessionId: number): Promise<SessionRestore> {
+  const resp = await request<SessionRestore>(`/api/v1/sessions/${sessionId}`)
+  return resp.data
+}
+
 export interface ReportPayload {
   id: number
   computed_at?: string
