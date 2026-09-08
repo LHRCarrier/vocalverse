@@ -43,6 +43,7 @@ EXPECTED_TABLES = {
     "post_likes",
     "defense_profiles",
     "usage_log",
+    "pitch_extract_jobs",  # 唱歌 P0 迁移 0010（2026-09-09）
 }
 
 
@@ -141,6 +142,78 @@ def test_alembic_single_head():
     """CI 同款单头断言：迁移历史必须线性单头。"""
     heads = ScriptDirectory.from_config(_alembic_config()).get_heads()
     assert len(heads) == 1, f"alembic 多头：{heads}"
+
+
+# ---------------------------------------------------------------------------
+# 唱歌 P0（迁移 0010 · 2026-09-09）：pitch_extract_jobs / sing_attempts 版本列 / songs.vocal_ref_url
+# ---------------------------------------------------------------------------
+def _seed_song_with_lrc(session) -> tuple[int, int]:
+    """建 song + 2 行 lrc，返回 (song_id, lrc_id)。"""
+    from app import models as m
+
+    song = m.Song(title="Twinkle", level=1, audio_url="/data/audio/twinkle.wav")
+    session.add(song)
+    session.flush()
+    lrc = m.Lrc(song_id=song.id, seq=1, offset_ms=0, end_offset_ms=2000, line_text="Twinkle twinkle")
+    session.add(lrc)
+    session.flush()
+    return song.id, lrc.id
+
+
+def test_pitch_job_status_check_enforced(sqlite_engine):
+    """pitch_extract_jobs.status 枚举 CHECK（docs/10 · 迁移 0010）：非法状态拒绝。"""
+    from app import models as m
+
+    with Session(sqlite_engine) as session, pytest.raises(IntegrityError):
+        song_id, lrc_id = _seed_song_with_lrc(session)
+        session.add(
+            m.PitchExtractJob(song_id=song_id, lrc_id=lrc_id, revision="lrc=1", status="paused")
+        )
+        session.commit()
+
+
+def test_pitch_job_partial_unique_active_per_lrc(sqlite_engine):
+    """部分唯一索引 uq_pitch_extract_jobs_lrc_active：同一 lrc 只允许一个 queued/running 任务。"""
+    from app import models as m
+
+    with Session(sqlite_engine) as session:
+        song_id, lrc_id = _seed_song_with_lrc(session)
+        session.add(m.PitchExtractJob(song_id=song_id, lrc_id=lrc_id, revision="lrc=1"))
+        session.commit()
+    # 第二个 queued 任务 → 唯一索引冲突（SQLite 同样生效，docs/10 §7 双方言）
+    with Session(sqlite_engine) as session, pytest.raises(IntegrityError):
+        session.add(m.PitchExtractJob(song_id=song_id, lrc_id=lrc_id, revision="lrc=1"))
+        session.commit()
+
+
+def test_pitch_job_done_then_new_active_allowed(sqlite_engine):
+    """done 后的任务不再占用部分唯一索引：LRC 重写 → 旧任务 done → 新任务可建（世代重建）。"""
+    from app import models as m
+
+    with Session(sqlite_engine) as session:
+        song_id, lrc_id = _seed_song_with_lrc(session)
+        session.add(
+            m.PitchExtractJob(song_id=song_id, lrc_id=lrc_id, revision="lrc=1", status="done")
+        )
+        session.commit()
+    with Session(sqlite_engine) as session:
+        session.add(m.PitchExtractJob(song_id=song_id, lrc_id=lrc_id, revision="lrc=2"))
+        session.commit()
+
+
+def test_sing_attempts_scoring_version_default(sqlite_engine):
+    """sing_attempts.scoring_version 默认 'v1'（迁移 0010 · D10 可追溯快照）。"""
+    from app import models as m
+
+    with Session(sqlite_engine) as session:
+        song_id, _ = _seed_song_with_lrc(session)
+        attempt = m.SingAttempt(
+            user_id=1, song_id=song_id, duration_s=90, lines=[], alignment={}
+        )
+        session.add(attempt)
+        session.commit()
+        assert attempt.scoring_version == "v1"
+        assert attempt.ref_version is None
 
 
 def test_alembic_offline_pg_render(capsys, monkeypatch):
