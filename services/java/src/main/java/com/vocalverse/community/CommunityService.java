@@ -94,6 +94,7 @@ public class CommunityService {
 
   // ------------------------------------------------------------------ feed
 
+  @Transactional(readOnly = true)
   public FeedPage feed(Long actorId, String domain, String cursor, int limit) {
     String normalized = normalizeDomain(domain);
     Cursor c = decodeCursor(cursor);
@@ -141,6 +142,7 @@ public class CommunityService {
     return buildViews(List.of(e), userId).get(0);
   }
 
+  @Transactional(readOnly = true)
   public CommunityPostView detail(Long userId, Long postId) {
     PostEntity post = posts.findById(postId).orElseThrow(() -> notFound("内容不存在或已删除"));
     boolean isAuthor = post.getAuthorId().equals(userId);
@@ -166,6 +168,7 @@ public class CommunityService {
 
   // ------------------------------------------------------------------ 评论
 
+  @Transactional(readOnly = true)
   public CommentPage comments(Long actorId, Long postId, String cursor, int limit) {
     requireVisible(postId);
     Cursor c = decodeCursor(cursor);
@@ -176,7 +179,8 @@ public class CommunityService {
     List<PostCommentEntity> rows = comments.page(postId, c.ts(), c.id(), pageable);
     boolean hasMore = rows.size() > pageSize;
     List<PostCommentEntity> page = hasMore ? rows.subList(0, pageSize) : rows;
-    List<CommentView> views = page.stream().map(this::toCommentView).toList();
+    // J-05：批量聚合作者（一次 loadAuthors），替代逐条 toCommentView 的 2 查询/条 N+1
+    List<CommentView> views = toCommentViews(page);
     String next = hasMore ? encodeCursor(lastKey(page)) : null;
     return new CommentPage(views, next, hasMore);
   }
@@ -380,6 +384,7 @@ public class CommunityService {
   }
 
   /** 关注列表（+对方是否也关注我 = 互关） */
+  @Transactional(readOnly = true)
   public List<FollowSummary> followingList(Long me) {
     List<FollowEntity> rows = follows.findByFollowerIdOrderByCreatedAtDesc(me);
     List<Long> targetIds = rows.stream().map(FollowEntity::getFolloweeId).toList();
@@ -399,6 +404,7 @@ public class CommunityService {
   }
 
   /** 推荐关注：作者全量（排除自己），followed 标记；按个人主页时间倒序演示。 */
+  @Transactional(readOnly = true)
   public List<FollowRecommend> recommendations(Long me) {
     return users.findAll().stream()
         .filter(u -> !u.getId().equals(me))
@@ -413,6 +419,7 @@ public class CommunityService {
   }
 
   /** 关注流：仅关注作者的新内容（keyset DESC，复用 buildViews 聚合作者/互动态） */
+  @Transactional(readOnly = true)
   public FeedPage followingFeed(Long me, String cursor, int limit) {
     List<Long> followeeIds =
         follows.findByFollowerIdOrderByCreatedAtDesc(me).stream()
@@ -441,6 +448,7 @@ public class CommunityService {
    * 互动通知（docs/38 §5 mergeKey 模板 · 演示窗口 = 近 50 条互动/评论，内存聚合）： like/coin/share 按 (post, action, 当日
    * UTC) 聚合为「actor 等 N 人…」；comment 逐条带内容； 仅本人可见帖、排除自身动作（自赞/自评不通知）；cursor = base64(ts|itemId) 阈值分页。
    */
+  @Transactional(readOnly = true)
   public NotificationsPage notifications(Long me, String cursor, int limit) {
     int pageSize = clampLimit(limit);
     List<PostInteractionEntity> inters =
@@ -697,11 +705,30 @@ public class CommunityService {
         p.getCheckinDate() == null ? null : p.getCheckinDate().toString());
   }
 
+  /**
+   * 批量组装评论（J-05）：先收集页内全部 authorId 一次 loadAuthors 得 authorMap，
+   * 再逐条组装——替代 toCommentView 逐条 2 查询/条 的 N+1（20 条页 ≈41 次往返 → 3 次）。
+   */
+  private List<CommentView> toCommentViews(List<PostCommentEntity> rows) {
+    if (rows.isEmpty()) {
+      return List.of();
+    }
+    Map<Long, AuthorView> authorMap =
+        loadAuthors(rows.stream().map(PostCommentEntity::getAuthorId).toList());
+    return rows.stream()
+        .map(
+            c ->
+                new CommentView(
+                    c.getId(),
+                    authorMap.getOrDefault(c.getAuthorId(), emptyAuthor(c.getAuthorId())),
+                    c.getBody(),
+                    c.getCreatedAt(),
+                    c.getReplyToNickname()))
+        .toList();
+  }
+
   private CommentView toCommentView(PostCommentEntity c) {
-    Map<Long, AuthorView> authorMap = loadAuthors(List.of(c.getAuthorId()));
-    AuthorView author = authorMap.getOrDefault(c.getAuthorId(), emptyAuthor(c.getAuthorId()));
-    return new CommentView(
-        c.getId(), author, c.getBody(), c.getCreatedAt(), c.getReplyToNickname());
+    return toCommentViews(List.of(c)).get(0);
   }
 
   private JsonNode parseJson(String json) {
