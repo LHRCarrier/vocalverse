@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -84,7 +85,24 @@ async def lifespan(app: FastAPI):
     from app.audio.warmup import schedule_startup_warmup
 
     app.state.tts_warm_task = schedule_startup_warmup()
+    # 参考旋律提取扫描（唱歌 P0 D2/D6：启动扫描 + 周期扫描；testing 跳过）
+    extract_stop = asyncio.Event()
+    scanner_task: asyncio.Task | None = None
+    if not settings.testing:
+        from app.sing.jobs import run_due_jobs_until_stopped
+
+        scanner_task = asyncio.create_task(run_due_jobs_until_stopped(extract_stop))
+        logger.info(
+            "pitch extract scanner started (interval=%ss)",
+            settings.pitch_extract_scan_interval_s,
+        )
     yield
+    if scanner_task is not None:
+        extract_stop.set()
+        try:
+            await asyncio.wait_for(scanner_task, timeout=5)
+        except TimeoutError:
+            scanner_task.cancel()
     logger.info("vocalverse python-api stopped")
 
 

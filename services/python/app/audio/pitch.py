@@ -1,0 +1,227 @@
+"""参考旋律/用户音高提取（docs/06 §9.4：librosa *pyin*；唱歌域 65~800Hz、
+frame 2048/hop 512、清浊门限）。
+
+角色（2026-09-09 唱歌 P0 拍板）：
+- 参考旋律输入轨（D1）：songs.vocal_ref_url 优先 → audio_url 回退（两级回退由 jobs 层负责）；
+- 提取结果写入 song_pitch_refs（Python 写方），version="pyin-v1"（算法世代可追溯）；
+- 用户逐帧 F0（D4）：sing 评分器复用 :func:`extract_f0_sync`（同参数），落 lines[i].user_f0。
+
+实现约定：
+- 重 CPU（librosa pyin）纯同步，调用方必须走 ``asyncio.to_thread``（docs/06 §8①）；
+- 输出 F0 数组统一 ``0.0`` 表示清音帧（不存 NaN——JSON 序列化友好、DTW 前再过滤）；
+- notes/midi 与 f0 逐帧对齐（清音帧为空串/None）。
+"""
+
+from __future__ import annotations
+
+import abc
+import logging
+import math
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from app.audio.ffmpeg_utils import run_ffmpeg
+
+logger = logging.getLogger("vocalverse")
+
+# docs/06 §9.4：唱歌域 F0 65~800Hz；frame 2048/hop 512@16k（hop=32ms）
+TARGET_SR = 16000
+PYIN_FMIN = 65.0
+PYIN_FMAX = 800.0
+FRAME_LENGTH = 2048
+HOP_LENGTH = 512
+# 清浊门限：voiced_prob > 此值视为有声帧（滤静音/呼吸/伴奏残留）
+VOICING_THRESHOLD = 0.6
+# 提取算法世代（写入 song_pitch_refs.version / sing_attempts.ref_version）
+EXTRACTOR_VERSION = "pyin-v1"
+
+
+class PitchExtractError(RuntimeError):
+    """提取失败（解码/加载/算法内部错误）——jobs 层捕获并落 failed 快照，不伪造数据。"""
+
+
+@dataclass
+class TrackF0:
+    """整轨 F0 提取结果（纯数值，可直接 JSON 序列化）。"""
+
+    sr: int
+    hop_ms: float
+    # 帧起点时间（毫秒，整数化）+ 对齐帧级数组
+    times_ms: list[float] = field(default_factory=list)
+    f0: list[float] = field(default_factory=list)  # 0.0 = 清音帧
+    midi: list[int | None] = field(default_factory=list)
+    names: list[str | None] = field(default_factory=list)  # 音名（C4/D#4 …），清音帧 None
+    duration_ms: float = 0.0
+
+
+class PitchExtractor(abc.ABC):
+    """参考旋律提取抽象（CI 零真 Key/零模型：APP_TESTING 时注入 Fake；docs/06 第 6 章）。"""
+
+    @abc.abstractmethod
+    def extract_track(self, wav_path: str) -> TrackF0:
+        """从 16k mono wav 提取整轨 F0（同步重活，调用方自行 to_thread）。"""
+        raise NotImplementedError
+
+
+class PyinPitchExtractor(PitchExtractor):
+    """librosa.pyin 实现（docs/06 §9.4 参数：fmin 65 / fmax 800 / frame 2048 / hop 512）。"""
+
+    def extract_track(self, wav_path: str) -> TrackF0:
+        try:
+            import librosa
+            import numpy as np
+        except ImportError as exc:  # pragma: no cover - 依赖已在 pyproject 固定
+            raise PitchExtractError(f"librosa 不可用: {exc}") from exc
+        try:
+            y, sr = librosa.load(wav_path, sr=TARGET_SR, mono=True)
+        except Exception as exc:
+            raise PitchExtractError(f"音频加载失败: {exc}") from exc
+        if y.size == 0:
+            raise PitchExtractError("音频为空")
+        try:
+            f0, voiced_flag, voiced_prob = librosa.pyin(
+                y,
+                fmin=PYIN_FMIN,
+                fmax=PYIN_FMAX,
+                sr=sr,
+                frame_length=FRAME_LENGTH,
+                hop_length=HOP_LENGTH,
+                fill_na=0.0,
+            )
+        except Exception as exc:
+            raise PitchExtractError(f"pyin 提取失败: {exc}") from exc
+        # voiced_prob 可能为 None（全部帧静音时 librosa 返回 None 序列）；按清浊门限二值化
+        if voiced_prob is None:
+            voiced_flag = np.zeros_like(f0, dtype=bool)
+        else:
+            voiced = np.asarray(voiced_prob, dtype=float) > VOICING_THRESHOLD
+            voiced_flag = np.asarray(voiced_flag, dtype=bool) & voiced
+        f0 = np.asarray(f0, dtype=float)
+        f0[~voiced_flag] = 0.0  # 清浊门限：清音帧统一置 0（滤静音/混响/和声残留）
+
+        times = np.arange(len(f0)) * (HOP_LENGTH / sr * 1000.0)
+        midi: list[int | None] = []
+        names: list[str | None] = []
+        for hz in f0:
+            if hz <= 0:
+                midi.append(None)
+                names.append(None)
+                continue
+            m = int(round(69 + 12 * math.log2(hz / 440.0)))
+            midi.append(m)
+            names.append(_midi_to_name(m))
+        return TrackF0(
+            sr=sr,
+            hop_ms=HOP_LENGTH / sr * 1000.0,
+            times_ms=[float(t) for t in times],
+            f0=[float(v) for v in f0],
+            midi=midi,
+            names=names,
+            duration_ms=float(len(y)) / sr * 1000.0,
+        )
+
+
+class FakePitchExtractor(PitchExtractor):
+    """CI 零音频/零模型打桩：合成 440Hz 正弦（周期 127.27 frames/秒），帧级 F0 恒定。
+
+    仅供测试（APP_TESTING 注入）；产出与 Pyin 同结构，保证 jobs/评分链路可测。
+    """
+
+    def extract_track(self, wav_path: str) -> TrackF0:
+        sr = TARGET_SR
+        # 以文件时长推导帧数（无音频时退化为 100 帧）；wav_path 仅为保持签名一致
+        n_frames = 100
+        try:
+            # 真实 wav 存在时按音频时长派生帧数（测试一般传合成 wav）
+            import soundfile as sf
+
+            info = sf.info(wav_path)
+            n_frames = max(1, int(info.duration / (HOP_LENGTH / sr)) + 1)
+        except Exception:
+            pass
+        times = [i * (HOP_LENGTH / sr * 1000.0) for i in range(n_frames)]
+        f0 = [440.0] * n_frames
+        midi = [int(round(69 + 12 * math.log2(440.0 / 440.0)))] * n_frames  # A4=69
+        names = ["A4"] * n_frames
+        return TrackF0(
+            sr=sr,
+            hop_ms=HOP_LENGTH / sr * 1000.0,
+            times_ms=times,
+            f0=f0,
+            midi=midi,
+            names=names,
+            duration_ms=n_frames * (HOP_LENGTH / sr * 1000.0),
+        )
+
+
+def get_pitch_extractor() -> PitchExtractor:
+    """依赖注入（docs/06 第 6 章）：APP_TESTING → Fake；production 缺 pyin 配置则 fail-fast。"""
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    if settings.testing:
+        return FakePitchExtractor()
+    if (settings.pitch_extractor or "pyin").lower() != "pyin":
+        raise PitchExtractError(f"未知 pitch_extractor={settings.pitch_extractor}")
+    return PyinPitchExtractor()
+
+
+def resolve_audio_path(url: str | None, audio_dir: str = "./data/audio") -> str | None:
+    """songs.audio_url/vocal_ref_url 路径归一（A-G7 路径语义三义性）。
+
+    约定（docs/06 §8 本地卷 + D-G2 共享卷）：Java 侧存共享卷路径字符串
+    （如 ``/data/audio/twinkle.wav``）；Python 容器内共享卷挂 ``<audio_dir>``
+    （dev 相对路径 ``./data/audio`` / 容器 ``/app/data/audio``）。
+    解析顺序：① 原样存在 → 用之；② ``<audio_dir>/<basename>`` → 用之；③ http(s) 或不存在 → None。
+    """
+    if not url:
+        return None
+    if Path(url).exists():
+        return url
+    if url.startswith("http://") or url.startswith("https://"):
+        logger.warning("vocal_ref/audio_url 为远程 URL 且非下载语义（D1 不引下载）：%s", url)
+        return None
+    candidate = Path(audio_dir) / Path(url).name
+    if candidate.exists():
+        return str(candidate)
+    logger.warning("音频文件不存在（vocal_ref/audio_url）：%s", url)
+    return None
+
+
+async def to_16k_mono_wav(src: str, dst: str, timeout_s: float = 15.0) -> None:
+    """任意容器格式 → 16k mono wav（ffmpeg；同 asr 护栏：async + 超时 kill，docs/19 P0-2）。"""
+    await run_ffmpeg(
+        ["-y", "-i", src, "-ar", str(TARGET_SR), "-ac", "1", "-f", "wav", dst],
+        timeout_s=timeout_s,
+    )
+
+
+def slice_window(track: TrackF0, start_ms: float, end_ms: float | None) -> dict:
+    """按句窗口切片（linspace 区间采样：窗口内帧保留，端点外剔除）。
+
+    返回 JSON 兼容 dict（song_pitch_refs.pitch_ref 契约）：
+    ``{"f0s": [...], "notes": [...], "midi": [...], "start_ms": ..., "end_ms": ...}``
+    窗口内全清音 → f0s 全 0（评分层按缺失降权处理，D5）。
+    """
+    hop = track.hop_ms or 32.0
+    i0 = max(0, int(start_ms / hop))
+    i1 = (
+        len(track.f0)
+        if end_ms is None
+        else min(len(track.f0), max(i0 + 1, int(math.ceil(end_ms / hop))))
+    )
+    seg = track.f0[i0:i1]
+    if not seg:
+        seg = [0.0]
+    return {
+        "f0s": seg,
+        "notes": track.names[i0:i1] or [None],
+        "midi": track.midi[i0:i1] or [None],
+        "start_ms": int(start_ms),
+        "end_ms": int(end_ms) if end_ms is not None else None,
+    }
+
+
+def _midi_to_name(midi: int) -> str:
+    names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+    return f"{names[midi % 12]}{midi // 12 - 1}"
