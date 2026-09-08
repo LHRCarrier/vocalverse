@@ -3,6 +3,17 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-09 TTS 预合成预热（docs/06 §8「开场/常用句预合成」兑现 · 组长拍板）· 3 op
+
+- **背景**：组长注意到 docs/audit「预合成/预热零落地」，问询确认价值——开场白/示范句首次合成 ~1.3s（edge-tts 网络往返，POC-1）→ 预热后 0ms 命中缓存；「3~5s 反馈」口径里 TTS 的 1~2s → ≈0s（首声 P50 下降的答辩证据加强项）。勘察澄清：**懒加载缓存实际已落地**（`tts_synthesize_cached`，docs/44 P1-B：/tts 与热路径共用，TTL 1d/512MB/原子写/容量裁剪），差额只在「预热」环节。
+- **实现（code 独立提交）**：`tts.py` 增 `warm_tts_cache(tts, texts, voice, rate)`——只补缓存（命中即跳过）+ 并发限速 4 + 文本去重 + 单句失败仅日志（预热不阻塞/不上抛）；`app/audio/warmup.py`——`collect_warm_texts`（保序去重）／`scenario_warm_texts`（开场白 + target_corpus 短语）／`schedule_startup_warmup`（main.py lifespan 后台异步，不阻塞启动；testing 跳过）／`schedule_texts_warm`（create_session 后 fire-and-forget）；service.py `_create_session_sync` 顺带产出 warm_texts 三元组。已知文本 = published 场景开场白 + 语料短语 + 影子逐句示范；**LLM 流式回复正文不可预知**——仍走 P0-5 边生成边合成（已是最优）。
+- **测试（test 独立提交）**：`test_tts_cache.py` +3（去重/空白跳过/二次命中零触引擎、键维度、失败容忍）；`test_warmup.py` +4（collect 保序去重、scenario 文本集、空场景零成本、testing 静默跳过）。
+- **文档（docs 独立提交）**：docs/06 §8 首声预算行补「2026-09-09 落地 开头/常用句预合成」；docs/audit V2.0 预合成行更新（懒缓存已落地 + 预热已落地 + 死代码清理登记）。
+- **门禁**：Python ruff+format 全绿、`pytest -q` **325 passed**（318+7）；前端零改动（预热纯服务端）。
+- **收益口径**：开场白（点播放 1.3s → 0ms）/ 示范提示句（8s 救援窗口内 0ms）/ 重听（热路径已缓存）——首声 P50 下降；RTF 不变；CI 零外部依赖（Fake）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-09）
+
 ## 2026-09-09 治理 P2：eslint 行数/语句门禁 + 功能位三处对账 + 语音链路杂项 · 7 op
 
 - **fe-08（eslint max-lines/max-statements）**：`eslint.config.js` 启用 `max-lines: error {350, skip 空行/注释}` + `max-statements: error {60}`；生成物 `src/api/generated/**` 加入 ignores（gen:api 再生成，不设行为准则）；**灰名单** = 存量超限 8 文件（MobileSpeakingView 753 / LoginView 522 / UicHome 478 / FluencyPreview 434 / PracticeView 432 / UicSinging 402 / MobileFreeChatView 357 / UicSpeaking 354 → max-lines off）+ 5 文件函数体语句超限（max-statements off）；`--print-config` 验证灰名单=0(off)、常检文件=2(error)；lint 全绿——**新代码不豁免，重构时摘名单**。
