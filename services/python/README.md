@@ -26,6 +26,20 @@ uv run alembic revision --autogenerate -m "init"   # 首迁移
 uv run alembic upgrade head
 ```
 
+## 基准脚本（va-09：语音链路分阶段基准，答辩「3~5s 反馈」证据）
+
+`../../scripts/bench/pipeline_bench.py`——分阶段计时 upload → ffmpeg → ASR(words) →
+LLM ttfa → TTS 首声 → 排播，输出 mean/p50/p95/RTF + 峰值内存 + 预算判定。
+
+```powershell
+# 真实基准（faster-whisper small + DeepSeek + edge-tts；需 .env 密钥与本地模型）
+uv run python ../../scripts/bench/pipeline_bench.py --speech --runs 3 --check-budget
+# CI/冒烟（Fake 客户端，零模型零 Key；CI 门禁同款）
+uv run python ../../scripts/bench/pipeline_bench.py --fake --runs 3 --check-budget
+```
+
+判定：RTF ≤0.6 → 演示话术「3~5s 反馈」；0.6~0.8 → 「5~8s」（docs/06 §8 延迟表口径）。
+
 ## 关键约定（详见 docs/06）
 
 - CI 零真实 API Key：ASR/TTS/评分/LLM 走 `app/audio/base.py` 接口 + `app/audio/stubs.py` Fake
