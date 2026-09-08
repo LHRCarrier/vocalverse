@@ -67,6 +67,8 @@ export interface TurnEndEvent {
   score_status: 'ok' | 'pending' | 'unavailable'
   /** R-13：服务端权威轮次（下一轮应提交的 expected_turn），断线/刷新后纠偏乐观计数 */
   expected_turn?: number | null
+  /** B4 词级时间轴（2026-09-09）：用户 utterance 的词时间戳快照 [{word,start,end,...}]（秒） */
+  words?: Array<{ word: string; start: number; end: number; [key: string]: unknown }> | null
 }
 
 export interface SessionEndEvent {
