@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 Java P1 批 ⑤：J-05+J-11 读路径批量聚合（评论 N+1 消除 + readOnly 事务）· 12 op
+
+- **背景**：review-java.json（java-05 确认：comments() :180 逐条 map(toCommentView)，每条 loadAuthors=2 查询（users+profiles），20 条页≈41 次往返且无事务（open-in-view=false 每调用一 session）；java-11 确认：feed/comments/followingFeed 等 7 个读方法均无 @Transactional + J-05 同根因（整体读放大，反向扫描待 EXPLAIN 证据——正式考证放 J-07 集成）；
+- **修复（code）**：① `comments()` 改**批量聚合作者**——先收页内全部 authorId → 一次 loadAuthors → 逐条组装（与 buildViews 同构）；抽出 `toCommentViews(List)` 复用，addComment 单条路径收敛委托；② 7 个读方法（feed/detail/comments/followingList/recommendations/followingFeed/notifications）加 `@Transactional(readOnly=true)`——同页多条查询收进单事务/连接；
+- **测试（test）**：`CommunityApiTest` 增 `comments_page_constant_roundtrips_after_batch`：20 位不同评论者 × 1 评论 → 一页 20 条，Hibernate Statistics（`hibernate.generate_statistics=true`，注意键必须是 `spring.jpa.properties.hibernate.*`，写 `spring.jpa.hibernate.*` 不生效——踩坑）计 JDBC 语句 **改前 43 / 改后 ≤8（实际 4：帖 1+评论页 1+users 1+profiles 1）**；断言 ≤8 防 N+1 回潮；
+- **登记**：docs/37 §9 测试清单补两条（SQL 往返恒定 + readOnly 事务；EXPLAIN 断言落地于 J-07 集成）；工作日志。
+- **门禁**：子集 11 例绿；全量在批次收尾统一跑。EXPLAIN/索引反扫验证 = J-07 Testcontainers 项内完成。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-08）
+
 ## 2026-09-08 Java P1 批 ④：J-08 错误体统一（全局 @RestControllerAdvice → Envelope）· 15 op
 
 - **背景**：review-java.json（java-08，确认）——全仓唯一 @RestControllerAdvice 限定 basePackages=community（:13），Auth/Admin/Ticket/Content/Internal 域直接 throw ResponseStatusException → Spring 默认错误体 {timestamp,status,error,path}，与社区 Envelope{code,message,data} 双形态并存；前端 java-api.d.ts 全部建模为 Envelope*，非社区错误体统一解包时 data=null、message 读不到。另：docs/api/error-codes.md 登记 40904 但代码从未抛出（登记未接线）；
