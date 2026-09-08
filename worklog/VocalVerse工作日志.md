@@ -3,6 +3,17 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-09 治理 P2：eslint 行数/语句门禁 + 功能位三处对账 + 语音链路杂项 · 7 op
+
+- **fe-08（eslint max-lines/max-statements）**：`eslint.config.js` 启用 `max-lines: error {350, skip 空行/注释}` + `max-statements: error {60}`；生成物 `src/api/generated/**` 加入 ignores（gen:api 再生成，不设行为准则）；**灰名单** = 存量超限 8 文件（MobileSpeakingView 753 / LoginView 522 / UicHome 478 / FluencyPreview 434 / PracticeView 432 / UicSinging 402 / MobileFreeChatView 357 / UicSpeaking 354 → max-lines off）+ 5 文件函数体语句超限（max-statements off）；`--print-config` 验证灰名单=0(off)、常检文件=2(error)；lint 全绿——**新代码不豁免，重构时摘名单**。
+- **arch-04（功能位/配置开关三处对账）**：docs/06 新增 **§17 功能位/配置开关登记表**（7 项：APP_META_LLM_HITS / APP_SKILL_CALLBACK / APP_LEARNER_INJECTION / APP_AGENT_LAB / APP_FLUENCY_PREVIEW / APP_SHADOW_PREVIEW / VOICEVERSE_COMMUNITY_POST——默认值/位置/README 登记要求）；`scripts/check_feature_flags.py`（纯函数 parse_registry/check_rows：Python config.py **词边界**字段 / Java application.yml 环境变量 / README 对外演示登记，退出码 1=漂移）+ **python-ci 门禁步骤**（本地 yaml.safe_load 通过）+ 单测 4 例（解析 / 缺字段红 / 词边界冒充红 / README 漏登记红）。实测 7/7 ✓。
+- **杂项**：① `app/audio/tts.py` 删除 `synthesize_concurrent`——全仓零生产调用（docs/19 评审早已举证「定义后全仓无人调用」）；py-08 对应用例一并移除（10→9 例），docs/audit 预合成行注明清理；② docs/audit V2.0:143 edge-tts 许可 **GPL-3.0 → LGPLv3** 更正（+ 微软服务条款标注保留）。
+- **⑤ 纯渲染核心（TODO 登记）**：textproc 已有 splitter+normalize；抽 render core（注入 synth 闭包，M3 唱歌/听读共用）——**折期**：仅当 B4 词级时间轴视图消费完成（移动端已落地）+ 排期允许再做；当前登记 P2，听读/跟唱批次设计时评估。
+- **fe-09 暂缓（组长指正 2026-09-09：优化以移动端为准）**：vite manualChunks + CI 产物断言属 Web 端构建治理，暂缓登记（重构 Web 构建时一并做，避免无效投入）。
+- **门禁（改后基线）**：Python ruff+format 全绿、`pytest -q` **318 passed**（315−1 死代码用例 +4 对账用例）；前端 lint（新规则生效）/typecheck/build 全绿、`test:run` **115 passed**；功能位对账脚本实测 7/7 ✓。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-09）
+
 ## 2026-09-09 B4 后端补强：词时间轴持久化（用户消息 meta.words）+ 恢复端点回带 · 1 op
 
 - **背景**：B4 前批 turn_end.words 仅 SSE 流内快照（未落库）——断线/刷新后词级对轴素材丢失；移动端点播自己录音需要「消息 → 词时间轴 + 录音 URL」成对可查。
