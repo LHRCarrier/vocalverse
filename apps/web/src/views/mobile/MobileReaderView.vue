@@ -28,6 +28,7 @@ import { useReaderProgress } from '@/composables/useReaderProgress'
 import { useReaderSettings } from '@/composables/useReaderSettings'
 import { useReaderTap } from '@/composables/useReaderTap'
 import { useReaderVocab } from '@/composables/useReaderVocab'
+import { useWordAudio } from '@/composables/useWordAudio'
 import { useWordLookup } from '@/composables/useWordLookup'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
@@ -133,6 +134,14 @@ const { selIdx, onReaderClick } = useReaderTap({
   ttsCurrentIdx,
   playFrom: (idx) => void tts.playFrom(idx),
 })
+
+/** 查词卡「朗读」：词读音端点需带 token，走 blob 管道（useWordAudio） */
+const { play: playWordAudio } = useWordAudio()
+function playWord(): void {
+  const word = wordLookup.state.word
+  if (!word) return
+  void playWordAudio(word).then((ok) => !ok && ui.showToast('读音播放失败'))
+}
 
 /**
  * 句子级动作（单一入口，供两处调用）：
@@ -360,7 +369,7 @@ function nextChapter() {
         :sentence-index="wordLookup.state.sentenceIdx"
         @close="wordLookup.close()"
         @add-vocab="addWordToVocab"
-        @play-word="void 0"
+        @play-word="playWord"
         @sentence-highlight="runSentenceAction('highlight')"
         @sentence-note="runSentenceAction('note')"
       />

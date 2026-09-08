@@ -76,8 +76,8 @@ function formText(exchange: Record<string, string> | null | undefined): string {
         </div>
         <div v-if="props.sentenceIndex != null" class="u-rd-word__sentence">
           <span class="u-rd-word__sentence-label">这一句</span>
-          <button class="u-btn u-btn--ghost" type="button" @click="emit('sentence-highlight')">高亮这句</button>
-          <button class="u-btn u-btn--ghost" type="button" @click="emit('sentence-note')">批注这句</button>
+          <button class="u-btn u-btn--secondary" type="button" @click="emit('sentence-highlight')">高亮这句</button>
+          <button class="u-btn u-btn--secondary" type="button" @click="emit('sentence-note')">批注这句</button>
         </div>
       </div>
     </div>
@@ -141,8 +141,9 @@ function formText(exchange: Record<string, string> | null | undefined): string {
         <!-- 句子级动作（作用于该词所在句子；命中区 = 按钮，不依赖点中空格） -->
         <div v-if="props.sentenceIndex != null" class="u-rd-word__sentence">
           <span class="u-rd-word__sentence-label">这一句</span>
-          <button class="u-btn u-btn--ghost" type="button" @click="emit('sentence-highlight')">高亮这句</button>
-          <button class="u-btn u-btn--ghost" type="button" @click="emit('sentence-note')">批注这句</button>
+          <!-- .u-btn--ghost 是深色卡专用（白字透明底）→ 白卡上文字为白不可见，改用浅色卡次级按钮 -->
+          <button class="u-btn u-btn--secondary" type="button" @click="emit('sentence-highlight')">高亮这句</button>
+          <button class="u-btn u-btn--secondary" type="button" @click="emit('sentence-note')">批注这句</button>
         </div>
       </div>
     </div>
