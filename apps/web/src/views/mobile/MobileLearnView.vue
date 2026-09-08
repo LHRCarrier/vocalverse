@@ -86,11 +86,19 @@ const selectedXpLabel = computed(() =>
 const modules = [
   {
     key: 'words',
-    icon: 'book',
+    icon: 'bookmark',
     tint: 'var(--u-dark-green)',
     title: '我的单词',
-    summary: '收录 24 词 · 薄弱 3 词',
-    path: '/m/learn/words',
+    summary: '阅读查词即收 · 生词本',
+    path: '/m/vocab',
+  },
+  {
+    key: 'shelf',
+    icon: 'book',
+    tint: 'var(--u-dark-navy)',
+    title: '书房',
+    summary: '英文小说 · 查词 · 听书',
+    path: '/m/bookshelf',
   },
   {
     key: 'community',

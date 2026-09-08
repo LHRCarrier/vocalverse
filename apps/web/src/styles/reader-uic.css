@@ -1,0 +1,696 @@
+/**
+ * 读书域移动端样式（docs/45 §6 · UI 拷问 U-22：类名前缀 u-rd-* = 阅读器 /
+ * u-bs-* = 书架 / u-bd-* = 书详情 / u-vb-* = 生词本）。
+ * 与 mobile-uic.css 共存：所有 --u-* token 与 .u-phone/.u-sheet/.u-btn-* 基底复用，
+ * 本文件只承载阅读场景新增类；阅读正文用衬线栈（--ur-font-serif，内容层豁免，
+ * UI 拷问 U 系列：工具层仍 u-* sans）。
+ */
+.u-rd-views {
+  --ur-font-serif: 'Georgia', 'Times New Roman', 'Songti SC', serif;
+  --ur-size-base: 19px;
+  --ur-line-base: 1.85;
+  --ur-theme-paper: #fdfbf6;
+  --ur-theme-ink: #26241f;
+  --ur-theme-sep: #ede9e0;
+  --ur-theme-highlight: #ffe9a8;
+  --ur-theme-sentence: #dff0ff;
+  --ur-theme-annotation: #fef3c7;
+}
+
+.u-rd-views[data-theme='cream'] {
+  --ur-theme-paper: #f7efdd;
+  --ur-theme-ink: #3a322a;
+  --ur-theme-sep: #e9dcc2;
+  --ur-theme-highlight: #f5d782;
+  --ur-theme-sentence: #d6e6d0;
+  --ur-theme-annotation: #f2e3b8;
+}
+
+.u-rd-views[data-theme='night'] {
+  --ur-theme-paper: #1b1d20;
+  --ur-theme-ink: #d6d3cc;
+  --ur-theme-sep: #2c2f33;
+  --ur-theme-highlight: #4a4322;
+  --ur-theme-sentence: #22384a;
+  --ur-theme-annotation: #3b3420;
+}
+
+/* ---------- 阅读器骨架 ---------- */
+.u-rd {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--ur-theme-paper);
+  color: var(--ur-theme-ink);
+}
+
+.u-rd__main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px calc(96px + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+.u-rd__chapter-title {
+  font: 800 17px/1.4 var(--u-font);
+  margin-bottom: 4px;
+}
+
+.u-rd__chapter-sub {
+  color: var(--u-weak);
+  font: 12px/1.6 var(--u-font);
+  margin-bottom: 20px;
+}
+
+.u-rd__para {
+  font-family: var(--ur-font-serif);
+  font-size: var(--ur-size-base);
+  line-height: var(--ur-line-base);
+  margin-bottom: 1.15em;
+  text-align: justify;
+  white-space: pre-wrap;
+}
+
+.u-rd__sentence {
+  transition: background-color 0.25s ease;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.u-rd__sentence.is-current {
+  background: var(--ur-theme-sentence);
+}
+
+.u-rd__sentence.is-vocab {
+  background: var(--ur-theme-annotation);
+}
+
+.u-rd__sentence.is-annotated {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+.u-rd__run {
+  cursor: pointer;
+}
+
+.u-rd__run.is-word {
+  box-shadow: inset 0 -2px 0 var(--ur-theme-highlight);
+}
+
+/* 阅读设置（字号/主题 chips） */
+.u-rd-settings {
+  padding: 18px 18px calc(8px + env(safe-area-inset-bottom));
+}
+
+.u-rd-settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.u-rd-settings__label {
+  font: 600 14px/1.4 var(--u-font);
+  color: var(--u-ink);
+}
+
+.u-rd-settings__chips {
+  display: flex;
+  gap: 8px;
+}
+
+.u-rd-settings__chip {
+  min-width: 40px;
+  padding: 9px 12px;
+  border: 1px solid var(--u-track);
+  border-radius: var(--u-r-chip);
+  background: var(--u-card);
+  color: var(--u-sub);
+  font: 600 13px/1 var(--u-font);
+  cursor: pointer;
+}
+
+.u-rd-settings__chip.is-active {
+  background: var(--u-ink);
+  color: var(--u-card);
+  border-color: var(--u-ink);
+}
+
+/* ---------- 底部工具条 ---------- */
+.u-rd-bar {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 12px 6px;
+  border-radius: var(--u-r-card);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--u-shadow-tabbar);
+  backdrop-filter: blur(12px);
+  z-index: 40;
+}
+
+.u-rd-bar__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 14px;
+  border: none;
+  background: transparent;
+  color: var(--u-sub);
+  font: 11px/1.3 var(--u-font);
+  cursor: pointer;
+  min-width: 48px;
+}
+
+.u-rd-bar__btn.is-active {
+  color: var(--u-ink);
+}
+
+/* ---------- 听书播放条 ---------- */
+.u-rd-tts {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--u-r-card);
+  background: rgba(28, 28, 26, 0.94);
+  color: #f5f4f1;
+  box-shadow: var(--u-shadow-tabbar);
+  z-index: 45;
+}
+
+.u-rd-tts__icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: #ffffff22;
+  color: #fff;
+  cursor: pointer;
+}
+
+.u-rd-tts__icon.is-primary {
+  width: 44px;
+  height: 44px;
+  background: var(--u-accent);
+}
+
+.u-rd-tts__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.u-rd-tts__label {
+  font: 600 13px/1.4 var(--u-font);
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.u-rd-tts__progress {
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: #ffffff2e;
+  overflow: hidden;
+}
+
+.u-rd-tts__fill {
+  display: block;
+  height: 100%;
+  background: var(--u-pop-green);
+  transition: width 0.3s ease;
+}
+
+.u-rd-tts__rate {
+  min-width: 46px;
+  padding: 6px 4px;
+  border: 1px solid #ffffff33;
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  font: 600 12px/1 var(--u-font);
+  cursor: pointer;
+}
+
+/* 预合成进度行 */
+.u-rd-prep {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font: 12px/1.5 var(--u-font);
+  color: var(--u-sub);
+  background: var(--u-track);
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+
+.u-rd-prep__bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: #ffffffb0;
+  overflow: hidden;
+}
+
+.u-rd-prep__fill {
+  display: block;
+  height: 100%;
+  background: var(--u-pop-green);
+}
+
+/* ---------- 查词卡（底部 sheet 内） ---------- */
+.u-rd-word {
+  padding: 6px 20px 24px;
+}
+
+.u-rd-word__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.u-rd-word__word {
+  font: 800 26px/1.2 var(--u-font);
+  color: var(--u-ink);
+}
+
+.u-rd-word__phonetic {
+  color: var(--u-sub);
+  font: 15px/1.6 var(--u-font);
+}
+
+.u-rd-word__head-actions {
+  margin-left: auto;
+}
+
+.u-rd-word__meaning {
+  margin-top: 14px;
+  font: 15px/1.7 var(--u-font);
+  color: var(--u-ink);
+  white-space: pre-line;
+}
+
+.u-rd-word__definition {
+  margin-top: 8px;
+  font: 13px/1.6 var(--u-font);
+  color: var(--u-sub);
+  white-space: pre-line;
+}
+
+.u-rd-word__meta {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.u-rd-word__actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+}
+
+.u-rd-word__out {
+  color: var(--u-weak);
+  font: 12px/1.5 var(--u-font);
+  margin-top: 10px;
+}
+
+/* ---------- 书架 ---------- */
+.u-bs {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.u-bs__list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  padding: 4px 16px 32px;
+}
+
+.u-bs-card {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.u-bs-card__cover {
+  position: relative;
+  aspect-ratio: 3 / 4.2;
+  border-radius: var(--u-r-inner);
+  padding: 14px 12px;
+  color: #fff;
+  overflow: hidden;
+  background: linear-gradient(150deg, var(--cover-color, #16303a), #000000b0);
+}
+
+.u-bs-card__emoji {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.u-bs-card__title {
+  display: block;
+  margin-top: 10px;
+  font: 800 15px/1.4 var(--u-font);
+}
+
+.u-bs-card__author {
+  display: block;
+  margin-top: 3px;
+  font: 11px/1.4 var(--u-font);
+  opacity: 0.8;
+}
+
+.u-bs-card__track {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  height: 4px;
+  border-radius: 2px;
+  background: #ffffff47;
+}
+
+.u-bs-card__fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.u-bs-card__pct {
+  position: absolute;
+  right: 12px;
+  bottom: 22px;
+  font: 600 11px/1.6 var(--u-font);
+}
+
+/* ---------- 书详情 ---------- */
+.u-bd__hero {
+  padding: 22px 20px 18px;
+  background: var(--u-paper);
+}
+
+.u-bd__cover-row {
+  display: flex;
+  gap: 16px;
+}
+
+.u-bd__left {
+  width: 108px;
+  aspect-ratio: 3 / 4.2;
+  border-radius: 14px;
+  color: #fff;
+  padding: 12px 10px;
+  overflow: hidden;
+}
+
+.u-bd__meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.u-bd__title {
+  font: 800 20px/1.3 var(--u-font);
+  color: var(--u-ink);
+}
+
+.u-bd__author {
+  margin-top: 4px;
+  font: 13px/1.5 var(--u-font);
+  color: var(--u-sub);
+}
+
+.u-bd__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.u-bd__badge {
+  padding: 3px 9px;
+  border-radius: var(--u-r-pill);
+  background: var(--u-track);
+  color: var(--u-sub);
+  font: 11px/1.5 var(--u-font);
+}
+
+.u-bd__desc {
+  margin-top: 14px;
+  font: 13px/1.7 var(--u-font);
+  color: var(--u-sub);
+}
+
+.u-bd__cta {
+  margin: 16px 20px 8px;
+}
+
+.u-bd__chapters {
+  margin-top: 6px;
+  padding: 0 20px 32px;
+}
+
+.u-bd__chapter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 2px;
+  border: none;
+  border-bottom: 1px solid var(--u-paper-grid);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.u-bd__chapter-no {
+  min-width: 30px;
+  color: var(--u-weak);
+  font: 600 12px/1.6 var(--u-font);
+}
+
+.u-bd__chapter-title {
+  flex: 1;
+  color: var(--u-ink);
+  font: 14px/1.5 var(--u-font);
+}
+
+.u-bd__chapter.is-current .u-bd__chapter-title {
+  color: var(--u-accent);
+  font-weight: 700;
+}
+
+/* ---------- 生词本 ---------- */
+.u-vb {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.u-vb__header {
+  padding: 4px 18px 12px;
+}
+
+.u-vb__count {
+  font: 13px/1.6 var(--u-font);
+  color: var(--u-sub);
+}
+
+.u-vb__list {
+  padding: 0 18px 32px;
+}
+
+.u-vb-card {
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  border: 1px solid var(--u-paper-grid);
+  border-radius: var(--u-r-inner);
+  background: var(--u-card);
+  box-shadow: var(--u-shadow-float);
+}
+
+.u-vb-card__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.u-vb-card__word {
+  font: 700 17px/1.4 var(--u-font);
+  color: var(--u-ink);
+}
+
+.u-vb-card__phonetic {
+  font: 12px/1.5 var(--u-font);
+  color: var(--u-weak);
+}
+
+.u-vb-card__status {
+  margin-left: auto;
+  font: 11px/1.5 var(--u-font);
+  color: var(--u-sub);
+}
+
+.u-vb-card__meaning {
+  margin-top: 5px;
+  font: 13px/1.6 var(--u-font);
+  color: var(--u-sub);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.u-vb-card__ctx {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--u-track);
+  color: var(--u-weak);
+  font: 12px/1.6 var(--u-font);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.u-vb-card__foot {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.u-vb-card__date {
+  font: 11px/1.5 var(--u-font);
+  color: var(--u-weak);
+}
+
+.u-vb-card__btn {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--u-weak);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 12px/1.5 var(--u-font);
+}
+
+/* ---------- 批注弹层 ---------- */
+.u-rd-ann {
+  padding: 6px 20px 26px;
+}
+
+.u-rd-ann__title {
+  font: 700 16px/1.4 var(--u-font);
+  color: var(--u-ink);
+  margin-bottom: 12px;
+}
+
+.u-rd-ann__snippet {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--u-track);
+  color: var(--u-ink);
+  font: 13px/1.6 var(--u-font);
+}
+
+.u-rd-ann__colors {
+  display: flex;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.u-rd-ann__color {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.u-rd-ann__color.is-active {
+  border-color: var(--u-ink);
+}
+
+.u-rd-ann__note {
+  width: 100%;
+  border: 1px solid var(--u-track);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--u-card);
+  color: var(--u-ink);
+  font: 14px/1.6 var(--u-font);
+  resize: none;
+}
+
+.u-rd-ann__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* 批注列表行（本章批注） */
+.u-rd-annlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.u-rd-annlist__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--u-paper-grid);
+}
+
+.u-rd-annlist__chip {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex: none;
+}
+
+.u-rd-annlist__main {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.u-rd-annlist__text {
+  color: var(--u-ink);
+  font: 13px/1.6 var(--u-font);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

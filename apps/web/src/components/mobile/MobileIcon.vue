@@ -46,6 +46,13 @@ const props = withDefaults(
       | 'settings'
       | 'search'
       | 'hash'
+      | 'pause'
+      | 'skip-back'
+      | 'skip-forward'
+      | 'trash'
+      | 'pencil'
+      | 'bookmark'
+      | 'x'
     size?: number
   }>(),
   { size: 20 },
@@ -245,6 +252,41 @@ const props = withDefaults(
     <!-- 话题（# · tabler: hash） -->
     <template v-else-if="props.name === 'hash'">
       <path d="M5 9h14M5 15h14M11 4L7 20M17 4l-4 16" />
+    </template>
+
+    <!-- 暂停（tabler: player-pause） -->
+    <template v-else-if="props.name === 'pause'">
+      <path d="M12 6v12M6 6v12M18 6v12" />
+    </template>
+
+    <!-- 上一句（tabler: player-skip-back） -->
+    <template v-else-if="props.name === 'skip-back'">
+      <path d="M20 6v12l-9-6zM7 5v14" />
+    </template>
+
+    <!-- 下一句（tabler: player-skip-forward） -->
+    <template v-else-if="props.name === 'skip-forward'">
+      <path d="M4 6v12l9-6zM17 5v14" />
+    </template>
+
+    <!-- 删除（tabler: trash） -->
+    <template v-else-if="props.name === 'trash'">
+      <path d="M4 7h16M10 11v6m4-6v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+    </template>
+
+    <!-- 批注/编辑（tabler: pencil） -->
+    <template v-else-if="props.name === 'pencil'">
+      <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1l1-4z" />
+    </template>
+
+    <!-- 书签（生词本 · tabler: bookmark） -->
+    <template v-else-if="props.name === 'bookmark'">
+      <path d="M6 4h12v17l-6-4.5L6 21z" />
+    </template>
+
+    <!-- 关闭（tabler: x） -->
+    <template v-else-if="props.name === 'x'">
+      <path d="M6 6l12 12M18 6L6 18" />
     </template>
   </svg>
 </template>
