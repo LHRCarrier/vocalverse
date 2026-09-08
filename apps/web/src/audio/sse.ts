@@ -10,6 +10,7 @@
  * - 解析器为纯函数（`parseSseBuffer`），可单测（跨 chunk/多 data/未知事件/心跳）。
  */
 
+import { PYTHON_BASE } from '@/api/client'
 import type { SseStreamEvent } from './sse-types'
 
 export const SSE_IDLE_TIMEOUT_MS = 90_000 // R-18：> 3× 心跳间隔(15s)，容 LLM 首 token/长音频
@@ -54,7 +55,9 @@ export function openSseFetch(
 ): void {
   let buffer = ''
   const headers = { Accept: 'text/event-stream', ...(init.headers ?? {}) }
-  fetch(url, { method: init.method, body: init.body, signal, headers })
+  // 2026-09-10 打包壳修复：URL 原为相对路径 → 落到页面源（https://localhost 的 Capacitor 本地服务器）
+  // 而非后端；前缀 PYTHON_BASE（dev 下为空，行为不变；打包壳为 http://localhost:8000 等绝对值）
+  fetch(`${PYTHON_BASE}${url}`, { method: init.method, body: init.body, signal, headers })
     .then(async (resp) => {
       if (!resp.ok || !resp.body) {
         // 非 SSE 错误（409/429/413 等）：尝试读 JSON envelope

@@ -32,7 +32,8 @@ export interface Envelope<T> {
   data: T
 }
 
-const PYTHON_BASE = import.meta.env.VITE_PYTHON_BASE ?? ''
+/** 构建期基址（打包壳用绝对值；dev 默认空=相对走 Vite 代理） */
+export const PYTHON_BASE = import.meta.env.VITE_PYTHON_BASE ?? ''
 export const JAVA_BASE = import.meta.env.VITE_JAVA_BASE ?? '/manage'
 
 /** 全局访问令牌（由 auth store 写入；request 自动携带）。 */
