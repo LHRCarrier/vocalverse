@@ -55,6 +55,116 @@ export function vocabWordSet(entries: Array<{ word: string }>): Set<string> {
   return new Set(entries.map((e) => e.word.toLowerCase()))
 }
 
+/* ---------------------------------------------------------------- 批注渲染分段
+ * 2026-09-10 修复「批注跳过去看不到、被批注的文本无颜色」（组长手机实测）：
+ * 渲染层原先把批注只映射成句子级 .is-annotated 下划线，且只认 kind==='highlight'
+ * （kind==='note' 的笔记批注连下划线都没有）→ 页面上完全看不出批注。
+ * 这里把「词块」与「批注区间」求交，切成可直接上色的渲染段：
+ *   · 段文本仍是句子内的连续切片（拼接后与原文逐字相等）；
+ *   · 段保留 word（用于点词查义）——词被批注边界切开的子段仍带同一个 word，
+ *     这样点任一部分都能查到整词；
+ *   · 段带 ann（该段覆盖的批注：优先带笔记的那条，其次最早的一条）。
+ */
+
+/** 渲染段（句子内连续切片） */
+export interface SentenceSegment {
+  text: string
+  /** 该段所属词（整词，用于查词；非词段为 null） */
+  word: string | null
+  /** 覆盖该段的批注（无批注为 null） */
+  ann: AnnotationRange | null
+  /** 该段是本句内某条「笔记批注」的最后一段 → 渲染批注角标（点击看笔记） */
+  noteMarker?: boolean
+}
+
+/** 批注渲染所需的最小字段（与 api/reading.AnnotationItem 结构兼容） */
+export interface AnnotationRange {
+  id: number
+  start_offset: number
+  end_offset: number
+  kind: 'highlight' | 'note'
+  color?: string | null
+  note?: string | null
+  text_snippet?: string | null
+}
+
+/**
+ * 句子 → 渲染段（词块 × 批注区间求交）。
+ * @param sentenceText 句子原文（服务端归一）
+ * @param sentenceStart 句子在章内的绝对起始 offset
+ * @param annotations 本章批注（绝对 offset 坐标系）
+ */
+export function buildSentenceSegments(
+  sentenceText: string,
+  sentenceStart: number,
+  annotations: ReadonlyArray<AnnotationRange>,
+): SentenceSegment[] {
+  const pieces = splitPieceWords(sentenceText)
+  const relevant = annotations.filter(
+    (a) => a.end_offset > sentenceStart && a.start_offset < sentenceStart + sentenceText.length,
+  )
+  const segments: SentenceSegment[] = []
+
+  for (const piece of pieces) {
+    const absStart = sentenceStart + piece.start
+    const absEnd = sentenceStart + piece.end
+    const hits = relevant.filter((a) => a.end_offset > absStart && a.start_offset < absEnd)
+    if (hits.length === 0) {
+      segments.push({ text: piece.text, word: piece.word, ann: null })
+      continue
+    }
+    const cuts = new Set<number>([absStart, absEnd])
+    for (const a of hits) {
+      cuts.add(Math.max(absStart, a.start_offset))
+      cuts.add(Math.min(absEnd, a.end_offset))
+    }
+    const sorted = [...cuts].filter((c) => c >= absStart && c <= absEnd).sort((x, y) => x - y)
+    for (let i = 0; i < sorted.length - 1; i += 1) {
+      const s = sorted[i]
+      const e = sorted[i + 1]
+      if (e <= s) continue
+      const covering = hits
+        .filter((a) => a.start_offset <= s && a.end_offset >= e)
+        .sort((a, b) => Number(b.kind === 'note') - Number(a.kind === 'note') || a.start_offset - b.start_offset)
+      segments.push({
+        text: sentenceText.slice(s - sentenceStart, e - sentenceStart),
+        word: piece.word,
+        ann: covering[0] ?? null,
+      })
+    }
+  }
+
+  // 笔记批注：在本句内该批注的最后一段打角标（避免被词边界切开的段重复出角标）
+  const lastSegOfNote = new Map<number, number>()
+  segments.forEach((seg, i) => {
+    if (seg.ann?.kind === 'note') lastSegOfNote.set(seg.ann.id, i)
+  })
+  for (const i of lastSegOfNote.values()) segments[i].noteMarker = true
+
+  return segments
+}
+
+/** 句子是否有批注（含笔记类——渲染判断用，修复前只认 highlight） */
+export function sentenceHasAnnotation(
+  annotations: ReadonlyArray<AnnotationRange>,
+  sentenceStart: number,
+  sentenceEnd: number,
+): boolean {
+  return annotations.some((a) => a.start_offset < sentenceEnd && a.end_offset > sentenceStart)
+}
+
+/** 该句的全部批注（按起点排序，供「本句批注」气泡） */
+export function annotationsOfSentence(
+  annotations: ReadonlyArray<AnnotationRange>,
+  sentenceStart: number,
+  sentenceEnd: number,
+): AnnotationRange[] {
+  return annotations
+    .filter((a) => a.start_offset < sentenceEnd && a.end_offset > sentenceStart)
+    .slice()
+    .sort((a, b) => a.start_offset - b.start_offset)
+}
+
 /** 词点击命中的原文（剥离首尾标点由 normalize 负责——这里只取词形） */
 export function pieceAt(pieces: TextPiece[], relOffset: number): TextPiece | null {
   let acc = 0

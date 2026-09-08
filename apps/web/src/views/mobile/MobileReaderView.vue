@@ -8,6 +8,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import MobileAnnotationNoteSheet from '@/components/mobile/MobileAnnotationNoteSheet.vue'
 import MobileAnnotationSheet from '@/components/mobile/MobileAnnotationSheet.vue'
 import MobileReaderBar from '@/components/mobile/MobileReaderBar.vue'
 import MobileReaderSettingsSheet from '@/components/mobile/MobileReaderSettingsSheet.vue'
@@ -16,7 +17,11 @@ import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import MobileTtsBar from '@/components/mobile/MobileTtsBar.vue'
 import MobileWordCard from '@/components/mobile/MobileWordCard.vue'
 import { fetchChapter, fetchVoices, fetchVocab } from '@/api/reading'
-import { splitPieceWords, vocabWordSet } from '@/audio/reader-words'
+import {
+  buildSentenceSegments,
+  sentenceHasAnnotation,
+  vocabWordSet,
+} from '@/audio/reader-words'
 import { useChapterPrep } from '@/composables/useChapterPrep'
 import { useChapterTts } from '@/composables/useChapterTts'
 import { useMobileBack } from '@/composables/useMobileBack'
@@ -28,7 +33,7 @@ import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 import '@/styles/reader-uic.css'
 
-import type { AnnotationItem, ReadingChapter, ReadingVoice } from '@/api/reading'
+import type { ReadingChapter, ReadingVoice } from '@/api/reading'
 
 const route = useRoute()
 const router = useRouter()
@@ -112,6 +117,7 @@ const annotationsApi = useReaderAnnotations(chapterId, () => chapter.value, scro
 const annotations = annotationsApi.annotations
 const annSheet = annotationsApi.annSheet
 const annListOpen = annotationsApi.annListOpen
+const { noteSheet, flashAnnId } = annotationsApi
 
 function onSelectionCreate() {
   const sel = window.getSelection()
@@ -128,44 +134,67 @@ async function removeAnnotation(id: number) {
   await annotationsApi.remove(id)
 }
 
-function jumpToAnnotation(a: AnnotationItem) {
-  annotationsApi.jump(a)
-}
-
-async function refreshAnnotations() {
-  await annotationsApi.refresh()
-}
-
-/* ---------- 渲染（词块/批注标记/点词） ---------- */
+/* ---------- 渲染（词块 × 批注区间 → 上色分段；点词查义） ---------- */
 const currentIdx = computed(() => ttsCurrentIdx.value)
 
-function sentencePieces(idx: number) {
+/** 句子渲染段：词 + 批注着色（见 reader-words.buildSentenceSegments） */
+function sentenceSegments(idx: number) {
   const s = chapter.value?.sentences[idx]
-  return s ? splitPieceWords(s.text) : []
+  return s ? buildSentenceSegments(s.text, s.start, annotations.value) : []
 }
 
-function sentenceHasAnnotation(sentenceStart: number, sentenceEnd: number): boolean {
-  return annotations.value.some(
-    (a) => a.kind === 'highlight' && a.start_offset >= sentenceStart && a.start_offset < sentenceEnd,
-  )
+function sentenceAnnotated(start: number, end: number): boolean {
+  return sentenceHasAnnotation(annotations.value, start, end)
+}
+
+function annStyle(color: string | null | undefined): Record<string, string> {
+  return { background: color ?? 'var(--ur-theme-annotation)' }
 }
 
 function onReaderClick(e: MouseEvent) {
   const target = e.target as HTMLElement
-  const wordEl = target.closest('.u-rd__run.is-word') as HTMLElement | null
-  if (wordEl) {
-    const word = wordEl.dataset.word ?? ''
-    const sentenceEl = wordEl.closest('.u-rd__sentence') as HTMLElement | null
+
+  // ① 批注角标（笔记标记）→ 看笔记（优先于查词，否则角标落在词上会查词）
+  const markEl = target.closest('.u-rd__annmark') as HTMLElement | null
+  if (markEl?.dataset.ann) {
+    annotationsApi.openNoteById(Number(markEl.dataset.ann))
+    return
+  }
+
+  const segEl = target.closest('.u-rd__seg') as HTMLElement | null
+  const sentenceEl = target.closest('.u-rd__sentence') as HTMLElement | null
+
+  // ② 词段 → 查词卡（任何词都可查；修复前只有「已加入生词本」的词有反应）
+  const word = segEl?.dataset.word ?? ''
+  if (word) {
     const idx = Number(sentenceEl?.dataset.idx ?? -1)
     const context = chapter.value?.sentences[idx]?.text ?? ''
     void wordLookup.openFor(word, context)
     return
   }
-  const sentenceEl = target.closest('.u-rd__sentence') as HTMLElement | null
-  if (sentenceEl && ttsState.value !== 'idle') {
-    const idx = Number(sentenceEl.dataset.idx ?? -1)
-    if (idx >= 0 && idx !== ttsCurrentIdx.value) void tts.playFrom(idx)
+
+  // ③ 非词批注段（标点/空格被批注）→ 看批注
+  if (segEl?.dataset.ann) {
+    annotationsApi.openNoteById(Number(segEl.dataset.ann))
+    return
   }
+
+  if (!sentenceEl) return
+  const idx = Number(sentenceEl.dataset.idx ?? -1)
+  if (idx < 0) return
+
+  // ④ 听书进行中：点句子 = 从该句续播
+  if (ttsState.value !== 'idle') {
+    if (idx !== ttsCurrentIdx.value) void tts.playFrom(idx)
+    return
+  }
+
+  // ⑤ 非听书态：点句子 = 对这句做批注/高亮（批注是「对某句/某段的理解」，不再要求长按划词）
+  annotationsApi.createForSentence(idx)
+}
+
+async function refreshAnnotations() {
+  await annotationsApi.refresh()
 }
 
 /* ---------- 装载与生命周期 ---------- */
@@ -215,6 +244,10 @@ const settingsOpen = ref(false)
  * （否则滑动返回会连带退页/退到桌面；见 useNativeBack 注释）
  */
 useNativeBack(() => {
+  if (noteSheet.open) {
+    noteSheet.open = false
+    return true
+  }
   if (wordLookup.state.open) {
     wordLookup.close()
     return true
@@ -292,16 +325,28 @@ function nextChapter() {
             v-for="s in chapter.sentences.filter((x) => x.para_idx === pi)"
             :key="s.idx"
             class="u-rd__sentence"
-            :class="{ 'is-current': currentIdx === s.idx, 'is-annotated': sentenceHasAnnotation(s.start, s.end) }"
+            :class="{ 'is-current': currentIdx === s.idx, 'is-annotated': sentenceAnnotated(s.start, s.end) }"
             :data-idx="s.idx"
           >
             <span
-              v-for="(piece, wi) in sentencePieces(s.idx)"
+              v-for="(seg, wi) in sentenceSegments(s.idx)"
               :key="wi"
-              class="u-rd__run"
-              :class="{ 'is-word': !!piece.word && vocabWords.has(piece.word.toLowerCase()) }"
-              :data-word="piece.word ?? undefined"
-            >{{ piece.text }}</span>
+              class="u-rd__seg"
+              :class="{
+                'is-word': !!seg.word && vocabWords.has(seg.word.toLowerCase()),
+                'is-ann': !!seg.ann,
+                'is-flash': !!seg.ann && seg.ann.id === flashAnnId,
+              }"
+              :style="seg.ann ? annStyle(seg.ann.color) : undefined"
+              :data-word="seg.word ?? undefined"
+              :data-ann="seg.ann ? seg.ann.id : undefined"
+            >{{ seg.text }}<span
+              v-if="seg.noteMarker && seg.ann"
+              class="u-rd__annmark"
+              :data-ann="seg.ann.id"
+              :style="{ background: seg.ann.color ?? '#fde68a' }"
+              aria-hidden="true"
+            /></span>
           </span>
         </p>
       </main>
@@ -360,8 +405,15 @@ function nextChapter() {
         mode="list"
         :annotations="annotations"
         @delete="removeAnnotation"
-        @jump="jumpToAnnotation"
+        @jump="annotationsApi.jump"
         @update:open="annListOpen = $event"
+      />
+      <!-- 单条批注查看（点正文批注段 / 批注角标 / 列表跳转后自动弹出） -->
+      <MobileAnnotationNoteSheet
+        :open="noteSheet.open"
+        :item="noteSheet.item"
+        @delete="removeAnnotation"
+        @update:open="noteSheet.open = $event"
       />
       <MobileReaderTocSheet :open="tocOpen" @update:open="tocOpen = $event" @close="tocOpen = false" />
     </template>
