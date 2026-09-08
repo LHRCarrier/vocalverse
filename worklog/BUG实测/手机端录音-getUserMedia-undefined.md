@@ -39,6 +39,8 @@
 - **后端可被手机访问**：python 改 `--host 0.0.0.0`（原只绑 127.0.0.1，手机连不到）；java 8080 已绑 `::`。
 - 代价：**无 HMR**（改 web 需 `pnpm build`+`cap copy`+`assembleDebug`+重装）；API 基址写死 IP（换网需重建）。
 
+**追加（组长手机实测 B 后，2026-09-10）**：录音提示「麦克风被拒绝，请在浏览器地址栏的权限设置里允许麦克风后重试」——根因：Capacitor `BridgeWebChromeClient.onPermissionRequest` 对 `AUDIO_CAPTURE` 会**同时**申请 `MODIFY_AUDIO_SETTINGS` + `RECORD_AUDIO`，缺任一 → 权限回调 deny → `request.deny()` → getUserMedia `NotAllowedError`；Manifest 此前只有 `RECORD_AUDIO` → 真机必被拒。修复：Manifest 补 `MODIFY_AUDIO_SETTINGS`（normal 级，安装即授）。验证：`dumpsys package` 两权限均 `granted=true`。
+
 ## 验证
 
 - `recorder.test.ts` +2 例：`mediaDevices` 为 undefined 时 `start()` 抛 `RecorderError`（非 TypeError）
