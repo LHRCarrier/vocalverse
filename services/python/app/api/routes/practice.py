@@ -14,7 +14,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.audio.base import get_llm_client
 from app.audio.upload import validate_audio_bytes
@@ -25,6 +25,7 @@ from app.core.response import BizError, ok
 from app.db import get_session_factory
 from app.models import Attempt, Report, ScenarioMessage
 from app.models import Session as DbSession
+from app.models.base import SessionStatus
 from app.practice import events as ev
 from app.practice.orchestrator import (
     OrchestratorError,
@@ -38,6 +39,9 @@ router = APIRouter(prefix="/api/v1", tags=["practice"])
 logger = logging.getLogger("vocalverse")
 
 _SAFE_NAME = re.compile(r"^[0-9a-f]{32}\.mp3$")
+
+#: R-13 恢复端点回带最近消息条数（UI 重建够用；完整历史以 scenario_messages 为准）
+RESTORE_MESSAGES_LIMIT = 12
 
 
 class SessionCreate(BaseModel):
@@ -115,6 +119,112 @@ async def post_session(
             "profile_id": session.profile_id,
             "shadow_material_id": session.shadow_material_id,
             "assigned_turns": session.assigned_turns,
+        }
+    )
+
+
+@router.get("/sessions/{session_id}")
+async def get_session_restore(
+    session_id: int,
+    user_id: int = Depends(get_current_user_id),
+):
+    """会话恢复（R-13 / docs/21 §3.1 目标态）：刷新/断线后前端据此重建 UI 与轮次。
+
+    返回运行态（state/current_turn/next_seq）+ 最近消息快照；运行态缺失（StateStore
+    TTL 过期/进程重启）时以 scenario_messages 权威历史重建（state.py 注释口径：
+    「权威历史永远在 scenario_messages」）。归属校验同 /turns：不拥有 → 40401。
+    """
+
+    # docs/19 P0-2：同步 DB 查询收进 to_thread（短事务，不阻塞事件循环）
+    def _q():
+        db = get_session_factory()()
+        try:
+            session = db.execute(
+                select(DbSession).where(DbSession.id == session_id, DbSession.user_id == user_id)
+            ).scalar_one_or_none()
+            if session is None:
+                return None
+            # 重建所需聚合：user 消息数 = current_turn；max(seq)+1 = next_seq
+            user_turns = db.execute(
+                select(func.count())
+                .select_from(ScenarioMessage)
+                .where(ScenarioMessage.session_id == session_id, ScenarioMessage.role == "user")
+            ).scalar_one()
+            max_seq = db.execute(
+                select(func.max(ScenarioMessage.seq)).where(
+                    ScenarioMessage.session_id == session_id
+                )
+            ).scalar_one()
+            msgs = list(
+                reversed(
+                    db.execute(
+                        select(ScenarioMessage)
+                        .where(ScenarioMessage.session_id == session_id)
+                        .order_by(ScenarioMessage.seq.desc())
+                        .limit(RESTORE_MESSAGES_LIMIT)
+                    )
+                    .scalars()
+                    .all()
+                )
+            )
+            # 已完成会话回带报告 id：前端直接跳转报告页（P0-8 短路语义复用）
+            report_id = None
+            if session.status == SessionStatus.COMPLETED:
+                report_id = db.execute(
+                    select(Report.id).where(
+                        Report.report_type == "session_report",
+                        Report.scope == "session",
+                        Report.scope_id == session.id,
+                    )
+                ).scalar_one_or_none()
+            return session, user_turns, max_seq, msgs, report_id
+        finally:
+            db.close()
+
+    row = await asyncio.to_thread(_q)
+    if row is None:
+        raise BizError(http_status=404, code=40401, message="session not found or expired")
+    session, user_turns, max_seq, msgs, report_id = row
+
+    state = await get_state_store().get(session_id)
+    if state is not None:
+        # 运行态优先：StateStore 为真源（进行中会话锁/轮次同步语义在编排器内维护）
+        live_state, current_turn, next_seq = state.state, state.current_turn, state.next_seq
+    else:
+        # 重建：只 INSERT 的 scenario_messages 为权威历史（state.py 注释口径）
+        current_turn = int(user_turns)
+        next_seq = int(max_seq or 0) + 1
+        if session.status == SessionStatus.COMPLETED:
+            live_state = "completed"
+        elif session.status == SessionStatus.ABANDONED:
+            live_state = "concluded"
+        else:
+            live_state = "awaiting_user"
+
+    return ok(
+        {
+            "id": session.id,
+            "kind": session.kind,
+            "status": session.status,
+            "assigned_turns": session.assigned_turns,
+            "state": live_state,
+            "current_turn": current_turn,
+            "next_seq": next_seq,
+            #: 客户端下轮提交 expected_turn 的权威值（与 TurnEnd.expected_turn 同语义）
+            "next_expected_turn": current_turn,
+            "report_id": report_id,
+            "messages": [
+                {
+                    "seq": m.seq,
+                    "role": m.role,
+                    "content": m.content,
+                    "audio_url": m.audio_url,
+                    "origin": m.origin,
+                    "action": m.action,
+                    "created_at": m.created_at.isoformat() if m.created_at else None,
+                }
+                for m in msgs
+            ],
         }
     )
 
