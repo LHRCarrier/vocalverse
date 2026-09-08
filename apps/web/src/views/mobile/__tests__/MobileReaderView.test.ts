@@ -122,15 +122,46 @@ describe('阅读器 · 点词查义（bug1）', () => {
     wrapper.unmount()
   })
 
-  it('点句子（非听书态）→ 打开整句批注弹层（批注针对句子，不再强制长按划词）', async () => {
+  it('单击句子 → 选中该句 + 底部动作条（高亮/批注/听这句）；再点「批注」才开弹层', async () => {
     const wrapper = await mountReader()
     await wrapper.get('.u-rd__sentence').trigger('click')
     await flushPromises()
 
+    // 选中态 + 动作条（2026-09-10 组长拍板：不直接弹层，避免误触）
+    expect(wrapper.get('.u-rd__sentence').classes()).toContain('is-selected')
+    const bar = wrapper.find('.u-rd-sel') // 非 Teleport，留在组件树内
+    expect(bar.exists()).toBe(true)
+    expect(bar.text()).toContain('批注')
+    expect(bar.text()).toContain('听这句')
+    expect(document.querySelector('.u-rd-ann')).toBeNull() // 尚未开弹层
+
+    // 点「批注」→ 批注弹层（整句范围）
+    const noteBtn = wrapper.findAll('.u-rd-sel__btn').find((b) => b.text().includes('批注'))
+    await noteBtn?.trigger('click')
+    await flushPromises()
     const sheet = document.querySelector('.u-rd-ann')
     expect(sheet).not.toBeNull()
-    expect(sheet?.textContent).toContain('添加批注')
     expect(sheet?.textContent).toContain('Alice was here.')
+    wrapper.unmount()
+  })
+
+  it('动作条点色点 → 直接整句高亮（createAnnotation 收到句子范围 + 该颜色）', async () => {
+    const wrapper = await mountReader()
+    await wrapper.get('.u-rd__sentence').trigger('click')
+    await flushPromises()
+
+    const green = wrapper.find('button[aria-label="高亮绿色"]')
+    expect(green.exists()).toBe(true)
+    await green.trigger('click')
+    await flushPromises()
+
+    expect(api.createAnnotation).toHaveBeenCalledTimes(1)
+    const payload = api.createAnnotation.mock.calls[0][0] as Record<string, unknown>
+    expect(payload.kind).toBe('highlight')
+    expect(payload.color).toBe('#bbf7d0')
+    expect(payload.start_offset).toBe(0)
+    expect(payload.end_offset).toBe(15)
+    expect(payload.sentence_idx).toBe(0)
     wrapper.unmount()
   })
 })
