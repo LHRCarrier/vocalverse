@@ -96,4 +96,5 @@ def bucket_limits(settings=None) -> dict[str, int]:
         "tts": s.tts_rate_per_hour,
         "ise": s.ise_rate_per_hour,
         "llm": s.llm_rate_per_hour,
+        "reading_tts": s.reading_tts_rate_per_hour,  # docs/45 §4：仅扣真实合成
     }

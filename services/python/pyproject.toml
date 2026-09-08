@@ -32,6 +32,14 @@ dependencies = [
     "num2words>=0.5",
 ]
 
+[project.optional-dependencies]
+# 读书域本地引擎（docs/45 §5）：KittenTTS mini（78MB ONNX · Apache-2.0 · CPU 实时）。
+# 默认不装（模型权重不入库红线）——需要本地听书引擎时：uv sync --extra local-tts，
+# 并在 .env 配 APP_VOICE_MODELS_DIR=<VoiceStudio models 目录>（docs/45 §5.1）。
+local-tts = [
+    "kittentts>=0.1.3",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.2",

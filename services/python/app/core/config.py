@@ -55,6 +55,16 @@ class Settings(BaseSettings):
     tts_voice: str = "en-US-JennyNeural"
     tts_rate: str = "+0%"
     azure_tts_key: str = ""  # 存在时切 Azure，见 docs/06 第 8 章
+    # 读书域 · 听书（docs/45 §5 · docs/46 B-3/B-4）：
+    # - provider：auto（kitten 可用→kitten，否则 edge）/ edge / kitten；
+    # - voice_models_dir：本地模型目录（默认空=不探测 kitten；填入 VoiceStudio
+    #   models 目录（如 F:\WorkingL\VoiceStudio\OmniVoiceStudio-Data\data\models）
+    #   即启用本地引擎；模型权重红线不入库，只做运行时引用；
+    # - 听书 bucket 独立于 /tts（60/时）：听书一章 ~200 句，只扣真实合成
+    #   次数（缓存命中 0 扣；prepared 按章扣 1），600/时留足余量。
+    reading_tts_provider: str = "auto"  # auto | edge | kitten
+    reading_tts_rate_per_hour: int = 600
+    voice_models_dir: str = ""
     ise_app_id: str = ""  # 讯飞评测 API（基线）
     ise_api_key: str = ""
     ise_api_secret: str = ""
