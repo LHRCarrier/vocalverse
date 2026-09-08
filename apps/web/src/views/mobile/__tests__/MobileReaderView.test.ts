@@ -164,6 +164,47 @@ describe('阅读器 · 点词查义（bug1）', () => {
     expect(payload.sentence_idx).toBe(0)
     wrapper.unmount()
   })
+
+  it('查词卡底部「高亮这句」→ 整句高亮（句子批注的可靠入口：空格命中区仅 4.6px）', async () => {
+    const wrapper = await mountReader()
+    await wrapper.get('.u-rd__seg[data-word="Alice"]').trigger('click')
+    await flushPromises()
+
+    const card = document.querySelector('.u-rd-word')
+    expect(card?.textContent).toContain('高亮这句')
+    expect(card?.textContent).toContain('批注这句')
+
+    const btn = [...card!.querySelectorAll('button')].find((b) => b.textContent?.includes('高亮这句'))
+    btn?.click()
+    await flushPromises()
+
+    expect(api.createAnnotation).toHaveBeenCalledTimes(1)
+    const payload = api.createAnnotation.mock.calls[0][0] as Record<string, unknown>
+    expect(payload.kind).toBe('highlight')
+    expect(payload.color).toBe('#fde68a')
+    expect(payload.start_offset).toBe(0)
+    expect(payload.end_offset).toBe(15)
+    expect(payload.sentence_idx).toBe(0)
+    wrapper.unmount()
+  })
+
+  it('查词卡「批注这句」→ 收掉词卡并打开整句批注弹层', async () => {
+    const wrapper = await mountReader()
+    await wrapper.get('.u-rd__seg[data-word="Alice"]').trigger('click')
+    await flushPromises()
+
+    const btn = [...document.querySelectorAll('.u-rd-word button')].find((b) =>
+      b.textContent?.includes('批注这句'),
+    )
+    ;(btn as HTMLButtonElement)?.click()
+    await flushPromises()
+
+    expect(document.querySelector('.u-rd-word')).toBeNull()
+    const sheet = document.querySelector('.u-rd-ann')
+    expect(sheet).not.toBeNull()
+    expect(sheet?.textContent).toContain('Alice was here.')
+    wrapper.unmount()
+  })
 })
 
 describe('阅读器 · 批注可见（bug2）', () => {
