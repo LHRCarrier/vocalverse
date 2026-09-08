@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 Java P1 批 ①：J-01 点赞并发幂等（like 500 / unlike 计数漂移）· 10 op
+
+- **背景**：local/review-java.json（java-01，确认）——like()「先查后插」无唯一键兜底（对比 :577-592 的 insertInteractionIdempotent 写法），PG READ COMMITTED 下并发双击 → 第二个 INSERT 撞 `uq_post_likes_post_liker` → 未捕获 DataIntegrityViolationException → **500**；unlike() 无条件删除+递减 → 并发双击取消双减 → like_count 与事实行漂移（GREATEST 只兜底到 0）。既有单测仅类级 @Transactional 单线程幂等，H2 不暴露并发缺陷；
+- **修复（code）**：① `PostLikeRepository` 新增 **DB 层原子语句**——`insertIgnoreConflict`（`INSERT ... ON CONFLICT DO NOTHING`，返回 1/0）与 `deleteOneByPostIdAndLikerId`（原生 DELETE 返回实际删行数 0/1）；② `PostInteractionRepository.insertIgnoreConflict` 同构（替代「先查后插 + catch」：catch 即便捕获冲突，Hibernate 已把事务标 rollback-only，提交期仍抛 UnexpectedRollbackException，真并发下 500 依旧——此隐藏坑一并消除）；③ `CommunityService.like()`：like 以「本次是否真实插入」为唯一递增依据；unlike 先判删除行数、仅 >0 才递减计数与删 interaction；`insertInteractionIdempotent` 收敛为一行 ON CONFLICT。**H2 MODE=PostgreSQL 实测支持无目标 `ON CONFLICT DO NOTHING`；带冲突目标的写法不支持（语法错，踩坑），故统一无目标写法**；
+- **测试（test）**：新 `LikeConcurrencyTest`（不挂类级事务 + 多线程栅栏对齐放行，最大化 check-then-act 窗口命中）2 例：并发 like×6 幂等返回且 like_count==1、事实行唯一；并发 unlike×6（预置 2 赞）仅减一次、计数与事实行一致。**改前失败证据**：stash 修复后实跑 → 2 例全红，`DataIntegrityViolationException: Unique index or primary key violation: UQ_POST_LIKES_POST_LIKER`（正是真机 500 的服务端根因）+ unlike 漂移断言失败；改后 17 tests 全绿（社区相关 10+5+2）；
+- **登记**：docs/37 §3.2 补第 4 条（J-01 并发幂等口径）+ §9 测试清单补 LikeConcurrencyTest。
+- **门禁**：`mvn -B -ntp verify -DskipITs` 全量 36→38 tests 绿 + spotless 绿（本轮记录时点：J-01 后跑过社区子集 17 绿；全量在批次收尾统一跑）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-08）
+
 ## 2026-09-07 音频回放 403 根因修复：TTS 输出独立 tts/ 前缀（免归属校验）· 21 op
 
 - **现象链**（用户网络面板逐步实锤）：401（原生 `<audio>` 不带 Bearer → `loadAudioBlob` 修复）→ **403 Forbidden**（归属校验 `Attempt/ScenarioMessage.audio_url` 引用；流式多句音频只有 `emitted_urls[0]` 落库，其余 chunk 无引用 → 40301）；
