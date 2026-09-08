@@ -46,6 +46,8 @@ const hitInfo = ref('')
 const coach = ref<string | null>(null)
 const error = ref<string | null>(null)
 let pollTimer: ReturnType<typeof setInterval> | null = null
+let abort = new AbortController()
+let reportTimer: ReturnType<typeof setTimeout> | null = null
 
 const recorder = new VoiceRecorder()
 recorder.onStateChange = (s) => {
@@ -62,6 +64,8 @@ recorder.onStop = (blob, _mime, durationMs) => {
 
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
+  if (reportTimer) clearTimeout(reportTimer)
+  abort.abort()
   releaseAll()
 })
 
@@ -107,10 +111,11 @@ function pollStatus(id: number) {
 
 async function startSession() {
   if (!profileId.value) return
+  abort = new AbortController()
   const session = await createSession({ kind: 'defense', profile_id: profileId.value })
   sessionId.value = session.id
   stage.value = 'session'
-  await track('scene_start', { targetType: 'defense', targetId: profileId.value })
+  await track('scene_start', { targetType: 'defense', targetId: profileId.value, beacon: true })
   await sendServe('start')
 }
 
@@ -121,7 +126,7 @@ async function sendServe(action: 'start' | 'next') {
   formData.append('expected_turn', String(questionIndex.value))
   streamTurn(sessionId.value!, formData, onSseEvent, (e) => {
     error.value = (e as Error).message
-  })
+  }, abort.signal)
 }
 
 function onSseEvent(e: SseStreamEvent) {
@@ -153,7 +158,8 @@ function onSseEvent(e: SseStreamEvent) {
       break
     case 'session_end':
       error.value = e.summary ?? '答辩完成！'
-      setTimeout(() => {
+      reportTimer = setTimeout(() => {
+        reportTimer = null
         if (e.report_id) router.push(`/report/${e.report_id}`)
       }, 1200)
       break
@@ -197,7 +203,7 @@ async function answer(blob: Blob) {
   questionIndex.value += 1
   streamTurn(sessionId.value!, formData, onSseEvent, (e) => {
     error.value = (e as Error).message
-  })
+  }, abort.signal)
 }
 
 async function nextQuestion() {

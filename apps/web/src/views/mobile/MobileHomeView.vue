@@ -80,9 +80,9 @@ function loadMore() {
 
 const visibleFeed = computed(() => community.items)
 
-/** 空态「刷新看看」：真实流重拉 */
+/** 空态「刷新看看」：真实流重拉（force 绕过按 domain 缓存） */
 function reloadFeed() {
-  void community.load(activeTab.value)
+  void community.load(activeTab.value, { force: true })
 }
 
 /** 作者色板取首色（tint #16303a → 渐变双色） */

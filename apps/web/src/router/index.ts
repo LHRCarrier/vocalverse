@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import type { RouteRecordRaw } from 'vue-router'
 
+import { track } from '@/api/events'
 import { previewRoute } from './preview'
 
 /**
@@ -206,6 +207,9 @@ router.afterEach((to) => {
   // 登录页专属 body 背景：mobile-uic.css 全局把 body 钉为移动端灰底（#edece8 !important），
   // 退出登录（SPA 导航）后 body 残留该背景会让登录卡配色错位——用 .is-login 类切回纸白底（2026-09-06）。
   document.body.classList.toggle('is-login', to.path === '/login')
+  // 页面曝光埋点（docs/06 §9.1 fe-06）：fire-and-forget，非关键路径不阻塞导航；
+  // 重复上报由后端 client_event_id 幂等去重兜底。
+  void track('page_view', { page: to.path })
 })
 
 export default router

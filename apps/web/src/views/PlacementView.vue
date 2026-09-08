@@ -69,7 +69,7 @@ async function startRecord() {
   recording.value = true
   try {
     // 埋点不阻塞开录：track() 内部已静默容错，await 它只会让麦克风晚一个 RTT 打开，
-    // 还凭空多出一个「已点击但录音未启动」的竞态窗口。
+    // 还凭空多出一个「已点击但录音未启动」的竞态窗口。埋点一律 fire-and-forget，不阻塞关键链路。
     void track('recording_start', { page: '/placement' })
     await recorder.start(15_000)
   } catch (e) {
@@ -112,7 +112,7 @@ async function upload(blob: Blob) {
       gram: resp.data.gram,
     })
     index.value += 1
-    await track('recording_complete', { page: '/placement' })
+    void track('recording_complete', { page: '/placement' }).catch(() => undefined)
   } catch (e) {
     error.value = (e as Error).message
   } finally {
@@ -131,7 +131,7 @@ async function finish() {
       },
     )
     final.value = resp.data
-    await track('practice_complete', { page: '/placement' })
+    void track('practice_complete', { page: '/placement', beacon: true }).catch(() => undefined)
     setTimeout(() => router.push('/practice'), 1500)
   } catch (e) {
     error.value = (e as Error).message

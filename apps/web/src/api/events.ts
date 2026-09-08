@@ -1,6 +1,9 @@
 /**
- * 埋点上报（docs/06 §9.1 / docs/14 §6.3）：10 类事件 + client_event_id 幂等去重。
+ * 埋点上报（docs/06 §9.1 / docs/14 §6.3）：13 类事件 + client_event_id 幂等去重。
  * 失败静默（埋点非关键路径）；每次生成唯一事件 id 防重复上报。
+ * beacon 模式（`beacon: true`）：用于页面卸载/刷新/路由切换边界的关键转化事件
+ * （scene_start / practice_complete），用 `keepalive: true` 的 fetch 携带 Authorization
+ * （sendBeacon 无法带 Authorization header，而本接口经 get_current_user_id 鉴权）。
  */
 
 let seq = 0
@@ -26,6 +29,8 @@ export interface TrackOptions {
   targetId?: number
   sceneId?: number
   payload?: Record<string, unknown>
+  /** 页面卸载/切换边界事件：用 keepalive fetch（可携带 Authorization，不阻塞卸载） */
+  beacon?: boolean
 }
 
 export async function track(name: EventName, options: TrackOptions = {}): Promise<void> {
@@ -35,6 +40,7 @@ export async function track(name: EventName, options: TrackOptions = {}): Promis
     await request('/api/v1/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      keepalive: options.beacon ? true : undefined,
       body: JSON.stringify({
         event_type: name,
         client_event_id: clientEventId,

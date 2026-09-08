@@ -88,6 +88,7 @@ const speaker = new Audio()
 let queue: string[] = []
 let pumping = false
 let turnUnlockTimer: ReturnType<typeof setTimeout> | null = null
+let reportTimer: ReturnType<typeof setTimeout> | null = null
 let turnAudioChunks = 0  // 本回合收到的 audio_chunk 数：0 → turn_end 立即解锁；>0 → 播完才解锁
 
 function maybeUnlockTurn() {
@@ -156,6 +157,7 @@ onMounted(async () => {
 onUnmounted(() => {
   abort.abort()
   flushSpeaker()
+  if (reportTimer) clearTimeout(reportTimer)
   replayAudio?.pause()
   releaseAll()
 })
@@ -234,7 +236,7 @@ async function boot() {
     })
     sessionId.value = session.id
     assignedTurns.value = session.assigned_turns ?? 8
-    await track('scene_start', { sceneId: scenario.value.id, payload: { session_id: session.id } })
+    await track('scene_start', { sceneId: scenario.value.id, payload: { session_id: session.id }, beacon: true })
     if (scenario.value.opening_line) {
       // 开场白不自动播放：进页不响；由底部「播放」按钮触发（2026-09-05 开始流程）
       bubbles.value.push({ role: 'assistant', text: scenario.value.opening_line, speakable: true })
@@ -470,9 +472,10 @@ function onSseEvent(e: SseStreamEvent) {
       phase.value = 'done'
       summaryText.value = e.summary ?? '完成！'
       reportId.value = e.report_id ?? null
-      void track('practice_complete', { sceneId: scenario.value?.id, payload: { report_id: e.report_id } })
+      void track('practice_complete', { sceneId: scenario.value?.id, payload: { report_id: e.report_id }, beacon: true })
       if (e.report_id) {
-        setTimeout(() => {
+        reportTimer = setTimeout(() => {
+          reportTimer = null
           router.push(`/m/report?reportId=${e.report_id}`)
         }, 1600)
       }

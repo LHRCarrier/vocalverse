@@ -82,7 +82,7 @@ async function boot() {
     })
     sessionId.value = session.id
     assignedTurns.value = session.assigned_turns ?? 8
-    await track('scene_start', { sceneId: scenario.value.id, payload: { session_id: session.id } })
+    await track('scene_start', { sceneId: scenario.value.id, payload: { session_id: session.id }, beacon: true })
     // 开场
     if (scenario.value.opening_line) {
       bubbles.value.push({ role: 'assistant', text: scenario.value.opening_line })
@@ -260,7 +260,7 @@ function onSseEvent(e: SseStreamEvent) {
     case 'session_end':
       phase.value = 'done'
       hintText.value = e.summary ?? '完成！'
-      void track('practice_complete', { sceneId: scenario.value?.id, payload: { report_id: e.report_id } })
+      void track('practice_complete', { sceneId: scenario.value?.id, payload: { report_id: e.report_id }, beacon: true })
       setTimeout(() => {
         if (e.report_id) router.push(`/report/${e.report_id}`)
       }, 1200)

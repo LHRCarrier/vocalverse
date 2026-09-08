@@ -24,35 +24,69 @@ export const useCommunityStore = defineStore('community', () => {
 
   const ui = useUiStore()
 
-  /** 首屏/刷新/切领域：清空重拉 */
-  async function load(domain: string | null) {
+  /** fe-04：feed 列表上限（超出裁剪，防长列表 DOM/内存无界增长；虚拟化登记 P2） */
+  const LIST_CAP = 60
+
+  /** 请求序号守卫：仅最新一次 load/loadMore 可写回状态，旧响应（stale）一律丢弃（fe-03 竞态修复） */
+  let loadSeq = 0
+  let loadAbort: AbortController | null = null
+  /** 按 domain 缓存上次结果：切回已加载领域免走网络+骨架屏；force=true（下拉刷新）才强制重拉 */
+  const cache = new Map<string, { items: CommunityPostView[]; cursor: string | null; hasMore: boolean }>()
+
+  const keyOf = (domain: string | null) => domain ?? ''
+
+  /** 首屏/刷新/切领域：清空重拉（force 时忽略缓存） */
+  async function load(domain: string | null, opts?: { force?: boolean }) {
     activeDomain.value = domain
+    loadAbort?.abort()
+    loadAbort = new AbortController()
+    const mySeq = ++loadSeq
+    const key = keyOf(domain)
+    const cached = cache.get(key)
+    if (cached && !opts?.force) {
+      items.value = cached.items
+      cursor.value = cached.cursor
+      hasMore.value = cached.hasMore
+      return
+    }
     loading.value = true
     error.value = ''
     try {
-      const page = await fetchFeed(domain, null)
+      const page = await fetchFeed(domain, null, 10, loadAbort.signal)
+      if (mySeq !== loadSeq) return
       items.value = page.items
       cursor.value = page.nextCursor
       hasMore.value = page.hasMore
+      cache.set(key, { items: page.items, cursor: page.nextCursor, hasMore: page.hasMore })
     } catch (e) {
+      if (mySeq !== loadSeq) return
       error.value = e instanceof Error ? e.message : '加载失败'
     } finally {
-      loading.value = false
+      if (mySeq === loadSeq) loading.value = false
     }
   }
 
   async function loadMore() {
     if (loadingMore.value || !hasMore.value || !cursor.value) return
     loadingMore.value = true
+    const mySeq = ++loadSeq
+    const domain = activeDomain.value
+    const cur = cursor.value
     try {
-      const page = await fetchFeed(activeDomain.value, cursor.value)
-      items.value = items.value.concat(page.items)
+      const page = await fetchFeed(domain, cur, 10, loadAbort?.signal)
+      if (mySeq !== loadSeq) return
+      const next = items.value.concat(page.items)
+      // fe-04：上限裁剪防长列表 DOM/内存无界增长（虚拟化登记 P2）
+      const capped = next.length > LIST_CAP ? next.slice(0, LIST_CAP) : next
+      items.value = capped
       cursor.value = page.nextCursor
-      hasMore.value = page.hasMore
+      hasMore.value = capped.length < next.length ? false : page.hasMore
+      cache.set(keyOf(domain), { items: capped, cursor: page.nextCursor, hasMore: hasMore.value })
     } catch (e) {
+      if (mySeq !== loadSeq) return
       ui.showToast(e instanceof Error ? e.message : '加载更多失败')
     } finally {
-      loadingMore.value = false
+      if (mySeq === loadSeq) loadingMore.value = false
     }
   }
 

@@ -75,10 +75,10 @@ const asCommentPage = (raw: RawCommentPage): CommentPage => ({
 })
 
 /** feed（keyset 游标；domain 空 = 全量混排；后端返回 current user liked/coined 态） */
-export async function fetchFeed(domain: string | null, cursor: string | null, limit = 10) {
+export async function fetchFeed(domain: string | null, cursor: string | null, limit = 10, signal?: AbortSignal) {
   const res = await request<RawFeedPage>(
     `/api/v1/community/posts${qs({ domain: domain ?? '', cursor: cursor ?? '', limit })}`,
-    undefined,
+    signal ? { signal } : undefined,
     JAVA_BASE,
   )
   return asPostPage(res.data)
