@@ -34,6 +34,7 @@ def _bigint_pk() -> sa.Column:
         sa.BigInteger().with_variant(sa.Integer(), "sqlite"),
         sa.Identity(always=False),
         nullable=False,
+        primary_key=True,  # 必须显式：PG 对 FK 引用列要求 UNIQUE/PK（2026-09-10 实跑复现）
     )
 
 
