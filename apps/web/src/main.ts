@@ -2,11 +2,15 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 
 import App from './App.vue'
+import { installNativeBackBridge } from './composables/useNativeBack'
 import { bootstrapAuth } from './stores/auth'
 import router from './router'
 
 import 'virtual:uno.css'
 import './styles/global.css'
+
+/** Android 返回手势/按键入口：原生壳调用 window.__vvNativeBack（浏览器里是死代码） */
+installNativeBackBridge()
 
 /**
  * 启动即恢复会话：token 从 localStorage 恢复到 client.ts 全局（供 request/SSE 自动携带）。

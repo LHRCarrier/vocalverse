@@ -20,6 +20,7 @@ import { splitPieceWords, vocabWordSet } from '@/audio/reader-words'
 import { useChapterPrep } from '@/composables/useChapterPrep'
 import { useChapterTts } from '@/composables/useChapterTts'
 import { useMobileBack } from '@/composables/useMobileBack'
+import { useNativeBack } from '@/composables/useNativeBack'
 import { useReaderAnnotations } from '@/composables/useReaderAnnotations'
 import { useReaderProgress } from '@/composables/useReaderProgress'
 import { useWordLookup } from '@/composables/useWordLookup'
@@ -208,6 +209,39 @@ onBeforeUnmount(() => {
 /* ---------- 其他弹层 ---------- */
 const tocOpen = ref(false)
 const settingsOpen = ref(false)
+
+/**
+ * 原生返回手势/按键：先关最上层弹层，再交给原生回退历史
+ * （否则滑动返回会连带退页/退到桌面；见 useNativeBack 注释）
+ */
+useNativeBack(() => {
+  if (wordLookup.state.open) {
+    wordLookup.close()
+    return true
+  }
+  if (annSheet.open) {
+    annSheet.open = false
+    return true
+  }
+  if (annListOpen.value) {
+    annListOpen.value = false
+    return true
+  }
+  if (settingsOpen.value) {
+    settingsOpen.value = false
+    return true
+  }
+  if (tocOpen.value) {
+    tocOpen.value = false
+    return true
+  }
+  if (ttsActive.value) {
+    tts.stop()
+    ttsActive.value = false
+    return true
+  }
+  return false
+})
 
 function nextChapter() {
   // 章节切换：回详情页列表（v1 精简路径）
