@@ -76,10 +76,14 @@ async def _prewarm_asr() -> None:
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(app: FastAPI):
     settings = get_settings()
     logger.info("vocalverse python-api %s starting (env=%s)", __version__, settings.app_env)
     await _prewarm_asr()  # whisper 预热（docs/06 §8：防首个请求卡 30s；testing/无模型跳过）
+    # TTS 预合成预热（docs/06 §8「开场/常用句预合成」；后台异步不阻塞启动；testing 跳过）
+    from app.audio.warmup import schedule_startup_warmup
+
+    app.state.tts_warm_task = schedule_startup_warmup()
     yield
     logger.info("vocalverse python-api stopped")
 

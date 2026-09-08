@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from app.audio.base import LLMClient
+from app.audio.warmup import collect_warm_texts, schedule_texts_warm
 from app.db import get_session_factory
 from app.models import (
     Attempt,
@@ -54,7 +55,7 @@ async def create_session(
     shadow_material_id: int | None = None,
 ) -> DbSession:
     """docs/19 P0-2：同步 DB 写入收进 to_thread 短事务（async 上下文不阻塞事件循环）。"""
-    session, state = await asyncio.to_thread(
+    session, state, warm_texts = await asyncio.to_thread(
         _create_session_sync,
         user_id,
         kind,
@@ -65,6 +66,9 @@ async def create_session(
         shadow_material_id,
     )
     await get_state_store().put(state)
+    # 预合成预热（docs/06 §8「开场/常用句预合成」）：已知文本后台写入 TTS 缓存——
+    # 进场景点「播放开场白/听示范」0ms 命中；fire-and-forget，不阻塞建会话响应
+    schedule_texts_warm(warm_texts)
     return session
 
 
@@ -76,8 +80,8 @@ def _create_session_sync(
     difficulty: int | None,
     turn_limit: int | None,
     shadow_material_id: int | None = None,
-) -> tuple[DbSession, SessionState]:
-    """同步实现（线程池内执行）：建会话 + 开场白落库，返回 (session, state) 供异步侧 put。"""
+) -> tuple[DbSession, SessionState, list[str]]:
+    """同步实现（线程池内执行）：建会话 + 开场白落库，返回三元组供异步侧调度。"""
     db = get_session_factory()()
     scenario = None  # dialog 分支赋值；defense/shadow 为 None（2026-09-04 修复未曾覆盖的
     # UnboundLocalError——此前 defense 建会话同样会踩中，只是无测试覆盖）
@@ -151,8 +155,15 @@ def _create_session_sync(
                 )
             )
             state.next_seq += 1
+        # 预热文本（已知文本：开场白 + target_corpus 短语 + 影子逐句示范）——
+        # collect_warm_texts 保序去重；异步侧 schedule_texts_warm 后台预热
+        warm_texts = collect_warm_texts(
+            [scenario.opening_line if scenario else None],
+            [it.phrase for it in parse_corpus(scenario.target_corpus)] if scenario else [],
+            split_sentences(material.text_content) if kind == SessionKinds.SHADOW else [],
+        )
         db.commit()
-        return session, state
+        return session, state, warm_texts
     finally:
         db.close()
 

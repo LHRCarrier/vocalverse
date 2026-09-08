@@ -289,3 +289,46 @@ async def tts_synthesize_cached(
     atomic_write_cache(path, data)
     prune_tts_cache(cache_dir, settings.tts_cache_max_mb * 1024 * 1024)
     return data
+
+
+async def warm_tts_cache(
+    tts: TTSClient,
+    texts: list[str],
+    voice: str,
+    rate: str,
+    *,
+    provider: str = "edge",
+    max_concurrency: int = 4,
+) -> int:
+    """预合成预热（docs/06 §8「开场/常用句预合成」兑现，2026-09-09）。
+
+    - 只补缓存：命中（已预热/已请求过）直接跳过，不触碰引擎；
+    - 文本去重（同 key 只预热一次）+ 并发限速（edge-tts 网络往返 ~1.3s/句，串行 35 句 ≈45s
+      —限速 4 并发 ≈11s 后背完成）；
+    - 单句失败仅日志（预热不阻塞调用方、不上抛）；
+    - 返回成功句数（含已命中跳过——调用方只关心「缓存就绪数」）。
+    """
+    seen: set[str] = set()
+    unique: list[str] = []
+    for text in texts:
+        if not text or not text.strip():
+            continue
+        key = tts_cache_key(voice, rate, text, provider=provider)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(text)
+
+    sem = asyncio.Semaphore(max_concurrency)
+
+    async def _one(text: str) -> bool:
+        async with sem:
+            try:
+                await tts_synthesize_cached(tts, text, voice, rate, provider=provider)
+                return True
+            except Exception:
+                logger.warning("tts warm failed: %r", text[:40], exc_info=True)
+                return False
+
+    results = await asyncio.gather(*(_one(t) for t in unique))
+    return sum(1 for ok in results if ok)
