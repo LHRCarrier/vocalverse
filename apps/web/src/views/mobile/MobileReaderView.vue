@@ -155,8 +155,9 @@ function runSentenceAction(action: 'highlight' | 'note' | 'play', color = '#fde6
   selIdx.value = null
   wordLookup.close()
   if (action === 'play') {
-    openTts()
-    void tts.playFrom(idx)
+    // 只显示听书条，不整章预合成；单句模式只播这一句，播完即止（2026-09-10 组长反馈）
+    ttsActive.value = true
+    void tts.playOne(idx)
   } else if (action === 'note') {
     annotationsApi.createForSentence(idx)
   } else {

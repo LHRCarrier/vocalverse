@@ -17,6 +17,8 @@ export function useChapterTts(chapterId: number, getSentences: () => ReadonlyArr
   const currentIdx = ref(-1)
   const rate = ref<number>(1)
   const errorText = ref('')
+  /** 单句听读模式（「听这句」）：本句播完即止，不自动连播下一句（2026-09-10 组长实测反馈） */
+  const singleShot = ref(false)
   const { createUrl, revokeUrl, releaseAll } = useBlobAudio()
   const audio = shallowRef<HTMLAudioElement | null>(null)
 
@@ -46,8 +48,9 @@ export function useChapterTts(chapterId: number, getSentences: () => ReadonlyArr
     return audio.value
   }
 
-  async function playFrom(idx: number): Promise<void> {
+  async function playFrom(idx: number, single = false): Promise<void> {
     if (idx < 0 || idx >= sentences.value.length) return
+    singleShot.value = single
     currentIdx.value = idx
     state.value = 'loading'
     errorText.value = ''
@@ -64,11 +67,23 @@ export function useChapterTts(chapterId: number, getSentences: () => ReadonlyArr
     } catch (err) {
       errorText.value = `本句加载失败（${(err as Error).message ?? ''}）`
       state.value = 'idle'
-      if (idx < sentences.value.length - 1) await playFrom(idx + 1)
+      if (!singleShot.value && idx < sentences.value.length - 1) await playFrom(idx + 1)
     }
   }
 
+  /** 单句听读入口：playFrom(idx, true)，播完即止 */
+  async function playOne(idx: number): Promise<void> {
+    await playFrom(idx, true)
+  }
+
   async function next(auto = false): Promise<void> {
+    // 单句模式：本句播完即止，不自动连播下一句（结束态交给用户重听/续播）
+    if (auto && singleShot.value) {
+      singleShot.value = false
+      state.value = 'ended'
+      return
+    }
+    singleShot.value = false
     if (currentIdx.value < sentences.value.length - 1) {
       await playFrom(currentIdx.value + 1)
     } else if (auto) {
@@ -139,6 +154,7 @@ export function useChapterTts(chapterId: number, getSentences: () => ReadonlyArr
     voice,
     setVoice,
     playFrom,
+    playOne,
     next,
     prev,
     toggle,
