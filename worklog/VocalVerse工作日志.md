@@ -3,6 +3,18 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 后端联调可观测性：java Tomcat accesslog + python 绑 0.0.0.0（手机联调支撑）
+
+- **java**：`application.yml` 开启 `server.tomcat.accesslog`（pattern `%h %t "%r" %s %b %Dms`）。
+  踩坑：embedded Tomcat 的 accesslog 相对目录基于 `catalina.base`（TEMP 下随机目录）
+  → 用 `${user.dir}/logs` 显式固定到进程工作目录（dev-up 方式 B 即 `services/java/logs/`）。
+- **python**：`scripts/dev-up.ps1` 的 uvicorn 补 `--host 0.0.0.0`——打包壳 Web 直调 `http://<局域网IP>:8000`，
+  只绑 127.0.0.1 时手机连不到（health 检查仍走 127.0.0.1，不受影响）。
+- **背景**：2026-09-10 手机联调「Failed to fetch」排查需要「请求是否到达后端」的确定性证据，
+  这条链路（accesslog + python 访问日志）后续所有联调通用（详见 `docs/30` §2 排查顺序）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 打包壳跨域（CORS）补齐：Python + Java 允许 https://localhost 来源（方案 B 直连后端必有）
 
 - **背景**：方案 B 打包壳（页面源 `https://localhost`）直接调本机后端 `http://192.168.0.104:8000/8080`（跨域）。开发时靠 Vite 代理同源、容器靠 nginx 同源，故此前从不需要 CORS——打包壳直连后，浏览器对 `Origin: https://localhost` 发 CORS 预检（OPTIONS），两个后端均无 CORS 处理 → python 405 / java 被安全链拦截（手机端实测日志现 `OPTIONS /api/v1/events → 405`）。
