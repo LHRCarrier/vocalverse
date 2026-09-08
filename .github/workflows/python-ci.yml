@@ -48,6 +48,9 @@ jobs:
       - name: Tests
         run: uv run pytest -m "not gpu" -q
 
+      - name: "Bench: 语音链路分阶段基准（va-09 · Fake 冒烟 + 操作数/时延预算门禁）"
+        run: uv run python ../../scripts/bench/pipeline_bench.py --fake --runs 3 --check-budget
+
       - name: "Single-Writer 探针（docs/10 §3.1 写方矩阵 / docs/19 P0-7：Python 不得写 Java-owned 表）"
         run: python ../../scripts/check_single_writer.py
 
