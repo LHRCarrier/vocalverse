@@ -265,12 +265,14 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         transcript = ""
         asr_meta: dict = {}
         fluency: dict = {}
+        words: list = []  # B4：词级时间轴（turn_end 快照数据源）
         if action in ("normal", "retry") and audio:
             try:
                 res = await asr.transcribe(audio)
                 transcript = res.text.strip()
                 # 流利度时间戳特征（docs/06 §9.3 辅助口径：wpm/停顿；数据源 = 词级时间戳）
                 fluency = compute_fluency_features(res.words or [], float(res.duration or 0.0))
+                words = res.words or []
                 asr_meta = {
                     # vasr-05：asr_seconds 用 whisper 实际时长（旧实现把 webm 字节当 16k 采样率算）
                     "asr_seconds": round(float(res.duration or 0.0) or len(audio) / 16000, 1),
@@ -340,7 +342,10 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             db.commit()
             await get_state_store().put(state)
             yield ev.TurnEnd(
-                turn_index=turn_index, score_status="unavailable", expected_turn=state.current_turn
+                turn_index=turn_index,
+                score_status="unavailable",
+                expected_turn=state.current_turn,
+                words=words or None,
             )
             return
 
@@ -574,7 +579,10 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         asyncio.create_task(SummarizerService(llm).maybe_summarize(state.session_id))
 
         yield ev.TurnEnd(
-            turn_index=turn_index, score_status=score_status, expected_turn=state.current_turn
+            turn_index=turn_index,
+            score_status=score_status,
+            expected_turn=state.current_turn,
+            words=words or None,
         )
 
         # 9) 收尾判定（MetaExecutor：meta.conclude 或轮次上限或用户放弃）
@@ -643,9 +651,12 @@ async def _defense_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         turn_index = state.current_turn + 1
         yield ev.TurnStart(turn_index=turn_index)
         transcript = ""
+        words: list = []  # B4：词级时间轴（turn_end 快照数据源）
         if audio:
             try:
-                transcript = (await asr.transcribe(audio)).text.strip()
+                res = await asr.transcribe(audio)
+                transcript = res.text.strip()
+                words = res.words or []
             except Exception:
                 transcript = ""
         current_q = next((x for x in questions if x.get("id") == state.question_id), None)
@@ -698,6 +709,7 @@ async def _defense_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             turn_index=turn_index,
             score_status="ok" if lang else "unavailable",
             expected_turn=state.current_turn,
+            words=words or None,
         )
         if done:
             summary = f"答辩练习完成，共 {len(state.answered)} 题。"
@@ -832,10 +844,12 @@ async def _shadow_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         # ASR + 流利度特征（② reuse；失败降级——分数不伪造，落 error 快照）
         transcript = ""
         fluency: dict = {}
+        words: list = []  # B4：词级时间轴（turn_end 快照数据源）
         try:
             res = await asr.transcribe(audio)
             transcript = res.text.strip()
             fluency = compute_fluency_features(res.words or [], float(res.duration or 0.0))
+            words = res.words or []
         except Exception as exc:
             logger.warning("shadow asr failed: %s", exc)
         score = None
@@ -935,7 +949,10 @@ async def _shadow_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
         state.last_action = action
         db.commit()
         yield ev.TurnEnd(
-            turn_index=turn_index, score_status=score_status, expected_turn=state.current_turn
+            turn_index=turn_index,
+            score_status=score_status,
+            expected_turn=state.current_turn,
+            words=words or None,
         )
 
         if conclude:

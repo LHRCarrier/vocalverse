@@ -79,6 +79,10 @@ class TurnEnd(pydantic.BaseModel):
     #: R-13 / va-arch-09：服务端权威轮次（本回合完成后 state.current_turn）——
     #: 客户端下轮提交的 expected_turn；断线/刷新后的乐观计数以此纠偏（根治 40903「重来」）
     expected_turn: int | None = None
+    #: B4 词级时间轴（2026-09-09）：用户 utterance 的 ASR 词时间戳快照
+    #: [{word, start, end, ...}]（秒）——前端逐词高亮/回放对轴（exclude_none 语义：
+    #: 无词（降级/轻回合）时字段缺省，旧端安全忽略）
+    words: list[dict[str, Any]] | None = None
 
 
 class SessionEnd(pydantic.BaseModel):
