@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -211,20 +210,23 @@ public class CommunityService {
     requireVisible(postId);
     boolean liked;
     if (on) {
-      if (likes.findByPostIdAndLikerId(postId, userId).isEmpty()) {
-        PostLikeEntity e = new PostLikeEntity();
-        e.setPostId(postId);
-        e.setLikerId(userId);
-        e.setCreatedAt(Instant.now());
-        likes.saveAndFlush(e);
+      // 唯一键原子幂等（ON CONFLICT DO NOTHING，J-01）：并发双击只生效一次。
+      // 替代「先查后插」check-then-act（PG READ COMMITTED 下两次并发查空 → 撞唯一键 →
+      // 未捕获 DataIntegrityViolationException → 500）；DB 原子性消除竞态窗口，不再依赖异常兜底。
+      int inserted = likes.insertIgnoreConflict(postId, userId, Instant.now());
+      if (inserted > 0) {
         posts.incrementLike(postId);
-        insertInteractionIdempotent(userId, postId, ACTION_LIKE);
+        interactions.insertIgnoreConflict(userId, postId, ACTION_LIKE, Instant.now());
       }
       liked = true;
     } else {
-      likes.deleteByPostIdAndLikerId(postId, userId);
-      posts.decrementLike(postId);
-      interactions.deleteByActorIdAndPostIdAndAction(userId, postId, ACTION_LIKE);
+      // 先判存在再减（J-01）：仅当事实行真实删除（返回 1）才递减计数——并发双击取消各自执行
+      // 「删除+递减」会双减，GREATEST 只兜底到 0 不防漂移；删行与计数同事务，行消失即计数保护。
+      int removed = likes.deleteOneByPostIdAndLikerId(postId, userId);
+      if (removed > 0) {
+        posts.decrementLike(postId);
+        interactions.deleteByActorIdAndPostIdAndAction(userId, postId, ACTION_LIKE);
+      }
       liked = false;
     }
     return new LikeState(liked, requireVisible(postId).getLikeCount());
@@ -573,22 +575,15 @@ public class CommunityService {
 
   // ------------------------------------------------------------------ 内部
 
-  /** 唯一键幂等插入：true=本次新增；false=已存在（重复请求返回当前态，不双计）。 */
+  /**
+   * 唯一键幂等插入：true=本次新增；false=已存在（重复请求返回当前态，不双计）。
+   *
+   * <p>J-01 起改用 DB 层 {@code ON CONFLICT DO NOTHING} 原子兜底：旧「先查后插 + catch
+   * DataIntegrityViolationException」即便捕获冲突，Hibernate 已把当前事务标为 rollback-only，
+   * 提交期仍抛 UnexpectedRollbackException（真并发下 500 依旧）——冲突路径根本不会走到「返回当前态」。
+   */
   private boolean insertInteractionIdempotent(Long actorId, Long postId, String action) {
-    if (interactions.findByActorIdAndPostIdAndAction(actorId, postId, action).isPresent()) {
-      return false;
-    }
-    PostInteractionEntity e = new PostInteractionEntity();
-    e.setActorId(actorId);
-    e.setPostId(postId);
-    e.setAction(action);
-    e.setCreatedAt(Instant.now());
-    try {
-      interactions.saveAndFlush(e);
-      return true;
-    } catch (DataIntegrityViolationException duplicate) {
-      return false; // 并发重复：唯一键兜底，幂等
-    }
+    return interactions.insertIgnoreConflict(actorId, postId, action, Instant.now()) > 0;
   }
 
   private PostEntity requireVisible(Long postId) {
