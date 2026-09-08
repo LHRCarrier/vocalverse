@@ -150,6 +150,7 @@ def _persist_dialog_turn(
     action: str,
     audio_url: str | None,
     asr_meta: dict,
+    words: list,
     hits: list,
     attempt_data: dict | None,
     reply: str,
@@ -174,7 +175,9 @@ def _persist_dialog_turn(
                 action=action if action in ("demo", "correction", "retry", "hint") else None,
                 content=transcript or f"[{action}]",
                 audio_url=audio_url,
-                meta={"corpus_hits": hits, **asr_meta, "action": action},
+                # B4 词级时间轴持久化：用户消息 meta 附 ASR 词时间戳（回合外（恢复/回放）
+                # 仍可按词对轴；turn_end SSE 快照为流内副本）
+                meta={"corpus_hits": hits, **asr_meta, "action": action, "words": words},
             )
         )
         if attempt_data is not None:
@@ -555,6 +558,7 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             action=action,
             audio_url=audio_url,
             asr_meta=asr_meta,
+            words=words,
             hits=hits,
             attempt_data=attempt_data,
             reply=reply,
@@ -680,7 +684,12 @@ async def _defense_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                 origin="respond",
                 content=transcript,
                 audio_url=audio_url,
-                meta={"level": level, "hits": hits, "question_id": state.question_id},
+                meta={
+                    "level": level,
+                    "hits": hits,
+                    "question_id": state.question_id,
+                    "words": words,
+                },
             )
         )
         state.current_turn = turn_index
@@ -908,6 +917,7 @@ async def _shadow_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
                     "sentence": sentence,
                     "wpm": fluency.get("wpm"),
                     "pause_count": fluency.get("pause_count"),
+                    "words": words,
                 },
             )
         )

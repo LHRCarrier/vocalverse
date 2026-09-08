@@ -221,6 +221,9 @@ async def get_session_restore(
                     "audio_url": m.audio_url,
                     "origin": m.origin,
                     "action": m.action,
+                    # B4 词级时间轴（2026-09-09）：用户消息 meta 持久化的 ASR 词时间戳
+                    # （点播自己录音/听读对轴；无词（降级/轻回合）缺省）
+                    "words": (m.meta or {}).get("words"),
                     "created_at": m.created_at.isoformat() if m.created_at else None,
                 }
                 for m in msgs
