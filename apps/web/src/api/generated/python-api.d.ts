@@ -143,6 +143,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Session Restore
+         * @description 会话恢复（R-13 / docs/21 §3.1 目标态）：刷新/断线后前端据此重建 UI 与轮次。
+         *
+         *     返回运行态（state/current_turn/next_seq）+ 最近消息快照；运行态缺失（StateStore
+         *     TTL 过期/进程重启）时以 scenario_messages 权威历史重建（state.py 注释口径：
+         *     「权威历史永远在 scenario_messages」）。归属校验同 /turns：不拥有 → 40401。
+         */
+        get: operations["get_session_restore_api_v1_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}/turns": {
         parameters: {
             query?: never;
@@ -947,6 +971,40 @@ export interface operations {
                 "application/json": components["schemas"]["SessionCreate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_restore_api_v1_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
