@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  2026-09-10 录音方案 A（mkcert + HTTPS）：让 WebView 信任「用户安装的 CA 证书」，
+  才能加载 https://192.168.0.104:5173（mkcert 私有 CA）+ 触发安全上下文 → getUserMedia。
+  没有它，Android 7+ 的应用默认不信任用户 CA，HTTPS 页面会 NET::ERR_CERT_AUTHORITY_INVALID。
+
+  ⚠️ 信任用户 CA 会降低证书校验强度——开发/验收用，**生产发布前必须移除**（回到仅 system 锚点）。
+  cleartextTrafficPermitted=true：兼容个别仍走 HTTP 的局域网调试地址（与 usesCleartextTraffic 同口径）。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
