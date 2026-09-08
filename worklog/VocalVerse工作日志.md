@@ -3,6 +3,18 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 登录偶发 40904 热修复：refresh token 加 UUID 随机因子（组长手机端实测复现 → 修复 + 回归测试 + 真机链路验证）· 3 op
+
+- **复现**：手机（WebView → 5173）登录 `xiaoqing` 报红字「数据冲突：唯一键或约束（重复提交/并发写入）」（Java 40904）。
+- **根因**（既有并发竞态，非读书域引入）：`AuthController.issue()` 的 refresh = `jwt.generateAccessToken(...) + "-" + System.currentTimeMillis()`；而 JwtService 令牌 payload 仅 {sub, role, iat, exp}（秒级精度、无随机字段）→ **同一毫秒**双登录/双刷新（双击/WebView 双请求）产出相同 refresh 串 → SHA-256 相同 → 撞 `uq_refresh_tokens_token_hash` → DataIntegrityViolation → 40904。报错发生在密码校验之后，说明 xiaoqing 密码本身正确。
+- **修复（code 独立提交）**：`AuthController.buildRefreshToken(jwtToken, nowMillis)` 追加 `UUID.randomUUID()`（refresh 为不透明串、服务端只存哈希，格式变更零兼容影响）；抽 package-private 纯静态便于确定性测试。
+- **测试（test 独立提交）**：`RefreshTokenUniquenessTest`（同输入两次构造 → 断言不同；修复前同输入必同串 → 红）；`mvn -Dtest=RefreshTokenUniquenessTest,AuthFlowTest test` 6 passed + `spotless:check` 通过。
+- **验证**：重建并重启本机 Java（8080；从根 .env 注入 JWT_SECRET/SERVICE_TOKEN——Maven 子进程不读 .env，手动起服务易漏 P0-9 fail-fast）→ 连续两次 POST /auth/login（demoadult）均 code=0 且 refreshToken 互异、含 `-\d+-<uuid>` 后缀 → 手机端可重试登录。
+- **踩坑**（已归档 `worklog/BUG实测/登录-并发refresh-token撞唯一键.md`）：①去重键必须随机源，不可用「无随机令牌+时间戳」拼串；②40904 映射面宽（任何 DataIntegrityViolation），排查看 Java 栈；③本地起 Java 记得 root .env 的 JWT_SECRET/SERVICE_TOKEN。
+- **门禁**：Java 子集 6 passed + spotless 绿；Python/前端零改动。未 push（分支 feat/novel-reading-main）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 读书域迁移 0010 热修复：`_bigint_pk()` 补 `primary_key=True`（组长实跑复现 → 修复 + 真 PG 验证）· 3 op
 
 - **复现**：组长本机 `uv run alembic upgrade head` → `psycopg.errors.InvalidForeignKey: no unique constraint matching given keys for referenced table "books"`（建 book_chapters 时 FK 引用 books(id) 被拒；迁移事务回滚后 seed 报 `relation "books" does not exist` 为连锁）。
