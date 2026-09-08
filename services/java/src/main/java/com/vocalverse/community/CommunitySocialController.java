@@ -52,8 +52,8 @@ public class CommunitySocialController {
 
   @GetMapping("/follows/recommendations")
   public Envelope<List<FollowRecommend>> followRecommendations(
-      @RequestAttribute("userId") Long userId) {
-    return Envelope.ok(service.recommendations(userId));
+      @RequestAttribute("userId") Long userId, @RequestParam(defaultValue = "50") int limit) {
+    return Envelope.ok(service.recommendations(userId, limit));
   }
 
   @GetMapping("/following-feed")

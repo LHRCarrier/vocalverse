@@ -50,17 +50,22 @@ public interface PostRepository
         .getContent();
   }
 
-  /** S2 关注流：仅关注作者的新内容（keyset DESC；authorIds 为空 → 空结果，不走 SQL）。 */
-  default List<PostEntity> followingFeed(
-      List<Long> authorIds, Instant ts, Long id, Pageable pageable) {
-    if (authorIds.isEmpty()) {
-      return List.of();
-    }
+  /**
+   * S2 关注流：仅关注作者的新内容（keyset DESC）。J-06：用相关 EXISTS 子查询（follower=:me AND followee=p.author_id）替代巨型
+   * authorIds IN（关注集到数万时 IN 列表使索引失效/走 seq scan）； 空关注由调用方 countByFollowerId 快检短路。
+   */
+  default List<PostEntity> followingFeed(Long me, Instant ts, Long id, Pageable pageable) {
     return findAll(
             (root, query, cb) -> {
               List<jakarta.persistence.criteria.Predicate> ps = new ArrayList<>();
               ps.add(cb.equal(root.get("status"), "visible"));
-              ps.add(root.get("authorId").in(authorIds));
+              jakarta.persistence.criteria.Subquery<Long> sq = query.subquery(Long.class);
+              jakarta.persistence.criteria.Root<FollowEntity> f = sq.from(FollowEntity.class);
+              sq.select(f.get("followeeId"));
+              sq.where(
+                  cb.equal(f.get("followerId"), me),
+                  cb.equal(f.get("followeeId"), root.get("authorId")));
+              ps.add(cb.exists(sq));
               if (ts != null) {
                 ps.add(
                     cb.or(

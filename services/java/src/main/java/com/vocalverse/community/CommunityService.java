@@ -403,33 +403,47 @@ public class CommunityService {
         .toList();
   }
 
-  /** 推荐关注：作者全量（排除自己），followed 标记；按个人主页时间倒序演示。 */
+  /**
+   * 推荐关注：候选 = 全库用户分页（排除自己；J-06 收敛：不再全表加载 + 每用户 3 次查询的 3N+1）。 limit 默认 50、上限
+   * 100；演示口径：无候选筛选算法（规模增长后按画像/同领域过滤，登记 docs/41 §5）。
+   */
   @Transactional(readOnly = true)
-  public List<FollowRecommend> recommendations(Long me) {
-    return users.findAll().stream()
-        .filter(u -> !u.getId().equals(me))
+  public List<FollowRecommend> recommendations(Long me, int limit) {
+    int cap = Math.min(Math.max(limit, 1), 100);
+    List<Long> ids =
+        users.findAll(PageRequest.of(0, cap)).stream()
+            .map(UserEntity::getId)
+            .filter(id -> !id.equals(me))
+            .toList();
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+    // 批量：作者 1 次 + 关注判定 1 次（替代旧实现每用户 2 次作者 + 1 次关注的 3N+1）
+    Map<Long, AuthorView> authors = loadAuthors(ids);
+    Set<Long> followed =
+        follows.findByFollowerIdAndFolloweeIdIn(me, ids).stream()
+            .map(FollowEntity::getFolloweeId)
+            .collect(Collectors.toSet());
+    return ids.stream()
         .map(
-            u -> {
-              AuthorView a =
-                  loadAuthors(List.of(u.getId())).getOrDefault(u.getId(), emptyAuthor(u.getId()));
-              boolean followed = follows.findByFollowerIdAndFolloweeId(me, u.getId()).isPresent();
-              return new FollowRecommend(a, followed);
-            })
+            id ->
+                new FollowRecommend(
+                    authors.getOrDefault(id, emptyAuthor(id)), followed.contains(id)))
         .toList();
   }
 
-  /** 关注流：仅关注作者的新内容（keyset DESC，复用 buildViews 聚合作者/互动态） */
+  /** 关注流：仅关注作者的新内容（keyset DESC，复用 buildViews 聚合作者/互动态）。 */
   @Transactional(readOnly = true)
   public FeedPage followingFeed(Long me, String cursor, int limit) {
-    List<Long> followeeIds =
-        follows.findByFollowerIdOrderByCreatedAtDesc(me).stream()
-            .map(FollowEntity::getFolloweeId)
-            .toList();
     Cursor c = decodeCursor(cursor);
     int pageSize = clampLimit(limit);
     PageRequest pageable =
         PageRequest.of(0, pageSize + 1, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
-    List<PostEntity> rows = posts.followingFeed(followeeIds, c.ts(), c.id(), pageable);
+    // J-06：空关注快检（不跑 EXISTS 查询）；有关注走相关子查询——不再拼巨型 authorIds IN
+    List<PostEntity> rows =
+        follows.countByFollowerId(me) == 0
+            ? List.of()
+            : posts.followingFeed(me, c.ts(), c.id(), pageable);
     boolean hasMore = rows.size() > pageSize;
     List<PostEntity> page = hasMore ? rows.subList(0, pageSize) : rows;
     List<CommunityPostView> views = buildViews(page, me);
@@ -587,8 +601,8 @@ public class CommunityService {
    * 唯一键幂等插入：true=本次新增；false=已存在（重复请求返回当前态，不双计）。
    *
    * <p>J-01 起改用 DB 层 {@code ON CONFLICT DO NOTHING} 原子兜底：旧「先查后插 + catch
-   * DataIntegrityViolationException」即便捕获冲突，Hibernate 已把当前事务标为 rollback-only，
-   * 提交期仍抛 UnexpectedRollbackException（真并发下 500 依旧）——冲突路径根本不会走到「返回当前态」。
+   * DataIntegrityViolationException」即便捕获冲突，Hibernate 已把当前事务标为 rollback-only， 提交期仍抛
+   * UnexpectedRollbackException（真并发下 500 依旧）——冲突路径根本不会走到「返回当前态」。
    */
   private boolean insertInteractionIdempotent(Long actorId, Long postId, String action) {
     return interactions.insertIgnoreConflict(actorId, postId, action, Instant.now()) > 0;
@@ -706,8 +720,8 @@ public class CommunityService {
   }
 
   /**
-   * 批量组装评论（J-05）：先收集页内全部 authorId 一次 loadAuthors 得 authorMap，
-   * 再逐条组装——替代 toCommentView 逐条 2 查询/条 的 N+1（20 条页 ≈41 次往返 → 3 次）。
+   * 批量组装评论（J-05）：先收集页内全部 authorId 一次 loadAuthors 得 authorMap， 再逐条组装——替代 toCommentView 逐条 2 查询/条 的
+   * N+1（20 条页 ≈41 次往返 → 3 次）。
    */
   private List<CommentView> toCommentViews(List<PostCommentEntity> rows) {
     if (rows.isEmpty()) {
