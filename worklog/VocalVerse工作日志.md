@@ -3,6 +3,15 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 自由对话「internal」复发：手动起 python 漏 APP_ASR_MODEL（ASR 模型脱绑）
+
+- **复现**：手机自由对话（语音）提示 internal；python `err.log` 见 `LocalEntryNotFoundError: Cannot find an appropriate cached snapshot folder ... outgoing traffic disabled`（HF 离线 + 按 repo_id 找模型）。
+- **根因**（归档类与 `方式B-Python-ASR-HF缓存失配` 同源）：python 进程环境缺 `APP_ASR_MODEL`（dev-up.ps1 会把其指向 `%USERPROFILE%\.cache\huggingface\hub\models--Systran--faster-whisper-small\snapshots\<rev>` 本地快照；手动 `uvicorn` 启动会漏注入）→ `settings.asr_model=""` → `WhisperModel(repo_id)` → 离线下载失败。
+- **修复/验证**：以 `scripts/dev-up.ps1 start` 重启 python（自动注入 APP_ASR_MODEL/HF_HUB_OFFLINE/根 .env）→ `readyz` 的 `asr` 字段已绑定本地快照；机器侧文本回合冒烟 SSE `text_delta` 正常。
+- **教训**：**起 python 一律用 dev-up.ps1**（或至少带 APP_ASR_MODEL + HF_HUB_OFFLINE=1）；漏注入的表现是「启动成功、ASR 调用时失败」（预热失败只警告不阻塞）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 后端联调可观测性：java Tomcat accesslog + python 绑 0.0.0.0（手机联调支撑）
 
 - **java**：`application.yml` 开启 `server.tomcat.accesslog`（pattern `%h %t "%r" %s %b %Dms`）。
