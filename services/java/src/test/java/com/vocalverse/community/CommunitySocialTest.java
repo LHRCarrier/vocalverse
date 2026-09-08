@@ -26,6 +26,7 @@ class CommunitySocialTest extends AbstractAdminApiTest {
 
   @Autowired private PostRepository posts;
   @Autowired private PostCommentRepository comments;
+  @Autowired private jakarta.persistence.EntityManagerFactory entityManagerFactory;
 
   private static final int CODE_OK = 0;
 
@@ -142,6 +143,38 @@ class CommunitySocialTest extends AbstractAdminApiTest {
             .findFirst()
             .orElseThrow();
     assertTrue(bNode.path("followed").asBoolean());
+  }
+
+  /** J-06：推荐关注 limit 生效 + SQL 往返恒定（批量聚合作者/关注判定，防 3N+1 回潮）。 */
+  @Test
+  void recommendations_limit_and_constant_roundtrips() throws Exception {
+    String a = registerUser("j06_rec_a");
+    for (int i = 0; i < 7; i++) {
+      registerUser("j06_rec_" + i);
+    }
+
+    // limit=3 → 只回 3 条（默认 50；修复前全表返回 → 新契约防全量加载）
+    JsonNode page =
+        json(
+            mockMvc
+                .perform(
+                    get("/api/v1/community/follows/recommendations?limit=3")
+                        .header("Authorization", bearer(a)))
+                .andReturn());
+    assertEquals(3, page.path("data").size(), page.toString());
+
+    // 往返恒定：users 分页 1 + 作者批量 2（users+profiles）+ 关注批量 1 ≈ 4
+    // （修复前：全表 1 + 7 用户 × 3 查询 = 22+）
+    org.hibernate.SessionFactory sf =
+        entityManagerFactory.unwrap(org.hibernate.SessionFactory.class);
+    sf.getStatistics().clear();
+    mockMvc
+        .perform(
+            get("/api/v1/community/follows/recommendations?limit=50")
+                .header("Authorization", bearer(a)))
+        .andReturn();
+    long statements = sf.getStatistics().getPrepareStatementCount();
+    assertTrue(statements <= 8, "推荐关注 SQL 往返应恒定（J-06 批量聚合），实际 " + statements);
   }
 
   @Test
