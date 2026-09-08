@@ -19,12 +19,12 @@ JAVA_OWNED_MODELS = {
     "User",
     "UserProfile",
     "RefreshToken",
-    # 内容库
+    # 内容库（song_pitch_refs 为 Python 写方次生表，docs/20 §4.1 L222/docs/10 §3.2，
+    # 故不列入 —— 2026-09-09 唱歌 P0 修正探针清单：此前误列）
     "Scenario",
     "ScenarioMessage",
     "Song",
     "Lrc",
-    "SongPitchRef",
     "ListeningMaterial",
     "PlacementQuestion",
     "Tickets",
