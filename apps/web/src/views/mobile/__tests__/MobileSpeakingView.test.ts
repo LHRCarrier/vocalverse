@@ -49,6 +49,7 @@ vi.mock('@/api/practice', async (importOriginal) => {
     ...actual,
     fetchScenarios: vi.fn(),
     createSession: vi.fn(),
+    fetchSessionRestore: vi.fn(),
     streamTurn: vi.fn(),
     tts: vi.fn(),
   }
@@ -73,12 +74,42 @@ const router = createRouter({
   routes: [{ path: '/m/chat/:sceneId?', component: MobileSpeakingView }],
 })
 
+const RESTORE_ACTIVE = {
+  id: 42,
+  kind: 'dialog',
+  status: 'active' as const,
+  assigned_turns: 4,
+  state: 'awaiting_user',
+  current_turn: 1,
+  next_seq: 4,
+  next_expected_turn: 1,
+  report_id: null,
+  messages: [
+    { seq: 1, role: 'assistant' as const, content: 'Good morning! Welcome. May I see your passport, please?' },
+    {
+      seq: 2,
+      role: 'user' as const,
+      content: "I'd like a coffee, please.",
+      audio_url: '/api/v1/audio/abc.mp3',
+      words: [
+        { word: "I'd", start: 0.12, end: 0.36 },
+        { word: 'like', start: 0.38, end: 0.61 },
+        { word: 'a', start: 0.64, end: 0.73 },
+        { word: 'coffee', start: 0.75, end: 1.12 },
+      ],
+    },
+    { seq: 3, role: 'assistant' as const, content: 'Here you go!' },
+  ],
+}
+
 beforeEach(() => {
+  vi.clearAllMocks()
   setActivePinia(createPinia())
   fake.recorderOnStop = null
   fake.onEvent = null
   vi.mocked(practiceApi.fetchScenarios).mockResolvedValue([scenario])
   vi.mocked(practiceApi.createSession).mockResolvedValue({ id: 7, kind: 'dialog', scenario_id: 1, assigned_turns: 4 })
+  vi.mocked(practiceApi.fetchSessionRestore).mockResolvedValue(RESTORE_ACTIVE)
   vi.mocked(practiceApi.tts).mockResolvedValue(new Blob([]))
   vi.mocked(practiceApi.streamTurn).mockImplementation((_sessionId, _form, onEvent) => {
     fake.onEvent = onEvent
@@ -179,5 +210,62 @@ describe('MobileSpeakingView（fe-07 报告跳转定时器清理）', () => {
     expect(pushSpy).not.toHaveBeenCalled()
     pushSpy.mockRestore()
     vi.useRealTimers()
+  })
+})
+
+describe('MobileSpeakingView（R-13 断线重连 + B4 词级时间轴）', () => {
+  it('?session=<id>：走恢复接口而非新建，既有对话重建 + 用户声泡逐词渲染 + 回放按钮（修复前：忽略 query 直接 createSession）', async () => {
+    await router.push('/m/chat/1?session=42')
+    await router.isReady()
+    const wrapper = mount(MobileSpeakingView, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(practiceApi.fetchSessionRestore).toHaveBeenCalledWith(42)
+    expect(practiceApi.createSession).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Good morning! Welcome.')
+    expect(wrapper.text()).toContain('Here you go!')
+    // B4：用户声泡逐词渲染（4 词）+ 自己录音回放按钮（恢复路径 audio_url 回带）
+    expect(wrapper.findAll('.u-word')).toHaveLength(4)
+    expect(wrapper.findAll('.u-selfplay')).toHaveLength(1)
+  })
+
+  it('已完成会话恢复：直接跳移动端报告页（修复前：无恢复逻辑，仍在练习页）', async () => {
+    vi.mocked(practiceApi.fetchSessionRestore).mockResolvedValue({
+      ...RESTORE_ACTIVE,
+      status: 'completed',
+      state: 'completed',
+      report_id: 9,
+    })
+    const pushSpy = vi.spyOn(router, 'push')
+    await router.push('/m/chat/1?session=42')
+    await router.isReady()
+    const wrapper = mount(MobileSpeakingView, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(pushSpy).toHaveBeenCalledWith('/m/report?reportId=9')
+    expect(wrapper.findAll('.u-word')).toHaveLength(0)
+    pushSpy.mockRestore()
+  })
+
+  it('直播回合 turn_end 附 words → 用户声泡逐词渲染（无 audio_url → 不回放按钮）', async () => {
+    const wrapper = await mountView()
+    fake.recorderOnStop!(new Blob(['x']), 'audio/webm', 3000)
+    await flushPromises()
+    fake.onEvent!({ type: 'user_transcript', turn_index: 0, text: "I'd like a coffee" } as SseStreamEvent)
+    fake.onEvent!({
+      type: 'turn_end',
+      turn_index: 0,
+      score_status: 'ok',
+      words: [
+        { word: "I'd", start: 0.12, end: 0.36 },
+        { word: 'like', start: 0.38, end: 0.61 },
+        { word: 'a', start: 0.64, end: 0.73 },
+        { word: 'coffee', start: 0.75, end: 1.12 },
+      ],
+    } as SseStreamEvent)
+    await nextTick()
+
+    expect(wrapper.findAll('.u-word')).toHaveLength(4)
+    expect(wrapper.findAll('.u-selfplay')).toHaveLength(0)
   })
 })
