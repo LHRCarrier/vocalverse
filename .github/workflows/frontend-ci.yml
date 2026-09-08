@@ -57,3 +57,6 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: "Bundle 门禁（fe-09：preview 树零体积 / p5 不进入口块 / echarts 零残留）"
+        run: node scripts/check-bundle.mjs

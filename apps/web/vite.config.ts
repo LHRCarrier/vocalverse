@@ -18,6 +18,30 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    // fe-09 包门禁脚本按 manifest 源模块路径判定（字符串猜测会误报：见 check-bundle.mjs 注）
+    manifest: true,
+    rollupOptions: {
+      output: {
+        // fe-09（2026-09-09）manualChunks：大依赖出专块——
+        // · 移动端 WebView 首屏不解析 desktop 侧 naive-ui（走懒加载块）；
+        // · p5/echarts 保持独立块（本就是动态 import，rename 仅防合流）；
+        // · vue 栈稳定快照块提高缓存命中（应用发布不重拉框架代码）。
+        // CI 门禁 apps/web/scripts/check-bundle.mjs 断言：preview 树零体积、
+        // p5 不进入口块、echarts 零残留——与 production 行为绑定，防回潮。
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('/naive-ui/')) return 'naive-ui'
+          if (id.includes('/p5/')) return 'p5'
+          if (id.includes('/echarts/')) return 'echarts'
+          if (id.includes('/vue/') || id.includes('/vue-router/') || id.includes('/pinia/')) {
+            return 'vue-vendor'
+          }
+          return 'vendor'
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {
