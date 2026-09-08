@@ -79,7 +79,9 @@ async function fetchOnce<T>(path: string, init: RequestInit | undefined, base: s
     body = (await resp.json()) as Envelope<T>
   } catch {
     // 后端不可达（代理返回空体 5xx 等）：给可操作提示，而不是「Unexpected end of JSON input」
-    const who = base === JAVA_BASE ? 'Java（登录/管理端）' : 'Python（语音/LLM）'
+    // /manage 前缀或 JAVA_BASE 基址 → Java（登录/管理端），否则 Python（语音/LLM）
+    const callsJava = base === JAVA_BASE || path.startsWith('/manage')
+    const who = callsJava ? 'Java（登录/管理端）' : 'Python（语音/LLM）'
     throw new ApiError(
       -1,
       `${who}服务不可达（HTTP ${resp.status}，${base}${path}）——请确认对应后端已启动`,

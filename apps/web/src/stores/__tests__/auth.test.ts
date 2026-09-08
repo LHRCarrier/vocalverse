@@ -8,6 +8,7 @@ vi.mock('@/api/client', () => ({
   request: vi.fn(),
   setAuthToken: vi.fn(),
   setAuthRefresher: vi.fn(),
+  JAVA_BASE: '/manage', // 测试环境即默认值；断言里以 /manage 校验
 }))
 
 describe('bootstrapAuth（启动恢复会话）', () => {
