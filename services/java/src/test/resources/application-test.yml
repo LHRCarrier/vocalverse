@@ -8,6 +8,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop # 仅测试：H2 建表（生产 ddl-auto=none，schema 真源= Alembic）
+    properties:
+      hibernate:
+        # J-05 读路径回归：需 Hibernate Statistics 断言评论页 SQL 往返数恒定（防 N+1 回潮）
+        generate_statistics: true
 
 vocalverse:
   jwt:

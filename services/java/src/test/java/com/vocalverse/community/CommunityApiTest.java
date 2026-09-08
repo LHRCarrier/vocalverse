@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 class CommunityApiTest extends AbstractAdminApiTest {
 
   @Autowired private PostRepository posts;
+  @Autowired private jakarta.persistence.EntityManagerFactory entityManagerFactory;
 
   private static final int CODE_OK = 0;
 
@@ -349,6 +350,38 @@ class CommunityApiTest extends AbstractAdminApiTest {
                 .andReturn());
     assertEquals(1, page2.path("data").path("items").size(), page2.toString());
     assertFalse(page2.path("data").path("hasMore").asBoolean());
+  }
+
+  /** J-05：评论页 SQL 往返数恒定（批量聚合作者，防 N+1 回潮）——20 位不同评论者的一页。 */
+  @Test
+  void comments_page_constant_roundtrips_after_batch() throws Exception {
+    String a = registerUser("j05_own");
+    long postId = createPost(a, "news");
+    // 20 位不同评论者：修复前逐条 loadAuthors（2 查询/条）≈41 次往返；修复后批量 ≈4 次
+    for (int i = 0; i < 20; i++) {
+      String ct = registerUser("j05_c" + i);
+      mockMvc
+          .perform(
+              post("/api/v1/community/posts/" + postId + "/comments")
+                  .header("Authorization", bearer(ct))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      String.format("{\"body\":\"comment %d\"}", i)
+                          .getBytes(StandardCharsets.UTF_8)))
+          .andReturn();
+    }
+    org.hibernate.SessionFactory sf =
+        entityManagerFactory.unwrap(org.hibernate.SessionFactory.class);
+    sf.getStatistics().clear();
+    MvcResult page =
+        mockMvc
+            .perform(
+                get("/api/v1/community/posts/" + postId + "/comments?limit=20")
+                    .header("Authorization", bearer(a)))
+            .andReturn();
+    assertEquals(20, json(page).path("data").path("items").size(), page.toString());
+    long statements = sf.getStatistics().getPrepareStatementCount();
+    assertTrue(statements <= 8, "评论页 SQL 往返应恒定（J-05 批量聚合），实际 " + statements);
   }
 
   @Test
