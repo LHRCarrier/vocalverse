@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 Java P1 批 ②：J-02 禁用即时生效（JwtAuthFilter 查 users.status → 401）· 9 op
+
+- **背景**：review-java.json（java-02，确认）——JwtAuthFilter 只验签不查 users.status（application.yml access-ttl=3600），管理端禁用（AdminUserController.updateStatus 只落 users.status）后，已签发 token **最长 1 小时仍可访问全部受保护端点**；Java 侧与 Python 侧同缺口（docs/19 P1-10 登记）。无告警/无黑名单/无二次鉴权；
+- **修复（code）**：`JwtAuthFilter` 注入 UserRepository + ObjectMapper：验签解析出 userId 后 `findById`（PK 命中）查 status，`users.status != 'active'` 或用户不存在 → clearContext + **显式 401 Envelope{40101}**（过滤器层无法走 @RestControllerAdvice，直接写 JSON 响应）+ 终止链路；`SecurityConfig` 构造注入仓库并传给过滤器。**取舍**：每请求一次 PK 查库（薄管理端 QPS 低可承受）换取**即时生效**——无 TTL 缓存窗口、无「禁用后仍可用 N 秒」；短 TTL 缓存 + 变更失效登记为后续项（docs/18 修订注），匿名访问仍 403（既有 unauth_403 用例锁定，未改）；
+- **测试（test）**：新 `DisabledUserAccessTest`（无类级事务，禁用必须提交后由过滤器独立事务读到）1 例：注册→禁用→同 token 立即 401（/auth/me 与社区 feed 均 40101）→重新启用→同 token 恢复 200。**改前失败证据**：stash 修复后实跑 → `expected: <401> but was: <200>`（正是「disabled 用户 1h 窗口仍可用」）；改后 1 例通过；
+- **登记**：docs/18 §J1 已知边界修订（① 的「仍有效」仅指主动登出；禁用已即时生效 + Python 侧跨端遗留）；工作日志。
+- **门禁**：J-02 子集 1 例绿；全量在批次收尾统一跑。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-08）
+
 ## 2026-09-08 Java P1 批 ①：J-01 点赞并发幂等（like 500 / unlike 计数漂移）· 10 op
 
 - **背景**：local/review-java.json（java-01，确认）——like()「先查后插」无唯一键兜底（对比 :577-592 的 insertInteractionIdempotent 写法），PG READ COMMITTED 下并发双击 → 第二个 INSERT 撞 `uq_post_likes_post_liker` → 未捕获 DataIntegrityViolationException → **500**；unlike() 无条件删除+递减 → 并发双击取消双减 → like_count 与事实行漂移（GREATEST 只兜底到 0）。既有单测仅类级 @Transactional 单线程幂等，H2 不暴露并发缺陷；
