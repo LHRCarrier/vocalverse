@@ -54,6 +54,9 @@ jobs:
       - name: "Single-Writer 探针（docs/10 §3.1 写方矩阵 / docs/19 P0-7：Python 不得写 Java-owned 表）"
         run: python ../../scripts/check_single_writer.py
 
+      - name: "功能位/配置开关三处对账（arch-04：docs/06 §17 ↔ config.py / application.yml / README）"
+        run: python ../../scripts/check_feature_flags.py
+
       - name: "Contract: OpenAPI snapshot in sync"
         # 契约真源 = 运行中的后端 /openapi.json；前端快照（apps/web/src/api/specs/）必须与之一致。
         # 后端契约变更后重跑 scripts/refresh-openapi.ps1 并提交快照，否则此步红。
