@@ -3,6 +3,17 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-09 B4：词级时间轴（SSE turn_end 附 words 快照 + golden 双端 + 前端逐词高亮纯函数）· 4 op
+
+- **背景**：任务 B4（词级时间轴，M）——fluency.py 已产 ASR 词级时间戳（whisper word_timestamps），但 SSE turn_end 不回带，前端无法逐词高亮/回放对轴。
+- **后端（code 独立提交）**：`TurnEnd` 增 `words: list[dict] | None = None`（exclude_none 兼容：无词时字段缺省，旧端安全忽略）；三类回合（dialog/defense/shadow）ASR 结果处捕获 `res.words`，normal/retry 回合 turn_end 回带快照（ASR 失败/轻回合零词 → 缺省）。
+- **契约（golden 双端，test 独立提交）**：`sse_event_cases.json` 增 `turn_end_with_words` 用例（payload 由事件模型生成、字节级）；后端 golden `_build` 映射 + exclude_none 语义补 words 缺省断言；前端 golden 测试同语料自动覆盖（parseSseBuffer 逐样例断言）。
+- **前端（code + test 分提交）**：`sse-types.ts` TurnEndEvent 增 `words`；`audio/word-timeline.ts` 纯函数（`normalizeTimeline` 过滤坏条目按 start 升序 / `startedWordIndex` 逐词高亮下标 / `timelineProgress` 回放进度 0..1，容忍口径同后端 fluency.py）+ vitest 3 例（归一化/下标边界/进度 clamp）。
+- **门禁（改后基线）**：Python ruff+format 全绿、`pytest -q` **314 passed**（基线保持，golden 用例并入既有测试）；前端 lint/typecheck/build 全绿、`test:run` **112 passed**（基线 109+3）。
+- **遗留登记**：① 逐词高亮**组件**消费（用户声泡回放对轴）未接入视图——纯函数层本批交付，组件层随 D（听读/跟读）批次接入；② `turn_end.words` 仅回合 SSE 流内快照，未落库（scenario_messages.meta 现只存流利度特征），恢复端点不回带词时间轴——按词回放需持久化（P2）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-09）
+
 ## 2026-09-09 R-13：会话恢复端点（GET /sessions/{id}）+ 前端断线重连 · 6 op
 
 - **背景**：docs/21 §5 R-13（docs/19 P2-4）——无会话恢复端点，双端轮次状态机无恢复路径，一次断线即永久错位（40903 stale turn）；`turn_end` 权威 `expected_turn` 已于 2026-09-08 落地（前端已采纳），本批补恢复端点 + 断线重连。
