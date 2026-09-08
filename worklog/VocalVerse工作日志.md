@@ -3,6 +3,15 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-09 fe-09：vite 构建拆分（manualChunks）+ 包体积门禁（组长继续遗留项）· 2 op
+
+- **背景**：fe-09（治理 P2 遗留，组长继续）——vite manualChunks + CI 断言产物不含 preview/p5/echarts 模块；此前无任何包体积门禁（preview 树生产剔除/懒加载拆分全靠约定无人验证）。
+- **实现（code 独立提交）**：① vite.config.ts `build.manifest=true` + `manualChunks`（naive-ui / p5 / echarts / vue-vendor / vendor 专块——p5/echarts 保持动态 import 独立块防合流，vue 栈快照块提高缓存命中）；② `apps/web/scripts/check-bundle.mjs` 门禁——**按 rollup manifest 源模块路径判定**（初版用正文字符串 `createCanvas`/`preview` 命中我方代码误报 2 处：`p.createCanvas()` 是业务调用、DemoView 注释含「preview」词——改 manifest 图判定消除猜测）；断言：preview 树零体积（docs/13 §8 dev-only 剔除承诺的机器验证版）／专块齐（naive-ui/vue-vendor/vendor/p5 落盘）／p5 禁入入口塔（仅录音声波页面块触发加载）／echarts 零残留（仅 preview 树使用）；③ frontend-ci.yml Build 后追加步骤（本地 yaml.safe_load ✓）。
+- **关键结论（实测，诚实口径）**：naive-ui **不能**从入口移除——App.vue 根 Provider（NConfigProvider/NDialogProvider/NMessageProvider）架构必需首屏加载；manualChunks 的实质价值 = ①独立可缓存块（业务发布不重拉 naive-ui/vue 栈；应用代码 entry 30.86kB vs 此前 296.91kB 一体块）②p5/echarts 懒加载保持（防合流入主块）③**门禁固化**（preview 剔除/p5 拆分/echarts 零残留从此机器可验证，防回潮）；移动端 WebView 每页面只拉自身 1~16kB 块 + 共享专块。
+- **门禁（改后基线）**：前端 lint（新 mjs 纳入扫描，顺手抓出一处 unused 变量已修）/typecheck/build 全绿、`test:run` **115 passed**（基线保持）；`node scripts/check-bundle.mjs` ✓；frontend-ci 新增步骤 yaml.safe_load ✓；Python 零改动。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-09）
+
 ## 2026-09-09 TTS 预合成预热（docs/06 §8「开场/常用句预合成」兑现 · 组长拍板）· 3 op
 
 - **背景**：组长注意到 docs/audit「预合成/预热零落地」，问询确认价值——开场白/示范句首次合成 ~1.3s（edge-tts 网络往返，POC-1）→ 预热后 0ms 命中缓存；「3~5s 反馈」口径里 TTS 的 1~2s → ≈0s（首声 P50 下降的答辩证据加强项）。勘察澄清：**懒加载缓存实际已落地**（`tts_synthesize_cached`，docs/44 P1-B：/tts 与热路径共用，TTL 1d/512MB/原子写/容量裁剪），差额只在「预热」环节。
