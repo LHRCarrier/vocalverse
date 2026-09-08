@@ -3,6 +3,17 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-09 R-13：会话恢复端点（GET /sessions/{id}）+ 前端断线重连 · 6 op
+
+- **背景**：docs/21 §5 R-13（docs/19 P2-4）——无会话恢复端点，双端轮次状态机无恢复路径，一次断线即永久错位（40903 stale turn）；`turn_end` 权威 `expected_turn` 已于 2026-09-08 落地（前端已采纳），本批补恢复端点 + 断线重连。
+- **后端（code + test 分提交）**：`GET /api/v1/sessions/{id}`——归属校验（P0-3，不拥有 → 40401）；返回运行态 state/current_turn/next_seq + `next_expected_turn` + 最近 12 条消息快照；**StateStore 优先**（运行态真源），**缺失时按 scenario_messages 权威历史重建**（state.py 注释口径「权威历史永远在 scenario_messages」：current_turn=user 消息数、next_seq=max(seq)+1；status 映射 active→awaiting_user / completed→completed / abandoned→concluded）；已完成会话回带 report_id（前端直接跳报告页，P0-8 短路语义复用）。测试 `tests/test_session_restore.py` 5 例：live 初始态 / 运行态优先于消息 / 状态缺失重建（current_turn=1、next_seq=4）/ 已完成回带 report_id / 越权 40401。
+- **前端（code + test 分提交）**：`practice.ts` 增 `fetchSessionRestore` + `SessionRestore` 类型；PracticeView `boot()` 检测 `?session=<id>` → `resume()`：重建气泡与轮次（`next_expected_turn` 权威修正「第 N 轮」），status=completed 直接 `router.push('/report/{id}')`；无 query 保持原新建路径。测试 `PracticeView.test.ts` 3 例（**修复前失败证据**：还原旧视图跑新测试 **2 红 1 绿**——无恢复逻辑时 fetchSessionRestore 零调用、不跳报告页；修复后 3 绿）。
+- **契约**：快照单行 compact 刷新（21 ops）+ `pnpm gen:api`（python-api.d.ts +58 行）→ 本地 committed==live 断言通过；docs/21 §2.1（新增 row 9 + 操作数 20→21）/ §3.1（turn_start/turn_end 事件表字段校正 + 目标态改「已落地」口径）/ §5 R-13 行状态更新。
+- **门禁（改后基线）**：Python ruff+format 全绿、`pytest -q` **314 passed**（基线 309+5）；前端 lint/typecheck/build 全绿、`test:run` **109 passed**（基线 106+3）；契约快照零 diff（已同步）。
+- **遗留登记**：移动端 MobileSpeakingView 断线重连未接（本轮覆盖桌面端练习页，移动端 P2）；turn_start 未回带 next_expected_turn（docs/21 已按实现口径校正为仅 turn_end 权威回带）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-09）
+
 ## 2026-09-09 py-08：非 testing 真实路径矩阵（mock 外部依赖直测真客户端 + /turns 真编排）· 2 op
 
 - **背景**：任务 py-08（M）——`tests/` 非 testing 真实路径矩阵；模板 `tests/rec/test_recommend_redis_cache.py`（fakeredis）：依赖注入 + monkeypatch，测真实实现而非 Fake 打桩。
