@@ -17,9 +17,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * J-01 点赞并发幂等回归（真实事务 · 多线程直调 service）。
@@ -29,6 +31,9 @@ import org.springframework.http.MediaType;
  * DataIntegrityViolationException → 500；并发双击取消 → 双减 → like_count 与事实行漂移（修复前本测试即红）。
  *
  * <p>线程由 {@code CountDownLatch} 栅栏对齐放行（全部先查空 → 同时插入，最大化窗口命中率）， 断言幂等返回 + 计数与事实行一致（改前失败/改后通过的双向证据）。
+ *
+ * <p>本类提交真实数据（并发事务必需），@AfterEach 清掉 j01_* 前缀行（FK 安全顺序）——共享 H2 上下文下防污染 CommunityApiTest 的「初始 feed
+ * 空」断言（2026-09-08 全量门禁抓到）。
  */
 class LikeConcurrencyTest extends AbstractAdminApiTest {
 
@@ -37,6 +42,23 @@ class LikeConcurrencyTest extends AbstractAdminApiTest {
   @Autowired private CommunityService service;
   @Autowired private PostRepository posts;
   @Autowired private PostLikeRepository likes;
+  @Autowired private JdbcTemplate jdbc;
+
+  @AfterEach
+  void cleanUpCommittedRows() {
+    // 只有本类测试创建 j01_* 用户与帖子；按 FK 顺序删除（likes/interactions→posts→profiles/tokens→users）
+    jdbc.update(
+        "DELETE FROM post_likes WHERE post_id IN (SELECT id FROM posts WHERE author_id IN (SELECT id FROM users WHERE username LIKE 'j01%'))");
+    jdbc.update(
+        "DELETE FROM post_interactions WHERE post_id IN (SELECT id FROM posts WHERE author_id IN (SELECT id FROM users WHERE username LIKE 'j01%'))");
+    jdbc.update(
+        "DELETE FROM posts WHERE author_id IN (SELECT id FROM users WHERE username LIKE 'j01%')");
+    jdbc.update(
+        "DELETE FROM user_profiles WHERE user_id IN (SELECT id FROM users WHERE username LIKE 'j01%')");
+    jdbc.update(
+        "DELETE FROM refresh_tokens WHERE user_id IN (SELECT id FROM users WHERE username LIKE 'j01%')");
+    jdbc.update("DELETE FROM users WHERE username LIKE 'j01%'");
+  }
 
   private JsonNode json(org.springframework.test.web.servlet.MvcResult result) throws Exception {
     return objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));

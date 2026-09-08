@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * J-08 错误体统一回归：所有错误响应必须为 Envelope{code, message, data}（消灭 Spring 默认错误体
@@ -19,7 +20,11 @@ import org.springframework.test.web.servlet.MvcResult;
  *
  * <p>改前失败证据：此前仅 community 包有 @RestControllerAdvice，Auth/Admin/Ticket/Content 等域抛
  * ResponseStatusException / 校验失败 → 默认错误体缺 code/message 字段，本文件断言即红。
+ *
+ * <p>类级 @Transactional：共享 H2 上下文（DB_CLOSE_DELAY=-1）——本类只做错误响应断言、无跨请求 提交需求，挂测试事务防污染 CommunityApiTest
+ * 的「初始 feed 空」断言（2026-09-08 全量门禁抓到： 曾提交 j08 用户帖子后 feed 首屏断言红）。
  */
+@Transactional
 class ErrorEnvelopeTest extends AbstractAdminApiTest {
 
   private JsonNode json(MvcResult r) throws Exception {
