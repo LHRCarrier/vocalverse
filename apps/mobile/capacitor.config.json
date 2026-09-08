@@ -3,7 +3,7 @@
   "appName": "VocalVerse",
   "webDir": "dist",
   "server": {
-    "url": "http://10.133.33.185:5173",
+    "url": "https://192.168.0.104:5173",
     "cleartext": true
   },
   "android": {
