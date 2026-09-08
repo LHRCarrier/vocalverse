@@ -3,6 +3,30 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-09 py-08：非 testing 真实路径矩阵（mock 外部依赖直测真客户端 + /turns 真编排）· 2 op
+
+- **背景**：任务 py-08（M）——`tests/` 非 testing 真实路径矩阵；模板 `tests/rec/test_recommend_redis_cache.py`（fakeredis）：依赖注入 + monkeypatch，测真实实现而非 Fake 打桩。
+- **实现（test 独立提交 33683ce）**：`tests/test_client_realpath.py` 10 例，三部分：
+  1. **EdgeTTSClient 真实路径 4 例**：`monkeypatch.setitem(sys.modules, "edge_tts", …)` 替换模块，直测 `_stream_audio`——只收集 audio 块、忽略 WordBoundary 元数据；voice/rate 透传（空值回退构造参数 or 链）；无 audio 块明确 `RuntimeError`（不静默返回空）；`synthesize_concurrent` 多句并发全部成功且无丢句。
+  2. **DeepSeekLLMClient 真实路径 5 例**：`httpx.MockTransport` 注入 `c._client`，直测 `chat_with_usage`（内容+usage 解析、prompt 含 json 时 `response_format={"type":"json_object"}` 断言）与 `stream_rich`（delta 拼接、usage 提取、`asyncio.gather` 并发双流结果一致、`data: not-json` 畸形行跳过容错）。
+  3. **/turns 编排真实路径 1 例**：MockASR/MockLLM/MockTTS/MockScorer 构造 `PracticeOrchestrator`，`monkeypatch app.api.routes.practice.get_orchestrator` 注入，真编排 `run_turn`（真 DB 建 Scenario、真 state/SSE/corpus 规则命中/TTS/turn_end）——断言事件序列 user_transcript/turn_start/text_delta/audio_chunk/meta_block/turn_end、`meta_block.coach_note`、`corpus_hits` 命中、`turn_end.expected_turn==1`。
+- **门禁（改后基线）**：`uv run pytest -q` **309 passed**（基线 299 + 10）；`ruff check .` + `ruff format --check .` 全绿（提交前文件级 4 个 ruff 错：I001 / SIM905 / 2×E501，已修）。
+- **触发路径**：`pytest tests/test_client_realpath.py`——真实客户端代码、仅 mock 外部依赖（edge_tts 模块 / httpx transport），零网络零密钥零 GPU。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-09）
+
+## 2026-09-09 va-09 批：语音链路分阶段基准脚本 + CI 操作数/时延预算门禁（本记录为补录）· 4 op
+
+- **背景**：任务 va-09（M）——基准脚本产出「录音后 3~5s 反馈」答辩证据；分阶段计时与真实 /turns 热路径同源。
+- **产出（feat/ci/docs 三提交已在本地 main：e27fec4 / 28f3de5 / 6bb2257）**：
+  - `scripts/bench/pipeline_bench.py`（389 行）：分阶段 upload → ffmpeg → ASR(words) → LLM ttfa → TTS 首声 → 排播（全链路），输出每阶段 mean/p50/p95/RTF + tracemalloc 峰值内存 + STAGE_BUDGETS 操作数预算 PASS/FAIL；`--speech`（faster-whisper small + DeepSeek + edge-tts，需 .env 密钥与本地模型）/ `--audio <file>` / `--fake`（零模型零 Key；ffmpeg 用 stdlib 生成 1s 静音 wav 走真实二进制）；`--check-budget` 超预算退出码 1。
+  - 判定口径（docs/06 §8 延迟表 + POC-1）：RTF ≤0.6 → 演示话术「3~5s 反馈」；0.6~0.8 → 「5~8s」。
+  - `python-ci.yml` 增 `--fake --runs 3 --check-budget` 步骤（CI 门禁，本地 yaml.safe_load 通过）；`services/python/README.md` 增「基准脚本」节（用法 + 判定口径）。
+- **验证（本次复测）**：`uv run python ../../scripts/bench/pipeline_bench.py --fake --runs 3 --check-budget` → 各阶段均在预算内，结果「通过」，峰值内存 1.3 MiB；python-ci.yml `yaml.safe_load` OK。
+- **备注**：本段批次提交时缺 worklog 置顶记录（协作纪律「每段工作主线 worklog 置顶 + 署名」），现补录对齐。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-09）
+
 ## 2026-09-08 前端 P1 批（Web/埋点部分：fe-02 / fe-05 / fe-06 + fe-07 Web 侧）· 8 op
 
 - **fe-02（S）答辩页 SSE 取消**：DefenseView 两处 streamTurn（sendServe / answer）补第 5 参 `abort.signal`（此前缺省 → openSseFetch 不传 signal，组件卸载后连接最长挂 90s idle 超时，占用服务端流式推理资源）；`onUnmounted` 补 `abort.abort()`；`startSession` 重建 controller（「重新生成」语义）。与同仓 MobileSpeakingView/PracticeView 取消行为对齐。
