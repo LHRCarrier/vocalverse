@@ -1465,6 +1465,16 @@
       "get" : {
         "tags" : [ "community-social-controller" ],
         "operationId" : "followRecommendations",
+        "parameters" : [ {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 50
+          }
+        } ],
         "responses" : {
           "200" : {
             "description" : "OK",

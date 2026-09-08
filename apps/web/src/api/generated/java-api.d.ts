@@ -2402,7 +2402,9 @@ export interface operations {
     };
     followRecommendations: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
