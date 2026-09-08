@@ -126,7 +126,7 @@ function sentenceSegments(idx: number) {
 /* ---------- 点击语义（词=查词 / 句=选中；分发在 useReaderTap） ---------- */
 const { selIdx, onReaderClick } = useReaderTap({
   getSentence: (idx) => chapter.value?.sentences[idx],
-  openWord: (word, context) => void wordLookup.openFor(word, context),
+  openWord: (word, context, idx) => void wordLookup.openFor(word, context, idx),
   openNoteById: annotationsApi.openNoteById,
   annotations,
   ttsState,
@@ -134,29 +134,27 @@ const { selIdx, onReaderClick } = useReaderTap({
   playFrom: (idx) => void tts.playFrom(idx),
 })
 
-/** 动作条 · 色点 → 整句高亮（免开弹层） */
-function highlightSelection(color: string) {
-  const idx = selIdx.value
+/**
+ * 句子级动作（单一入口，供两处调用）：
+ * · 动作条（单击句子/分隔符选中后）：highlight=色点、note=批注、play=听这句
+ * · 查词卡底部：highlight=高亮这句、note=批注这句（**点中空格的命中区只有 4.6px，
+ *   卡片按钮才是可靠入口**——2026-09-10 量测结论）
+ */
+function runSentenceAction(action: 'highlight' | 'note' | 'play', color = '#fde68a') {
+  const idx = selIdx.value ?? wordLookup.state.sentenceIdx
   if (idx == null) return
   selIdx.value = null
-  void annotationsApi.highlightSentence(idx, color).then((ok) => ui.showToast(ok ? '已高亮' : '高亮失败'))
-}
-
-/** 动作条 · 批注 → 打开批注弹层（带笔记） */
-function noteSelection() {
-  const idx = selIdx.value
-  if (idx == null) return
-  selIdx.value = null
-  annotationsApi.createForSentence(idx)
-}
-
-/** 动作条 · 听这句 → 起听书并从该句播放 */
-function playSelection() {
-  const idx = selIdx.value
-  if (idx == null) return
-  selIdx.value = null
-  openTts()
-  void tts.playFrom(idx)
+  wordLookup.close()
+  if (action === 'play') {
+    openTts()
+    void tts.playFrom(idx)
+  } else if (action === 'note') {
+    annotationsApi.createForSentence(idx)
+  } else {
+    void annotationsApi
+      .highlightSentence(idx, color)
+      .then((ok) => ui.showToast(ok ? '已高亮这句' : '高亮失败'))
+  }
 }
 
 async function refreshAnnotations() {
@@ -341,9 +339,9 @@ function nextChapter() {
       <!-- 句子选中动作条（单击句子后出现；听书进行中不显示） -->
       <MobileReaderSelectionBar
         :visible="selIdx !== null"
-        @highlight="highlightSelection"
-        @note="noteSelection"
-        @play="playSelection"
+        @highlight="runSentenceAction('highlight', $event)"
+        @note="runSentenceAction('note')"
+        @play="runSentenceAction('play')"
         @close="selIdx = null"
       />
       <MobileReaderBar
@@ -359,9 +357,12 @@ function nextChapter() {
         :result="wordLookup.state.result"
         :loading="wordLookup.state.loading"
         :missing="wordLookup.state.missing"
+        :sentence-index="wordLookup.state.sentenceIdx"
         @close="wordLookup.close()"
         @add-vocab="addWordToVocab"
         @play-word="void 0"
+        @sentence-highlight="runSentenceAction('highlight')"
+        @sentence-note="runSentenceAction('note')"
       />
       <MobileReaderSettingsSheet
         :open="settingsOpen"

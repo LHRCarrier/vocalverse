@@ -12,8 +12,8 @@ import type { AnnotationItem, ReadingSentence } from '@/api/reading'
 
 export interface ReaderTapDeps {
   getSentence: (idx: number) => ReadingSentence | undefined
-  /** 打开查词卡 */
-  openWord: (word: string, contextSentence: string) => void
+  /** 打开查词卡（带上该词所在句子 idx，供卡片里的「高亮这句/批注这句」） */
+  openWord: (word: string, contextSentence: string, sentenceIdx: number | null) => void
   /** 按批注 id 打开批注查看弹层 */
   openNoteById: (id: number) => void
   /** 当前批注列表（取被点段落的批注用） */
@@ -50,7 +50,7 @@ export function useReaderTap(deps: ReaderTapDeps) {
     if (word) {
       clearSelection()
       const idx = Number(sentenceEl?.dataset.idx ?? -1)
-      deps.openWord(word, idx >= 0 ? (deps.getSentence(idx)?.text ?? '') : '')
+      deps.openWord(word, idx >= 0 ? (deps.getSentence(idx)?.text ?? '') : '', idx >= 0 ? idx : null)
       return
     }
 

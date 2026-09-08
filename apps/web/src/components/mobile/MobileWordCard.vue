@@ -11,12 +11,16 @@ const props = defineProps<{
   loading?: boolean
   /** 查词未收录（45003）时的降级展示 */
   missing?: boolean
+  /** 该词所在句子 idx（2026-09-10：句子级批注入口——空格只有 4.6px 宽，点句命中不可靠，改由卡片提供） */
+  sentenceIndex?: number | null
 }>()
 
 const emit = defineEmits<{
   close: []
   'add-vocab': []
   'play-word': []
+  'sentence-highlight': []
+  'sentence-note': []
 }>()
 
 function firstMeaning(translation: string | null | undefined): string {
@@ -69,6 +73,11 @@ function formText(exchange: Record<string, string> | null | undefined): string {
         <div class="u-rd-word__actions">
           <button class="u-btn u-btn--primary" type="button" @click="emit('add-vocab')">加入生词本</button>
           <button class="u-btn" type="button" @click="emit('close')">关闭</button>
+        </div>
+        <div v-if="props.sentenceIndex != null" class="u-rd-word__sentence">
+          <span class="u-rd-word__sentence-label">这一句</span>
+          <button class="u-btn u-btn--ghost" type="button" @click="emit('sentence-highlight')">高亮这句</button>
+          <button class="u-btn u-btn--ghost" type="button" @click="emit('sentence-note')">批注这句</button>
         </div>
       </div>
     </div>
@@ -127,6 +136,13 @@ function formText(exchange: Record<string, string> | null | undefined): string {
           >
             更多释义
           </a>
+        </div>
+
+        <!-- 句子级动作（作用于该词所在句子；命中区 = 按钮，不依赖点中空格） -->
+        <div v-if="props.sentenceIndex != null" class="u-rd-word__sentence">
+          <span class="u-rd-word__sentence-label">这一句</span>
+          <button class="u-btn u-btn--ghost" type="button" @click="emit('sentence-highlight')">高亮这句</button>
+          <button class="u-btn u-btn--ghost" type="button" @click="emit('sentence-note')">批注这句</button>
         </div>
       </div>
     </div>

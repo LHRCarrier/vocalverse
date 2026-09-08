@@ -464,6 +464,22 @@
   gap: 10px;
 }
 
+/* 句子级动作行（2026-09-10：点中空格的命中区仅 4.6px，句子批注改由卡片按钮承载） */
+.u-rd-word__sentence {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--u-paper-grid);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.u-rd-word__sentence-label {
+  font: 600 12px var(--u-font);
+  color: var(--u-sub);
+  margin-right: 2px;
+}
+
 .u-rd-word__out {
   color: var(--u-weak);
   font: 12px/1.5 var(--u-font);

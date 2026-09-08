@@ -16,12 +16,15 @@ export function useWordLookup() {
     result: null as WordLookupResult | null,
     word: '',
     context: '',
+    /** 该词所在句子 idx（句子级动作「高亮这句/批注这句」用；无法定位时为 null） */
+    sentenceIdx: null as number | null,
   })
 
-  async function openFor(word: string, contextSentence: string) {
+  async function openFor(word: string, contextSentence: string, sentenceIdx: number | null = null) {
     if (!word) return
     state.word = word
     state.context = contextSentence
+    state.sentenceIdx = sentenceIdx
     state.open = true
     state.loading = true
     state.missing = false
