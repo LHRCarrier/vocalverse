@@ -3,6 +3,15 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 Java P1 批 收尾：**双端门禁 + 全量 48+299+95 绿**（踩坑：共享 H2 上下文污染）· 12 op
+
+- **全量门禁（改后基线）**：Java `mvn verify` **48 tests 绿**（基线 36 + 新增 12：J-01 并发 2 / J-02 禁用 1 / J-04 软删通知 1 / J-05 往返恒定 1 / J-06 limit+往返 1 / J-08 错误体 6）+ spotless 绿；`mvn verify -Pintegration -Dtest=CommunityPgIntegrationTest` **6/6 绿**（真 PG）；Python `ruff + format + pytest -q` **299 passed**（基线保持，本批 Java 侧不动 Python）；前端 `pnpm lint/typecheck/test:run/build` 全绿（**95 tests**，基线保持）；`ContractSnapshotTest` 对账通过（J-06 契约变更已同步快照+gen:api，python 快照零 diff）；java-ci.yml 本地 yaml.safe_load 校验通过；
+- **踩坑（全量门禁抓手）**：① **共享 H2 上下文污染**——所有 @SpringBootTest 用同一 `jdbc:h2:mem:vocalverse;DB_CLOSE_DELAY=-1`，新测试类若提交真实数据（J-01 并发测试必须提交；J-08 错误体测试当时未挂事务）会在类间残留帖子 → CommunityApiTest「初始 feed 空」断言红（单跑绿、全量红，典型的顺序依赖 flaky 形态）。处置：ErrorEnvelopeTest 挂类级 @Transactional（无跨请求提交需求）；LikeConcurrencyTest（无法回滚）@AfterEach 按 FK 安全顺序清理 j01_* 行（likes/interactions→posts→profiles/tokens→users）——**回归教训：新增提交型测试必须自带清理或挂事务**（已写进两个测试类注释）；② J-01/J-05 等批次提交时未跑 spotless（`mvn test` 不触发 spotless:check——它绑 verify 阶段），CI 的 verify 会红 → 已用 `spotless:apply` 补齐（style 独立提交），最终 verify 全绿；
+- **批次结论**：J-01/J-02/J-04/J-05+J-11/J-06/J-07/J-08 七项全部落地（J-03 按 L 级口径登记不实施，后续项见 docs/41 §1），每项 code/test/docs 三分提交 + chore(contract) + style 补齐 + 本记录；本地 main 领先 origin/main **24 commits**（推送待组长授权）；
+- **遗留提醒**：`docs/42-App功能说明书.md`（他人产出）仍未入库，请组长确认归属后自行提交。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-08）
+
 ## 2026-09-08 Java P1 批 ⑦：J-07 Testcontainers 真 PG 集成（6 例 · 抓出 timestamptz 舍入口径差）· 25 op
 
 - **背景**：review-java.json（java-07，确认）——pom 无 testcontainers、无 @Tag("integration")、H2 create-drop 从头至尾；**部分唯一索引 uq_posts_checkin / JSONB / timestamptz(6) 微秒 / GREATEST / ON CONFLICT 从未在真 PG 验证**（H2 MODE=PostgreSQL 近似；42P18 未类型化 NULL 是「H2 全绿掩盖真机 500」前车之鉴）；
