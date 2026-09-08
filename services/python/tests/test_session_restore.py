@@ -134,3 +134,39 @@ def test_restore_ownership_404(client, auth_headers) -> None:
     resp = client.get(f"/api/v1/sessions/{sid}", headers={"X-Test-User-Id": "2"})
     assert resp.status_code == 404
     assert resp.json()["code"] == 40401
+
+
+def test_restore_returns_persisted_words(client, auth_headers) -> None:
+    """B4：用户消息 meta 持久化的词时间戳随恢复端点回带（断线后仍可按词对轴）。"""
+    sid = _create_dialog_session(client, auth_headers)
+    db = get_session_factory()()
+    db.add(
+        ScenarioMessage(
+            session_id=sid,
+            seq=2,
+            role="user",
+            origin="respond",
+            content="I'd like a coffee, please.",
+            audio_url="/api/v1/audio/abc.mp3",
+            meta={
+                "words": [
+                    {"word": "I'd", "start": 0.12, "end": 0.36, "probability": 0.99},
+                    {"word": "coffee", "start": 0.75, "end": 1.12, "probability": 0.98},
+                ]
+            },
+        )
+    )
+    db.commit()
+    db.close()
+    asyncio.run(get_state_store().delete(sid))
+    resp = client.get(f"/api/v1/sessions/{sid}", headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    user_msg = next(m for m in data["messages"] if m["role"] == "user")
+    assert user_msg["words"][0] == {
+        "word": "I'd",
+        "start": 0.12,
+        "end": 0.36,
+        "probability": 0.99,
+    }
+    assert user_msg["audio_url"] == "/api/v1/audio/abc.mp3"
