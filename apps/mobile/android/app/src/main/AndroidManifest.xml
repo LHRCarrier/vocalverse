@@ -37,6 +37,8 @@
     </application>
 
     <!-- Permissions -->
-
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 2026-09-10：App 核心录音（WebRTC getUserMedia）依赖 RECORD_AUDIO；
+         此前缺失 → WebView 即便安全上下文也拿不到麦克风（页面 onPermissionRequest 无法被授予） -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 </manifest>
