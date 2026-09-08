@@ -5,29 +5,29 @@
  * + 阅读设置（字号/行距/主题，localStorage）+ 进度保存（防抖 + 退出 flush）。
  * 拆分纪律（fe-08 新代码不豁免）：查词/批注/进度/预合成为 composable，本页 ≈ 300 行。
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import MobileAnnotationNoteSheet from '@/components/mobile/MobileAnnotationNoteSheet.vue'
 import MobileAnnotationSheet from '@/components/mobile/MobileAnnotationSheet.vue'
 import MobileReaderBar from '@/components/mobile/MobileReaderBar.vue'
+import MobileReaderSelectionBar from '@/components/mobile/MobileReaderSelectionBar.vue'
 import MobileReaderSettingsSheet from '@/components/mobile/MobileReaderSettingsSheet.vue'
 import MobileReaderTocSheet from '@/components/mobile/MobileReaderTocSheet.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import MobileTtsBar from '@/components/mobile/MobileTtsBar.vue'
 import MobileWordCard from '@/components/mobile/MobileWordCard.vue'
-import { fetchChapter, fetchVoices, fetchVocab } from '@/api/reading'
-import {
-  buildSentenceSegments,
-  sentenceHasAnnotation,
-  vocabWordSet,
-} from '@/audio/reader-words'
+import { fetchChapter, fetchVoices } from '@/api/reading'
+import { buildSentenceSegments, sentenceHasAnnotation } from '@/audio/reader-words'
 import { useChapterPrep } from '@/composables/useChapterPrep'
 import { useChapterTts } from '@/composables/useChapterTts'
 import { useMobileBack } from '@/composables/useMobileBack'
 import { useNativeBack } from '@/composables/useNativeBack'
 import { useReaderAnnotations } from '@/composables/useReaderAnnotations'
 import { useReaderProgress } from '@/composables/useReaderProgress'
+import { useReaderSettings } from '@/composables/useReaderSettings'
+import { useReaderTap } from '@/composables/useReaderTap'
+import { useReaderVocab } from '@/composables/useReaderVocab'
 import { useWordLookup } from '@/composables/useWordLookup'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
@@ -50,20 +50,11 @@ const loading = ref(true)
 const error = ref('')
 
 const voices = ref<ReadingVoice[]>([])
-const vocabWords = ref<Set<string>>(new Set())
+/** 生词标记集合（已加入生词本 → 正文淡黄下划线）；见 useReaderVocab */
+const { vocabWords, refreshVocab } = useReaderVocab()
 
-/* ---------- 阅读设置（localStorage） ---------- */
-const settings = reactive({
-  theme: (localStorage.getItem('vv_rd_theme') as 'paper' | 'cream' | 'night') ?? 'paper',
-  fontSize: Number(localStorage.getItem('vv_rd_font') ?? 19),
-  lineHeight: Number(localStorage.getItem('vv_rd_line') ?? 1.85),
-})
-function patchSettings(patch: Partial<typeof settings>) {
-  Object.assign(settings, patch)
-  localStorage.setItem('vv_rd_theme', settings.theme)
-  localStorage.setItem('vv_rd_font', String(settings.fontSize))
-  localStorage.setItem('vv_rd_line', String(settings.lineHeight))
-}
+/* ---------- 阅读设置（localStorage；见 useReaderSettings） ---------- */
+const { settings, patchSettings } = useReaderSettings()
 
 /* ---------- 进度保存（防抖 + 退出 flush + 恢复定位） ---------- */
 const mainEl = ref<HTMLElement | null>(null)
@@ -103,15 +94,6 @@ async function addWordToVocab() {
   if (ok) await refreshVocab()
 }
 
-async function refreshVocab() {
-  try {
-    const res = await fetchVocab()
-    vocabWords.value = vocabWordSet(res.items)
-  } catch {
-    /* 生词标记非关键路径 */
-  }
-}
-
 /* ---------- 划词批注（useReaderAnnotations：句内划选 → 高亮/笔记） ---------- */
 const annotationsApi = useReaderAnnotations(chapterId, () => chapter.value, scrollToSentence)
 const annotations = annotationsApi.annotations
@@ -135,62 +117,46 @@ async function removeAnnotation(id: number) {
 }
 
 /* ---------- 渲染（词块 × 批注区间 → 上色分段；点词查义） ---------- */
-const currentIdx = computed(() => ttsCurrentIdx.value)
-
 /** 句子渲染段：词 + 批注着色（见 reader-words.buildSentenceSegments） */
 function sentenceSegments(idx: number) {
   const s = chapter.value?.sentences[idx]
   return s ? buildSentenceSegments(s.text, s.start, annotations.value) : []
 }
 
-function sentenceAnnotated(start: number, end: number): boolean {
-  return sentenceHasAnnotation(annotations.value, start, end)
+/* ---------- 点击语义（词=查词 / 句=选中；分发在 useReaderTap） ---------- */
+const { selIdx, onReaderClick } = useReaderTap({
+  getSentence: (idx) => chapter.value?.sentences[idx],
+  openWord: (word, context) => void wordLookup.openFor(word, context),
+  openNoteById: annotationsApi.openNoteById,
+  annotations,
+  ttsState,
+  ttsCurrentIdx,
+  playFrom: (idx) => void tts.playFrom(idx),
+})
+
+/** 动作条 · 色点 → 整句高亮（免开弹层） */
+function highlightSelection(color: string) {
+  const idx = selIdx.value
+  if (idx == null) return
+  selIdx.value = null
+  void annotationsApi.highlightSentence(idx, color).then((ok) => ui.showToast(ok ? '已高亮' : '高亮失败'))
 }
 
-function annStyle(color: string | null | undefined): Record<string, string> {
-  return { background: color ?? 'var(--ur-theme-annotation)' }
-}
-
-function onReaderClick(e: MouseEvent) {
-  const target = e.target as HTMLElement
-
-  // ① 批注角标（笔记标记）→ 看笔记（优先于查词，否则角标落在词上会查词）
-  const markEl = target.closest('.u-rd__annmark') as HTMLElement | null
-  if (markEl?.dataset.ann) {
-    annotationsApi.openNoteById(Number(markEl.dataset.ann))
-    return
-  }
-
-  const segEl = target.closest('.u-rd__seg') as HTMLElement | null
-  const sentenceEl = target.closest('.u-rd__sentence') as HTMLElement | null
-
-  // ② 词段 → 查词卡（任何词都可查；修复前只有「已加入生词本」的词有反应）
-  const word = segEl?.dataset.word ?? ''
-  if (word) {
-    const idx = Number(sentenceEl?.dataset.idx ?? -1)
-    const context = chapter.value?.sentences[idx]?.text ?? ''
-    void wordLookup.openFor(word, context)
-    return
-  }
-
-  // ③ 非词批注段（标点/空格被批注）→ 看批注
-  if (segEl?.dataset.ann) {
-    annotationsApi.openNoteById(Number(segEl.dataset.ann))
-    return
-  }
-
-  if (!sentenceEl) return
-  const idx = Number(sentenceEl.dataset.idx ?? -1)
-  if (idx < 0) return
-
-  // ④ 听书进行中：点句子 = 从该句续播
-  if (ttsState.value !== 'idle') {
-    if (idx !== ttsCurrentIdx.value) void tts.playFrom(idx)
-    return
-  }
-
-  // ⑤ 非听书态：点句子 = 对这句做批注/高亮（批注是「对某句/某段的理解」，不再要求长按划词）
+/** 动作条 · 批注 → 打开批注弹层（带笔记） */
+function noteSelection() {
+  const idx = selIdx.value
+  if (idx == null) return
+  selIdx.value = null
   annotationsApi.createForSentence(idx)
+}
+
+/** 动作条 · 听这句 → 起听书并从该句播放 */
+function playSelection() {
+  const idx = selIdx.value
+  if (idx == null) return
+  selIdx.value = null
+  openTts()
+  void tts.playFrom(idx)
 }
 
 async function refreshAnnotations() {
@@ -244,6 +210,10 @@ const settingsOpen = ref(false)
  * （否则滑动返回会连带退页/退到桌面；见 useNativeBack 注释）
  */
 useNativeBack(() => {
+  if (selIdx.value !== null) {
+    selIdx.value = null
+    return true
+  }
   if (noteSheet.open) {
     noteSheet.open = false
     return true
@@ -325,7 +295,11 @@ function nextChapter() {
             v-for="s in chapter.sentences.filter((x) => x.para_idx === pi)"
             :key="s.idx"
             class="u-rd__sentence"
-            :class="{ 'is-current': currentIdx === s.idx, 'is-annotated': sentenceAnnotated(s.start, s.end) }"
+            :class="{
+              'is-current': ttsCurrentIdx === s.idx,
+              'is-annotated': sentenceHasAnnotation(annotations, s.start, s.end),
+              'is-selected': selIdx === s.idx,
+            }"
             :data-idx="s.idx"
           >
             <span
@@ -337,7 +311,7 @@ function nextChapter() {
                 'is-ann': !!seg.ann,
                 'is-flash': !!seg.ann && seg.ann.id === flashAnnId,
               }"
-              :style="seg.ann ? annStyle(seg.ann.color) : undefined"
+              :style="{ background: seg.ann ? (seg.ann.color ?? 'var(--ur-theme-annotation)') : undefined }"
               :data-word="seg.word ?? undefined"
               :data-ann="seg.ann ? seg.ann.id : undefined"
             >{{ seg.text }}<span
@@ -363,6 +337,14 @@ function nextChapter() {
         @next="tts.next()"
         @change-rate="tts.changeRate()"
         @close="tts.stop(); ttsActive = false"
+      />
+      <!-- 句子选中动作条（单击句子后出现；听书进行中不显示） -->
+      <MobileReaderSelectionBar
+        :visible="selIdx !== null"
+        @highlight="highlightSelection"
+        @note="noteSelection"
+        @play="playSelection"
+        @close="selIdx = null"
       />
       <MobileReaderBar
         :tts-active="ttsActive"

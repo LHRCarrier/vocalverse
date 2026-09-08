@@ -126,6 +126,77 @@
   text-decoration-thickness: 2px;
 }
 
+/* 选中句子（单击句子后、动作条出现期间；与听书高亮 .is-current 区分） */
+.u-rd__sentence.is-selected {
+  background: color-mix(in srgb, var(--u-accent) 14%, transparent);
+  box-shadow: inset 3px 0 0 var(--u-accent);
+}
+
+/* ---------- 句子选中动作条 ---------- */
+.u-rd-sel {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: var(--u-r-card);
+  background: var(--ur-theme-chrome);
+  box-shadow: var(--u-shadow-tabbar);
+  backdrop-filter: blur(12px);
+  z-index: 46;
+}
+
+.u-rd-sel__colors {
+  display: flex;
+  gap: 6px;
+  margin-right: 2px;
+}
+
+.u-rd-sel__dot {
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid var(--u-track);
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 60ms ease-out;
+}
+
+.u-rd-sel__dot:active {
+  transform: scale(0.9);
+}
+
+.u-rd-sel__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--u-track);
+  border-radius: var(--u-r-pill);
+  background: transparent;
+  color: var(--ur-theme-ink);
+  font: 600 12px var(--u-font);
+  cursor: pointer;
+}
+
+.u-rd-sel__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ur-theme-muted);
+  cursor: pointer;
+}
+
 .u-rd__seg {
   cursor: pointer;
   border-radius: 3px;

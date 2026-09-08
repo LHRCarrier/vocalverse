@@ -76,6 +76,12 @@ export function useReaderAnnotations(
     return true
   }
 
+  /** 整句快速高亮（动作条色点直出，不弹层） */
+  async function highlightSentence(sentenceIdx: number, color: string): Promise<boolean> {
+    if (!createForSentence(sentenceIdx)) return false
+    return await save({ note: '', color })
+  }
+
   async function save(payload: { note: string; color: string }): Promise<boolean> {
     const sentence = getChapter()?.sentences[annSheet.sentenceIdx]
     const start = annSheet.relStart
@@ -142,6 +148,7 @@ export function useReaderAnnotations(
     refresh,
     createFromSelection,
     createForSentence,
+    highlightSentence,
     save,
     remove,
     jump,
