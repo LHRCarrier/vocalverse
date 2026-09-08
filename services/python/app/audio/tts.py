@@ -163,16 +163,6 @@ class AzureNotWiredClient(TTSClient):
         raise RuntimeError("Azure TTS 未接线（见 docs/44 P0-C）")
 
 
-async def synthesize_concurrent(
-    client: TTSClient, sentences: list[str], voice: str = "", rate: str = ""
-) -> list[bytes]:
-    """并发合成（每句一轮网络往返，并发摊薄总时长——POC-1 结论）。"""
-    results = await asyncio.gather(
-        *(client.synthesize(s, voice=voice, rate=rate) for s in sentences)
-    )
-    return list(results)
-
-
 def cached_audio_path(cache_dir: Path, key: str) -> Path:
     """预合成缓存路径（开场白/常用句；demo 保底，docs/06 §8）。"""
     path = cache_dir / f"{key}.tts.mp3"
