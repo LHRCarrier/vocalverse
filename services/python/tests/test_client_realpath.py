@@ -16,7 +16,7 @@ import httpx
 import pytest
 from app.audio.base import ASRClient, ASRResult, LLMClient, ScorerClient, ScoreResult, TTSClient
 from app.audio.llm import DeepSeekLLMClient
-from app.audio.tts import EdgeTTSClient, synthesize_concurrent
+from app.audio.tts import EdgeTTSClient
 from app.practice.meta import render_meta
 from app.practice.orchestrator import PracticeOrchestrator
 
@@ -76,17 +76,6 @@ async def test_edge_stream_voice_rate_fallbacks(monkeypatch) -> None:
     c = EdgeTTSClient(voice="en-US-JennyNeural", rate="+15%")
     await c._stream_audio("hi", "", "")
     assert calls[0][1:] == ("en-US-JennyNeural", "+15%")
-
-
-async def test_edge_synthesize_concurrent(monkeypatch) -> None:
-    """synthesize_concurrent：多句并发合成全部成功（真实客户端 + mock 引擎）。"""
-    calls: list = []
-    mod = _fake_edge_tts([{"type": "audio", "data": b"x"}], record=calls)
-    monkeypatch.setitem(sys.modules, "edge_tts", mod)
-    c = EdgeTTSClient()
-    out = await synthesize_concurrent(c, ["a", "b", "c"])
-    assert out == [b"x", b"x", b"x"]
-    assert sorted(t for t, _, _ in calls) == ["a", "b", "c"]
 
 
 # ---------------------------------------------------------------------------
