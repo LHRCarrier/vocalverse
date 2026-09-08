@@ -13,6 +13,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app import __version__
@@ -151,3 +152,22 @@ if get_settings().shadow_preview_enabled:
 
     app.include_router(shadow_preview.router)
 app.add_middleware(RequestIdMiddleware)  # X-Request-Id 透传（docs/06 §11）
+# CORS（2026-09-10 打包壳方案 B：页面源 https://localhost、API 打到本机 http://<IP>:8000，
+# 跨域 → 需 CORS）。开发靠 Vite 代理同源、容器靠 nginx 同源，均不触发；仅打包壳直连后端需要。
+# allow_credentials=True ⇒ 禁止 allow_origins=["*"]，需精确列出后端地址（含 https://localhost）。
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://localhost",
+        "http://localhost",
+        "http://127.0.0.1",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://192.168.0.104:5173",
+        "http://192.168.0.104:8088",
+        "http://localhost:8088",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

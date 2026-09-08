@@ -3,6 +3,15 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 打包壳跨域（CORS）补齐：Python + Java 允许 https://localhost 来源（方案 B 直连后端必有）
+
+- **背景**：方案 B 打包壳（页面源 `https://localhost`）直接调本机后端 `http://192.168.0.104:8000/8080`（跨域）。开发时靠 Vite 代理同源、容器靠 nginx 同源，故此前从不需要 CORS——打包壳直连后，浏览器对 `Origin: https://localhost` 发 CORS 预检（OPTIONS），两个后端均无 CORS 处理 → python 405 / java 被安全链拦截（手机端实测日志现 `OPTIONS /api/v1/events → 405`）。
+- **修复**：python `app/main.py` 加 `CORSMiddleware`（精确 origins 列表含 `https://localhost`，`allow_credentials=True`——凭据不允许 `*`）；java `SecurityConfig` 加 `.cors(Customizer.withDefaults())` + `CorsConfigurationSource` bean（同名单）。
+- **验证**：预检 `OPTIONS /api/v1/events`、`OPTIONS /auth/login`（Origin=https://localhost）→ 均 200 + `Access-Control-Allow-Origin: https://localhost` + `Allow-Credentials: true`；python `uv run pytest -q` **370 passed** + ruff/format 全绿；java 编译运行正常（mvn spring-boot:run 重编译生效）。
+- **踩坑**：① CORS 与「安全上下文」是两回事——打包壳解决了 getUserMedia，但跨域请求仍需后端 CORS；② `allow_credentials=True` 时 `allow_origins` 禁止 `["*"]`，必须精确列来源（含 `https://localhost`）；③ 干净重启后端用 `scripts/dev-up.ps1 stop` + `start`（按端口杀进程树；之前手动杀 uvicorn --reload 的父进程留下孤儿 worker 占端口 8000，netstat 显示已死 PID 的僵尸 LISTENING——需按端口 taskkill /T /F 并核实真释放）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 读书域合入 main（组长手机验收后直合 · 15 提交 · 分支 feat/novel-reading-main）
 
 - 组长手机端验收（Web 5173 → APK 壳均已跑通）后授权直合：`git merge --no-ff` → `main 5c10d19..15f774b` 推送成功（CI 三套门禁由 push 触发）。

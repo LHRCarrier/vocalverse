@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -21,6 +22,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
  * 安全策略（docs/18 §3-J1）：公开白名单仅 login/register/refresh/forgot（原 /auth/** 全开放， 2026-09-07
@@ -61,6 +65,7 @@ public class SecurityConfig {
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http.csrf(csrf -> csrf.disable())
+        .cors(Customizer.withDefaults()) // CORS（2026-09-10 打包壳跨域直连本机后端）
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
@@ -87,6 +92,28 @@ public class SecurityConfig {
             new JwtAuthFilter(jwt, users, mapper), UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(new ServiceTokenFilter(serviceToken), JwtAuthFilter.class);
     return http.build();
+  }
+
+  /** 跨域配置（2026-09-10 打包壳方案 B：页面源 https://localhost，API 打到本机 http://<IP>:8080）。 */
+  @Bean
+  public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration cfg = new CorsConfiguration();
+    cfg.setAllowedOrigins(
+        List.of(
+            "https://localhost",
+            "http://localhost",
+            "http://127.0.0.1",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://192.168.0.104:5173",
+            "http://192.168.0.104:8088",
+            "http://localhost:8088"));
+    cfg.setAllowedMethods(List.of("*"));
+    cfg.setAllowedHeaders(List.of("*"));
+    cfg.setAllowCredentials(true);
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", cfg);
+    return source;
   }
 
   /** service-token 校验（仅匹配 /manage/internal/**；其余路径放行交给安全链）。 */
