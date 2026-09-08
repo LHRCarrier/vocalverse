@@ -31,6 +31,7 @@ def _build(name: str, event: dict):
         "error": ev.StreamError,
         "turn_end_authoritative": ev.TurnEnd,
         "turn_end_legacy_no_expected": ev.TurnEnd,
+        "turn_end_with_words": ev.TurnEnd,
         "session_end": ev.SessionEnd,
     }[name]
     return cls(**event)
@@ -50,10 +51,18 @@ def test_golden_parse_roundtrip() -> None:
 
 
 def test_golden_exclude_none_semantics() -> None:
-    """exclude_none 语义固化：未设置的可选字段（duration/expected_turn/…）不出现在载荷。"""
+    """exclude_none 语义固化：未设置的可选字段（duration/expected_turn/words/…）不出现在载荷。"""
     plain = next(c for c in _CASES["cases"] if c["name"] == "audio_chunk_plain")
     assert "duration" not in plain["event"]
     legacy = next(c for c in _CASES["cases"] if c["name"] == "turn_end_legacy_no_expected")
     assert "expected_turn" not in legacy["event"]
+    assert "words" not in legacy["event"]  # B4：无词时字段缺省（旧端安全忽略）
     authoritative = next(c for c in _CASES["cases"] if c["name"] == "turn_end_authoritative")
     assert authoritative["event"]["expected_turn"] == 1
+    with_words = next(c for c in _CASES["cases"] if c["name"] == "turn_end_with_words")
+    assert with_words["event"]["words"][0] == {
+        "word": "I'd",
+        "start": 0.12,
+        "end": 0.36,
+        "probability": 0.99,
+    }

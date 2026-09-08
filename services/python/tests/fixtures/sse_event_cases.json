@@ -121,6 +121,42 @@
       }
     },
     {
+      "name": "turn_end_with_words",
+      "payload": "data: {\"type\": \"turn_end\", \"turn_index\": 1, \"score_status\": \"ok\", \"expected_turn\": 1, \"words\": [{\"word\": \"I'd\", \"start\": 0.12, \"end\": 0.36, \"probability\": 0.99}, {\"word\": \"like\", \"start\": 0.38, \"end\": 0.61, \"probability\": 0.98}, {\"word\": \"a\", \"start\": 0.64, \"end\": 0.73, \"probability\": 0.97}, {\"word\": \"coffee\", \"start\": 0.75, \"end\": 1.12, \"probability\": 0.99}]}\n\n",
+      "event": {
+        "type": "turn_end",
+        "turn_index": 1,
+        "score_status": "ok",
+        "expected_turn": 1,
+        "words": [
+          {
+            "word": "I'd",
+            "start": 0.12,
+            "end": 0.36,
+            "probability": 0.99
+          },
+          {
+            "word": "like",
+            "start": 0.38,
+            "end": 0.61,
+            "probability": 0.98
+          },
+          {
+            "word": "a",
+            "start": 0.64,
+            "end": 0.73,
+            "probability": 0.97
+          },
+          {
+            "word": "coffee",
+            "start": 0.75,
+            "end": 1.12,
+            "probability": 0.99
+          }
+        ]
+      }
+    },
+    {
       "name": "session_end",
       "payload": "data: {\"type\": \"session_end\", \"summary\": \"Done\", \"report_id\": 5, \"metrics\": {\"turn_count\": 2}}\n\n",
       "event": {
