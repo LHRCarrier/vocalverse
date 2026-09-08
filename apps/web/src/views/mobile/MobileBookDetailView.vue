@@ -9,6 +9,7 @@ import MobileBookCover from '@/components/mobile/MobileBookCover.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { fetchBookDetail } from '@/api/reading'
+import { useMobileBack } from '@/composables/useMobileBack'
 import '@/styles/mobile-uic.css'
 import '@/styles/reader-uic.css'
 
@@ -17,6 +18,9 @@ import type { ReadingBookDetail } from '@/api/reading'
 const route = useRoute()
 const router = useRouter()
 const bookId = Number(route.params.bookId)
+
+/** 返回：回上一页（书架/学习页）；冷启直达本书详情时回退到书架（否则返回键无响应） */
+const goBack = useMobileBack('/m/bookshelf')
 
 const book = ref<ReadingBookDetail | null>(null)
 const loading = ref(true)
@@ -55,7 +59,7 @@ function chapterLabel(no: number): string {
 
 <template>
   <div class="u-phone">
-    <MobileTopBar title="书籍详情" back @back="router.back()" />
+    <MobileTopBar title="书籍详情" back @back="goBack" />
     <div class="u-bd">
       <section v-if="loading" class="u-bd__hero">
         <p class="u-comm-empty__sub">加载中…</p>

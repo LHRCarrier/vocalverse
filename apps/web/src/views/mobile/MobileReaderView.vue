@@ -19,6 +19,7 @@ import { fetchChapter, fetchVoices, fetchVocab } from '@/api/reading'
 import { splitPieceWords, vocabWordSet } from '@/audio/reader-words'
 import { useChapterPrep } from '@/composables/useChapterPrep'
 import { useChapterTts } from '@/composables/useChapterTts'
+import { useMobileBack } from '@/composables/useMobileBack'
 import { useReaderAnnotations } from '@/composables/useReaderAnnotations'
 import { useReaderProgress } from '@/composables/useReaderProgress'
 import { useWordLookup } from '@/composables/useWordLookup'
@@ -34,6 +35,9 @@ const ui = useUiStore()
 
 const chapterId = Number(route.params.chapterId)
 const bookId = Number(route.query.book ?? 0)
+
+/** 返回：回上一页（书详情/书架）；冷启直达阅读器（无上一条历史）时回退到书详情 */
+const goBack = useMobileBack(bookId ? `/m/books/${bookId}` : '/m/bookshelf')
 
 const chapter = ref<ReadingChapter | null>(null)
 const loading = ref(true)
@@ -232,7 +236,7 @@ function nextChapter() {
       </div>
     </div>
     <template v-else-if="chapter">
-      <MobileTopBar :title="chapter.title" back @back="router.push(bookId ? `/m/books/${bookId}` : '/m/bookshelf')" />
+      <MobileTopBar :title="chapter.title" back @back="goBack" />
 
       <main ref="mainEl" class="u-rd__main" @click="onReaderClick" @scroll.passive="scheduleSave()">
         <p class="u-rd__chapter-title">{{ chapter.title }}</p>
