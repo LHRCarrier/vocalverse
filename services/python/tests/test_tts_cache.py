@@ -11,6 +11,7 @@ from app.audio.tts import (
     prune_tts_cache,
     tts_cache_key,
     tts_synthesize_cached,
+    warm_tts_cache,
 )
 
 
@@ -23,6 +24,13 @@ class _CountingTTS(FakeTTSClient):
     ) -> bytes:
         self.calls += 1
         return f"audio:{text}".encode()
+
+
+class _RaisingTTS(FakeTTSClient):
+    async def synthesize(
+        self, text: str, voice: str = "en-US-JennyNeural", rate: str = "+0%"
+    ) -> bytes:
+        raise RuntimeError("engine down")
 
 
 # ---------------------------------------------------------------------------
@@ -117,3 +125,46 @@ async def test_synthesize_cached_expires_by_ttl(tmp_path, monkeypatch) -> None:
         _os.utime(p, (old, old))
     await tts_synthesize_cached(tts, "Hi.", "v", "+0%")
     assert tts.calls == 2
+
+
+# ---------------------------------------------------------------------------
+# 预热 warm_tts_cache（docs/06 §8「开场/常用句预合成」；只补缓存，命中不动引擎）
+# ---------------------------------------------------------------------------
+
+
+async def test_warm_dedupes_and_skips_blanks_then_hits(tmp_path, monkeypatch) -> None:
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "audio_dir", str(tmp_path))
+    tts = _CountingTTS()
+    # 重复文本只预热一次；空/空白文本跳过
+    ok = await warm_tts_cache(tts, ["Hi.", "Hi.", "  ", "", "Bye."], "v", "+0%")
+    assert ok == 2
+    assert tts.calls == 2
+    # 二次预热：缓存命中（返回就绪数，引擎零触访）——预热幂等
+    ok2 = await warm_tts_cache(tts, ["Hi.", "Bye."], "v", "+0%")
+    assert ok2 == 2
+    assert tts.calls == 2
+
+
+async def test_warm_respects_key_dimensions(tmp_path, monkeypatch) -> None:
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "audio_dir", str(tmp_path))
+    tts = _CountingTTS()
+    await warm_tts_cache(tts, ["Hi."], "v1", "+0%")
+    await warm_tts_cache(tts, ["Hi."], "v2", "+0%")  # 不同 voice → 不同键
+    assert tts.calls == 2
+
+
+async def test_warm_failure_tolerant(tmp_path, monkeypatch) -> None:
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "audio_dir", str(tmp_path))
+    tts = _RaisingTTS()
+    # 引擎失败不抛（预热语义：失败仅日志）；返回 0
+    ok = await warm_tts_cache(tts, ["Hi."], "v", "+0%")
+    assert ok == 0
