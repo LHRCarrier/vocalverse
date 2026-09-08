@@ -992,6 +992,51 @@ body.is-login {
   color: var(--u-accent);
 }
 
+/* B4 词级时间轴（2026-09-09）：用户声泡逐词渲染，点播自己录音时 is-active 随播放对轴 */
+.u-word {
+  display: inline-block;
+  padding: 0 1px;
+  color: rgba(255, 255, 255, 0.78);
+  border-radius: 4px;
+  transition: color 120ms ease-out, background-color 120ms ease-out;
+}
+
+.u-word.is-active {
+  color: var(--u-accent, #2f6bff);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* 自己录音回放按钮（用户气泡内；恢复路径 audio_url 回带时出现） */
+.u-selfplay {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 4px 10px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--u-r-pill);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 11px;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background-color 150ms ease-out, transform 60ms ease-out;
+}
+
+.u-selfplay:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.u-selfplay:active {
+  transform: scale(0.95);
+}
+
+.u-selfplay.is-playing {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
 /* 均衡器三柱（扩音动画：只动 transform/opacity，reduced-motion 降级为静态） */
 .u-eq {
   display: inline-flex;

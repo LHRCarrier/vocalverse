@@ -12,8 +12,16 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { track } from '@/api/events'
 import { loadAudioBlob } from '@/api/client'
-import { createSession, fetchScenarios, streamTurn, tts, type ScenarioItem } from '@/api/practice'
+import {
+  createSession,
+  fetchScenarios,
+  fetchSessionRestore,
+  streamTurn,
+  tts,
+  type ScenarioItem,
+} from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
+import { normalizeTimeline, startedWordIndex } from '@/audio/word-timeline'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
 import { useBlobAudio } from '@/composables/useBlobAudio'
 
@@ -33,6 +41,12 @@ interface Bubble {
   chips?: Array<{ phrase: string }>
   /** 有可播语音（喇叭按钮出现条件；开场白进页即启用，回合气泡在 turn_end 解锁且一直保留 → 每条 AI 话语都可重听，2026-09-07） */
   speakable?: boolean
+  /** B4 词级时间轴：ASR 词时间戳（turn_end 快照 / 恢复端点 meta 回带）——自己声泡点播录音时逐词对轴高亮 */
+  words?: Array<{ word: string; start: number; end: number }>
+  /** 用户原始录音回放 URL（save_audio_bytes 落盘引用；恢复端点回带，直播回合内 SSE 不回带） */
+  audioUrl?: string | null
+  /** 词级高亮当前下标（-1 = 前导静默；undefined = 未在播） */
+  highlight?: number
 }
 
 const route = useRoute()
@@ -72,6 +86,8 @@ const reportId = ref<number | null>(null)
 const currentAssistant = ref<Bubble | null>(null)
 const playingBubble = ref<number | null>(null)
 let replayAudio: HTMLAudioElement | null = null
+/** B4：自己录音点播播放态（词级高亮对轴；与 AI 重听互斥——共用单元素 speaker） */
+const playingUserBubble = ref<number | null>(null)
 
 const recorder = new VoiceRecorder()
 let abort = new AbortController()
@@ -147,7 +163,13 @@ onMounted(async () => {
   // 无 sceneId（口语 Tab/中央 + 直达）→ 先让用户选场景；带 sceneId（场景选择/自由对话切换）→ 直接开工
   // 注意：params 缺省可能为 undefined 或 ''，两种都要判（2026-09-05 踩坑：'' 时被误放进场 → 未选场景先出题）
   const sid = route.params.sceneId
-  if (sid !== undefined && sid !== '') {
+  // R-13 断线重连：URL 带 ?session=<id>（刷新/重开页面）→ 恢复既有会话而非新建
+  const resumeId = Number(route.query.session)
+  if (sid !== undefined && sid !== '' && Number.isInteger(resumeId) && resumeId > 0) {
+    stage.value = 'practice'
+    phase.value = 'loading'
+    await resume(resumeId)
+  } else if (sid !== undefined && sid !== '') {
     await startScene()
   } else {
     stage.value = 'choose'
@@ -207,6 +229,44 @@ function resetToChoose() {
   resetChatState()
   phase.value = 'loading'
   stage.value = 'choose'
+}
+
+/** R-13 断线重连（GET /sessions/{id}）：重建对话与轮次；已完成会话直接跳移动端报告页 */
+async function resume(restoreId: number) {
+  try {
+    const r = await fetchSessionRestore(restoreId)
+    if (r.status === 'completed' && r.report_id) {
+      router.push(`/m/report?reportId=${r.report_id}`)
+      return
+    }
+    resetChatState()
+    stage.value = 'practice'
+    phase.value = 'loading'
+    sessionId.value = r.id
+    assignedTurns.value = r.assigned_turns ?? 8
+    currentTurn.value = r.next_expected_turn
+    bubbles.value = r.messages
+      .filter((m) => m.role !== 'system' && m.content)
+      .map((m) => ({
+        role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
+        text: m.content,
+        speakable: m.role === 'assistant', // 重听 = 按文本实时 TTS（既有口径）
+        audioUrl: m.audio_url ?? null,
+        words: m.words?.length ? m.words : undefined,
+      }))
+    // 场景信息（错误提示/埋点用；恢复 URL 保留原 sceneId）
+    try {
+      const scenes = await fetchScenarios()
+      const sceneId = Number(route.params.sceneId)
+      scenario.value = scenes.find((s) => s.id === sceneId) ?? scenes[0] ?? null
+    } catch {
+      scenario.value = null
+    }
+    phase.value = 'ready'
+  } catch {
+    errorMsg.value = '恢复会话失败：请检查登录状态与网络后重试'
+    phase.value = 'done'
+  }
 }
 
 function onScenePicked(sceneId: number) {
@@ -336,6 +396,59 @@ function replay(index: number, text: string) {
   void playTts(text, undefined, index)
 }
 
+/** B4：点播自己的录音 + 词级高亮对轴（恢复路径 audio_url 回带；与 AI 重听共用单元素 speaker） */
+function replayUser(index: number, bubble: Bubble) {
+  if (!bubble.audioUrl || bubble.role !== 'user') return
+  if (playingUserBubble.value === index) {
+    speaker.pause()
+    speaker.ontimeupdate = null
+    speaker.onended = null
+    playingUserBubble.value = null
+    bubble.highlight = undefined
+    return
+  }
+  flushSpeaker()
+  void loadAudioBlob(bubble.audioUrl)
+    .then((blob) => {
+      if (!blob.size) throw new Error('empty audio')
+      const url = createUrl(blob)
+      speaker.src = url
+      speaker.ontimeupdate = null
+      playingUserBubble.value = index
+      const timeline = normalizeTimeline(bubble.words)
+      const finish = () => {
+        speaker.ontimeupdate = null
+        revokeUrl(url)
+        if (playingUserBubble.value === index) {
+          playingUserBubble.value = null
+          bubble.highlight = undefined
+        }
+      }
+      speaker.ontimeupdate = () => {
+        if (playingUserBubble.value !== index) return
+        bubble.highlight = startedWordIndex(timeline, speaker.currentTime)
+      }
+      speaker.onended = finish
+      // 兜底：ended 不触发时按时长定时结束（同 playTts 口径）
+      speaker.addEventListener(
+        'loadedmetadata',
+        () => {
+          const ms =
+            Number.isFinite(speaker.duration) && speaker.duration > 0
+              ? speaker.duration * 1000 + 400
+              : 8000
+          setTimeout(finish, Math.min(ms, 15000))
+        },
+        { once: true },
+      )
+      void speaker.play().catch(() => finish())
+    })
+    .catch((err) => {
+      console.warn('[selfplay] failed:', err)
+      if (playingUserBubble.value === index) playingUserBubble.value = null
+    })
+}
+
 /** 回合流式音频块（单元素排队，顺序播放；播完自动解锁该轮重听按钮） */
 function playChunk(url: string) {
   queueChunk(url)
@@ -446,6 +559,12 @@ function onSseEvent(e: SseStreamEvent) {
       scoreStatus.value = e.score_status === 'ok' ? scoreStatus.value : e.score_status
       // R-13：权威轮次纠偏（服务端回带 expected_turn；断线/刷新后不再靠乐观计数撞 40903）
       currentTurn.value = e.expected_turn ?? currentTurn.value + 1
+      // B4：词级时间轴快照附到本轮用户声泡（点播自己录音按词对轴；直播回合 SSE 不回带录音
+      // URL → 点播按钮在恢复路径（audio_url 回带）出现，直播回合 words 先行存为对轴素材）
+      if (e.words?.length) {
+        const userBubble = [...bubbles.value].reverse().find((b) => b.role === 'user')
+        if (userBubble) userBubble.words = e.words
+      }
       // 2026-09-07 用户反馈重构「听取后才显示重播按钮」：本回合音频**队列播放完**才解锁
       // （maybeUnlockTurn，advance/pump 收尾时触发）；8s 兜底解锁防播放环节异常卡死，
       // 空文本不解锁（LLM 失败降级 → 重播空文本会触发 /tts 422，同上版注释）。
@@ -522,7 +641,27 @@ function onSseEvent(e: SseStreamEvent) {
             <MobileIcon name="wave" :size="16" />
           </span>
           <div class="u-bubble" :class="m.role === 'user' ? 'u-bubble--user' : 'u-bubble--ai'">
-            {{ m.text || '…' }}
+            <!-- B4：用户声泡有词时间轴 → 逐词渲染，点播自己录音时高亮随播放对轴 -->
+            <template v-if="m.role === 'user' && m.words?.length">
+              <span
+                v-for="(w, k) in m.words"
+                :key="k"
+                class="u-word"
+                :class="{ 'is-active': m.highlight === k }"
+              >{{ w.word }}</span>
+              <button
+                v-if="m.audioUrl"
+                class="u-selfplay"
+                :class="{ 'is-playing': playingUserBubble === i }"
+                type="button"
+                :title="playingUserBubble === i ? '停止' : '回放我的录音'"
+                :aria-label="playingUserBubble === i ? '停止播放' : '回放我的录音'"
+                @click="replayUser(i, m)"
+              >
+                {{ playingUserBubble === i ? '■ 停止' : '▶ 回放' }}
+              </button>
+            </template>
+            <template v-else>{{ m.text || '…' }}</template>
             <button
               v-if="m.role === 'assistant' && m.speakable"
               class="u-replay"

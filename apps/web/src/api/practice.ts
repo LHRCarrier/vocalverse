@@ -33,6 +33,8 @@ export interface RestoredMessage {
   audio_url?: string | null
   origin?: string | null
   action?: string | null
+  /** B4 词级时间轴：用户消息 meta 持久化的 ASR 词时间戳（点播自己录音/听读对轴） */
+  words?: Array<{ word: string; start: number; end: number; [key: string]: unknown }> | null
   created_at?: string | null
 }
 
