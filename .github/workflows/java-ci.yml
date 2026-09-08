@@ -34,6 +34,10 @@ jobs:
           cache: maven
 
       - name: Verify (spotless:check + tests)
+        # J-07（2026-09-08）：@Tag("integration")（真 PG Testcontainers）由 surefire
+        # excludedGroups 默认排除——本 job 即 CI 单测档；本地必跑集成：
+        #   cd services/java && mvn verify -Pintegration
+        # （需 Docker + uv；schema 迁移走 services/python alembic upgrade head）
         run: mvn -B -ntp verify -DskipITs
         env:
           MAVEN_OPTS: -Xmx1024m
