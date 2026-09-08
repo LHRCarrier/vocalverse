@@ -17,22 +17,23 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 /**
  * 全局异常 → Envelope（J-08，2026-09-08）：统一 {code, message, data}。
  *
- * <p>背景：此前全仓唯一 @RestControllerAdvice 限定 basePackages=community，Auth/Admin/Ticket/Content/
- * Internal 等域抛 ResponseStatusException / 校验失败 → Spring 默认错误体 {timestamp,status,error,path}，
- * 前端按 Envelope 解包时 data=null、message 读不到（docs/06 第 7 章「任何返回必须过 Envelope」被静默破坏）。
+ * <p>背景：此前全仓唯一 @RestControllerAdvice 限定 basePackages=community，Auth/Admin/Ticket/Content/ Internal
+ * 等域抛 ResponseStatusException / 校验失败 → Spring 默认错误体 {timestamp,status,error,path}， 前端按 Envelope 解包时
+ * data=null、message 读不到（docs/06 第 7 章「任何返回必须过 Envelope」被静默破坏）。
  *
  * <p>职责边界：
+ *
  * <ul>
- *   <li>{@link CommunityException} 仍由 community 包专属 Advice 处理（社区业务码 4xxxx 语义）；</li>
+ *   <li>{@link CommunityException} 仍由 community 包专属 Advice 处理（社区业务码 4xxxx 语义）；
  *   <li>本 Advice **不声明** MethodArgumentNotValidException：community 控制器仍命中
- *       CommunityExceptionHandler（校验失败统一 42203 特例，docs/37）；非 community 校验异常由
- *       下方兜底 handler 转 42201（docs/api/error-codes.md）；</li>
+ *       CommunityExceptionHandler（校验失败统一 42203 特例，docs/37）；非 community 校验异常由 下方兜底 handler 转
+ *       42201（docs/api/error-codes.md）；
  *   <li>ResponseStatusException（Auth/Admin/Ticket/Content/Internal 显式抛出）按 HTTP 状态映射
  *       错误码：400→40001、401→40101、403→40301、404→40401、405→40501、409→40904（「已登记未抛出」
- *       接线：资源/唯一键冲突语义，2026-09-08）、422→42201，其余→50002；</li>
- *   <li>兜底 Exception（含 DataIntegrityViolationException 外的未知异常）→ 500/50002，
- *       不再吐 Spring 默认错误体；过滤器层（JwtAuthFilter 401 / ServiceTokenFilter / Security
- *       403）不经本 Advice，属已知边界（docs/18 登记）。</li>
+ *       接线：资源/唯一键冲突语义，2026-09-08）、422→42201，其余→50002；
+ *   <li>兜底 Exception（含 DataIntegrityViolationException 外的未知异常）→ 500/50002， 不再吐 Spring
+ *       默认错误体；过滤器层（JwtAuthFilter 401 / ServiceTokenFilter / Security 403）不经本 Advice，属已知边界（docs/18
+ *       登记）。
  * </ul>
  */
 @RestControllerAdvice
@@ -53,7 +54,8 @@ public class GlobalExceptionHandler {
   public ResponseEntity<Envelope<Void>> handleResponseStatus(ResponseStatusException ex) {
     int http = ex.getStatusCode().value();
     String message = ex.getReason() != null ? ex.getReason() : "请求处理失败";
-    return ResponseEntity.status(http).body(Envelope.error(STATUS_CODE.getOrDefault(http, 50002), message));
+    return ResponseEntity.status(http)
+        .body(Envelope.error(STATUS_CODE.getOrDefault(http, 50002), message));
   }
 
   /** 唯一键/约束冲突（注册撞用户名、并发写撞唯一索引等）→ 409/40904（J-08 接线「已登记未抛出」码）。 */
@@ -70,7 +72,8 @@ public class GlobalExceptionHandler {
   }
 
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-  public ResponseEntity<Envelope<Void>> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex) {
+  public ResponseEntity<Envelope<Void>> handleMethodNotAllowed(
+      HttpRequestMethodNotSupportedException ex) {
     return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
         .body(Envelope.error(40501, "方法不允许：" + ex.getMethod()));
   }
@@ -81,7 +84,8 @@ public class GlobalExceptionHandler {
   }
 
   @ExceptionHandler(HandlerMethodValidationException.class)
-  public ResponseEntity<Envelope<Void>> handleMethodValidation(HandlerMethodValidationException ex) {
+  public ResponseEntity<Envelope<Void>> handleMethodValidation(
+      HandlerMethodValidationException ex) {
     return ResponseEntity.badRequest().body(Envelope.error(40001, "参数校验失败"));
   }
 

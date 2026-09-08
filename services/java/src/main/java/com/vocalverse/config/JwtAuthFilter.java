@@ -19,13 +19,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * JWT 请求过滤器：解析 Bearer 令牌 → 查 users.status（J-02）→ 写入 SecurityContext
- * （principal=userId，authority=ROLE_&lt;role&gt;）与 request attr。role 来自 JWT claim（2026-09 起签发），
- * 无 role claim 的旧令牌按 ROLE_USER 处理。
+ * （principal=userId，authority=ROLE_&lt;role&gt;）与 request attr。role 来自 JWT claim（2026-09 起签发）， 无
+ * role claim 的旧令牌按 ROLE_USER 处理。
  *
- * <p>J-02（2026-09-08）：status != 'active' 或用户已不存在 → 立即 401（Envelope 40101），不再等
- * access token 过期——修复「禁用不即时生效」：JwtAuthFilter 此前只验签不查库，disabled 用户在
- * access-ttl=3600 内仍可访问全部受保护端点。代价 = 每请求一次 PK 查库（本服务为薄管理端，
- * QPS 低，可承受；规模增长再上短 TTL 缓存 + 变更失效，登记 docs/18 J-02 后续项）。
+ * <p>J-02（2026-09-08）：status != 'active' 或用户已不存在 → 立即 401（Envelope 40101），不再等 access token
+ * 过期——修复「禁用不即时生效」：JwtAuthFilter 此前只验签不查库，disabled 用户在 access-ttl=3600 内仍可访问全部受保护端点。代价 = 每请求一次 PK
+ * 查库（本服务为薄管理端， QPS 低，可承受；规模增长再上短 TTL 缓存 + 变更失效，登记 docs/18 J-02 后续项）。
  */
 public class JwtAuthFilter extends OncePerRequestFilter {
 

@@ -24,13 +24,11 @@ import org.springframework.http.MediaType;
 /**
  * J-01 点赞并发幂等回归（真实事务 · 多线程直调 service）。
  *
- * <p>与 {@link CommunityApiTest} 的类级 @Transactional 不同：本类**不**挂测试事务——MockMvc 请求与
- * service 调用各自开独立事务，多线程并发 like/unlike 才可能落入「先查后插」的 check-then-act
- * 竞态窗口：修复前并发双击 → 第二个 INSERT 撞唯一键 → 未捕获 DataIntegrityViolationException →
- * 500；并发双击取消 → 双减 → like_count 与事实行漂移（修复前本测试即红）。
+ * <p>与 {@link CommunityApiTest} 的类级 @Transactional 不同：本类**不**挂测试事务——MockMvc 请求与 service
+ * 调用各自开独立事务，多线程并发 like/unlike 才可能落入「先查后插」的 check-then-act 竞态窗口：修复前并发双击 → 第二个 INSERT 撞唯一键 → 未捕获
+ * DataIntegrityViolationException → 500；并发双击取消 → 双减 → like_count 与事实行漂移（修复前本测试即红）。
  *
- * <p>线程由 {@code CountDownLatch} 栅栏对齐放行（全部先查空 → 同时插入，最大化窗口命中率），
- * 断言幂等返回 + 计数与事实行一致（改前失败/改后通过的双向证据）。
+ * <p>线程由 {@code CountDownLatch} 栅栏对齐放行（全部先查空 → 同时插入，最大化窗口命中率）， 断言幂等返回 + 计数与事实行一致（改前失败/改后通过的双向证据）。
  */
 class LikeConcurrencyTest extends AbstractAdminApiTest {
 
@@ -154,8 +152,7 @@ class LikeConcurrencyTest extends AbstractAdminApiTest {
     // 修复前：6 次并发双双「删除+递减」→ like_count=GREATEST(2-6,0)=0，事实行剩 1 行（C）→ 漂移 1；
     // 修复后：仅实际删除行的那一次递减 → 2-1=1，与事实行数一致。
     assertEquals(1, p.getLikeCount(), "并发取消只减一次");
-    assertEquals(
-        1, likes.findByLikerIdAndPostIdIn(cId, List.of(postId)).size(), "计数与事实行一致（无漂移）");
+    assertEquals(1, likes.findByLikerIdAndPostIdIn(cId, List.of(postId)).size(), "计数与事实行一致（无漂移）");
     assertFalse(likes.findByPostIdAndLikerId(postId, bId).isPresent(), "B 的行已删除");
     assertTrue(likes.findByPostIdAndLikerId(postId, cId).isPresent(), "C 的行保留");
   }

@@ -15,9 +15,8 @@ import org.springframework.test.web.servlet.MvcResult;
 /**
  * J-02 禁用即时生效回归：已签发未过期 token 在 users.status=disabled 后立即 401。
  *
- * <p>修复前：JwtAuthFilter 只验签不查库（application.yml access-ttl=3600），disabled 用户在
- * token 有效窗口（最长 1 小时）内仍可访问全部受保护端点——本测试改前即红（/auth/me 与
- * 社区 feed 仍 200）。本类不挂 @Transactional：禁用必须提交后由过滤器（独立事务）读到。
+ * <p>修复前：JwtAuthFilter 只验签不查库（application.yml access-ttl=3600），disabled 用户在 token 有效窗口（最长 1
+ * 小时）内仍可访问全部受保护端点——本测试改前即红（/auth/me 与 社区 feed 仍 200）。本类不挂 @Transactional：禁用必须提交后由过滤器（独立事务）读到。
  */
 class DisabledUserAccessTest extends AbstractAdminApiTest {
 

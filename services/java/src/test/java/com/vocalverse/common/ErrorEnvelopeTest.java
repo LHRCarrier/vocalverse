@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.vocalverse.support.AbstractAdminApiTest;
@@ -79,8 +78,7 @@ class ErrorEnvelopeTest extends AbstractAdminApiTest {
     String admin = seedAdminAndLogin();
     assertEnvelope(
         mockMvc
-            .perform(
-                get("/api/v1/admin/users/99999999").header("Authorization", "Bearer " + admin))
+            .perform(get("/api/v1/admin/users/99999999").header("Authorization", "Bearer " + admin))
             .andReturn(),
         404,
         40401);

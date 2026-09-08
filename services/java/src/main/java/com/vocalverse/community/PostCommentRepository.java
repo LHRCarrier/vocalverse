@@ -37,7 +37,8 @@ public interface PostCommentRepository
         .getContent();
   }
 
-  /** S2 通知：指向我（作者）可见帖子的**可见评论**，按时间倒序取近 window。
+  /**
+   * S2 通知：指向我（作者）可见帖子的**可见评论**，按时间倒序取近 window。
    *
    * <p>J-04（2026-09-08）：补 {@code c.status = 'visible'}——此前只过滤父帖状态，软删/隐藏评论
    * 仍会进入通知聚合（点击无法定位，软删约束被绕过）；与 comments() 展示路径 page() 的状态口径对齐。

@@ -83,7 +83,8 @@ public class SecurityConfig {
                     .hasRole("SERVICE")
                     .anyRequest()
                     .authenticated())
-        .addFilterBefore(new JwtAuthFilter(jwt, users, mapper), UsernamePasswordAuthenticationFilter.class)
+        .addFilterBefore(
+            new JwtAuthFilter(jwt, users, mapper), UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(new ServiceTokenFilter(serviceToken), JwtAuthFilter.class);
     return http.build();
   }

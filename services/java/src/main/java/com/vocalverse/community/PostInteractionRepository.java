@@ -24,8 +24,8 @@ public interface PostInteractionRepository extends JpaRepository<PostInteraction
    * 唯一键原子幂等插入（J-01）：返回 1=本次新增；0=已存在（重复请求返回当前态，不双计）。
    *
    * <p>DB 层 {@code ON CONFLICT DO NOTHING} 兜底，替代「先查后插 + catch DataIntegrityViolationException」：
-   * 后者即便 catch 到冲突，Hibernate 已把当前事务标为 rollback-only，事务提交仍抛
-   * UnexpectedRollbackException（真并发下 500 依旧）——由 DB 原子性彻底消除竞态窗口。
+   * 后者即便 catch 到冲突，Hibernate 已把当前事务标为 rollback-only，事务提交仍抛 UnexpectedRollbackException（真并发下 500
+   * 依旧）——由 DB 原子性彻底消除竞态窗口。
    */
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
