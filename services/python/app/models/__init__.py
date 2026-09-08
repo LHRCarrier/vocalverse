@@ -13,6 +13,7 @@ from .community import Follow, Post, PostComment, PostInteraction, PostLike
 from .content import (
     ListeningMaterial,
     Lrc,
+    PitchExtractJob,
     PlacementQuestion,
     Scenario,
     ScenarioMessage,
@@ -44,6 +45,7 @@ __all__ = [
     "Song",
     "Lrc",
     "SongPitchRef",
+    "PitchExtractJob",
     "ListeningMaterial",
     "PlacementQuestion",
     # 练习域

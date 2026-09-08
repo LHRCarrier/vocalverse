@@ -224,6 +224,14 @@ class SingAttempt(CreatedAtMixin, Base):
     lrc_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("lrc.id", ondelete="SET NULL")
     )
+    # 评分算法世代快照（2026-09-09 唱歌 P0 · D10 可追溯）：scoring_version=评分器版本
+    # （如 'v1'——算法/参数升级后旧分可解释，不作废）；ref_version=所用参考旋律提取世代
+    # （song_pitch_refs.version 快照，替代 lrc.revision 方案——LRC 重写→pitch_refs 重建→
+    # version 变化即表达世代，Java 零改动）
+    scoring_version: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("'v1'")
+    )
+    ref_version: Mapped[str | None] = mapped_column(String(16))
     audio_url: Mapped[str | None] = mapped_column(String(512))
     duration_s: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     overall_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
