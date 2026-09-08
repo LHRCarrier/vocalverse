@@ -89,4 +89,38 @@ describe('useChapterTts 单句/章节模式', () => {
     expect(tts.state.value).toBe('ended')
     expect(fake.plays).toHaveLength(3)
   })
+
+  it('单句播完后按 ▶ 重播：仍是单句（不再连播下一句）', async () => {
+    const tts = useChapterTts(1, () => SENTENCES)
+    await tts.playOne(0)
+    expect(fake.plays).toHaveLength(1)
+
+    fake.endedHandler?.() // 单句播完结束
+    await flushPromises()
+    expect(tts.state.value).toBe('ended')
+
+    await tts.toggle() // ▶ 重播
+    expect(fake.plays).toHaveLength(2)
+    expect(tts.state.value).toBe('playing')
+
+    fake.endedHandler?.() // 重播结束：应为单句，不自动进下一句
+    await flushPromises()
+    expect(fake.plays).toHaveLength(2)
+    expect(tts.state.value).toBe('ended')
+  })
+
+  it('章节模式 pause→resume 重播：仍是整章连播', async () => {
+    const tts = useChapterTts(1, () => SENTENCES)
+    await tts.playFrom(0) // plays=1, lastSingle=false
+    await tts.toggle() // ▶ 暂停
+    expect(tts.state.value).toBe('paused')
+    await tts.toggle() // ▶ 恢复 → playFrom(0, false)（章节模式）
+    expect(tts.state.value).toBe('playing')
+    expect(fake.plays).toHaveLength(2)
+
+    fake.endedHandler?.() // 恢复后播完：章节模式 → 自动进下一句
+    await flushPromises()
+    expect(tts.currentIdx.value).toBe(1)
+    expect(fake.plays).toHaveLength(3)
+  })
 })
