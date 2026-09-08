@@ -29,12 +29,15 @@
   WebView 的 onPermissionRequest 也拿不到麦克风）。二者是**录音能用的必要条件**，但**不足够**：
   非安全上下文这个前提不解决，手机上录音仍不可用。
 
-## 根治方向（待组长拍板）
+## 根治（2026-09-10 已落地 · 方案 B）
 
-| 方案 | 说明 | 代价 |
-|---|---|---|
-| **A · HTTPS 局域网 + 手机信任 CA** | Vite 用 mkcert 生成证书起 `https://192.168.0.104:5173`，手机安装该 CA → 安全上下文 → 录音可用；保留 HMR | 手机上装一次 CA；需重打 APK 改 `server.url` |
-| **B · 打包进壳（推荐）** | `webDir` 指向打包产物、去掉 `server.url` → Capacitor 以 `https://localhost` 服务 → 安全上下文；生产形态 | 每次改 web 需 `pnpm build`+`cap sync`+`assembleDebug`（无 HMR） |
+组长先选 A（HTTPS + 手机装 CA），嫌麻烦后改 **B（打包进壳）**：
+
+- `capacitor.config.json`：`webDir="../web/dist"`、`server.androidScheme="https"`、`android.allowMixedContent=true`，去掉 `server.url` → Capacitor 以 **`https://localhost`** 提供打包 web（**浏览器自带安全上下文**，无需装 CA）→ `getUserMedia`/`MediaRecorder` 可用；
+- web 以 `VITE_PYTHON_BASE=http://<IP>:8000`、`VITE_JAVA_BASE=http://<IP>:8080` 重建，API 打到本机后端（构建期写死 IP）；
+- `network_security_config.xml`：仅信任 system CA + `cleartextTrafficPermitted=true`（https 页调 http 后端的混合内容/明文放行）；
+- **后端可被手机访问**：python 改 `--host 0.0.0.0`（原只绑 127.0.0.1，手机连不到）；java 8080 已绑 `::`。
+- 代价：**无 HMR**（改 web 需 `pnpm build`+`cap copy`+`assembleDebug`+重装）；API 基址写死 IP（换网需重建）。
 
 ## 验证
 
