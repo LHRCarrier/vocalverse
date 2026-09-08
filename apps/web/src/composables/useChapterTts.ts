@@ -19,11 +19,12 @@ export function useChapterTts(chapterId: number, getSentences: () => ReadonlyArr
   const errorText = ref('')
   /** 单句听读模式（「听这句」）：本句播完即止，不自动连播下一句（2026-09-10 组长实测反馈） */
   const singleShot = ref(false)
+  /** 上一次是否为单句：重播（▶）沿用同一模式（2026-09-10 组长要求「重播也是单句」） */
+  const lastSingle = ref(false)
   const { createUrl, revokeUrl, releaseAll } = useBlobAudio()
   const audio = shallowRef<HTMLAudioElement | null>(null)
 
   const sentences = computed(() => getSentences())
-
   const currentSentence = computed(() =>
     currentIdx.value >= 0 ? (sentences.value[currentIdx.value] ?? null) : null,
   )
@@ -51,6 +52,7 @@ export function useChapterTts(chapterId: number, getSentences: () => ReadonlyArr
   async function playFrom(idx: number, single = false): Promise<void> {
     if (idx < 0 || idx >= sentences.value.length) return
     singleShot.value = single
+    lastSingle.value = single
     currentIdx.value = idx
     state.value = 'loading'
     errorText.value = ''
@@ -101,8 +103,9 @@ export function useChapterTts(chapterId: number, getSentences: () => ReadonlyArr
       el.pause()
       state.value = 'paused'
     } else if (state.value === 'idle' || state.value === 'paused' || state.value === 'ended') {
+      // 重播沿用上一次模式：单句则仍是单句（组长要求），章节则整章；currentIdx<0（新开）走整章
       if (currentIdx.value < 0) await playFrom(0)
-      else await playFrom(currentIdx.value)
+      else await playFrom(currentIdx.value, lastSingle.value)
     }
   }
 
