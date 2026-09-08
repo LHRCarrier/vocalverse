@@ -3,6 +3,14 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 读书域合入 main（组长手机验收后直合 · 15 提交 · 分支 feat/novel-reading-main）
+
+- 组长手机端验收（Web 5173 → APK 壳均已跑通）后授权直合：`git merge --no-ff` → `main 5c10d19..15f774b` 推送成功（CI 三套门禁由 push 触发）。
+- 内容：读书域 12 功能提交（模型/迁移/种子/20 端点/听书/前端 4 页/契约/docs45-46）+ 2 组热修复 3 提交（0010 迁移 `_bigint_pk` PK 缺失、登录 40904 refresh token 唯一性）——两组热修复均为组长实跑复现 → 修复 + 回归守卫 + BUG 实测归档。
+- 后续排期登记：听书词级时间轴/跨句批注/章节内 TOC/crossfade 见 docs/45 §11（P2 后置）；本地 KittenTTS 启用方式见 README（`uv sync --extra local-tts` + `APP_VOICE_MODELS_DIR`）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 登录偶发 40904 热修复：refresh token 加 UUID 随机因子（组长手机端实测复现 → 修复 + 回归测试 + 真机链路验证）· 3 op
 
 - **复现**：手机（WebView → 5173）登录 `xiaoqing` 报红字「数据冲突：唯一键或约束（重复提交/并发写入）」（Java 40904）。
