@@ -33,8 +33,14 @@ public class SecurityConfig {
 
   private final JwtService jwt;
   private final String serviceToken;
+  private final com.vocalverse.user.UserRepository users;
+  private final com.fasterxml.jackson.databind.ObjectMapper mapper;
 
-  public SecurityConfig(JwtService jwt, @Value("${vocalverse.service-token}") String serviceToken) {
+  public SecurityConfig(
+      JwtService jwt,
+      com.vocalverse.user.UserRepository users,
+      com.fasterxml.jackson.databind.ObjectMapper mapper,
+      @Value("${vocalverse.service-token}") String serviceToken) {
     // docs/19 P0-9：service-token 缺失 → 启动即失败（fail-fast）：内部委托端点双端契约依赖同值，
     // 空串会导致 /internal/** 全部 403 且难以定位（改由启动时显式报错）。
     if (serviceToken == null || serviceToken.isBlank()) {
@@ -43,6 +49,8 @@ public class SecurityConfig {
     }
     this.jwt = jwt;
     this.serviceToken = serviceToken;
+    this.users = users;
+    this.mapper = mapper;
   }
 
   @Bean
@@ -75,7 +83,7 @@ public class SecurityConfig {
                     .hasRole("SERVICE")
                     .anyRequest()
                     .authenticated())
-        .addFilterBefore(new JwtAuthFilter(jwt), UsernamePasswordAuthenticationFilter.class)
+        .addFilterBefore(new JwtAuthFilter(jwt, users, mapper), UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(new ServiceTokenFilter(serviceToken), JwtAuthFilter.class);
     return http.build();
   }
