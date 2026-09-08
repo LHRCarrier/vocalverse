@@ -3,6 +3,17 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 Java P1 批 ④：J-08 错误体统一（全局 @RestControllerAdvice → Envelope）· 15 op
+
+- **背景**：review-java.json（java-08，确认）——全仓唯一 @RestControllerAdvice 限定 basePackages=community（:13），Auth/Admin/Ticket/Content/Internal 域直接 throw ResponseStatusException → Spring 默认错误体 {timestamp,status,error,path}，与社区 Envelope{code,message,data} 双形态并存；前端 java-api.d.ts 全部建模为 Envelope*，非社区错误体统一解包时 data=null、message 读不到。另：docs/api/error-codes.md 登记 40904 但代码从未抛出（登记未接线）；
+- **修复（code）**：新增 `common/GlobalExceptionHandler`（全局 @RestControllerAdvice）：ResponseStatusException 按 HTTP 映射（400→40001/401→40101/403→40301/404→40401/405→40501/409→**40904**（接线已登记码）/422→42201，其余 50002）；DataIntegrityViolationException→409/40904；NoResourceFoundException→404/40401；HttpRequestMethodNotSupportedException→405/40501；HttpMessageNotReadableException→400/40001；HandlerMethodValidationException→400/40001；兜底 Exception→500/50002（不再吐默认错误体，非社区校验异常经兜底转 42201）。**CommunityExceptionHandler 加 @Order(HIGHEST_PRECEDENCE)**——踩坑：全局兜底 `@ExceptionHandler(Exception.class)` 会先于社区 Advice 命中 CommunityException（Advice 咨询顺序按 Order/注册序），必须显式排位才能保住社区 42203/4xxxx 语义；
+- **测试（test）**：新 `common/ErrorEnvelopeTest` 6 例：登录 401→40101 / 重复用户名注册 409→40904 / 无效 refresh 401→40101；admin 404→40401；请求体校验 400→42201（非社区）且社区仍 42203（双码并存锁）；坏 JSON→400/40001；DELETE /coins→405/40501（既有 coin 用例的 405 断言不回归）；未知路径→404/40401。**改前失败证据**：stash 后实跑 → **6/6 红**（「非 Envelope 错误体」——正是双形态缺陷）；改后 6 例绿；
+- **错误码登记**：40501（方法不允许）、50002（服务内部错误兜底）先登记后用；40904 行修订为「资源/唯一键冲突」通用语义（唯一键兜底 + 注册撞名等）；
+- **登记**：docs/api/envelope.md（错误体统一 + 映射表 + 过滤器层边界）、docs/api/error-codes.md、工作日志。契约快照零 diff（Advice 不改变 springdoc 渲染的接口签名）。
+- **门禁**：子集 6 例绿；全量在批次收尾统一跑。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-08）
+
 ## 2026-09-08 Java P1 批 ③：J-04 软删评论通知复活（findMine 补 c.status='visible'）· 6 op
 
 - **背景**：review-java.json（java-04，确认）——`PostCommentRepository.findMine`（:41-45）WHERE 只过滤父帖 status，**未过滤评论自身 c.status**；schema 定义 post_comments.status 三态（visible/hidden/deleted，0007_community_s1.py:186）→ 软删/隐藏评论仍进入通知聚合并推给作者，点击无法定位，软删约束被绕过。对照 comments() 展示路径 page() 已过滤 `c.status='visible'`（口径不一致）；

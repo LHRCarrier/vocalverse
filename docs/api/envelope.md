@@ -11,6 +11,7 @@
 ```
 
 - `code = 0`：成功；非 0 为业务错误码（见 `error-codes.md`）
+- **错误体统一（J-08 · 2026-09-08）**：Java 错误响应一律 `{code, message, data:null}` envelope——全局 `GlobalExceptionHandler`（`@RestControllerAdvice`）把 `ResponseStatusException` / 校验失败 / 唯一键冲突 / 未匹配路径 / 405 / 兜底异常全部翻译为 Envelope（社区包业务码 4xxxx 仍由 `CommunityExceptionHandler` 先咨询，校验失败 42203 特例）；已知边界：过滤器层 401/403（JwtAuthFilter / ServiceTokenFilter / Security）不经 Advice（docs/18 登记）；Java 侧错误码 → HTTP 映射见 error-codes.md（401→40101、404→40401、409→40904、405→40501、兜底→50002）
 - HTTP 状态码负责传输层错误（404/413/429/5xx），`code` 负责业务语义，两者并存
 - 时间字段一律 UTC ISO-8601
 - 分页（offset 型）：`data = { items: [], total, page, page_size }`
