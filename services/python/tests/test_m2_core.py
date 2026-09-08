@@ -407,14 +407,14 @@ def test_events_unknown_type_ignored(client, auth_headers):
     assert r.status_code == 200 and r.json()["data"]["dedup"] is True
 
 
-def test_event_types_all_15_insertable(client, auth_headers):
-    """docs/06 §9.1：15 类事件逐类可落库（防常量/CHECK 漂移；15 = 10 类 + 自由对话 5 类）。"""
+def test_event_types_all_20_insertable(client, auth_headers):
+    """docs/06 §9.1：20 类事件逐类可落库（防常量/CHECK 漂移；15 类既有 + 读书域 5 类）。"""
     import time
 
     from app.models.base import EventTypes
 
     allowed = {v for k, v in vars(EventTypes).items() if k.isupper() and not k.startswith("__")}
-    assert len(allowed) == 15, f"事件类应有 15 个：{allowed}"
+    assert len(allowed) == 20, f"事件类应有 20 个：{allowed}"
     now = int(time.time())
     for i, name in enumerate(sorted(allowed)):
         r = client.post(

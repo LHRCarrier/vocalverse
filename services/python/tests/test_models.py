@@ -43,6 +43,15 @@ EXPECTED_TABLES = {
     "post_likes",
     "defense_profiles",
     "usage_log",
+    # 读书域（docs/45 · 迁移 0010；含词形反向索引表）
+    "books",
+    "book_chapters",
+    "dictionary_entries",
+    "dictionary_forms",
+    "user_reading_progress",
+    "user_vocabulary",
+    "reading_annotations",
+    "tts_tasks",
 }
 
 
