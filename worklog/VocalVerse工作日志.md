@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-09 B4 后端补强：词时间轴持久化（用户消息 meta.words）+ 恢复端点回带 · 1 op
+
+- **背景**：B4 前批 turn_end.words 仅 SSE 流内快照（未落库）——断线/刷新后词级对轴素材丢失；移动端点播自己录音需要「消息 → 词时间轴 + 录音 URL」成对可查。
+- **实现（code 独立提交）**：三类回合用户消息 meta 附 `words`（dialog `_persist_dialog_turn` 增参 / defense / shadow 落库处）；`GET /sessions/{id}` 恢复响应 messages 增 `words`（meta 读取，无词缺省）——回合外（恢复/回放）仍可按词对轴。
+- **测试（test 独立提交）**：`test_session_restore.py` +1——meta 持久化词时间戳 + audio_url 随恢复端点回带（修复前：响应无 words 字段，红）。
+- **门禁**：Python `ruff + format --check .` 全绿、`pytest -q` **315 passed**（314+1）；契约快照**零 diff**（响应体无 OpenAPI schema 绑定，committed==live 断言通过）；前端侧见安卓日志（移动端断线重连 + 词级高亮，115 passed）。
+- **组长指正登记（2026-09-09）**：优化系列以**移动端为准**，网页端暂缓——桌面端已落地功能保留，新投入优先手机端。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-09）
+
 ## 2026-09-09 B4：词级时间轴（SSE turn_end 附 words 快照 + golden 双端 + 前端逐词高亮纯函数）· 4 op
 
 - **背景**：任务 B4（词级时间轴，M）——fluency.py 已产 ASR 词级时间戳（whisper word_timestamps），但 SSE turn_end 不回带，前端无法逐词高亮/回放对轴。
