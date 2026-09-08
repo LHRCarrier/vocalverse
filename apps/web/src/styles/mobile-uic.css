@@ -3231,10 +3231,16 @@ body.is-login {
  * 统一顶栏 MobileTopBar（全局头像 / 页面标题 / 右侧扩展按钮 · 2026-09-05）
  * 2026-09-05 晚：改 grid 三列 1fr auto 1fr（标题真居中，不受左右宽度影响）；
  * 右侧按钮改底部 tab 同款 Tabler 线性图标（无底 icon-only，Grok 对照）
+ * 2026-09-10 修复长标题遮挡左上头像（组长手机实测 bug 2）：
+ *   原 `1fr auto 1fr` 的中间 auto 轨道按 max-content 撑开，左右 1fr 被压到 0 →
+ *   `.u-topbar__left{min-width:0}` 让头像溢出到标题盒下面（标题盒 x=26 < 头像右沿 52）。
+ *   改为左右轨道 min = min-content（头像/右侧按钮永不被压缩），
+ *   中间轨道 minmax(0, auto)（长标题可收缩到 0 走省略号，短标题仍按内容居中）。
+ *   实测 390px 视口：长标题 title=[62,320] / ava=[16,52] → overlap=false（修复前 overlap=true）。
  * ============================================================ */
 .u-topbar {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(min-content, 1fr) minmax(0, auto) minmax(min-content, 1fr);
   align-items: center;
   gap: 10px;
   padding: 12px 16px 10px;
@@ -3245,7 +3251,7 @@ body.is-login {
   align-items: center;
   gap: 8px;
   justify-content: flex-start;
-  min-width: 0;
+  min-width: 0; /* 轨道 min-content 已保证头像不被压缩（见 .u-topbar 注）；此处仅防内部溢出 */
 }
 
 /* 离开钮（右侧 actions 位 · 2026-09-09 组长反馈：放左侧破坏 X「左身份右操作」范式 →
@@ -3283,6 +3289,7 @@ body.is-login {
 
 .u-topbar__title {
   margin: 0;
+  min-width: 0; /* 长标题必须能收缩到 0，否则把左右轨道挤没（2026-09-10） */
   font-size: 17px;
   font-weight: 800;
   letter-spacing: 0; /* 中文标题 0 字距（docs/31）；grid auto 列天然居中 */
