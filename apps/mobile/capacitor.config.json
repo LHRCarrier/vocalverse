@@ -1,10 +1,9 @@
 {
   "appId": "com.vocalverse.app",
   "appName": "VocalVerse",
-  "webDir": "dist",
+  "webDir": "../web/dist",
   "server": {
-    "url": "https://192.168.0.104:5173",
-    "cleartext": true
+    "androidScheme": "https"
   },
   "android": {
     "allowMixedContent": true

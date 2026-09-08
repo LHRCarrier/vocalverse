@@ -1,8 +1,12 @@
 # apps/mobile · VocalVerse 手机壳（Capacitor）
 
-> 2026 今日交付形态：**远程 URL 型壳**——Android WebView 直接加载局域网内全栈地址
-> `http://192.168.1.3:8088`（docker compose 一键栈，nginx 同源反代 `/api/v1` 与 `/manage`；IP 以实际局域网为准）。
-> 无需在前端构建产物装入壳内；壳与 Web 应用解耦、后端零改动。
+> 2026-09-10 起改为**打包进壳型**（方案 B）：`webDir: "../web/dist"`，Capacitor 以 **`https://localhost`**
+> 提供 web（安全上下文 → 手机端录音 `getUserMedia`/`MediaRecorder` 可用，无需装 CA）；Web 的 API 用构建期
+> 环境变量指到本机后端（`VITE_PYTHON_BASE=http://<局域网IP>:8000`、`VITE_JAVA_BASE=http://<局域网IP>:8080`），
+> 经 `allowMixedContent` + 网络安全配置放行明文。
+>
+> ⚠️ 早期是「远程 URL 型壳」（`server.url` 指向局域网 HTTP）。因 getUserMedia 要求安全上下文，
+> 远程 HTTP 在手机上必然不可用；若坚持远程壳，需 HTTPS + 手机信任 CA（曾为方案 A，已弃用）。
 
 ## 目录
 
@@ -18,19 +22,25 @@ apps/mobile/
 ```powershell
 cd apps/mobile
 pnpm install
-npx cap init "VocalVerse" "com.vocalverse.app" --web-dir=dist
-# 修改 capacitor.config.json：server.url = 全栈访问地址（真机与后端起在同一局域网）
+# ① 先构建 Web（API 基址指向本机后端；桌面/localhost 开发可省略这两行环境变量）
+cd ../web
+$env:VITE_PYTHON_BASE='http://<局域网IP>:8000'
+$env:VITE_JAVA_BASE='http://<局域网IP>:8080'
+pnpm build        # 产物 apps/web/dist
+cd ../mobile
+# ② 初始化 Capacitor（androidScheme https = 打包壳走 https://localhost 安全上下文）
+npx cap init "VocalVerse" "com.vocalverse.app" --web-dir=.
 npx cap add android
-npx cap sync android
+npx cap copy android
 cd android
 .\gradlew.bat assembleDebug
 # 产物：android\app\build\outputs\apk\debug\app-debug.apk
 ```
 
-## 真机安装
+## 手机安装
 
 ```powershell
-# 方式 1：adb（需开启开发者模式 + USB 调试）
+# 方式 1：adb（需开发者模式 + USB 调试）
 adb install -r android\app\build\outputs\apk\debug\app-debug.apk
 # 方式 2：把 APK 传到手机直接安装（允许未知来源）
 ```
@@ -39,10 +49,12 @@ adb install -r android\app\build\outputs\apk\debug\app-debug.apk
 
 | 项 | 值 | 说明 |
 |---|---|---|
-| `server.url` | `http://<局域网IP>:8088` | 改为你环境实际 IP；`localhost` 在手机上不成立 |
-| `server.cleartext` | `true` | 允许 HTTP 明文（内网演示；上生产 HTTPS 后应移除并改 `false`） |
-| `android.allowMixedContent` | `true` | 同上，演示用 |
-| AndroidManifest | `usesCleartextTraffic=true` | Android 9+ 默认禁明文，已显式放开 |
+| `webDir` | `../web/dist` | 打包的 web 产物（apps/web/dist），`npx cap copy` 同步 |
+| `server.androidScheme` | `https` | 打包壳以 `https://localhost` 服务 → 安全上下文（录音可用） |
+| `android.allowMixedContent` | `true` | https 页面向 http 后端发请求（混合内容）放行；演示口径，生产应改 https |
+| 网络安全配置 | `res/xml/network_security_config.xml` | `cleartextTrafficPermitted=true` 放行明文；仅信任 system CA |
+| API 基址 | 构建期 `VITE_PYTHON_BASE`/`VITE_JAVA_BASE` | 写死局域网 IP；换网/IP 变需重新 `pnpm build` + `cap copy` |
+| `RECORD_AUDIO` | AndroidManifest | 录音（getUserMedia）必需权限 |
 
 ## 演示账号（M2 seed）
 
