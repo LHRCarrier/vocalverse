@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.vocalverse.support.AbstractAdminApiTest;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional
 class CommunitySocialTest extends AbstractAdminApiTest {
+
+  @Autowired private PostRepository posts;
+  @Autowired private PostCommentRepository comments;
 
   private static final int CODE_OK = 0;
 
@@ -255,5 +259,68 @@ class CommunitySocialTest extends AbstractAdminApiTest {
                 .andReturn());
     assertEquals(1, noti.path("data").path("items").size());
     assertEquals(postA, noti.path("data").path("items").get(0).path("postId").asLong());
+  }
+
+  /** J-04：软删/隐藏评论不得在通知里「复活」（findMine 须过滤 c.status='visible'）。 */
+  @Test
+  void notifications_exclude_softdeleted_comments() throws Exception {
+    String author = registerUser("s2_nt3_a");
+    String b = registerUser("s2_nt3_b");
+    long postId = createPost(author);
+
+    MvcResult comment =
+        mockMvc
+            .perform(
+                post("/api/v1/community/posts/" + postId + "/comments")
+                    .header("Authorization", bearer(b))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"body\":\"会被删的评论\"}".getBytes(StandardCharsets.UTF_8)))
+            .andReturn();
+    JsonNode c1 = json(comment);
+    assertEquals(CODE_OK, c1.path("code").asInt(), c1.toString());
+    long commentId = c1.path("data").path("id").asLong();
+
+    // 拆除前：通知含 1 条评论
+    JsonNode before =
+        json(
+            mockMvc
+                .perform(
+                    get("/api/v1/community/notifications").header("Authorization", bearer(author)))
+                .andReturn());
+    assertEquals(1, before.path("data").path("items").size(), before.toString());
+
+    // 软删评论（status=deleted；评论展示路径 page() 早已过滤，唯独通知 findMine 没有——J-04）
+    PostCommentEntity c = comments.findById(commentId).orElseThrow();
+    c.setStatus("deleted");
+    comments.save(c);
+
+    JsonNode after =
+        json(
+            mockMvc
+                .perform(
+                    get("/api/v1/community/notifications").header("Authorization", bearer(author)))
+                .andReturn());
+    assertEquals(0, after.path("data").path("items").size(), "软删评论不得出现在通知：\n" + after);
+
+    // 同口径覆盖 hidden（隐藏评论同样不通知）
+    MvcResult c2 =
+        mockMvc
+            .perform(
+                post("/api/v1/community/posts/" + postId + "/comments")
+                    .header("Authorization", bearer(b))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"body\":\"会被隐藏的评论\"}".getBytes(StandardCharsets.UTF_8)))
+            .andReturn();
+    long hiddenId = json(c2).path("data").path("id").asLong();
+    PostCommentEntity h = comments.findById(hiddenId).orElseThrow();
+    h.setStatus("hidden");
+    comments.save(h);
+    JsonNode after2 =
+        json(
+            mockMvc
+                .perform(
+                    get("/api/v1/community/notifications").header("Authorization", bearer(author)))
+                .andReturn());
+    assertEquals(0, after2.path("data").path("items").size(), "隐藏评论不得出现在通知：\n" + after2);
   }
 }
