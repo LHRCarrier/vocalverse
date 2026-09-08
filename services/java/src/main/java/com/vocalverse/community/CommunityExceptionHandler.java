@@ -1,15 +1,20 @@
 package com.vocalverse.community;
 
 import com.vocalverse.common.dto.Envelope;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * 社区域异常 → Envelope（限定 basePackages=community，不影响既有端点的 Spring 默认错误体）。 校验失败统一 42203（docs/37
+ * 社区域异常 → Envelope（限定 basePackages=community，与全局 GlobalExceptionHandler 并存：
+ * 本类 @Order(HIGHEST_PRECEDENCE) 保证先被咨询——同类型异常（CommunityException / 校验失败）由本类
+ * 按社区语义处理（42203），其余类型回落到全局 Advice 统一 Envelope）。校验失败统一 42203（docs/37
  * 错误码），业务错误按 CommunityException 的 code/httpStatus。
  */
+@Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(basePackages = "com.vocalverse.community")
 public class CommunityExceptionHandler {
 
