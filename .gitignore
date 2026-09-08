@@ -80,3 +80,6 @@ Thumbs.db
 
 # HF 模型下载缓存（构建上下文预下载用；红线禁止提交，2026-09-07）
 services/python/.models-cache/
+
+# --- Java 本地访问日志（2026-09-10 手机联调排障开启） ---
+services/java/logs/

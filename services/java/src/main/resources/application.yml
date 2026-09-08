@@ -12,6 +12,16 @@ spring:
 
 server:
   port: 8080
+  # 2026-09-10 手机联调排障：后端默认不记访问日志，无法确认手机请求是否到达。
+  # 开启 Tomcat access log（pattern：远端IP 时间 "方法 路径" 状态 字节 耗时ms）；
+  # 文件写到进程工作目录 logs/ 下（dev-up 方式 B 即 services/java/logs/）。
+  tomcat:
+    accesslog:
+      enabled: true
+      pattern: '%h %t "%r" %s %b %Dms'
+      # embedded Tomcat 的相对目录基于 catalina.base（TEMP 下随机目录）→ 显式 user.dir 固定到
+      # 进程工作目录（dev-up 方式 B 即 services/java/logs/）
+      directory: ${user.dir}/logs
 
 # 日志带 requestId（RequestIdFilter 写 MDC，docs/06 §11）
 logging:
