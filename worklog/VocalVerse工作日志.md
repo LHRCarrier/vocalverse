@@ -3,6 +3,19 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 前端 P1 批（Web/埋点部分：fe-02 / fe-05 / fe-06 + fe-07 Web 侧）· 8 op
+
+- **fe-02（S）答辩页 SSE 取消**：DefenseView 两处 streamTurn（sendServe / answer）补第 5 参 `abort.signal`（此前缺省 → openSseFetch 不传 signal，组件卸载后连接最长挂 90s idle 超时，占用服务端流式推理资源）；`onUnmounted` 补 `abort.abort()`；`startSession` 重建 controller（「重新生成」语义）。与同仓 MobileSpeakingView/PracticeView 取消行为对齐。
+- **fe-07（S，Web 侧）报告跳转定时器清理**：DefenseView `session_end` 的 1200ms `setTimeout` 存入 `reportTimer`，`onUnmounted` 清理——用户收尾窗口内返回/切页不再被拽回 `/report/{id}`。
+- **fe-05（XS）埋点不阻塞关键链路**：PlacementView `upload()` 的 `await track('recording_complete')` 与 `finish()` 的 `await track('practice_complete')` 改 fire-and-forget（`void ... .catch(() => undefined)`）——此前埋点往返拖住 `uploading` 按钮，事件服务不可达时「下一题」被卡到 fetch 超时；与 recording_start 既有口径统一（注释同步为「埋点一律 fire-and-forget，不阻塞关键链路」）。
+- **fe-06（M）埋点可靠性**：① events.ts 注释「10 类事件」修正为「13 类」（union 实际 13 成员）；② `router/index.ts` afterEach 补 `page_view` 上报（fire-and-forget；此前 page_view 声明零调用，核心页面曝光指标恒无数据）；③ 关键转化事件（`scene_start` / `practice_complete` 全部调用点）加 `beacon: true`——实现为 `keepalive: true` fetch（**sendBeacon 无法携带 Authorization header，本接口经 get_current_user_id 鉴权，故改用 keepalive**；页面卸载/刷新/路由切换边界事件不再静默丢失）。free_chat_switch/free_chat_rate 仍为「声明未接线」（docs/14 规划事件、当前 UI 无接线点，按评审「或删除」暂保留在 union 供后续功能使用）。
+- **测试（test 独立提交）**：`api/__tests__/events.test.ts` 4 例（beacon→keepalive 断言 / 默认无 keepalive / 失败静默）；`views/__tests__/DefenseView.test.ts` 2 例（卸载 abort 断言 + session_end 卸载不跳转）。
+- **修复前失败证据**：stash 源码（保留新测试）后跑新测试——**8 例红**（events 1 / community 4 / DefenseView 2 / MobileSpeakingView 1），逐一对应缺陷：events `beacon keepalive` 断言失败；community「旧请求覆盖新 domain：expected [1] to deeply equal [2]」；DefenseView「expected null to be truthy」= streamTurn 无 signal、session_end 卸载后 push 仍被调（`expected "push" to not be called at all`）。
+- **门禁（改后基线）**：`pnpm test:run` **106 passed**（基线 95 + 11）；`pnpm lint` / `pnpm typecheck` / `pnpm build` 全绿；契约零 diff（纯前端，无后端/契约改动）。
+- **遗留登记**：fe-04 虚拟化登记 P2（本轮做上限裁剪 + 懒加载确认，详见安卓日志）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-08）
+
 ## 2026-09-08 Java P1 批 收尾：**双端门禁 + 全量 48+299+95 绿**（踩坑：共享 H2 上下文污染）· 12 op
 
 - **全量门禁（改后基线）**：Java `mvn verify` **48 tests 绿**（基线 36 + 新增 12：J-01 并发 2 / J-02 禁用 1 / J-04 软删通知 1 / J-05 往返恒定 1 / J-06 limit+往返 1 / J-08 错误体 6）+ spotless 绿；`mvn verify -Pintegration -Dtest=CommunityPgIntegrationTest` **6/6 绿**（真 PG）；Python `ruff + format + pytest -q` **299 passed**（基线保持，本批 Java 侧不动 Python）；前端 `pnpm lint/typecheck/test:run/build` 全绿（**95 tests**，基线保持）；`ContractSnapshotTest` 对账通过（J-06 契约变更已同步快照+gen:api，python 快照零 diff）；java-ci.yml 本地 yaml.safe_load 校验通过；
