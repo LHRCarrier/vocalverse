@@ -3,6 +3,28 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-08 Java P1 批 ⑦：J-07 Testcontainers 真 PG 集成（6 例 · 抓出 timestamptz 舍入口径差）· 25 op
+
+- **背景**：review-java.json（java-07，确认）——pom 无 testcontainers、无 @Tag("integration")、H2 create-drop 从头至尾；**部分唯一索引 uq_posts_checkin / JSONB / timestamptz(6) 微秒 / GREATEST / ON CONFLICT 从未在真 PG 验证**（H2 MODE=PostgreSQL 近似；42P18 未类型化 NULL 是「H2 全绿掩盖真机 500」前车之鉴）；
+- **实现**：pom 加 `org.testcontainers:postgresql + junit-jupiter`（test scope）+ surefire `<excludedGroups>${surefire.excludedGroups}</excludedGroups>`（默认 integration，`-Pintegration` 覆盖为空→全跑）；`CommunityPgIntegrationTest`（@Tag("integration")）——Testcontainers 起 postgres:16-alpine → **Alembic `uv run alembic upgrade head` 建真 schema**（dp: APP_DATABASE_URL 指向容器；schema 真源=迁移，杜绝「Hibernate create-drop 假绿」）→ 裸 JDBC 断言 6 例：① uq_posts_checkin 部分唯一索引（每日一卡×同日 article 豁免×异作者豁免）；② GREATEST 减到 0 护底；③ ON CONFLICT DO NOTHING 幂等（J-01 依赖语义）；④ JSONB 写入往返 + jsonb 相等（键序无关）；⑤ **timestamptz(6) 微秒**；⑥ **EXPLAIN**（enable_seqscan=off）feed 混排/领域查询反向扫描命中 ix_posts_feed_time / ix_posts_domain_time + Backward（J-11 证据落地）；
+- **重大发现（⑤，集成测试的价值兑现）**：PG timestamptz(6) 对纳秒输入**四舍五入**（.123456789 → .123457），而 `CommunityService.micro()` 是 **%1000 截断**——口径差真实存在；核实读路径（实体值均从 DB 读回、已 6 位）无碰撞，keyset 游标安全，仅「以写入期 9 位 Instant 做游标」的未来场景会差 1µs → 登记 docs/37 §9（断言改为「舍入后的微秒键相等」+ 上/下舍入双边界）；
+- **踩坑（环境级）**：① 本机 Docker Desktop 4.69（Engine 29.4.0）下 testcontainers 1.19.8/1.21.3 的 docker-java 命名管道协商全败（ping 400 BadRequest，`docker_cli` pipe 在 4.69 已非完整 API——CLI/Python testcontainers 都正常，唯 docker-java 挂）；**官方 issue #11422 处置 = 1.21.4**（维护者 eddumelendez 指定），升后即通；② Docker Desktop 开机未启动时集成测试自动 skip（assumption，不破坏默认门禁）；③ surefire 版本属性覆盖 BOM 用 `<testcontainers.version>`；
+- **验证**：`mvn verify -Pintegration -Dtest=CommunityPgIntegrationTest` **6/6 绿**（含 alembic 迁移跑通）；CI 默认档（`mvn verify`，排除 integration）不受影响；契约快照零 diff（本次 Advice 不涉接口）——J-06 的 limit 参数另走 chore(contract) 提交；
+- **登记**：pom/README/github java-ci（注释登记 -Pintegration 用法与前置 Docker+uv）/docs/37 §9（PG-only 用例落地 + micro 舍入口径）/工作日志。yaml.safe_load 校验 java-ci.yml 通过。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-08）
+
+## 2026-09-08 Java P1 批 ⑥：J-06 收敛（推荐关注 3N+1 + 巨型 IN → 批量 + EXISTS；J-03 登记口径）· 14 op
+
+- **背景**：review-java.json（java-06，确认）——recommendations() users.findAll() 全表 + 每用户 2 次 loadAuthors + 1 次 follows 判定（3N+1）；followingFeed 把全部 followeeIds 塞 IN（数万级列表索引失效）。二者均为用户可见端点、演示期简化注释在案；
+- **修复（code）**：① recommendations 改**候选分页**（`?limit` 默认 50/上限 100，服务端 clamp；users 分页不再全表）+ **批量作者一次 loadAuthors + 批量关注 `findByFollowerIdAndFolloweeIdIn` 一次判定**（3 查询恒定）；② followingFeed 改**相关 EXISTS 子查询**（follower=:me AND followee=p.author_id，命中 ix_follows_followee）+ `countByFollowerId` 空关注快检——不再拼巨型 IN；
+- **测试（test）**：`CommunitySocialTest` 增 `recommendations_limit_and_constant_roundtrips`：limit=3 只回 3 条（改前：全表 10 条）、Hibernate Statistics 往返 ≤8（改前：1+7×3=22+）。**改前失败证据**：stash 后实跑 → `expected 3 but was 10`（全表返回）；改后 7 例全绿；
+- **J-03 登记（L 级 · 按任务口径登记不实施）**：notifications 的 50+50 内存窗口 + 窗口内重筛是**有意的演示期简化**（代码注释 + docs/41 §1 登记）；第 51 条起数据丢失（正确性）+ O(窗口) 每页重算（性能）为真问题——**后续项**：DB 层 keyset 分页 + SQL 层 mergeKey 聚合（或物化通知表）+ EXPLAIN 验证（posts 侧证据链已在 J-07 完成）；当前演示量级无法感知，随规模升级验收；
+- **登记**：docs/41 §1/§2/§3（J-06 收敛口径 + J-03 后续项清单 + 契约 limit 行）；docs/37 §9。**契约变更**：/follows/recommendations 加 `limit` 参数 → 快照 + gen:api 已刷新（chore(contract) 提交）。
+- **门禁**：子集 7 例绿；全量在批次收尾统一跑。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-08）
+
 ## 2026-09-08 Java P1 批 ⑤：J-05+J-11 读路径批量聚合（评论 N+1 消除 + readOnly 事务）· 12 op
 
 - **背景**：review-java.json（java-05 确认：comments() :180 逐条 map(toCommentView)，每条 loadAuthors=2 查询（users+profiles），20 条页≈41 次往返且无事务（open-in-view=false 每调用一 session）；java-11 确认：feed/comments/followingFeed 等 7 个读方法均无 @Transactional + J-05 同根因（整体读放大，反向扫描待 EXPLAIN 证据——正式考证放 J-07 集成）；
