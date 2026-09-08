@@ -3,6 +3,17 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 读书域迁移 0010 热修复：`_bigint_pk()` 补 `primary_key=True`（组长实跑复现 → 修复 + 真 PG 验证）· 3 op
+
+- **复现**：组长本机 `uv run alembic upgrade head` → `psycopg.errors.InvalidForeignKey: no unique constraint matching given keys for referenced table "books"`（建 book_chapters 时 FK 引用 books(id) 被拒；迁移事务回滚后 seed 报 `relation "books" does not exist` 为连锁）。
+- **根因**：`alembic/versions/0010_reading.py::_bigint_pk()` 漏 `primary_key=True` → books.id 为普通 BIGINT；PG 对 FK 引用列要求 UNIQUE/PK。模型侧 `base.py::bigint_pk()` 有主键，故 **SQLite 单测（create_all）与离线 SQL 渲染（test_alembic_offline_pg_render 只拼串）都不暴露 → CI 绿真库红**。
+- **修复（code 独立提交）**：辅助函数补 `primary_key=True`（8 表共享一处修复）；**回归守卫**（test 独立提交）：`test_models.py` 的离线渲染断言后追加逐表检查——抽取每张读书域表的 CREATE 块断言含 `PRIMARY KEY`（修复前必失败；`READING_TABLES` 常量 8 表）。
+- **验证（真 PG16 容器）**：`upgrade head` ✅（原错消除）→ `alembic check` ✅ 零漂移 → `downgrade 0009` + `upgrade head` 往返 ✅ → `seed_reading` ✅（books 3 / dictionary 10,612 / forms 11,501）→ `pg_tables` 8 表齐 → pytest 全量 **366 passed / 4 skipped**。
+- **踩坑（已归档 `worklog/BUG实测/读书域迁移0010-PK缺失.md`）**：①离线渲染 ≠ 可执行验证——新建表迁移合入前必须在真 PG 跑 upgrade+downgrade 往返；②迁移辅助函数与模型辅助函数必须同构（base.py::bigint_pk 即为范本）；③seed 报「表不存在」先查 `alembic current`，别先改 seed。
+- **门禁**：ruff/format 全绿、pytest 366 passed；前端零改动。未 push（分支 feat/novel-reading-main）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 读书域（英文小说阅读）· 后端 + 契约 + 文档（组长午间委托 AI 全自动闭环：需求→四官拷问→实现→测试→文档，分支 feat/novel-reading-main，未 push）· 多 op
 
 - **背景与需求（组长口述 + 截图）**：加「书籍」功能——纯文本阅读、听书（参考 https://github.com/debpalash/VoiceStudio；语音模型可选用 `F:\WorkingL\VoiceStudio\OmniVoiceStudio-Data\data\models`）、点击选词看释义（截图形态：音标+释义+加入生词本+外链）、笔记/生词/划词/批注；**前端只做移动端**；全自动闭环（需求→设计→子代理拷问[数据模型/业务逻辑联动/模块设计/UI-UX]→实现）；新分支不 push。
