@@ -181,7 +181,9 @@ switch ($Action) {
 
         Write-Host "== 启动 Python :8000（uvicorn --reload）=="
         if ((Get-PortPid 8000).Count -eq 0) {
-            Start-Detached "python-8000" "Set-Location '$Root\services\python'; uv run uvicorn app.main:app --reload --port 8000" "$Root\services\python"
+            # --host 0.0.0.0（2026-09-10）：方案 B 打包壳里 Web 直接调 http://<局域网IP>:8000，
+            # 只绑 127.0.0.1 时手机连不到（本地 health 检查仍走 127.0.0.1，不受影响）
+            Start-Detached "python-8000" "Set-Location '$Root\services\python'; uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000" "$Root\services\python"
         } else { Write-Host "  已在运行，跳过。" }
 
         Write-Host "== 启动 Java :8080（mvn spring-boot:run）=="
