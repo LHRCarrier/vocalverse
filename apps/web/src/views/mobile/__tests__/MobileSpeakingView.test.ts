@@ -162,3 +162,22 @@ describe('MobileSpeakingView（场景对话重听按钮）', () => {
     expect(wrapper.findAll('.u-replay')).toHaveLength(1)
   })
 })
+
+describe('MobileSpeakingView（fe-07 报告跳转定时器清理）', () => {
+  it('session_end 后卸载：1600ms 定时器被清理，不把用户拽回报告页（修复前：离开仍跳转）', async () => {
+    const wrapper = await mountView()
+    vi.useFakeTimers()
+    // 录音触发 sendTurn → streamTurn 捕获 onEvent（同步设置，无需 flush）
+    fake.recorderOnStop!(new Blob(['x']), 'audio/webm', 3000)
+    expect(fake.onEvent).toBeTruthy()
+
+    const pushSpy = vi.spyOn(router, 'push')
+    fake.onEvent!({ type: 'session_end', report_id: 9, summary: '完成' } as SseStreamEvent)
+
+    wrapper.unmount()
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(pushSpy).not.toHaveBeenCalled()
+    pushSpy.mockRestore()
+    vi.useRealTimers()
+  })
+})
