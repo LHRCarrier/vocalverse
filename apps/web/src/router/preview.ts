@@ -46,6 +46,10 @@ export const previewRoute: RouteRecordRaw | null = import.meta.env.DEV
           component: () => import('@/views/preview/CommunityPreview.vue'),
         },
         {
+          path: 'singing',
+          component: () => import('@/views/preview/SingingPreview.vue'),
+        },
+        {
           path: 'admin-dashboard',
           component: () => import('@/views/preview/AdminDashboardPreview.vue'),
         },

@@ -34,6 +34,12 @@ export const previewPages: PreviewPage[] = [
     group: '用户端',
     layout: 'gallery',
   },
+  {
+    path: '/preview/singing',
+    label: '唱歌评分 · 全链路联调台（M3 P0）',
+    group: '用户端',
+    layout: 'gallery',
+  },
   { path: '/preview/admin-dashboard', label: '评价看板（可视化）', group: '管理端', layout: 'admin' },
   { path: '/preview/admin-users', label: '用户管理', group: '管理端', layout: 'admin' },
   { path: '/preview/lieflat', label: 'Lieflat 表盘（高保真）', group: '管理端', layout: 'gallery' },

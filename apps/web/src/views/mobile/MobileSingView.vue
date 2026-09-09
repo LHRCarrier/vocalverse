@@ -1,25 +1,35 @@
 <script setup lang="ts">
 /**
- * 移动端 · 唱吧（跟唱）——ui-concept-design skill 重制版 · M3 UI 先行演示帧
- * 功能点：英文歌跟唱（选歌 → 歌词/旋律展示 → 跟唱 → 逐句音准节奏评分，docs/06 §9.4）。
- * 当前为 UI 演示帧（后端跟唱引擎 M3 接入）：选歌/去跟唱均 toast 提示，数据为示例值。
- * 视觉：深青精选卡（同色系 chip + 幽灵按钮 + 大音符线稿锚点）→ 56px 分段 → 点线时间轴歌单。
+ * 移动端 · 唱吧（跟唱）—— M3 唱歌 P0 接真（2026-09-09）
+ * 全链路：选歌（歌曲列表 + 40905 就绪门禁）→ 整首跟唱（≤180s）→ 上传 →
+ * 异步评分轮询（queued→processing→done|failed）→ 逐句评分 + D3 对齐图 + 报告。
+ * 数据源：GET /api/v1/songs(/id)、POST /sessions(kind=sing)、POST /sessions/{id}/audio、
+ * GET /sing/attempts/{id}(/status)（api/sing.ts；错误码映射见 singErrorMessage）。
+ * 视觉：沿用重制版基线（深青精选卡/56px 分段/点线时间轴歌单）；交互逻辑接真。
  */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import IconShare from '~icons/tabler/share'
 
 import { shareDemoLink } from '@/composables/share'
+import { useSingPlay } from '@/composables/sing'
 import { useUiStore } from '@/stores/ui'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import { renderSingChart } from '@/lib/sing-chart'
 import '@/styles/mobile-uic.css'
+import '@/styles/mobile-sing.css'
 
 const router = useRouter()
 const ui = useUiStore()
+
+const play = useSingPlay()
+
+/** 跟唱面板（同页全屏 sheet）：null=关闭 */
+const sheetOpen = ref(false)
 
 type Tab = 'all' | 'hot' | 'fav'
 
@@ -31,88 +41,68 @@ const tabs: { key: Tab; label: string; icon: 'chart' | 'note' | 'heart' }[] = [
   { key: 'fav', label: '收藏', icon: 'heart' },
 ]
 
-interface Song {
-  id: number
-  icon: 'note' | 'headphone'
-  color: string
-  title: string
-  sub: string
-  value: string
-  valueInk?: boolean
-  badge: { text: string; variant: 'success' | 'star' | 'neutral' }
-  tags: Tab[]
-}
-
-/* 【占位·M3】歌单示例数据（跟唱评分接入后替换） */
-const songs: Song[] = [
-  {
-    id: 1,
-    icon: 'note',
-    color: '#16303A',
-    title: 'Perfect Night',
-    sub: 'LE SSERAFIM · 107s · 节奏轻快',
-    value: '88.1',
-    badge: { text: '新纪录', variant: 'star' },
-    tags: ['hot'],
-  },
-  {
-    id: 2,
-    icon: 'headphone',
-    color: '#1E2B26',
-    title: 'Yesterday Once More',
-    sub: 'Carpenters · 150s · 慢板抒情',
-    value: '91.5',
-    badge: { text: '优秀', variant: 'success' },
-    tags: ['hot', 'fav'],
-  },
-  {
-    id: 3,
-    icon: 'note',
-    color: '#232044',
-    title: 'Counting Stars',
-    sub: 'OneRepublic · 132s · 中速律动',
-    value: '90.2',
-    badge: { text: '优秀', variant: 'success' },
-    tags: ['hot'],
-  },
-  {
-    id: 4,
-    icon: 'headphone',
-    color: '#3A2440',
-    title: 'Blank Space',
-    sub: 'Taylor Swift · 148s · 中速流行',
-    value: '86.0',
-    badge: { text: '收藏', variant: 'success' },
-    tags: ['fav'],
-  },
-  {
-    id: 5,
-    icon: 'note',
-    color: '#16303A',
-    title: 'City of Stars',
-    sub: 'La La Land · 124s · 慢速叙事',
-    value: '79.5',
-    valueInk: true,
-    badge: { text: '待提升', variant: 'neutral' },
-    tags: [],
-  },
-]
-
+/* 分类规则（数据驱动的轻量口径）：hot=短歌（句数少），fav=低难度（level 1~2） */
 const visibleSongs = computed(() =>
-  tab.value === 'all' ? songs : songs.filter((s) => s.tags.includes(tab.value)),
+  tab.value === 'all'
+    ? play.songs.value
+    : play.songs.value.filter((s) =>
+        tab.value === 'hot' ? s.expected_lines <= 8 : s.level <= 2,
+      ),
 )
 
-/* ---------- 演示交互 toast（跟唱引擎 M3 后替换为真实跳转） ---------- */
-function demoComingSoon(feature: string) {
-  ui.showToast(`「${feature}」：跟唱引擎 M3 上线后开放`)
+const featured = computed(() => play.songs.value[0] ?? null)
+const sheetDetail = computed(() => play.detail.value)
+const recording = computed(() => play.phase.value === 'recording')
+const processing = computed(() => play.phase.value === 'processing' || play.phase.value === 'uploading')
+const scoreColor = (v: number | null) =>
+  v == null ? '#999' : v >= 85 ? '#18a058' : v >= 60 ? '#f2a43a' : '#d03050'
+
+function statusBadge(s: string): { text: string; variant: 'success' | 'star' | 'neutral' } {
+  switch (s) {
+    case 'ready':
+      return { text: '就绪', variant: 'success' }
+    case 'building':
+      return { text: '提取中', variant: 'neutral' }
+    case 'invalid':
+      return { text: '提取失败', variant: 'neutral' }
+    default:
+      return { text: '未就绪', variant: 'neutral' }
+  }
 }
 
-/** 顶栏 · 分享歌曲（演示：系统面板 / 复制链接） */
+async function openSong(songId: number) {
+  const ok = await play.openSong(songId)
+  if (ok) sheetOpen.value = true
+  else ui.showToast(play.error.value ?? '该歌暂时不能跟唱')
+}
+
+async function startOver() {
+  play.reset()
+  sheetOpen.value = false
+}
+
+onMounted(play.loadSongs)
+
+/** 结果就绪 → 渲染 D3 对齐图（参考 + 用户曲线） */
+watch(
+  () => play.result.value,
+  async (v) => {
+    if (!v) return
+    await new Promise((r) => setTimeout(r, 60))
+    const el = document.getElementById('m-sing-chart')
+    if (el && sheetDetail.value) {
+      renderSingChart(el, sheetDetail.value, v)
+    }
+  },
+)
+
+/** 顶栏 · 分享歌曲（演示：系统面板 / 复制链接）——架构级功能，保留演示入口 */
 async function shareSong() {
+  const s = featured.value
   const result = await shareDemoLink({
-    title: 'Perfect Night · LE SSERAFIM',
-    text: 'VocalVerse 跟唱 · 最佳成绩 88.1 分',
-    url: 'https://vocalverse.demo/song/perfect-night',
+    title: s?.title ?? 'VocalVerse 跟唱',
+    text: s ? `VocalVerse 跟唱 · ${s.title}（${s.expected_lines} 句）` : 'VocalVerse 跟唱',
+    url: 'https://vocalverse.demo/sing',
   })
   if (result === 'shared') ui.showToast('已分享')
   else if (result === 'copied') ui.showToast('歌曲链接已复制（演示链接）')
@@ -125,7 +115,7 @@ async function shareSong() {
     <!-- 统一顶栏（← 回学习主页 + 全局头像 / 唱吧 / 分享歌曲） -->
     <MobileTopBar title="唱吧" back @back="router.push('/m/learn')">
       <template #actions>
-        <button class="u-topbar__act" type="button" title="分享歌曲（演示）" aria-label="分享歌曲" @click="shareSong">
+        <button class="u-topbar__act" type="button" title="分享歌曲" aria-label="分享歌曲" @click="shareSong">
           <IconShare />
         </button>
       </template>
@@ -135,21 +125,38 @@ async function shareSong() {
       <p class="u-head__sub" style="margin: 0 0 16px">英文歌逐句跟唱，音准与节奏即时评分。</p>
 
       <!-- 本周精选（深青卡 · 每屏唯一深色卡 · 音符线稿锚点） -->
-      <section class="u-dark-card u-dark-card--teal">
+      <section v-if="featured" class="u-dark-card u-dark-card--teal">
         <div class="u-dark-card__art" aria-hidden="true">
           <MobileArt name="note" :size="104" />
         </div>
-        <span class="u-chip u-chip--teal">本周精选</span>
-        <span class="u-dark-card__meta">LE SSERAFIM · 107s · 全曲跟唱</span>
-        <h2 class="u-dark-card__title">Perfect Night</h2>
-        <p class="u-dark-card__desc">上一遍 88.1 分 · 音准 93 · 节奏 91，稳住节奏就能破 90。</p>
-        <button class="u-btn u-btn--ghost" type="button" style="margin-top: 16px" @click="demoComingSoon('去跟唱')">
+        <span class="u-chip u-chip--teal">
+          {{ featured.pitch_ref_status === 'ready' ? '本周精选' : '参考旋律提取中' }}
+        </span>
+        <span class="u-dark-card__meta">
+          {{ featured.artist ?? '歌单' }} · {{ featured.expected_lines }} 句 ·
+          {{ featured.pitch_ref_status === 'ready' ? '可跟唱' : '稍后开放' }}
+        </span>
+        <h2 class="u-dark-card__title">{{ featured.title }}</h2>
+        <p class="u-dark-card__desc">
+          {{
+            featured.pitch_ref_status === 'ready'
+              ? `整首跟唱 ≤3 分钟，逐句音准/节奏/发音 + D3 对齐图。`
+              : '参考旋律正在离线提取，完成后即可跟唱（自动刷新）。'
+          }}
+        </p>
+        <button
+          class="u-btn u-btn--ghost"
+          type="button"
+          style="margin-top: 16px"
+          @click="openSong(featured.id)"
+        >
           <MobileIcon name="mic" :size="16" /> 去跟唱
         </button>
-        <div class="u-dark-card__score">
-          <div class="label">最佳成绩</div>
-          <div class="num">88.1</div>
-        </div>
+      </section>
+      <section v-else class="u-dark-card u-dark-card--teal">
+        <div class="u-dark-card__art" aria-hidden="true"><MobileArt name="note" :size="104" /></div>
+        <span class="u-chip u-chip--teal">歌曲库</span>
+        <h2 class="u-dark-card__title">加载中…</h2>
       </section>
 
       <!-- 分段筛选（56px） -->
@@ -167,20 +174,34 @@ async function shareSong() {
         </button>
       </div>
 
-      <!-- 歌单（点线时间轴） -->
+      <!-- 歌单（点线时间轴 · 真实数据） -->
       <div class="u-section-title">歌曲库</div>
       <template v-for="(s, i) in visibleSongs" :key="s.id">
-        <button class="u-item" type="button" style="width: 100%; text-align: left" @click="demoComingSoon(s.title)">
-          <span class="u-icon-block" :style="{ background: s.color }">
-            <MobileIcon :name="s.icon" :size="22" />
+        <button class="u-item" type="button" style="width: 100%; text-align: left" @click="openSong(s.id)">
+          <span class="u-icon-block" :style="{ background: s.level <= 2 ? '#1E2B26' : '#16303A' }">
+            <MobileIcon :name="s.level <= 2 ? 'headphone' : 'note'" :size="22" />
           </span>
           <span class="u-item__main">
             <span class="u-item__title">{{ s.title }}</span>
-            <span class="u-item__sub">{{ s.sub }}</span>
+            <span class="u-item__sub">
+              {{ s.artist ?? '歌单' }} · {{ s.expected_lines }} 句 · 难度 L{{ s.level }}
+            </span>
           </span>
           <span class="u-item__right">
-            <span class="u-item__value" :class="{ 'u-item__value--ink': s.valueInk }">{{ s.value }}</span>
-            <span class="u-badge" :class="`u-badge--${s.badge.variant}`">{{ s.badge.text }}</span>
+            <span class="u-item__value" :class="{ 'u-item__value--ink': s.pitch_ref_status !== 'ready' }">
+              {{
+                s.pitch_ref_status === 'ready'
+                  ? '可跟唱'
+                  : s.pitch_ref_status === 'building'
+                    ? '提取中'
+                    : s.pitch_ref_status === 'invalid'
+                      ? '提取失败'
+                      : '未就绪'
+              }}
+            </span>
+            <span class="u-badge" :class="`u-badge--${statusBadge(s.pitch_ref_status).variant}`">
+              {{ statusBadge(s.pitch_ref_status).text }}
+            </span>
           </span>
         </button>
         <div v-if="i < visibleSongs.length - 1" class="u-dotline" aria-hidden="true">
@@ -190,12 +211,108 @@ async function shareSong() {
       <div v-if="!visibleSongs.length" class="u-empty">
         <div class="u-empty__art"><MobileArt name="note" :size="96" /></div>
         <div class="u-empty__title">这个分类还没有歌</div>
-        <div class="u-empty__sub">M3 跟唱引擎接入后，这里会展示给你的推荐歌单。</div>
+        <div class="u-empty__sub">参考旋律离线提取完成后即可跟唱。</div>
       </div>
 
       <p class="u-note" style="margin-top: 24px">
-        当前为 UI 演示帧（M3 接入基频提取 + DTW 对齐评分），歌曲与成绩为示例数据。
+        跟唱评分 = 0.5·音准 + 0.2·节奏 + 0.3·发音（发音=抽样句，默认前 3 句）；蓝图与抽检见 docs/06 §9.4。
       </p>
+    </div>
+
+    <!-- 跟唱面板（全屏 sheet） -->
+    <div v-if="sheetOpen" class="m-sing-sheet">
+      <div class="m-sing-sheet__head">
+        <button class="u-topbar__act" type="button" aria-label="关闭" @click="startOver">
+          <MobileIcon name="chevron" :size="20" style="transform: rotate(90deg)" />
+        </button>
+        <strong>{{ sheetDetail?.title ?? '跟唱' }}</strong>
+        <span class="m-sing-sheet__sub">{{ sheetDetail?.expected_lines }} 句 · 整首 ≤180s</span>
+      </div>
+
+      <div class="m-sing-sheet__body">
+        <!-- 录音/评分阶段 -->
+        <template v-if="!play.result.value">
+          <div v-if="play.error.value" class="m-sing-sheet__hint" style="color: #c0392b; margin: 8px 0">
+            {{ play.error.value }}
+          </div>
+          <div class="m-sing-sheet__lyrics">
+            <p v-for="line in (sheetDetail?.lines ?? []).slice(0, 6)" :key="line.seq" class="m-sing-lyric">
+              {{ line.text }}
+            </p>
+            <p v-if="(sheetDetail?.lines.length ?? 0) > 6" class="m-sing-lyric m-sing-lyric--more">
+              …共 {{ sheetDetail?.lines.length }} 句
+            </p>
+          </div>
+          <button
+            class="u-btn u-btn--primary"
+            type="button"
+            style="width: 100%; margin-top: 12px"
+            :disabled="recording || processing"
+            @click="play.startRecording()"
+          >
+            <MobileIcon name="mic" :size="16" />
+            {{ recording ? '录音中…' : processing ? '上传/评分中…' : '开始跟唱（≤3 分钟）' }}
+          </button>
+          <div v-if="recording" class="m-sing-sheet__stopbar">
+            <button class="u-btn u-btn--secondary" type="button" style="width: 48%" @click="play.cancelRecording()">
+              放弃重录
+            </button>
+            <button class="u-btn u-btn--primary" type="button" style="width: 48%" @click="play.stopRecording()">
+              停止并评分
+            </button>
+          </div>
+          <div v-if="processing" class="m-sing-sheet__progress">
+            <div class="m-sing-sheet__bar">
+              <div class="m-sing-sheet__bar-inner" :style="{ width: `${play.progressPct.value}%` }" />
+            </div>
+            <span>{{ play.progressPct.value }}% · {{ play.progressPct.value < 100 ? '评分计算中…' : '正在生成报告…' }}</span>
+          </div>
+          <div class="m-sing-sheet__hint">
+            移动端提示：授权后请保持前台；录音自动在 3 分钟停止。
+          </div>
+        </template>
+
+        <!-- 报告阶段 -->
+        <template v-else>
+          <div class="m-sing-report">
+            <div class="m-sing-report__score">
+              <span class="m-sing-report__num">{{ play.result.value.overall?.toFixed(1) ?? '—' }}</span>
+              <span class="m-sing-report__label">综合分</span>
+            </div>
+            <div class="m-sing-report__sub">
+              <span>音准 {{ play.result.value.pitch?.toFixed(1) ?? '—' }}</span>
+              <span>节奏 {{ play.result.value.rhythm?.toFixed(1) ?? '—' }}</span>
+              <span>发音 {{ play.result.value.pron?.toFixed(1) ?? '—' }}</span>
+            </div>
+            <div id="m-sing-chart" class="m-sing-chart" />
+            <div class="m-sing-report__lines">
+              <div v-for="(l, i) in play.result.value.lines" :key="l.seq" class="m-sing-line">
+                <span class="m-sing-line__text">
+                  {{ i + 1 }}. {{ l.skipped ? `未评测（${l.reason ?? 'skipped'}）` : '✓' }}
+                </span>
+                <span class="m-sing-line__score">
+                  <b :style="{ color: scoreColor(l.pitch_score) }">{{ l.pitch_score?.toFixed(0) ?? '—' }}</b>
+                  <i :style="{ color: scoreColor(l.rhythm_score) }">{{ l.rhythm_score?.toFixed(0) ?? '—' }}</i>
+                </span>
+              </div>
+            </div>
+            <div
+              v-if="!play.result.value.is_complete"
+              class="m-sing-sheet__hint"
+              style="color: #b8860b; margin: 8px 0"
+            >
+              {{
+                play.result.value.expected_lines -
+                  play.result.value.lines.filter((x) => !x.skipped).length
+              }}
+              句未评测（无音高/参考缺失），综合按有效句均分（docs/06 §9.4 D5）。
+            </div>
+            <button class="u-btn u-btn--ghost" type="button" style="width: 100%; margin-top: 10px" @click="startOver">
+              返回歌单
+            </button>
+          </div>
+        </template>
+      </div>
     </div>
   </div>
 </template>
