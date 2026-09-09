@@ -149,6 +149,31 @@ class TestVocab:
         resp = client.delete(f"/api/v1/reading/vocab/{vid}", headers={"X-Test-User-Id": "2"})
         assert resp.status_code == 404  # 越权按不存在处理（docs/06 §11 口径）
 
+    def test_add_vocab_scene_community(self, client, auth_headers, reading_seed):
+        """社区划词来源（docs/47 §5.5）：scene 入参必须落库并回带。"""
+        resp = client.post(
+            "/api/v1/reading/vocab",
+            headers=auth_headers,
+            json={"word": "wonderful", "context": "A wonderful post!", "scene": "community"},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["vocab"]["scene"] == "community"
+        items = client.get("/api/v1/reading/vocab", headers=auth_headers).json()["data"]["items"]
+        assert items[0]["scene"] == "community"
+
+    def test_add_vocab_default_scene_is_reading(self, client, auth_headers, reading_seed):
+        resp = client.post("/api/v1/reading/vocab", headers=auth_headers, json={"word": "dream"})
+        assert resp.json()["data"]["vocab"]["scene"] == "reading"
+
+    def test_add_vocab_invalid_scene_45002(self, client, auth_headers, reading_seed):
+        resp = client.post(
+            "/api/v1/reading/vocab",
+            headers=auth_headers,
+            json={"word": "dream", "scene": "hacking"},
+        )
+        assert resp.status_code == 422
+        assert resp.json()["code"] == 45002
+
 
 class TestAnnotations:
     def test_crud(self, client, auth_headers, reading_seed):
