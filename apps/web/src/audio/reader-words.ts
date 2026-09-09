@@ -165,6 +165,17 @@ export function annotationsOfSentence(
     .sort((a, b) => a.start_offset - b.start_offset)
 }
 
+/* ---------------------------------------------------------------- 批注配色安全
+ * 2026-09-09 修复「暗黑模式下批注为粉色看不清」（组长手机实测）：
+ * 渲染层原先把批注色**直接**写成 background（浅粉 #fbcfe8），而 night 主题正文墨色是
+ * 浅灰 #d6d3cc → 浅底浅字，对比度 ≈1.08，等于不可读。
+ * 修正（见 reader-uic.css 的 --ur-ann-mix 与 audio/annotation-colors.ts）：
+ *   ① 颜色只作 CSS 自定义属性 --ur-ann-color 传入，由 CSS 按主题与纸面底色 color-mix 出
+ *      「同色系但足够对比」的底色，文字色统一 var(--ur-theme-ink)；
+ *   ② 颜色是不可信输入 → 只放行色板内的值（safeAnnColor 见 annotation-colors.ts）。
+ */
+export { ANN_FALLBACK_COLOR, safeAnnColor } from './annotation-colors'
+
 /** 词点击命中的原文（剥离首尾标点由 normalize 负责——这里只取词形） */
 export function pieceAt(pieces: TextPiece[], relOffset: number): TextPiece | null {
   let acc = 0

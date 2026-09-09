@@ -23,6 +23,10 @@
   /* 阅读器内浮层（底部工具条/顶栏图标）跟随主题：夜间不出现白底白字 */
   --ur-theme-chrome: rgba(255, 255, 255, 0.94);
   --ur-theme-muted: #6f6f6a;
+  /* 批注底色 = 用户色 × --ur-ann-mix 混入纸面底色（2026-09-09 修复「暗黑模式批注粉色看不清」）：
+     直接把浅粉当底色、文字又用浅灰墨色 → 对比度 ≈1.6，不可读。混色后底色永远与纸面同调，
+     文字统一用 --ur-theme-ink；实测对比度：paper 12.8 / cream 9.9 / night 4.6~5.0（AA 正文线 4.5）。 */
+  --ur-ann-mix: 55%;
   /* 固定视口 + 正文内部滚动：正文分支 DOM 里没有 .u-rd，若这里不设 flex/高度，
      .u-rd__main 的 flex:1/overflow-y:auto 全部失效 → 实际是 body 在滚，
      @scroll 绑在 main 上收不到事件 → 阅读进度（防抖保存）永远不触发（2026-09-10 一并修） */
@@ -56,6 +60,7 @@
   --ur-theme-sentence: #d6e6d0;
   --ur-theme-annotation: #f2e3b8;
   --ur-theme-chrome: rgba(253, 248, 238, 0.94);
+  --ur-ann-mix: 58%;
 }
 
 .u-rd-views[data-theme='night'] {
@@ -67,6 +72,10 @@
   --ur-theme-annotation: #3b3420;
   --ur-theme-chrome: rgba(38, 41, 45, 0.94);
   --ur-theme-muted: #9a9a94;
+  /* 夜间：混入比例压到 24% → 浅粉落在 #5c5159 一带，浅灰墨色 #d6d3cc 上对比度 5.1（可读）；
+     24% 而非 30% 的由来：色板里最亮的绿在 30% 只有 4.63（勉强过线），而「色板外颜色被
+     safeAnnColor 拦回默认色」之前，最坏色 #ffffff 在 30% 只有 4.16（不达标）。门禁按最坏色矩阵断言。 */
+  --ur-ann-mix: 24%;
 }
 
 /* ---------- 阅读器骨架 ---------- */
@@ -207,9 +216,21 @@
   box-shadow: inset 0 -2px 0 var(--ur-theme-highlight);
 }
 
-/* 批注段：底色由行内 style 给（批注色），跳转时闪一下 */
+/* 批注段：底色 = --ur-ann-color（行内给，已过白名单）× --ur-ann-mix 混入纸面；
+   文字色统一 --ur-theme-ink —— 主题自适应，夜间不再是「浅粉底 + 浅灰字」（2026-09-09 修复） */
 .u-rd__seg.is-ann {
+  background: color-mix(in srgb, var(--ur-ann-color, var(--ur-theme-annotation)) var(--ur-ann-mix), var(--ur-theme-paper));
+  color: var(--ur-theme-ink);
   border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* 不支持 color-mix 的旧内核兜底：直接用主题批注色（仍比原浅粉可读） */
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+  .u-rd__seg.is-ann {
+    background: var(--ur-theme-annotation);
+  }
 }
 
 .u-rd__seg.is-flash {
@@ -226,7 +247,7 @@
   }
 }
 
-/* 笔记批注角标（该批注有笔记时出现在段尾，点击看笔记） */
+/* 笔记批注角标（该批注有笔记时出现在段尾，点击看笔记）；底色同样按主题混色 */
 .u-rd__annmark {
   display: inline-block;
   width: 3px;
@@ -234,6 +255,49 @@
   margin-left: 2px;
   border-radius: 2px;
   vertical-align: -0.08em;
+  background: color-mix(in srgb, var(--ur-ann-color, var(--ur-theme-annotation)) var(--ur-ann-mix), var(--ur-theme-paper));
+}
+
+/**
+ * 句首批注角标（2026-09-09 修复组长实测「查看已批注句子困难」）：
+ * 修复前只有 kind='note' 的批注在**段尾**有一根 3px 竖条，纯高亮批注完全无标记；
+ * 且正文里点词优先走查词 → 用户只能去点单词之间的空格（命中区仅 4.6px）才能看批注。
+ *
+ * 形态：**行内**（不是绝对定位）。绝对定位的 `left:-14px` 在「句子从行中间开始」时会压到
+ * 上一句的文字上（`.u-rd__sentence` 是 inline span，行中句子没有左侧沟），行内元素永远落在
+ * 句子起点、零重叠。代价是给该句增加 ~11px 宽，仅对有批注的句子生效。
+ *
+ * 触控：视觉 5×0.9em，靠 padding 撑到 ~11×29px；**≥44px 的可靠入口是选中句子后的动作条
+ * 「看批注」按钮**（`.u-rd-sel__btn`，见 MobileReaderSelectionBar）——角标是快捷方式，不是唯一入口。
+ */
+.u-rd__sentmark {
+  display: inline-block;
+  width: 5px;
+  height: 0.9em;
+  margin: 0 0 0 -2px;
+  padding: 6px 3px;
+  border: none;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ur-ann-color, var(--ur-theme-annotation)) var(--ur-ann-mix), var(--ur-theme-paper));
+  background-clip: content-box;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ur-theme-ink) 22%, transparent);
+  vertical-align: -0.08em;
+  cursor: pointer;
+}
+
+.u-rd__sentmark:active {
+  transform: scale(0.9);
+}
+
+/* 多批注同句：角标右侧补一个小圆点，提示「点开是一列」 */
+.u-rd__sentmark.is-multi::after {
+  content: '·';
+  position: relative;
+  top: -0.35em;
+  margin-left: 1px;
+  color: var(--ur-theme-muted);
+  font-size: 0.8em;
+  line-height: 1;
 }
 
 /* 阅读设置（字号/主题 chips） */

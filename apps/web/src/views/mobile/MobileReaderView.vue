@@ -5,7 +5,7 @@
  * + 阅读设置（字号/行距/主题，localStorage）+ 进度保存（防抖 + 退出 flush）。
  * 拆分纪律（fe-08 新代码不豁免）：查词/批注/进度/预合成为 composable，本页 ≈ 300 行。
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import MobileAnnotationNoteSheet from '@/components/mobile/MobileAnnotationNoteSheet.vue'
@@ -18,15 +18,14 @@ import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import MobileTtsBar from '@/components/mobile/MobileTtsBar.vue'
 import MobileWordCard from '@/components/mobile/MobileWordCard.vue'
 import { fetchChapter, fetchVoices } from '@/api/reading'
-import { buildSentenceSegments, sentenceHasAnnotation } from '@/audio/reader-words'
-import { useChapterPrep } from '@/composables/useChapterPrep'
-import { useChapterTts } from '@/composables/useChapterTts'
+import { buildSentenceSegments, safeAnnColor, sentenceHasAnnotation } from '@/audio/reader-words'
 import { useMobileBack } from '@/composables/useMobileBack'
-import { useNativeBack } from '@/composables/useNativeBack'
-import { useReaderAnnotations } from '@/composables/useReaderAnnotations'
+import { useReaderAnnotationUi } from '@/composables/useReaderAnnotationUi'
+import { useReaderBackLayers } from '@/composables/useReaderBackLayers'
 import { useReaderProgress } from '@/composables/useReaderProgress'
 import { useReaderSettings } from '@/composables/useReaderSettings'
 import { useReaderTap } from '@/composables/useReaderTap'
+import { useReaderTts } from '@/composables/useReaderTts'
 import { useReaderVocab } from '@/composables/useReaderVocab'
 import { useWordAudio } from '@/composables/useWordAudio'
 import { useWordLookup } from '@/composables/useWordLookup'
@@ -63,28 +62,22 @@ const readerProgress = useReaderProgress(bookId, chapterId, mainEl, () => chapte
 const scrollToSentence = readerProgress.scrollToSentence
 const scheduleSave = () => readerProgress.scheduleSave()
 
-/* ---------- 听书（useChapterTts 句级播放 + useChapterPrep 整章预合成） ---------- */
-const ttsActive = ref(false)
-const tts = useChapterTts(chapterId, () => chapter.value?.sentences ?? [])
-const ttsState = tts.state
-const ttsProgress = tts.progress
-const ttsRate = tts.rate
-const ttsError = tts.errorText
-const ttsVoice = tts.voice
-const ttsCurrentIdx = tts.currentIdx
-const { prepState, start: startPrep } = useChapterPrep()
-const progressLabel = computed(() => {
-  const total = chapter.value?.sentences.length ?? 0
-  return total ? `${Math.min(ttsCurrentIdx.value + 1, total)}/${total}` : '听书'
-})
-
-function openTts() {
-  if (!chapter.value) return
-  ttsActive.value = true
-  if (prepState.status === 'idle' || prepState.status === 'failed') {
-    startPrep(chapter.value.id, ttsVoice.value)
-  }
-}
+/* ---------- 听书（useReaderTts：句级播放 + 整章预合成 + 听书条开关） ---------- */
+const {
+  ttsActive,
+  tts,
+  prepState,
+  progressLabel,
+  ttsState,
+  ttsProgress,
+  ttsRate,
+  ttsError,
+  ttsVoice,
+  ttsCurrentIdx,
+  openTts,
+  closeTts,
+  playOne,
+} = useReaderTts(chapterId, () => chapter.value?.id ?? null, () => chapter.value?.sentences ?? [])
 
 /* ---------- 查词卡（useWordLookup：纯状态管理；词卡展示层在 MobileWordCard） ---------- */
 const wordLookup = useWordLookup()
@@ -95,26 +88,27 @@ async function addWordToVocab() {
   if (ok) await refreshVocab()
 }
 
-/* ---------- 划词批注（useReaderAnnotations：句内划选 → 高亮/笔记） ---------- */
-const annotationsApi = useReaderAnnotations(chapterId, () => chapter.value, scrollToSentence)
-const annotations = annotationsApi.annotations
-const annSheet = annotationsApi.annSheet
-const annListOpen = annotationsApi.annListOpen
-const { noteSheet, flashAnnId } = annotationsApi
+/* ---------- 划词批注（useReaderAnnotationUi：句内划选 → 高亮/笔记；句首角标 → 查看/编辑） ---------- */
+const annotationsApi = useReaderAnnotationUi(chapterId, () => chapter.value, scrollToSentence)
+const {
+  annotations,
+  annSheet,
+  annListOpen,
+  noteSheet,
+  flashAnnId,
+  sentList,
+  sentListItems,
+  annBySentence,
+  sentMarkColor,
+  saveAnnotation,
+  updateAnnotation,
+  removeAnnotation,
+} = annotationsApi
 
 function onSelectionCreate() {
   const sel = window.getSelection()
   if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return
   annotationsApi.createFromSelection(sel)
-}
-
-async function saveAnnotation(payload: { note: string; color: string }) {
-  const ok = await annotationsApi.save(payload)
-  ui.showToast(ok ? '已添加批注' : '批注保存失败')
-}
-
-async function removeAnnotation(id: number) {
-  await annotationsApi.remove(id)
 }
 
 /* ---------- 渲染（词块 × 批注区间 → 上色分段；点词查义） ---------- */
@@ -145,25 +139,29 @@ function playWord(): void {
 
 /**
  * 句子级动作（单一入口，供两处调用）：
- * · 动作条（单击句子/分隔符选中后）：highlight=色点、note=批注、play=听这句
- * · 查词卡底部：highlight=高亮这句、note=批注这句（**点中空格的命中区只有 4.6px，
- *   卡片按钮才是可靠入口**——2026-09-10 量测结论）
+ * · 动作条（单击句子/分隔符选中后）：highlight=色点（显式传色→直出）、note=批注、play=听这句
+ * · 查词卡底部：highlight=**先出选色面板**（不传色）、note=批注这句
+ *   （**点中空格的命中区只有 4.6px，卡片按钮才是可靠入口**——2026-09-10 量测结论）
+ * 2026-09-09 修复组长实测「点高亮这句不等选色就默认第一个颜色」：不传色 = 先选色再落库。
  */
-function runSentenceAction(action: 'highlight' | 'note' | 'play', color = '#fde68a') {
+function runSentenceAction(action: 'highlight' | 'note' | 'play', color?: string) {
   const idx = selIdx.value ?? wordLookup.state.sentenceIdx
   if (idx == null) return
   selIdx.value = null
   wordLookup.close()
   if (action === 'play') {
     // 只显示听书条，不整章预合成；单句模式只播这一句，播完即止（2026-09-10 组长反馈）
-    ttsActive.value = true
-    void tts.playOne(idx)
+    playOne(idx)
   } else if (action === 'note') {
     annotationsApi.createForSentence(idx)
-  } else {
+  } else if (color) {
+    // 动作条色点直出：色点本身就是选色动作
     void annotationsApi
       .highlightSentence(idx, color)
       .then((ok) => ui.showToast(ok ? '已高亮这句' : '高亮失败'))
+  } else {
+    // 查词卡「高亮这句」：先让用户选色，保存后才高亮
+    annotationsApi.chooseColorForSentence(idx)
   }
 }
 
@@ -214,45 +212,23 @@ const tocOpen = ref(false)
 const settingsOpen = ref(false)
 
 /**
- * 原生返回手势/按键：先关最上层弹层，再交给原生回退历史
- * （否则滑动返回会连带退页/退到桌面；见 useNativeBack 注释）
+ * 原生返回手势/按键：按「最上层到最下层」顺序关弹层，全关完才交给原生回退历史
+ * （否则滑动返回会连带退页/退到桌面；实现见 useReaderBackLayers）
  */
-useNativeBack(() => {
-  if (selIdx.value !== null) {
-    selIdx.value = null
-    return true
-  }
-  if (noteSheet.open) {
-    noteSheet.open = false
-    return true
-  }
-  if (wordLookup.state.open) {
-    wordLookup.close()
-    return true
-  }
-  if (annSheet.open) {
-    annSheet.open = false
-    return true
-  }
-  if (annListOpen.value) {
-    annListOpen.value = false
-    return true
-  }
-  if (settingsOpen.value) {
-    settingsOpen.value = false
-    return true
-  }
-  if (tocOpen.value) {
-    tocOpen.value = false
-    return true
-  }
-  if (ttsActive.value) {
-    tts.stop()
-    ttsActive.value = false
-    return true
-  }
-  return false
-})
+useReaderBackLayers([
+  { open: () => selIdx.value !== null, close: () => (selIdx.value = null) },
+  { open: () => noteSheet.open, close: () => (noteSheet.open = false) },
+  { open: () => wordLookup.state.open, close: () => wordLookup.close() },
+  { open: () => annSheet.open, close: () => (annSheet.open = false) },
+  { open: () => sentList.open, close: () => (sentList.open = false) },
+  { open: () => annListOpen.value, close: () => (annListOpen.value = false) },
+  { open: () => settingsOpen.value, close: () => (settingsOpen.value = false) },
+  { open: () => tocOpen.value, close: () => (tocOpen.value = false) },
+  {
+    open: () => ttsActive.value,
+    close: closeTts,
+  },
+])
 
 function nextChapter() {
   // 章节切换：回详情页列表（v1 精简路径）
@@ -310,6 +286,16 @@ function nextChapter() {
             }"
             :data-idx="s.idx"
           >
+            <!-- 句首批注角标（修复「查看已批注句子困难」：正文点词优先查词，只有空格能点开批注） -->
+            <button
+              v-if="annBySentence.has(s.idx)"
+              class="u-rd__sentmark"
+              :class="{ 'is-multi': (annBySentence.get(s.idx)?.length ?? 0) > 1 }"
+              type="button"
+              :style="{ '--ur-ann-color': sentMarkColor(s.idx) }"
+              :aria-label="`查看这句的批注（${annBySentence.get(s.idx)?.length ?? 0} 条）`"
+              @click.stop="annotationsApi.openSentence(s.idx)"
+            />
             <span
               v-for="(seg, wi) in sentenceSegments(s.idx)"
               :key="wi"
@@ -319,14 +305,14 @@ function nextChapter() {
                 'is-ann': !!seg.ann,
                 'is-flash': !!seg.ann && seg.ann.id === flashAnnId,
               }"
-              :style="{ background: seg.ann ? (seg.ann.color ?? 'var(--ur-theme-annotation)') : undefined }"
+              :style="seg.ann ? { '--ur-ann-color': safeAnnColor(seg.ann.color) } : undefined"
               :data-word="seg.word ?? undefined"
               :data-ann="seg.ann ? seg.ann.id : undefined"
             >{{ seg.text }}<span
               v-if="seg.noteMarker && seg.ann"
               class="u-rd__annmark"
               :data-ann="seg.ann.id"
-              :style="{ background: seg.ann.color ?? '#fde68a' }"
+              :style="{ '--ur-ann-color': safeAnnColor(seg.ann.color) }"
               aria-hidden="true"
             /></span>
           </span>
@@ -349,8 +335,10 @@ function nextChapter() {
       <!-- 句子选中动作条（单击句子后出现；听书进行中不显示） -->
       <MobileReaderSelectionBar
         :visible="selIdx !== null"
+        :has-annotation="selIdx !== null && annBySentence.has(selIdx)"
         @highlight="runSentenceAction('highlight', $event)"
         @note="runSentenceAction('note')"
+        @open-note="selIdx !== null && annotationsApi.openSentence(selIdx); selIdx = null"
         @play="runSentenceAction('play')"
         @close="selIdx = null"
       />
@@ -388,7 +376,7 @@ function nextChapter() {
       />
       <MobileAnnotationSheet
         :open="annSheet.open && chapter !== null"
-        mode="create"
+        :mode="annSheet.mode"
         :snippet="annSheet.snippet"
         @save="saveAnnotation"
         @update:open="annSheet.open = $event"
@@ -401,10 +389,22 @@ function nextChapter() {
         @jump="annotationsApi.jump"
         @update:open="annListOpen = $event"
       />
-      <!-- 单条批注查看（点正文批注段 / 批注角标 / 列表跳转后自动弹出） -->
+      <!-- 本句批注列表（句首角标命中多条时打开） -->
+      <MobileAnnotationSheet
+        :open="sentList.open"
+        mode="list"
+        title="本句批注"
+        :annotations="sentListItems"
+        @delete="removeAnnotation"
+        @jump="annotationsApi.jump"
+        @update:open="sentList.open = $event"
+      />
+      <!-- 单条批注查看/编辑（点正文批注段 / 句首角标 / 段尾笔记角标 / 列表跳转后自动弹出） -->
       <MobileAnnotationNoteSheet
         :open="noteSheet.open"
         :item="noteSheet.item"
+        :busy="annotationsApi.noteBusy.value"
+        @save="updateAnnotation"
         @delete="removeAnnotation"
         @update:open="noteSheet.open = $event"
       />
