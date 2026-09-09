@@ -110,15 +110,15 @@ describe('buildSentenceSegments', () => {
     expect(segs.find((s) => s.text === ' ')?.word).toBeNull()
   })
 
-  it('笔记批注：句内最后一段打角标（noteMarker）', () => {
+  it('笔记批注与高亮批注都落到段上（2026-09-09 起句尾编号标签替代段尾角标）', () => {
     const segs = buildSentenceSegments(TEXT, START, [
       ann({ id: 7, kind: 'note', note: '这里用了过去时', start_offset: START + 6, end_offset: START + 14 }),
     ])
-    const marked = segs.filter((s) => s.noteMarker)
-    expect(marked).toHaveLength(1)
-    expect(marked[0].ann?.id).toBe(7)
-    // 角标落在该批注覆盖范围内的最后一段
-    expect(segs[segs.length - 1].noteMarker).not.toBe(true)
+    const annotated = segs.filter((s) => s.ann)
+    expect(annotated.map((s) => s.text).join('')).toBe('was here')
+    expect(annotated.every((s) => s.ann?.id === 7)).toBe(true)
+    // 段对象不再带 noteMarker（旧段尾角标已下线；编号标签由视图按句渲染）
+    expect('noteMarker' in segs[0]).toBe(false)
   })
 
   it('跨句批注：本句只取交集部分', () => {

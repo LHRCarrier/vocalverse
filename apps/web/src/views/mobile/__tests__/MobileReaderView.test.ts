@@ -249,19 +249,19 @@ describe('阅读器 · 批注可见（bug2）', () => {
     api.createAnnotation.mockReset()
   })
 
-  it('正文按批注色分段上色 + 笔记角标（修复前只有句子下划线、note 类连下划线都没有）', async () => {
+  it('正文按批注色分段上色 + 句尾编号标签（修复前只有句子下划线、note 类连下划线都没有）', async () => {
     const wrapper = await mountReader()
     const seg = wrapper.get('.u-rd__seg.is-ann')
     expect(seg.text()).toContain('Alice')
     expect(seg.attributes('style')).toContain('#bbf7d0')
-    expect(wrapper.find('.u-rd__annmark').exists()).toBe(true)
+    expect(wrapper.find('.u-rd__senttag').exists()).toBe(true)
     expect(wrapper.get('.u-rd__sentence').classes()).toContain('is-annotated')
     wrapper.unmount()
   })
 
-  it('点批注角标 → 弹出批注内容（能看到笔记文字，不只是滚动定位）', async () => {
+  it('点句尾编号标签 → 弹出批注内容（能看到笔记文字，不只是滚动定位）', async () => {
     const wrapper = await mountReader()
-    await wrapper.get('.u-rd__annmark').trigger('click')
+    await wrapper.get('.u-rd__senttag').trigger('click')
     await flushPromises()
 
     const sheet = document.querySelector('.u-rd-ann')

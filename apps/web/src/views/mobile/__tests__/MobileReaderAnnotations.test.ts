@@ -103,16 +103,20 @@ describe('阅读器 · 批注可查看可编辑（2026-09-09 系列）', () => {
     api.lookupWord.mockReset()
   })
 
-  it('Bug2：句首有批注角标（任何 kind 都有），点击即看批注内容', async () => {
+  it('Bug2（改版）：句尾编号标签 [1]，点击即看批注内容', async () => {
     const wrapper = await mountReader()
-    const mark = wrapper.find('.u-rd__sentmark')
-    expect(mark.exists()).toBe(true)
-    expect(mark.attributes('aria-label')).toContain('查看这句的批注')
-    // 角标颜色走白名单变量，不是裸 background
-    expect(mark.attributes('style')).toContain('--ur-ann-color')
-    expect(mark.attributes('style')).toContain('#bbf7d0')
+    const tag = wrapper.find('.u-rd__senttag')
+    expect(tag.exists()).toBe(true)
+    expect(tag.text()).toBe('1') // 句内序号
+    expect(tag.attributes('aria-label')).toContain('查看这句的第 1 条批注')
+    // 标签底色走白名单变量（主题混色），不是裸 background
+    expect(tag.attributes('style')).toContain('--ur-ann-color')
+    expect(tag.attributes('style')).toContain('#bbf7d0')
+    // 旧的两个标记（句首竖条 / 段尾竖条）已下线
+    expect(wrapper.find('.u-rd__sentmark').exists()).toBe(false)
+    expect(wrapper.find('.u-rd__annmark').exists()).toBe(false)
 
-    await mark.trigger('click')
+    await tag.trigger('click')
     await flushPromises()
     const sheet = document.querySelector('.u-rd-ann')
     expect(sheet).not.toBeNull()
@@ -120,35 +124,83 @@ describe('阅读器 · 批注可查看可编辑（2026-09-09 系列）', () => {
     wrapper.unmount()
   })
 
-  it('Bug2：纯高亮批注（kind=highlight，无笔记）也有句首角标（修复前完全无标记）', async () => {
+  it('Bug2（改版）：纯高亮批注（无笔记）也有句尾标签', async () => {
     api.fetchAnnotations.mockResolvedValue([
       { ...fixtures.noteAnn, id: 12, kind: 'highlight' as const, note: null, color: '#fbcfe8' },
     ])
     const wrapper = await mountReader()
-    expect(wrapper.find('.u-rd__annmark').exists()).toBe(false) // 段尾笔记角标不出现
-    expect(wrapper.find('.u-rd__sentmark').exists()).toBe(true) // 句首角标必须出现
+    const tag = wrapper.get('.u-rd__senttag')
+    expect(tag.text()).toBe('1')
+    expect(tag.attributes('style')).toContain('#fbcfe8')
     wrapper.unmount()
   })
 
-  it('Bug2：同句多条批注 → 角标打开「本句批注」列表', async () => {
+  it('Bug2（改版）：同句多条批注 → 句尾 [1][2] 两标签，按批注色区分，点第 2 个开第 2 条', async () => {
     api.fetchAnnotations.mockResolvedValue([
-      fixtures.noteAnn,
-      { ...fixtures.noteAnn, id: 13, kind: 'highlight' as const, note: null, start_offset: 6, end_offset: 9 },
+      fixtures.noteAnn, // id 11，色 #bbf7d0，起点 0
+      {
+        ...fixtures.noteAnn,
+        id: 13,
+        kind: 'highlight' as const,
+        note: null,
+        color: '#fbcfe8',
+        start_offset: 6,
+        end_offset: 9,
+      },
     ])
     const wrapper = await mountReader()
-    expect(wrapper.get('.u-rd__sentmark').classes()).toContain('is-multi')
-    await wrapper.get('.u-rd__sentmark').trigger('click')
-    await flushPromises()
+    const tags = wrapper.findAll('.u-rd__senttag')
+    expect(tags.map((t) => t.text())).toEqual(['1', '2'])
+    expect(tags[0].attributes('style')).toContain('#bbf7d0')
+    expect(tags[1].attributes('style')).toContain('#fbcfe8')
 
+    await tags[1].trigger('click')
+    await flushPromises()
     const sheet = document.querySelector('.u-rd-ann')
-    expect(sheet?.textContent).toContain('本句批注')
-    expect(sheet?.querySelectorAll('.u-rd-annlist__row').length).toBe(2)
+    expect(sheet).not.toBeNull()
+    // 第 2 条是纯高亮 → 弹层提示「留空则只保留高亮色」
+    expect(sheet?.textContent).toContain('只保留高亮色')
     wrapper.unmount()
+  })
+
+  it('长按句子（静止 550ms）→ 直接打开该句批注卡', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = await mountReader()
+      const sentence = wrapper.get('.u-rd__sentence').element as HTMLElement
+      sentence.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 100, clientY: 100 }))
+      await vi.advanceTimersByTimeAsync(600)
+      await flushPromises()
+
+      const sheet = document.querySelector('.u-rd-ann')
+      expect(sheet).not.toBeNull()
+      expect(sheet?.textContent).toContain('添加批注')
+      expect(sheet?.textContent).toContain('Alice was here.')
+      wrapper.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('长按后拖动 → 不打开批注卡（让位给划词）', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = await mountReader()
+      const sentence = wrapper.get('.u-rd__sentence').element as HTMLElement
+      sentence.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 100, clientY: 100 }))
+      sentence.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 140, clientY: 100 }))
+      await vi.advanceTimersByTimeAsync(800)
+      await flushPromises()
+      expect(document.querySelector('.u-rd-ann')).toBeNull()
+      wrapper.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('Bug1：批注弹层可改色 + 改笔记，保存走 PATCH（修复前只有「删除」）', async () => {
     const wrapper = await mountReader()
-    await wrapper.get('.u-rd__sentmark').trigger('click')
+    await wrapper.get('.u-rd__senttag').trigger('click')
     await flushPromises()
 
     const sheet = document.querySelector('.u-rd-ann')!
@@ -179,7 +231,7 @@ describe('阅读器 · 批注可查看可编辑（2026-09-09 系列）', () => {
 
   it('Bug1：笔记清空 → kind 回落 highlight（避免「note 但没有笔记」的脏数据）', async () => {
     const wrapper = await mountReader()
-    await wrapper.get('.u-rd__sentmark').trigger('click')
+    await wrapper.get('.u-rd__senttag').trigger('click')
     await flushPromises()
 
     const sheet = document.querySelector('.u-rd-ann')!
@@ -208,7 +260,7 @@ describe('阅读器 · 批注可查看可编辑（2026-09-09 系列）', () => {
 
   it('安卓返回键：先关批注弹层，再交给原生回退（新增弹层必须进 useReaderBackLayers 层序）', async () => {
     const wrapper = await mountReader()
-    await wrapper.get('.u-rd__sentmark').trigger('click')
+    await wrapper.get('.u-rd__senttag').trigger('click')
     await flushPromises()
     expect(document.querySelector('.u-rd-ann')).not.toBeNull()
 
