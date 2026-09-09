@@ -49,7 +49,7 @@ VocalVerse 面向不同年龄段英语学习者，产品形态 = **「练」+「
 ### 0. 先明确当前阶段能测什么
 
 - ✅ **能测**：注册/登录（Java JWT，演示账号 `demoadult`/`demoteen`/`demosenior`，密码 `demo123456`）→ 移动端全流程：**社区首页（S1 真实流：三领域 Tab + 为你推荐混排（含每日打卡卡）+ 发帖/评论/点赞/支持/分享，Java 社区接口）** → **口语**（先选场景 → 播放开场白 → 录音 ≤15s → 三维评分 + 语言点覆盖 + 教练笔记 → 8 轮收尾 → 评分报告）→ **AI 自由说**（麦克风或打字 → DeepSeek 流式 + TTS 播报）→ **我的**；自定义答辩导师（粘贴论文 → AI 评委英文提问 → 等级反馈）；埋点 15 类事件；SSE 流式（音频为时间轴权威、文本字幕）。
-- ✅ **唱歌（M3 P0 · 2026-09-09 落地）**：`/m/sing` 唱吧全链路——选歌（参考旋律就绪门禁，未就绪/提取中/失败徽标）→ 整首跟唱（≤180s，保持前台；停止或 3min 自动收）→ 上传 → 异步评分（轮询 queued→processing→done|failed）→ 逐句音准/节奏/发音 + 综合（`0.5·音准+0.2·节奏+0.3·发音`）+ **D3 对齐图**（参考旋律线 + 用户曲线 + 逐句分柱）→ 报告（未评测句标注，发音=抽样句）。参考旋律离线提取（pyin）+ Java 状态委托全链路可自动跑（lint 听歌/seed 后自动提取）；管理端有提取状态（`pitch_ref_status`）。**联调测试页**：`/preview/singing`（dev-only）。
+- ✅ **唱歌（M3 P0 · 2026-09-09 落地）**：`/m/sing` 唱吧全链路——选歌（参考旋律就绪门禁，未就绪/提取中/失败徽标）→ 整首跟唱（≤180s，保持前台；停止或 3min 自动收）→ 上传 → 异步评分（轮询 queued→processing→done|failed）→ 逐句音准/节奏/发音 + 综合（`0.5·音准+0.2·节奏+0.3·发音`）+ **D3 对齐图**（参考旋律线 + 用户曲线 + 逐句分柱）→ 报告（未评测句标注，发音=抽样句）。**演示曲目**：`python scripts/setup-assets.py` 合成 3 首公有领域童谣旋律（音频落 `data/audio/`，gitignored，不入库）→ Java `SongSeeder` 启动播种元数据/逐句 LRC → Python 离线 pyin 提取自动置 `pitch_ref_status=ready`（实测 6/4/4 句全部就绪）。**联调测试页**：`/preview/singing`（dev-only）。
 - ⏳ 真实语音链路需 `.env` 密钥（DeepSeek/讯飞）+ ffmpeg + whisper 模型；缺省时全链路走 Fake（`APP_TESTING=true`），联调冒烟脚本：`python scripts/poc/demo_smoke.py`。
 - ⏳ 推荐/报表仍按 M3 排期推进；社区 S1 真实流已上线（发帖开关 `VOICEVERSE_COMMUNITY_POST_ENABLED=true` 演示开启、生产默认关）；**S2 关注 + 互动通知已真实化**（通知中心「通知/关注」两 tab = 真实流；「私信」tab 仍演示）；搜索/嵌套楼/视频播放器（S3）后置。
 
