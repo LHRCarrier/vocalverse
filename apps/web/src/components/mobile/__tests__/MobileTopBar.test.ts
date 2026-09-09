@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 
 describe('MobileTopBar', () => {
@@ -14,6 +15,33 @@ describe('MobileTopBar', () => {
 
     await wrapper.get('button[aria-label="账户菜单"]').trigger('click')
     expect(useUiStore().drawerOpen).toBe(true)
+  })
+
+  /**
+   * 2026-09-09 组长手机实测：设了真实头像后，只有侧边抽屉显示新头像，顶栏仍是首字母。
+   * 根因是顶栏写死 `avatarLetter`（未换 MobileAvatar）。
+   */
+  it('顶栏头像用真实头像（设了 avatarUrl 时渲染 img，不再只显示首字母）', () => {
+    const auth = useAuthStore()
+    auth.me = {
+      userId: 1,
+      username: 'emma',
+      nickname: 'Emma',
+      level: 'L3',
+      avatarUrl: '/api/v1/media/abcdef0123456789abcdef0123456789',
+      tint: '#1e2b26',
+    }
+    const wrapper = mount(MobileTopBar, { props: { title: '社区' } })
+    const img = wrapper.get('.u-topbar__ava .u-ava__img')
+    expect(img.attributes('src')).toBe('/api/v1/media/abcdef0123456789abcdef0123456789')
+  })
+
+  it('无头像时回退首字母（保持原视觉基线）', () => {
+    const auth = useAuthStore()
+    auth.me = { userId: 1, username: 'emma', nickname: 'Emma', level: 'L3', avatarUrl: null }
+    const wrapper = mount(MobileTopBar, { props: { title: '社区' } })
+    expect(wrapper.find('.u-topbar__ava .u-ava__img').exists()).toBe(false)
+    expect(wrapper.get('.u-topbar__ava').text()).toContain('E')
   })
 
   it('back=true 时离开钮（门图标）触发 back 事件', async () => {
