@@ -372,6 +372,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["patchMe"];
+        trace?: never;
+    };
     "/api/v1/admin/users/{id}/status": {
         parameters: {
             query?: never;
@@ -926,7 +942,9 @@ export interface components {
             body: string;
             kind: string;
             domain: string;
+            media?: components["schemas"]["JsonNode"];
         };
+        JsonNode: Record<string, never>;
         AuthorView: {
             /** Format: int64 */
             id?: number;
@@ -934,6 +952,7 @@ export interface components {
             handle?: string;
             tint?: string;
             level?: string;
+            avatarUrl?: string;
         };
         CommunityPostView: {
             /** Format: int64 */
@@ -968,7 +987,6 @@ export interface components {
             message?: string;
             data?: components["schemas"]["CommunityPostView"];
         };
-        JsonNode: Record<string, never>;
         EnvelopeShareState: {
             /** Format: int32 */
             code?: number;
@@ -1006,6 +1024,28 @@ export interface components {
             kind: string;
             prompt: string;
             referenceAnswer?: string;
+        };
+        PatchMeRequest: {
+            nickname?: string;
+            handle?: string;
+            tint?: string;
+            avatarUrl?: string;
+        };
+        EnvelopeMeView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["MeView"];
+        };
+        MeView: {
+            /** Format: int64 */
+            userId?: number;
+            username?: string;
+            nickname?: string;
+            level?: string;
+            handle?: string;
+            tint?: string;
+            avatarUrl?: string;
         };
         StatusUpdate: {
             status: string;
@@ -1072,19 +1112,6 @@ export interface components {
         TicketPatch: {
             status?: string;
             adminReply?: string;
-        };
-        EnvelopeMeView: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: components["schemas"]["MeView"];
-        };
-        MeView: {
-            /** Format: int64 */
-            userId?: number;
-            username?: string;
-            nickname?: string;
-            level?: string;
         };
         EnvelopeListTicketView: {
             /** Format: int32 */
@@ -2171,6 +2198,30 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["EnvelopeMaterialView"];
+                };
+            };
+        };
+    };
+    patchMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchMeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMeView"];
                 };
             };
         };

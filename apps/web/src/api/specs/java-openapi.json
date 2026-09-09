@@ -1191,6 +1191,34 @@
         }
       }
     },
+    "/api/v1/users/me" : {
+      "patch" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "patchMe",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PatchMeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMeView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/users/{id}/status" : {
       "patch" : {
         "tags" : [ "admin-user-controller" ],
@@ -2553,8 +2581,14 @@
             "maxLength" : 16,
             "minLength" : 0,
             "type" : "string"
+          },
+          "media" : {
+            "$ref" : "#/components/schemas/JsonNode"
           }
         }
+      },
+      "JsonNode" : {
+        "type" : "object"
       },
       "AuthorView" : {
         "type" : "object",
@@ -2573,6 +2607,9 @@
             "type" : "string"
           },
           "level" : {
+            "type" : "string"
+          },
+          "avatarUrl" : {
             "type" : "string"
           }
         }
@@ -2655,9 +2692,6 @@
             "$ref" : "#/components/schemas/CommunityPostView"
           }
         }
-      },
-      "JsonNode" : {
-        "type" : "object"
       },
       "EnvelopeShareState" : {
         "type" : "object",
@@ -2756,6 +2790,73 @@
             "type" : "string"
           },
           "referenceAnswer" : {
+            "type" : "string"
+          }
+        }
+      },
+      "PatchMeRequest" : {
+        "type" : "object",
+        "properties" : {
+          "nickname" : {
+            "maxLength" : 64,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "handle" : {
+            "maxLength" : 32,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "tint" : {
+            "maxLength" : 16,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "avatarUrl" : {
+            "maxLength" : 512,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "EnvelopeMeView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/MeView"
+          }
+        }
+      },
+      "MeView" : {
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "username" : {
+            "type" : "string"
+          },
+          "nickname" : {
+            "type" : "string"
+          },
+          "level" : {
+            "type" : "string"
+          },
+          "handle" : {
+            "type" : "string"
+          },
+          "tint" : {
+            "type" : "string"
+          },
+          "avatarUrl" : {
             "type" : "string"
           }
         }
@@ -2943,39 +3044,6 @@
           "adminReply" : {
             "maxLength" : 2000,
             "minLength" : 0,
-            "type" : "string"
-          }
-        }
-      },
-      "EnvelopeMeView" : {
-        "type" : "object",
-        "properties" : {
-          "code" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/MeView"
-          }
-        }
-      },
-      "MeView" : {
-        "type" : "object",
-        "properties" : {
-          "userId" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "username" : {
-            "type" : "string"
-          },
-          "nickname" : {
-            "type" : "string"
-          },
-          "level" : {
             "type" : "string"
           }
         }

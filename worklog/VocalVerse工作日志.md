@@ -3,6 +3,34 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-09 社区内容 S3 闭环落地：媒体上传（图/视频/头像）+ 帖子详情 + 划词查义（六路拷问后实施）
+
+- **需求**：社区从「只读流 + 纯文本发帖」补成闭环——发帖（图文/视频）、点帖子有查看方式、用户头像、社区正文划词查义。
+- **设计先行**：`docs/47-社区内容闭环（S3）实施设计.md`（v1）→ **六路子代理拷问**（并发性能 / 日志可观测 / 数据模型 / 业务联动 / 模块设计 / 前端 UI-UX，各写报告到 `local/拷问-*.md`，共 128 条）→ `docs/48-社区内容S3拷问报告.md` 合流裁定 **23 条阻断级** → `docs/47` v2 定稿。拷问抓到三处「照稿实现即坏产物」：① `sha256` 全局唯一 + 软删会让「传→删→再传」永久失败；② 暴露 `bigserial` 的 URL 与「不可猜」的匿名读理由自相矛盾（逐号 curl 可枚举全站媒体）；③ 64MB 视频上限被 `nginx.conf` 的 `client_max_body_size 20m` 挡在网关。
+- **Python（媒体服务，新域）**：迁移 **0011**（`media_assets`：随机 `public_id` 对外 / 行级去重键 `(owner_id, sha256) WHERE status='ready'` / 物理文件按 sha256 内容寻址共享 / 软删不动物理文件）+ `user_profiles` 补 `lower(handle)` 唯一索引（迁移内先去重）；`app/media/{sniff,storage,service}.py` + `app/api/routes/media.py`（POST 上传 / GET 裸流 **Range 由 Starlette FileResponse 提供** / DELETE 软删 / GET 我的上传）；魔数嗅探白名单（图 jpeg/png/webp/gif、视频 mp4/webm）、分块写盘 + uuid 临时名 + `os.replace`、新限流桶 `media` 60/时；生词本 `POST /reading/vocab` 补 `scene` 入参（`community` 划词来源）并把 check-then-act 改唯一键兜底。
+- **日志可观测（阻断修复）**：新增 `app/core/logging.py` 的 `dictConfig` —— 此前全仓无 `basicConfig/dictConfig`，`vocalverse` logger **无 handler，所有 `logger.info` 零输出**（`APP_LOG_LEVEL` 也是死配置）；现在格式含 `%(request_id)s`，媒体域按「上传成功/被拒/404/软删」分级别记录。
+- **Java**：`AuthorView` 末尾增 `avatarUrl`（feed/详情/评论/关注一次带回，零额外请求；通知不带，登记 S4）；发帖 `CreatePostRequest` 增 `media` + 新 `MediaRefValidator`（形状/条数/URL 前缀白名单，**拒绝外链**；不强制 kind 与 media 一致，保住既有 `kind=video` 无 media 的契约）；新增 `PATCH /api/v1/users/me`（昵称/@handle/tint/头像；handle 撞唯一键 40904），`GET /auth/me` 扩 `avatarUrl/handle`（**不新增重复 GET**）；`CommunitySeeder` 的 media 时长键改 camelCase（种子视频时长角标此前一直是坏的）。
+- **前端**：`api/media.ts`（XHR 上传带进度 + `mediaUrl()` 拼 `PYTHON_BASE`，修复「打包壳里相对路径打到 https://localhost」）+ `api/users.ts`；`types/community.ts` 增 `normalizeMedia()` 兼容三种历史形状；新组件 `MobileAvatar`（收敛 8 套头像实现）/`MobileMediaGrid`/`MobileMediaLightbox`/`MobileVideoPlayer`/`MobileMediaPicker`；新页面 `/m/post/:postId`（详情：作者头像 + 多图 + 视频 + 互动 + 内联评论 + 删自己的帖）与 `/m/me/profile`（头像上传 + 资料编辑）；发帖接媒体选择器；**社区划词**：`useCommunityWordLookup` 复用读书域查词卡/生词本/朗读，来源 `scene=community`；灯箱/播放器/词卡全注册进 `useBackLayers`（否则安卓返回直接退页）。
+- **门禁与验证**：Python `ruff check`/`format --check`/**pytest 388 passed**（含 18 条媒体用例：嗅探/超限/元数据/越权/软删/去重与再传/匿名读 + Range 206/416）；Java **mvn verify 65+ 用例**（`CommunityMediaApiTest` 10 条 + `UserMeApiTest` 6 条）；前端 `lint`/`typecheck`/**test:run 202 passed**/`build`/`check-bundle.mjs`（preview 树零体积）全绿；契约快照双端刷新 + `pnpm gen:api`，Python 快照与 `app.openapi()` 对账一致、Java `ContractSnapshotTest` 绿；`check_feature_flags.py` / `check_single_writer.py` 均 ok（本域**不新增功能位**：媒体是真实功能，边界=鉴权+限流+白名单，与音频上传同口径）。
+- **基础设施**：`nginx.conf` `client_max_body_size 20m → 64m`（与 `APP_MEDIA_MAX_VIDEO_BYTES` 双写项）、`docker-compose.yml` 补 `./data/media` 卷、`.env.example` 补 `APP_MEDIA_DIR`/`APP_MEDIA_MAX_VIDEO_BYTES`。
+- **登记**：`docs/21`（Python 48 ops / Java 端点表 + 限流桶 + 裸流例外第 4 条）、`docs/api/error-codes.md`（新增 40403/41501/42205，拓宽 41301）、`docs/06 §19`（媒体存储/读取口径/上限三处同步/日志/跨服务边界）、`docs/13`（3 个新 token）、`docs/35`（沉浸页例外）、`README` 文档索引；联调测试页 `/preview/community-s3`（含可删清单）。
+- **登记的不做项**：媒体物理文件 GC（三条件设计见 docs/48 B19）、签名 URL、作者主页、通知带头像、列表页划词、社区批注（无服务端权威 char offset）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-09）
+
+## 2026-09-09 阅读器批注四连修复（组长实测 BUG记录 → 归档 BUG实测，后端零改动）
+
+- **来源**：`worklog/BUG记录/读书域系列BUG9-09/`（组长手机实测 4 条），修复后**该目录已删除**，逐条归档到 `worklog/BUG实测/读书域批注-*.md`（4 份）。
+- **缺陷与修法**（详见归档；UI 细节另见 `worklog/安卓开发日志.md`）：
+  1. **暗黑模式批注不可读**：批注色裸写 `background` + night 浅灰墨色 → 对比度 1.05~1.23；改 `--ur-ann-color` + 按主题 `color-mix`（night 24%）+ 文字统一 `--ur-theme-ink`（修复后 5.59~5.95）。
+  2. **只能删除、改不了色/笔记**：批注卡改「查看即编辑」→ 走既有 `PATCH /api/v1/reading/annotations/{id}`（`patchAnnotation` 此前全仓零调用，**后端无需改动**）。
+  3. **查看批注只能点空格（命中区 4.6px）**：新增句首批注角标（任何 kind 都有；单条直开、多条开本句列表）+ 选中句动作条「看批注」大热区入口。
+  4. **点「高亮这句」不等选色**：不传色 → 先开选色面板（未选色禁用保存）；动作条色点仍直出。
+- **附带修复**：`createFromSelection` 用 `range.startOffset`（相对选区容器）当句内偏移 → 句内嵌套词块时批注错位，改 Range 前缀长度法；色板收成单一真源 + `safeAnnColor` 白名单（封 CSS 注入/非法值使声明失效）。
+- **门禁**：新增「解析 CSS 源文件算 WCAG 对比度」门禁（三主题 × 色板全色 + 最坏色兜底）；**修复前必红证据**：HEAD `63fcaee` worktree + 新测试文件 → 14 条红；修复后前端 lint/typecheck/test:run（178 passed）/build 全绿；`MobileReaderView` 抽 3 个 composable 回到 350 行门禁内。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-09）
+
 ## 2026-09-10 自由对话「internal」复发：手动起 python 漏 APP_ASR_MODEL（ASR 模型脱绑）
 
 - **复现**：手机自由对话（语音）提示 internal；python `err.log` 见 `LocalEntryNotFoundError: Cannot find an appropriate cached snapshot folder ... outgoing traffic disabled`（HF 离线 + 按 repo_id 找模型）。

@@ -238,6 +238,8 @@ worklog/          团队工作日志（主线 VocalVerse工作日志.md + App �
 | `docs/44-TTS链路整改计划.md` | **TTS 链路整改计划（对抗拷问产出 · 待评审稿）**：依据 `local/grill-voice-tts.json`（9 项 P0×3/P1×5/P2×1）+ 语音链路审计 V2.0；TTS 优先四类硬伤（句切分缩写/小数点当句号、单引擎无生命周期且 Azure 备胎零代码、文本零前处理、/tts 回 hex×2 且无响度归一）；P0-A~C（切分/生命周期/Azure 兜底）+ P1-A~E（文本归一/缓存/缺句上报/duration/输出封装+loudnorm/ssml-lite 语速停顿）+ P2（听读逐词时间轴）；每项给改动文件/做法（借鉴不拷代码，算法引上游 MIT 的 Patter/voicebox，依赖引 MIT `num2words`/ffmpeg/azure SDK）/验收（修复前必失败回归测试）/风险回退/建议 PR + 测试策略（CI 不打真 TTS/Azure，走纯函数+FakeTTSClient）+ 待评估项（crossfade/m4b/speech_rate/发音词典）+ 时间线 |
 | `docs/45-英文小说阅读功能设计.md` | **英文小说阅读（读书）功能设计（定稿 · 四官拷问后）**：定位（词汇速记落地主体）/用户路径 / 8 表数据模型（content_version 版本守卫/词形反向索引/批注偏移坐标系）/ 20 端点契约（45xxx 错误码）/ 听书 TTS（provider 链 edge+kitten、VoiceStudio jobs 模式借鉴、句级对齐）/ 前端 u-* 语义（书架/详情/阅读器/生词本 + 7 组件 + 5 composables）/ 种子（公版书 3 本 + ECDICT 子集）/ 测试与门禁 / 红线与后续登记 |
 | `docs/46-英文小说阅读拷问报告.md` | **读书功能四官拷问合流**：数据模型（V-1…V-20）/业务逻辑（B-1…B-22）/模块工程（M-1…M-18）/UI-UX（U-1…U-22）的裁决表（C-1…C-10：设计语言 u-*/词卡 sheet/桶 600·只扣真实合成/SSE 任务通道/联调页 A 落法等）+ 本地模型能力清单（KittenTTS mini 选为本地引擎；OmniVoice CC-BY-NC 禁商用等）+ VoiceStudio AGPL 红线注记 |
+| `docs/47-社区内容闭环（S3）实施设计.md` | **社区内容闭环 S3 实施设计（定稿 v2 · 六路拷问后）**：媒体上传（图/视频/头像）+ 帖子详情页 + 真实头像 + 社区正文划词查义；`media_assets` 迁移 0011（随机 `public_id` 对外 / 行级去重键 `(owner_id,sha256) WHERE ready` / 软删不动物理文件）+ `posts.media` jsonb 多图形状与 S1 向后兼容 + 3 新错误码（40403/41501/42205）+ Python `FileResponse` Range 读 + 前端 7 组件/2 页面/4 composable + 联调测试页与删除清单 |
+| `docs/48-社区内容S3拷问报告.md` | **社区 S3 六路拷问合流与拍板**：并发性能/日志可观测/数据模型/业务联动/模块设计/前端 UI-UX 六角度共 128 条，其中**阻断级 23 条**逐条裁定（sha256 全局唯一与软删互斥、`bigserial` URL 可枚举、64MB 撞 nginx 20m、Python logger 无 handler、媒体相对路径在打包壳必破、错误码未登记且自相矛盾…）+ 6 项待定项裁定 + 未采纳登记 |
 
 ## 里程碑（详见 docs/04、docs/06；状态随工作日志滚动更新）
 

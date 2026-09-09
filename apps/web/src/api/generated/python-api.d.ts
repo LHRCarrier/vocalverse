@@ -679,6 +679,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Mine
+         * @description 我的上传列表（配额排查/管理用；只读本人 ready 行）。
+         */
+        get: operations["list_mine_api_v1_media_get"];
+        put?: never;
+        /** Upload */
+        post: operations["upload_api_v1_media_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/media/{public_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download
+         * @description 二进制读取（匿名可用；``status='deleted'`` → 40403）。Range 由 FileResponse 处理。
+         */
+        get: operations["download_api_v1_media__public_id__get"];
+        put?: never;
+        post?: never;
+        /** Remove */
+        delete: operations["remove_api_v1_media__public_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -819,6 +861,22 @@ export interface components {
              * @default +0%
              */
             rate: string;
+        };
+        /** Body_upload_api_v1_media_post */
+        Body_upload_api_v1_media_post: {
+            /** File */
+            file: string;
+            /**
+             * Kind
+             * @default image
+             */
+            kind: string;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Duration S */
+            duration_s?: number | null;
         };
         /** BookDetailView */
         BookDetailView: {
@@ -1000,6 +1058,20 @@ export interface components {
              */
             message: string;
             data?: components["schemas"]["LookupResultView"] | null;
+        };
+        /** Envelope[MediaView] */
+        Envelope_MediaView_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["MediaView"] | null;
         };
         /** Envelope[PagedItems] */
         Envelope_PagedItems_: {
@@ -1195,6 +1267,25 @@ export interface components {
             in_vocab: boolean;
             /** Vocab Id */
             vocab_id?: number | null;
+        };
+        /** MediaView */
+        MediaView: {
+            /** Id */
+            id: string;
+            /** Url */
+            url: string;
+            /** Kind */
+            kind: string;
+            /** Mimetype */
+            mimeType: string;
+            /** Size */
+            size: number;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Durations */
+            durationS?: number | null;
         };
         /** PagedItems */
         PagedItems: {
@@ -2879,6 +2970,141 @@ export interface operations {
             };
             path: {
                 task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_str__bool__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_mine_api_v1_media_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_str__Any__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_api_v1_media_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_api_v1_media_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_MediaView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_api_v1_media__public_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                public_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_api_v1_media__public_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                public_id: string;
             };
             cookie?: never;
         };
