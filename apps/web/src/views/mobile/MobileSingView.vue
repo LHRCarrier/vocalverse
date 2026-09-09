@@ -60,6 +60,15 @@ const processing = computed(
 const scoreColor = (v: number | null) =>
   v == null ? '#999' : v >= 85 ? '#18a058' : v >= 60 ? '#f2a43a' : '#d03050'
 
+/** 覆盖率（v2 口径）：有效句 < 50% → 「样本不足」提示（分数仍给，标注仅供参考） */
+const evaluatedCount = computed(
+  () => play.result.value?.lines.filter((x) => !x.skipped).length ?? 0,
+)
+const expectedCount = computed(() => play.result.value?.expected_lines ?? 0)
+const lowCoverage = computed(
+  () => expectedCount.value > 0 && evaluatedCount.value < expectedCount.value * 0.5,
+)
+
 /** 参考旋律回放（2026-09-09 真机反馈：先听一遍再跟唱，避免凭记忆清唱音准普遍偏低） */
 const refPlaying = ref(false)
 let refAudio: HTMLAudioElement | null = null
@@ -346,7 +355,12 @@ async function shareSong() {
             <div class="m-sing-report__lines">
               <div v-for="(l, i) in play.result.value.lines" :key="l.seq" class="m-sing-line">
                 <span class="m-sing-line__text">
-                  {{ i + 1 }}. {{ l.skipped ? `未评测（${l.reason ?? 'skipped'}）` : '✓' }}
+                  {{ i + 1 }}.
+                  <template v-if="l.skipped">未评测（{{ l.reason ?? 'skipped' }}）</template>
+                  <template v-else-if="l.onset_dev_ms != null">
+                    起唱偏差 {{ Math.round(l.onset_dev_ms) }}ms
+                  </template>
+                  <template v-else>✓</template>
                 </span>
                 <span class="m-sing-line__score">
                   <b :style="{ color: scoreColor(l.pitch_score) }">{{ l.pitch_score?.toFixed(0) ?? '—' }}</b>
@@ -354,16 +368,14 @@ async function shareSong() {
                 </span>
               </div>
             </div>
-            <div
-              v-if="!play.result.value.is_complete"
-              class="m-sing-sheet__hint"
-              style="color: #b8860b; margin: 8px 0"
-            >
-              {{
-                play.result.value.expected_lines -
-                  play.result.value.lines.filter((x) => !x.skipped).length
-              }}
-              句未评测（无音高/参考缺失），综合按有效句均分（docs/06 §9.4 D5）。
+            <div class="m-sing-sheet__hint" style="margin: 8px 0">
+              有效句 {{ evaluatedCount }}/{{ expectedCount }}
+              <template v-if="evaluatedCount < expectedCount">
+                · 未评测 {{ expectedCount - evaluatedCount }} 句（无音高/参考缺失/有效帧不足），综合按有效句均分（docs/06 §9.4 D5）
+              </template>
+            </div>
+            <div v-if="lowCoverage" class="m-sing-sheet__hint" style="color: #c0392b; margin: 8px 0">
+              样本不足（仅 {{ evaluatedCount }}/{{ expectedCount }} 句有效），分数仅供参考——建议完整唱一遍再评。
             </div>
             <button class="u-btn u-btn--ghost" type="button" style="width: 100%; margin-top: 10px" @click="startOver">
               返回歌单

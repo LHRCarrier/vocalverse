@@ -57,9 +57,11 @@ export interface SingLineResult {
   reason?: string | null
   ref_seq?: number | null
   no_ref?: boolean
+  /** v2：该句起唱偏差 ms（相对「LRC 时间戳 + 整首对齐偏移」；null=未检出） */
+  onset_dev_ms?: number | null
   /** D4：用户逐帧 F0 [[t_ms, f0_hz], ...] */
   user_f0: [number, number][]
-  /** 帧级 cent 偏差（D3 图辅助） */
+  /** 帧级折叠 cent 偏差（D3 图辅助） */
   cent_dev?: number[]
 }
 
