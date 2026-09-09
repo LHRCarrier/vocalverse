@@ -7,7 +7,7 @@
  * GET /sing/attempts/{id}(/status)（api/sing.ts；错误码映射见 singErrorMessage）。
  * 视觉：沿用重制版基线（深青精选卡/56px 分段/点线时间轴歌单）；交互逻辑接真。
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import IconShare from '~icons/tabler/share'
@@ -15,6 +15,7 @@ import IconShare from '~icons/tabler/share'
 import { shareDemoLink } from '@/composables/share'
 import { useSingPlay } from '@/composables/sing'
 import { useUiStore } from '@/stores/ui'
+import { loadAudioBlob } from '@/api/client'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
@@ -53,9 +54,51 @@ const visibleSongs = computed(() =>
 const featured = computed(() => play.songs.value[0] ?? null)
 const sheetDetail = computed(() => play.detail.value)
 const recording = computed(() => play.phase.value === 'recording')
-const processing = computed(() => play.phase.value === 'processing' || play.phase.value === 'uploading')
+const processing = computed(
+  () => play.phase.value === 'processing' || play.phase.value === 'uploading',
+)
 const scoreColor = (v: number | null) =>
   v == null ? '#999' : v >= 85 ? '#18a058' : v >= 60 ? '#f2a43a' : '#d03050'
+
+/** 参考旋律回放（2026-09-09 真机反馈：先听一遍再跟唱，避免凭记忆清唱音准普遍偏低） */
+const refPlaying = ref(false)
+let refAudio: HTMLAudioElement | null = null
+
+const refAudioPath = computed(() => {
+  const url = sheetDetail.value?.audio_url
+  return url ? `/api/v1/audio/${url.split('/').pop()}` : null
+})
+
+async function toggleReference() {
+  if (refPlaying.value) {
+    stopReference()
+    return
+  }
+  const path = refAudioPath.value
+  if (!path) {
+    ui.showToast('该曲目暂无参考旋律音频')
+    return
+  }
+  try {
+    const blob = await loadAudioBlob(path)
+    refAudio = new Audio(URL.createObjectURL(blob))
+    refAudio.onended = () => {
+      refPlaying.value = false
+      refAudio = null
+    }
+    await refAudio.play()
+    refPlaying.value = true
+  } catch {
+    ui.showToast('参考旋律播放失败，请重试')
+    refPlaying.value = false
+  }
+}
+
+function stopReference() {
+  refAudio?.pause()
+  refAudio = null
+  refPlaying.value = false
+}
 
 function statusBadge(s: string): { text: string; variant: 'success' | 'star' | 'neutral' } {
   switch (s) {
@@ -77,9 +120,14 @@ async function openSong(songId: number) {
 }
 
 async function startOver() {
+  stopReference()
   play.reset()
   sheetOpen.value = false
 }
+
+onUnmounted(() => {
+  stopReference()
+})
 
 onMounted(play.loadSongs)
 
@@ -244,9 +292,19 @@ async function shareSong() {
             </p>
           </div>
           <button
-            class="u-btn u-btn--primary"
+            class="u-btn u-btn--secondary"
             type="button"
             style="width: 100%; margin-top: 12px"
+            :disabled="recording"
+            @click="toggleReference"
+          >
+            <MobileIcon name="play" :size="16" />
+            {{ refPlaying ? '停止参考旋律' : '听参考旋律（建议先听一遍再跟唱）' }}
+          </button>
+          <button
+            class="u-btn u-btn--primary"
+            type="button"
+            style="width: 100%; margin-top: 8px"
             :disabled="recording || processing"
             @click="play.startRecording()"
           >

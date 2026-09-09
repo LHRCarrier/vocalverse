@@ -13,6 +13,8 @@ export interface SongSummary {
   bpm?: number | null
   musical_key?: string | null
   cover_url?: string | null
+  /** 参考旋律音频（共享卷路径；前端取 basename 走 /api/v1/audio/{name} 回放） */
+  audio_url?: string | null
   pitch_ref_status: 'missing' | 'building' | 'ready' | 'invalid'
   expected_lines: number
 }
