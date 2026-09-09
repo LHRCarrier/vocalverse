@@ -42,12 +42,23 @@ def test_rhythm_score_bands():
     assert rhythm_score_from_dev(1500) >= 0
 
 
-def test_cent_deviation_same_and_octave():
+def test_cent_deviation_is_octave_agnostic():
+    """音准八度无关（2026-09-09 真机回归）：低/高八度演唱按同一音高判（KTV/唱吧口径）。
+
+    真机实测用户 78~110Hz vs 参考 341Hz（低约 2 个八度）——绝对比较会恒判 0 分。
+    """
     ref = np.full(20, 440.0)
     same = np.full(20, 440.0)
     octave_up = np.full(20, 880.0)
+    octave_down = np.full(20, 220.0)
+    two_octaves_down = np.full(20, 110.0)
     assert _cent_deviation(same, ref) == 0.0
-    assert abs(_cent_deviation(octave_up, ref) - 1200.0) < 1.0
+    assert _cent_deviation(octave_up, ref) < 1.0, "八度上唱应视为同音高"
+    assert _cent_deviation(octave_down, ref) < 1.0, "八度下唱应视为同音高"
+    assert _cent_deviation(two_octaves_down, ref) < 1.0, "低两个八度仍视为同音高"
+    # 真跑调（半音 ≈ 100 cent）仍能被测出
+    flat = np.full(20, 440.0 * 2 ** (100 / 1200.0))
+    assert abs(_cent_deviation(flat, ref) - 100.0) < 1.0
     # 有效帧 <3 → None（缺失降权 D5）
     assert _cent_deviation(np.array([0.0] * 20), ref) is None
 

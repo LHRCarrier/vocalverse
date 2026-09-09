@@ -13,7 +13,9 @@ from pathlib import Path
 from app.audio.pitch import (
     EXTRACTOR_VERSION,
     FakePitchExtractor,
+    PyinPitchExtractor,
     _midi_to_name,
+    apply_voicing_gate,
     resolve_audio_path,
     slice_window,
 )
@@ -95,3 +97,61 @@ def test_midi_to_name():
 
 def test_extractor_version_stable():
     assert EXTRACTOR_VERSION == "pyin-v1"
+
+
+# ---------------------------------------------------------------------------
+# 清浊门限（2026-09-09 真机回归：真人歌声 voicing prob 偏低，叠加门限会误杀整句）
+# ---------------------------------------------------------------------------
+def test_apply_voicing_gate_default_keeps_viterbi_flag():
+    """默认门限 0：只信 librosa voiced_flag（viterbi 判决），低 vprob 帧必须保留。"""
+    import numpy as np
+
+    flag = np.array([True, True, False, True])
+    prob = np.array([0.05, 0.55, 0.9, 0.01])  # 真人歌声的典型低 vprob
+    out = apply_voicing_gate(flag, prob, threshold=0.0)
+    assert list(out) == [True, True, False, True], "低 vprob 有声帧被误杀（回归：全句 no_pitch）"
+
+
+def test_apply_voicing_gate_optional_threshold_filters():
+    """显式调高门限（如 0.5）时叠加过滤——仅在需要更激进剔除静音时使用。"""
+    import numpy as np
+
+    flag = np.array([True, True, True])
+    prob = np.array([0.05, 0.55, 0.9])
+    assert list(apply_voicing_gate(flag, prob, threshold=0.5)) == [False, True, True]
+
+
+def test_apply_voicing_gate_all_silent():
+    """voiced_prob=None（全静音序列）→ 全 False。"""
+    import numpy as np
+
+    out = apply_voicing_gate(np.array([True, True]), None, threshold=0.0)
+    assert not out.any()
+
+
+def test_pyin_extracts_f0_from_noisy_singing_signal(tmp_path):
+    """真机回归：带噪声的正弦（模拟真人唱歌的低 voicing prob）必须能提出 F0。
+
+    修复前（清浊叠加门限 0.6）此用例失败：全部帧被判清音 → f0 全 0。
+    """
+    import numpy as np
+    import soundfile as sf
+
+    sr = 16000
+    t = np.linspace(0, 2.0, sr * 2, endpoint=False)
+    rng = np.random.default_rng(42)
+    tone = 0.35 * np.sin(2 * np.pi * 440 * t)
+    # 加性噪声 + 颤音（±1.5% 频率调制）→ 贴近真实歌声，voicing prob 显著低于 0.6
+    noise = 0.12 * rng.standard_normal(len(t))
+    vibrato = 0.015 * np.sin(2 * np.pi * 5.5 * t)
+    signal = (tone + vibrato * tone + noise).astype("float32")
+    path = tmp_path / "noisy.wav"
+    sf.write(str(path), signal, sr)
+
+    track = PyinPitchExtractor().extract_track(str(path))
+    voiced = [v for v in track.f0 if v > 0]
+    assert len(voiced) > len(track.f0) * 0.3, (
+        f"有声帧过少（{len(voiced)}/{len(track.f0)}）——清浊门限误杀回归"
+    )
+    median = sorted(voiced)[len(voiced) // 2]
+    assert 400 < median < 480, f"提取基频偏离 440Hz：{median:.1f}"
