@@ -23,6 +23,7 @@ from .content import (
 from .defense import DefenseProfile
 from .difficulty import MaterialDifficulty
 from .mastery import UserCorpusMastery, UserMastery
+from .media import MediaAsset, MediaKinds, MediaStatus
 from .practice import Attempt, Score, Session, SingAttempt
 from .reading import (
     Book,
@@ -76,6 +77,10 @@ __all__ = [
     "PostLike",
     "PostInteraction",
     "Follow",
+    # 媒体域（社区 S3 · Python 写方，docs/47 §3.1）
+    "MediaAsset",
+    "MediaKinds",
+    "MediaStatus",
     # 答辩域
     "DefenseProfile",
     # 推荐域（local/31 §2，2026-09-02 设计）

@@ -306,6 +306,10 @@ async def add_vocab(
     book_id = body.get("book_id")
     chapter_id = body.get("chapter_id")
     context = body.get("context")
+    # 生词来源（docs/47 §5.5 社区划词）：reading | community | manual
+    scene = str(body.get("scene") or "reading")
+    if scene not in ("reading", "community", "manual"):
+        raise BizError(422, 45002, "scene invalid")
 
     def _q():
         row, added = service.add_vocab(
@@ -315,6 +319,7 @@ async def add_vocab(
             book_id=int(book_id) if book_id else None,
             chapter_id=int(chapter_id) if chapter_id else None,
             context_snippet=str(context) if context else None,
+            scene=scene,
         )
         db.commit()
         entry = db.execute(

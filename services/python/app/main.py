@@ -23,6 +23,7 @@ from app.api.routes import (
     events,
     free_chat,
     health,
+    media,
     placement,
     practice,
     reading,
@@ -30,6 +31,7 @@ from app.api.routes import (
     recommendations,
 )
 from app.core.config import get_settings
+from app.core.logging import configure_logging
 from app.core.response import BizError
 from app.core.trace import RequestIdLogFilter, RequestIdMiddleware
 
@@ -52,6 +54,8 @@ if _repo_root is not None:
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
+# 日志先配置再用（docs/48 B4：此前无 handler → logger.info 零输出）
+configure_logging()
 logger = logging.getLogger("vocalverse")
 logger.addFilter(RequestIdLogFilter())  # 每条日志带 request_id（docs/06 §11）
 
@@ -134,6 +138,7 @@ app.include_router(events.router)
 app.include_router(recommendations.router)
 app.include_router(reading.router)  # 读书域（docs/45：书架/查词/生词/批注/进度/音色）
 app.include_router(reading_tts.router)  # 听书（单句音频/预合成 SSE/任务）
+app.include_router(media.router)  # 媒体（社区 S3 · docs/47 §4.1：图片/视频/头像上传与读取）
 # Agent Lab（test-only 测试台；默认关闭，开启才注册 → 404；删除无影响，见 agent_lab.py 删除清单）
 if get_settings().agent_lab_enabled:
     from app.api.routes import agent_lab

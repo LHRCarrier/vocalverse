@@ -99,6 +99,23 @@ class Settings(BaseSettings):
     audio_dir: str = "./data/audio"  # 本地卷存储（docs/06 §8）
 
     # =========================================================================
+    # 媒体（社区 S3 · docs/47 §4.1）：图片/视频/头像上传与读取
+    # 存储口径与音频一致（本地卷 + 预留对象存储抽象，docs/06 §8）；
+    # ⚠️ 视频上限改动必须同步 apps/web/nginx.conf 的 client_max_body_size
+    #    （网关先于 Python 生效，否则容器链路 >20MB 直接 nginx 413 且响应非 Envelope，
+    #     见 docs/48 B3）。
+    # =========================================================================
+    media_dir: str = "./data/media"
+    # 视频 64MB（图片/头像沿用 max_upload_bytes 20MB）
+    media_max_video_bytes: int = 64 * 1024 * 1024
+    media_rate_per_hour: int = 60  # 上传限流桶（docs/47 §4.1）
+    media_max_items_per_post: int = 9  # 单帖图片数上限（Java 侧同口径校验）
+    media_max_dimension: int = 8192  # 宽/高上界
+    media_max_duration_s: int = 600  # 视频时长上界（秒）
+    # Java 只允许引用本前缀的媒体 URL（拒绝外链，docs/47 §4.3）
+    media_url_prefix: str = "/api/v1/media/"
+
+    # =========================================================================
     # 推荐系统（local/31 §4.4 配置汇总 + local/32 六维拷问修订；依据 local/26~32）
     # 注意：env 前缀 APP_（APP_SKILL_WINDOW_SIZE 等）；所有值进配置，不写死。
     # =========================================================================

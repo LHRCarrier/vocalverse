@@ -128,6 +128,15 @@ class UserProfile(TimestampMixin, Base):
         CheckConstraint("voice_rate IN ('slow', 'normal', 'fast')", name="voice_rate"),
         CheckConstraint("preferred_difficulty BETWEEN 1 AND 4", name="preferred_difficulty"),
         CheckConstraint("cefr_level_source IN ('placement', 'manual')", name="cefr_level_source"),
+        # @handle 大小写不敏感唯一（迁移 0011 · docs/47 §3.2）：此前只在注释里写「唯一」，
+        # 实际无任何约束（docs/48 B17）。部分索引：handle 可为 NULL（未设置展示名）。
+        Index(
+            "uq_user_profiles_handle_lower",
+            func.lower(handle),
+            unique=True,
+            postgresql_where=text("handle IS NOT NULL"),
+            sqlite_where=text("handle IS NOT NULL"),
+        ),
     )
 
 

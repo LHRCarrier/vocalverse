@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.response import BizError
@@ -219,11 +220,16 @@ def add_vocab(
     book_id: int | None,
     chapter_id: int | None,
     context_snippet: str | None,
+    scene: str = "reading",
 ) -> tuple[UserVocabulary, bool]:
     """加生词本：唯一键幂等（已存在 → 现有行 + added=False；first-write-wins，拷问 V-10）。
 
     词形解析与 lookup 同链：被点词形（inventions）→ 头词（invention）入库，
     context_snippet 保留原文句（含被点词形）。
+
+    ``scene``：reading（阅读器）/ community（社区划词，docs/47 §5.5）/ manual。
+    并发：check-then-act 在唯一键上会撞 IntegrityError（两次并发首次添加）→ 回读既有行，
+    与社区点赞同款「DB 原子性兜底」（2026-09-09 修复，docs/48 B15 附带项）。
     """
     word = normalize_word(word)
     headword = _resolve_headword(session, word)
@@ -237,12 +243,24 @@ def add_vocab(
     row = UserVocabulary(
         user_id=user_id,
         word=headword,
+        scene=scene,
         book_id=book_id,
         chapter_id=chapter_id,
         context_snippet=(context_snippet or "")[:500] or None,
     )
     session.add(row)
-    session.flush()
+    try:
+        session.flush()
+    except IntegrityError:
+        session.rollback()
+        again = session.execute(
+            select(UserVocabulary).where(
+                UserVocabulary.user_id == user_id, UserVocabulary.word == headword
+            )
+        ).scalar_one_or_none()
+        if again is None:
+            raise
+        return again, False
     return row, True
 
 
