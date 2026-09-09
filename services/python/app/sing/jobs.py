@@ -335,12 +335,15 @@ def _run_job_inner(job_id: int, audio_dir: str) -> None:
     try:
         for line, (start, end) in zip(lines, line_windows, strict=True):
             payload = slice_window(track, start, end)
+            # frame_start/frame_end 是 slice_window 的辅助键（起唱检测取能量用），
+            # 不属参考旋律契约（song_pitch_refs.pitch_ref = {f0s,notes,midi}），剔除
+            pitch_ref = {k: v for k, v in payload.items() if k not in ("frame_start", "frame_end")}
             db.add(
                 SongPitchRef(
                     lrc_id=int(line.id),
                     start_ms=payload["start_ms"],
                     end_ms=payload["end_ms"] or end,
-                    pitch_ref=payload,
+                    pitch_ref=pitch_ref,
                     extractor="pyin",
                     version=EXTRACTOR_VERSION,
                 )

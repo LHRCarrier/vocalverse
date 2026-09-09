@@ -56,6 +56,9 @@ class TrackF0:
     midi: list[int | None] = field(default_factory=list)
     names: list[str | None] = field(default_factory=list)  # 音名（C4/D#4 …），清音帧 None
     duration_ms: float = 0.0
+    # 逐帧能量（RMS，与 f0 同帧对齐）：起唱检测的能量兜底用（sing.py A3 拍板；
+    # 气声/低信噪比时 F0 全清音但确有发声，需能量定位起唱点）
+    rms: list[float] = field(default_factory=list)
 
 
 def apply_voicing_gate(voiced_flag, voiced_prob, threshold: float):
@@ -123,6 +126,16 @@ class PyinPitchExtractor(PitchExtractor):
         f0 = np.asarray(f0, dtype=float)
         f0[~flag] = 0.0  # 清音帧统一置 0（静音/无音高段）
 
+        # 逐帧 RMS（起唱检测能量兜底；与 f0 帧数对齐——librosa.feature.rms 帧数可能差 1）
+        try:
+            rms_raw = librosa.feature.rms(y=y, frame_length=FRAME_LENGTH, hop_length=HOP_LENGTH)
+            rms = np.asarray(rms_raw[0], dtype=float)
+            if len(rms) < len(f0):
+                rms = np.pad(rms, (0, len(f0) - len(rms)))
+            rms = rms[: len(f0)]
+        except Exception:  # 能量计算失败不阻塞（起唱检测退化为 F0 单路径）
+            rms = np.zeros(len(f0), dtype=float)
+
         times = np.arange(len(f0)) * (HOP_LENGTH / sr * 1000.0)
         midi: list[int | None] = []
         names: list[str | None] = []
@@ -142,6 +155,7 @@ class PyinPitchExtractor(PitchExtractor):
             midi=midi,
             names=names,
             duration_ms=float(len(y)) / sr * 1000.0,
+            rms=[float(v) for v in rms],
         )
 
 
@@ -175,6 +189,7 @@ class FakePitchExtractor(PitchExtractor):
             midi=midi,
             names=names,
             duration_ms=n_frames * (HOP_LENGTH / sr * 1000.0),
+            rms=[0.1] * n_frames,  # 恒定能量（起唱检测在测试里走 F0 主路径）
         )
 
 
@@ -243,6 +258,9 @@ def slice_window(track: TrackF0, start_ms: float, end_ms: float | None) -> dict:
         "midi": track.midi[i0:i1] or [None],
         "start_ms": int(start_ms),
         "end_ms": int(end_ms) if end_ms is not None else None,
+        # 帧索引（v2 新增）：调用方按同一区间取能量包络（起唱检测兜底，sing.py A3）
+        "frame_start": i0,
+        "frame_end": i1,
     }
 
 

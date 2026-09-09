@@ -25,7 +25,12 @@ from sqlalchemy import select
 
 from app.audio.ffmpeg_utils import probe_duration_seconds
 from app.audio.pitch import to_16k_mono_wav
-from app.audio.sing import LineScore, SingScoreResult, get_sing_scorer
+from app.audio.sing import (
+    SCORING_VERSION,
+    LineScore,
+    SingScoreResult,
+    get_sing_scorer,
+)
 from app.audio.upload import validate_audio_bytes
 from app.core.config import get_settings
 from app.core.ratelimit import consume
@@ -388,7 +393,7 @@ async def _finish_attempt(
         attempt.expected_lines = result.expected_lines
         attempt.lines = [_line_dict(line) for line in result.lines]
         attempt.alignment = result.alignment
-        attempt.scoring_version = "v1"
+        attempt.scoring_version = SCORING_VERSION  # v2（口径升级留痕；docs/10 §4.3）
         attempt.ref_version = ref_meta.get("ref_version")
         db.commit()
     finally:
@@ -404,7 +409,7 @@ async def _finish_attempt(
 
 
 def _line_dict(line: LineScore) -> dict:
-    """lines[i] 落库契约（docs/10 §4.3：分项 + user_f0 + missing 降权标注）。"""
+    """lines[i] 落库契约（docs/10 §4.3：分项 + user_f0 + missing 降权标注 + 起唱偏差）。"""
     return {
         "seq": line.seq,
         "start_ms": line.start_ms,
@@ -417,6 +422,8 @@ def _line_dict(line: LineScore) -> dict:
         "reason": line.reason,
         "ref_seq": line.ref_seq,
         "no_ref": line.no_ref,
+        # v2：该句起唱偏差 ms（相对「LRC 时间戳 + 整首对齐偏移」；None = 未检出）
+        "onset_dev_ms": line.onset_dev_ms,
         "user_f0": line.user_f0,
         "cent_dev": line.cent_dev,
     }
