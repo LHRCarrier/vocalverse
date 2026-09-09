@@ -3,6 +3,16 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-09 联调发现并修复：读书进度「第二次保存起 500」（ORM 过期属性跨会话访问）
+
+- **怎么发现的**：S3 验收时翻 `local/dev-logs/python-8000.err.log`，看到一串 `DetachedInstanceError`；随后用 live PG 复现：PUT 进度第 1 次 200、第 2 次起 500。
+- **根因**：`app/api/routes/reading.py` 的 `put_progress` 在 `_db()` 退出（session 已 close）后访问 `row.updated_at`。该列是 `onupdate=func.now()` 服务端生成列，**UPDATE 路径** commit 后被标记过期 → detached 实例触发刷新 → `DetachedInstanceError` → 500。INSERT 路径（第 1 次）走 RETURNING 已取值，所以既有单测（只 PUT 一次）永远绿。
+- **影响**：阅读器每次滚动都保存进度 → **只有每本书的第一次保存生效**，后续静默失败（前端 fire-and-forget 不报错）。
+- **修复**：改为**会话内序列化**（`return _progress_dict(row)` 移进 `_q()`，与 `list_annotations`/`create_annotation` 同式）；`get_progress` 一并统一（它此前只是「碰巧没 commit」）。
+- **验证**：新增 `TestProgress::test_put_twice_update_path`（连续 3 次 PUT + `updated_at` 非空 + GET 末值，修复前必红）；live PG 三次 PUT 全部 `code=0` 且 GET 返回 300；ruff + 全量 pytest 绿。归档 `BUG实测/读书进度-二次保存500.md`。
+- **教训**：ORM 实例不要跨会话边界返回；用例必须覆盖**第二条**写入。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-09）
 ## 2026-09-09 社区内容 S3 闭环落地：媒体上传（图/视频/头像）+ 帖子详情 + 划词查义（六路拷问后实施）
 
 - **需求**：社区从「只读流 + 纯文本发帖」补成闭环——发帖（图文/视频）、点帖子有查看方式、用户头像、社区正文划词查义。
