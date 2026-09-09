@@ -132,6 +132,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/song/{songId}/pitch-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["setPitchStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/level": {
         parameters: {
             query?: never;
@@ -638,12 +654,12 @@ export interface components {
             bpm?: number;
             musicalKey?: string;
             audioUrl: string;
+            vocalRefUrl?: string;
             lrcUrl?: string;
             coverUrl?: string;
             interestTags?: string;
             source?: string;
             status?: string;
-            pitchRefStatus?: string;
         };
         EnvelopeSongView: {
             /** Format: int32 */
@@ -663,6 +679,7 @@ export interface components {
             bpm?: number;
             musicalKey?: string;
             audioUrl?: string;
+            vocalRefUrl?: string;
             lrcUrl?: string;
             coverUrl?: string;
             interestTags?: string;
@@ -814,10 +831,11 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
-        LevelRequest: {
+        PitchStatusRequest: {
             /** Format: int64 */
-            userId: number;
-            level: string;
+            songId: number;
+            status: string;
+            version?: string;
         };
         EnvelopeLong: {
             /** Format: int32 */
@@ -825,6 +843,11 @@ export interface components {
             message?: string;
             /** Format: int64 */
             data?: number;
+        };
+        LevelRequest: {
+            /** Format: int64 */
+            userId: number;
+            level: string;
         };
         CheckinRequest: {
             /** Format: int64 */
@@ -1671,6 +1694,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["EnvelopeMaterialView"];
+                };
+            };
+        };
+    };
+    setPitchStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                songId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PitchStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeLong"];
                 };
             };
         };

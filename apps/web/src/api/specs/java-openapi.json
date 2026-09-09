@@ -521,6 +521,43 @@
         }
       }
     },
+    "/internal/song/{songId}/pitch-status" : {
+      "post" : {
+        "tags" : [ "internal-song-status-controller" ],
+        "operationId" : "setPitchStatus",
+        "parameters" : [ {
+          "name" : "songId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PitchStatusRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeLong"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/level" : {
       "post" : {
         "tags" : [ "internal-level-controller" ],
@@ -1766,6 +1803,11 @@
             "minLength" : 0,
             "type" : "string"
           },
+          "vocalRefUrl" : {
+            "maxLength" : 512,
+            "minLength" : 0,
+            "type" : "string"
+          },
           "lrcUrl" : {
             "maxLength" : 512,
             "minLength" : 0,
@@ -1785,10 +1827,6 @@
           },
           "status" : {
             "pattern" : "draft|published|archived",
-            "type" : "string"
-          },
-          "pitchRefStatus" : {
-            "pattern" : "missing|building|ready|invalid",
             "type" : "string"
           }
         }
@@ -1836,6 +1874,9 @@
             "type" : "string"
           },
           "audioUrl" : {
+            "type" : "string"
+          },
+          "vocalRefUrl" : {
             "type" : "string"
           },
           "lrcUrl" : {
@@ -2246,15 +2287,21 @@
           }
         }
       },
-      "LevelRequest" : {
-        "required" : [ "level", "userId" ],
+      "PitchStatusRequest" : {
+        "required" : [ "songId", "status" ],
         "type" : "object",
         "properties" : {
-          "userId" : {
+          "songId" : {
             "type" : "integer",
             "format" : "int64"
           },
-          "level" : {
+          "status" : {
+            "pattern" : "missing|building|ready|invalid",
+            "type" : "string"
+          },
+          "version" : {
+            "maxLength" : 16,
+            "minLength" : 0,
             "type" : "string"
           }
         }
@@ -2272,6 +2319,19 @@
           "data" : {
             "type" : "integer",
             "format" : "int64"
+          }
+        }
+      },
+      "LevelRequest" : {
+        "required" : [ "level", "userId" ],
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "level" : {
+            "type" : "string"
           }
         }
       },

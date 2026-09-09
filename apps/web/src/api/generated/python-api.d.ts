@@ -264,6 +264,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{session_id}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Song Audio
+         * @description 整首跟唱音频上传 → 异步评分任务（20MB/180s；校验后扣桶，失败不扣）。
+         */
+        post: operations["upload_song_audio_api_v1_sessions__session_id__audio_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sing/attempts/{attempt_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Attempt Status */
+        get: operations["attempt_status_api_v1_sing_attempts__attempt_id__status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sing/attempts/{attempt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Attempt Result */
+        get: operations["attempt_result_api_v1_sing_attempts__attempt_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/free-chat/turn": {
         parameters: {
             query?: never;
@@ -538,6 +592,11 @@ export interface components {
              */
             rate: string;
         };
+        /** Body_upload_song_audio_api_v1_sessions__session_id__audio_post */
+        Body_upload_song_audio_api_v1_sessions__session_id__audio_post: {
+            /** Audio */
+            audio: string;
+        };
         /**
          * ChatResult
          * @description LLM 场景扮演单轮回复。M2 多轮/流式扩展时更新契约（docs/06 §8）。
@@ -705,6 +764,8 @@ export interface components {
             turn_limit?: number | null;
             /** Shadow Material Id */
             shadow_material_id?: number | null;
+            /** Song Id */
+            song_id?: number | null;
         };
         /**
          * TTSResult
@@ -1175,6 +1236,112 @@ export interface operations {
             };
             path: {
                 name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_song_audio_api_v1_sessions__session_id__audio_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_song_audio_api_v1_sessions__session_id__audio_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attempt_status_api_v1_sing_attempts__attempt_id__status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                attempt_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attempt_result_api_v1_sing_attempts__attempt_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                attempt_id: number;
             };
             cookie?: never;
         };
