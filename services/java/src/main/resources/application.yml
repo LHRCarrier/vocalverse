@@ -40,6 +40,10 @@ vocalverse:
     post-enabled: ${VOICEVERSE_COMMUNITY_POST_ENABLED:false}
     # 演示内容种子（虚构作者 + 8 帖 + 历史打卡卡；仅演示环境）
     seed: ${VOICEVERSE_COMMUNITY_SEED:true}
+    # 发帖 media 只允许引用本前缀的 URL（拒绝外链：防盗链/SSRF/存储型 XSS 面，docs/47 §4.3）
+    media-url-prefix: ${VOICEVERSE_COMMUNITY_MEDIA_URL_PREFIX:/api/v1/media/}
+    # 单帖媒体条数上限（与 Python APP_MEDIA_MAX_ITEMS_PER_POST 同口径）
+    media-max-items: ${VOICEVERSE_COMMUNITY_MEDIA_MAX_ITEMS:9}
 
 management:
   endpoints:

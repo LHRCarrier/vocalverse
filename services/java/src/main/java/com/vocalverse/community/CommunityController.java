@@ -34,7 +34,9 @@ public class CommunityController {
       @Size(max = 200) String title,
       @NotBlank @Size(max = 8000) String body,
       @NotBlank @Size(max = 16) String kind,
-      @NotBlank @Size(max = 16) String domain) {}
+      @NotBlank @Size(max = 16) String domain,
+      /** 媒体引用（docs/47 §4.3）；纯文本帖为 null */
+      com.fasterxml.jackson.databind.JsonNode media) {}
 
   public record AddCommentRequest(@NotBlank @Size(max = 500) String body) {}
 
@@ -57,7 +59,8 @@ public class CommunityController {
   public Envelope<CommunityPostView> create(
       @RequestAttribute("userId") Long userId, @Valid @RequestBody CreatePostRequest body) {
     return Envelope.ok(
-        service.create(userId, body.title(), body.body(), body.kind(), body.domain()));
+        service.create(
+            userId, body.title(), body.body(), body.kind(), body.domain(), body.media()));
   }
 
   @GetMapping("/{id}")

@@ -52,7 +52,17 @@ public class AuthController {
   public record TokenResponse(
       String accessToken, String refreshToken, long expiresIn, long userId) {}
 
-  public record MeView(Long userId, String username, String nickname, String level) {}
+  /**
+   * 当前用户视图。{@code avatarUrl}/{@code handle} 为 2026-09-09 新增（社区 S3 · docs/47 §4.2）：
+   * 前端账户抽屉/资料页要显示真实头像；写入走 {@code PATCH /api/v1/users/me}（不新增重复 GET）。
+   */
+  public record MeView(
+      Long userId,
+      String username,
+      String nickname,
+      String level,
+      String handle,
+      String avatarUrl) {}
 
   private static final long REFRESH_TTL_SECONDS = 30L * 24 * 3600;
 
@@ -196,8 +206,16 @@ public class AuthController {
             .findById(userId)
             .orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no such user"));
-    String level = profiles.findByUserId(userId).map(UserProfileEntity::getCefrLevel).orElse("L1");
-    return Envelope.ok(new MeView(user.getId(), user.getUsername(), user.getNickname(), level));
+    UserProfileEntity profile = profiles.findByUserId(userId).orElse(null);
+    String level = profile == null ? "L1" : profile.getCefrLevel();
+    return Envelope.ok(
+        new MeView(
+            user.getId(),
+            user.getUsername(),
+            user.getNickname(),
+            level,
+            profile == null ? null : profile.getHandle(),
+            profile == null ? null : profile.getAvatarUrl()));
   }
 
   private TokenResponse issue(Long userId, String role, HttpServletRequest request) {

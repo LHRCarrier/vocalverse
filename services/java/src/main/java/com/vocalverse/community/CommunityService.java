@@ -69,6 +69,7 @@ public class CommunityService {
   private final UserRepository users;
   private final UserProfileRepository profiles;
   private final ObjectMapper mapper;
+  private final MediaRefValidator mediaValidator;
   private final boolean postEnabled;
 
   public CommunityService(
@@ -80,6 +81,7 @@ public class CommunityService {
       UserRepository users,
       UserProfileRepository profiles,
       ObjectMapper mapper,
+      MediaRefValidator mediaValidator,
       @Value("${vocalverse.community.post-enabled:false}") boolean postEnabled) {
     this.posts = posts;
     this.comments = comments;
@@ -89,6 +91,7 @@ public class CommunityService {
     this.users = users;
     this.profiles = profiles;
     this.mapper = mapper;
+    this.mediaValidator = mediaValidator;
     this.postEnabled = postEnabled;
   }
 
@@ -114,7 +117,7 @@ public class CommunityService {
 
   @Transactional
   public CommunityPostView create(
-      Long userId, String title, String body, String kind, String domain) {
+      Long userId, String title, String body, String kind, String domain, JsonNode media) {
     if (!postEnabled) {
       throw new CommunityException(40302, "社区发帖功能未开放", HttpStatus.FORBIDDEN);
     }
@@ -128,12 +131,21 @@ public class CommunityService {
     if (body == null || body.isBlank()) {
       throw new CommunityException(42203, "帖子正文不能为空", HttpStatus.BAD_REQUEST);
     }
+    // media 契约校验（docs/47 §4.3）：形状/条数/URL 前缀白名单；违规 42203
+    JsonNode validatedMedia = mediaValidator.validate(media);
     PostEntity e = new PostEntity();
     e.setAuthorId(userId);
     e.setKind(kind);
     e.setDomain(normalized);
     e.setTitle(title);
     e.setBody(body);
+    if (validatedMedia != null) {
+      try {
+        e.setMedia(mapper.writeValueAsString(validatedMedia));
+      } catch (Exception ex) {
+        throw new CommunityException(42203, "media 序列化失败", HttpStatus.BAD_REQUEST);
+      }
+    }
     e.setStatus(STATUS_VISIBLE);
     Instant now = Instant.now();
     e.setCreatedAt(now);
@@ -676,13 +688,14 @@ public class CommunityService {
               u == null ? "未知用户" : u.getNickname(),
               p == null ? null : p.getHandle(),
               p == null ? null : p.getTint(),
-              p == null ? "L1" : p.getCefrLevel()));
+              p == null ? "L1" : p.getCefrLevel(),
+              p == null ? null : p.getAvatarUrl()));
     }
     return out;
   }
 
   private AuthorView emptyAuthor(Long id) {
-    return new AuthorView(id, "未知用户", null, null, "L1");
+    return new AuthorView(id, "未知用户", null, null, "L1", null);
   }
 
   private CommunityPostView toPostView(
