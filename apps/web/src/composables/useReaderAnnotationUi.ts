@@ -1,15 +1,14 @@
 /**
- * 阅读器 · 批注视图装配（2026-09-09）：把「批注状态 + 句首角标渲染数据 + 带 toast 的动作」收进
+ * 阅读器 · 批注视图装配（2026-09-09）：把「批注状态 + 句尾编号标签渲染数据 + 带 toast 的动作」收进
  * 一个 composable，让 MobileReaderView 保持在 fe-08 的 350 行门禁内（新代码不豁免）。
  *
  * 分工：
  *   · useReaderAnnotations —— 纯状态与接口调用（无 UI 依赖，可单测）；
- *   · 本模块 —— 视图侧派生（句 → 批注映射、角标颜色）与用户反馈（toast）；
- *   · 视图 —— 只负责模板与点击分发（useReaderTap）。
+ *   · 本模块 —— 视图侧派生（句 → 批注映射）与用户反馈（toast）；
+ *   · 视图 —— 只负责模板与点击/长按分发（useReaderTap）。
  */
 import { computed, ref } from 'vue'
 
-import { safeAnnColor } from '@/audio/annotation-colors'
 import { useReaderAnnotations } from '@/composables/useReaderAnnotations'
 import { useUiStore } from '@/stores/ui'
 
@@ -25,7 +24,7 @@ export function useReaderAnnotationUi(
   /** 单条批注保存中（PATCH 在飞）——由父级持有，失败后按钮自动恢复可点 */
   const noteBusy = ref(false)
 
-  /** 句 → 该句批注（句首批注角标渲染用；批注变化时重算，量级 = 句数 × 批注数） */
+  /** 句 → 该句批注（句尾编号标签渲染用；按起点排序 = 标签序号；批注变化时重算） */
   const annBySentence = computed<Map<number, AnnotationItem[]>>(() => {
     const map = new Map<number, AnnotationItem[]>()
     const ch = getChapter()
@@ -38,11 +37,6 @@ export function useReaderAnnotationUi(
     }
     return map
   })
-
-  /** 句首批注角标颜色：取该句第一条批注色（已过白名单，非法值回退默认） */
-  function sentMarkColor(idx: number): string {
-    return safeAnnColor(annBySentence.value.get(idx)?.[0]?.color)
-  }
 
   async function saveAnnotation(payload: { note: string; color: string }) {
     const ok = await api.save(payload)
@@ -69,7 +63,6 @@ export function useReaderAnnotationUi(
   return {
     ...api,
     annBySentence,
-    sentMarkColor,
     noteBusy,
     saveAnnotation,
     updateAnnotation,

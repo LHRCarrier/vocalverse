@@ -247,57 +247,43 @@
   }
 }
 
-/* 笔记批注角标（该批注有笔记时出现在段尾，点击看笔记）；底色同样按主题混色 */
-.u-rd__annmark {
-  display: inline-block;
-  width: 3px;
-  height: 0.85em;
-  margin-left: 2px;
-  border-radius: 2px;
-  vertical-align: -0.08em;
-  background: color-mix(in srgb, var(--ur-ann-color, var(--ur-theme-annotation)) var(--ur-ann-mix), var(--ur-theme-paper));
-}
-
 /**
- * 句首批注角标（2026-09-09 修复组长实测「查看已批注句子困难」）：
- * 修复前只有 kind='note' 的批注在**段尾**有一根 3px 竖条，纯高亮批注完全无标记；
- * 且正文里点词优先走查词 → 用户只能去点单词之间的空格（命中区仅 4.6px）才能看批注。
+ * 句尾批注编号标签（2026-09-09 组长实测改版）：
+ * 旧版是「句首 4px 竖条」（`.u-rd__sentmark`）+「段尾 3px 竖条」（`.u-rd__annmark`），
+ * 组长反馈「很奇怪、不明显」→ 现统一为**句末上标编号** [1][2]…：
+ * 按句内序号、按批注色区分，点标签看/改该条批注（两处旧标记已删除）。
  *
- * 形态：**行内**（不是绝对定位）。绝对定位的 `left:-14px` 在「句子从行中间开始」时会压到
- * 上一句的文字上（`.u-rd__sentence` 是 inline span，行中句子没有左侧沟），行内元素永远落在
- * 句子起点、零重叠。代价是给该句增加 ~11px 宽，仅对有批注的句子生效。
- *
- * 触控：视觉 5×0.9em，靠 padding 撑到 ~11×29px；**≥44px 的可靠入口是选中句子后的动作条
- * 「看批注」按钮**（`.u-rd-sel__btn`，见 MobileReaderSelectionBar）——角标是快捷方式，不是唯一入口。
+ * 触控：视觉 ~1.35em 见方（约 15×18px）；**≥44px 的可靠入口仍是选中句子后的动作条
+ * 「看批注」**（`.u-rd-sel__btn`）——标签是快捷方式，不是唯一入口。
  */
-.u-rd__sentmark {
+.u-rd__senttags {
+  display: inline;
+  white-space: nowrap;
+}
+
+.u-rd__senttag {
   display: inline-block;
-  width: 5px;
-  height: 0.9em;
-  margin: 0 0 0 -2px;
-  padding: 6px 3px;
+  min-width: 1.35em;
+  margin-left: 0.2em;
+  padding: 0 0.3em;
   border: none;
-  border-radius: 2px;
+  border-radius: 0.4em;
   background: color-mix(in srgb, var(--ur-ann-color, var(--ur-theme-annotation)) var(--ur-ann-mix), var(--ur-theme-paper));
-  background-clip: content-box;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ur-theme-ink) 22%, transparent);
-  vertical-align: -0.08em;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ur-theme-ink) 24%, transparent);
+  color: var(--ur-theme-ink);
+  font: 700 0.6em/1.7 var(--u-font);
+  font-variant-numeric: tabular-nums;
+  vertical-align: super;
   cursor: pointer;
+  transition: transform 60ms ease-out;
 }
 
-.u-rd__sentmark:active {
-  transform: scale(0.9);
+.u-rd__senttag:active {
+  transform: scale(0.88);
 }
 
-/* 多批注同句：角标右侧补一个小圆点，提示「点开是一列」 */
-.u-rd__sentmark.is-multi::after {
-  content: '·';
-  position: relative;
-  top: -0.35em;
-  margin-left: 1px;
-  color: var(--ur-theme-muted);
-  font-size: 0.8em;
-  line-height: 1;
+.u-rd__senttag.is-flash {
+  animation: u-rd-flash 1.8s ease-out;
 }
 
 /* 阅读设置（字号/主题 chips） */

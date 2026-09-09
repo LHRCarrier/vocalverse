@@ -64,6 +64,10 @@ export function vocabWordSet(entries: Array<{ word: string }>): Set<string> {
  *   · 段保留 word（用于点词查义）——词被批注边界切开的子段仍带同一个 word，
  *     这样点任一部分都能查到整词；
  *   · 段带 ann（该段覆盖的批注：优先带笔记的那条，其次最早的一条）。
+ *
+ * 2026-09-09 二次改版（组长手机实测：「句首那根竖条很奇怪、不明显」）：
+ * 标记从「句首竖条 + 段尾竖条」改为**句尾上标编号标签**（[1] [2]…，按句内序号、按批注色区分），
+ * 因此 `SentenceSegment.noteMarker` 与段尾角标一并下线（见 MobileReaderView 模板）。
  */
 
 /** 渲染段（句子内连续切片） */
@@ -73,8 +77,6 @@ export interface SentenceSegment {
   word: string | null
   /** 覆盖该段的批注（无批注为 null） */
   ann: AnnotationRange | null
-  /** 该段是本句内某条「笔记批注」的最后一段 → 渲染批注角标（点击看笔记） */
-  noteMarker?: boolean
 }
 
 /** 批注渲染所需的最小字段（与 api/reading.AnnotationItem 结构兼容） */
@@ -134,13 +136,7 @@ export function buildSentenceSegments(
     }
   }
 
-  // 笔记批注：在本句内该批注的最后一段打角标（避免被词边界切开的段重复出角标）
-  const lastSegOfNote = new Map<number, number>()
-  segments.forEach((seg, i) => {
-    if (seg.ann?.kind === 'note') lastSegOfNote.set(seg.ann.id, i)
-  })
-  for (const i of lastSegOfNote.values()) segments[i].noteMarker = true
-
+  // 句尾编号标签在视图层按「该句批注按起点排序」直接渲染（见 annotationsOfSentence）
   return segments
 }
 

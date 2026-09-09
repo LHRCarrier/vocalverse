@@ -23,12 +23,12 @@ import { useMobileBack } from '@/composables/useMobileBack'
 import { useReaderAnnotationUi } from '@/composables/useReaderAnnotationUi'
 import { useBackLayers } from '@/composables/useBackLayers'
 import { useReaderProgress } from '@/composables/useReaderProgress'
+import { useReaderSelection } from '@/composables/useReaderSelection'
 import { useReaderSettings } from '@/composables/useReaderSettings'
 import { useReaderTap } from '@/composables/useReaderTap'
 import { useReaderTts } from '@/composables/useReaderTts'
 import { useReaderVocab } from '@/composables/useReaderVocab'
-import { useWordAudio } from '@/composables/useWordAudio'
-import { useWordLookup } from '@/composables/useWordLookup'
+import { useReaderWordUi } from '@/composables/useReaderWordUi'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 import '@/styles/reader-uic.css'
@@ -79,16 +79,10 @@ const {
   playOne,
 } = useReaderTts(chapterId, () => chapter.value?.id ?? null, () => chapter.value?.sentences ?? [])
 
-/* ---------- 查词卡（useWordLookup：纯状态管理；词卡展示层在 MobileWordCard） ---------- */
-const wordLookup = useWordLookup()
+/* ---------- 查词卡与词音（useReaderWordUi：状态 + 生词本 + 词音 blob 管道） ---------- */
+const { wordLookup, addWordToVocab, playWord } = useReaderWordUi(bookId, chapterId, refreshVocab)
 
-async function addWordToVocab() {
-  const ok = await wordLookup.addToVocab({ bookId, chapterId })
-  ui.showToast(ok ? '已加入生词本' : '加入失败')
-  if (ok) await refreshVocab()
-}
-
-/* ---------- 划词批注（useReaderAnnotationUi：句内划选 → 高亮/笔记；句首角标 → 查看/编辑） ---------- */
+/* ---------- 划词批注（useReaderAnnotationUi：划选 → 高亮/笔记；句尾编号标签 → 查看/编辑） ---------- */
 const annotationsApi = useReaderAnnotationUi(chapterId, () => chapter.value, scrollToSentence)
 const {
   annotations,
@@ -99,11 +93,24 @@ const {
   sentList,
   sentListItems,
   annBySentence,
-  sentMarkColor,
   saveAnnotation,
   updateAnnotation,
   removeAnnotation,
 } = annotationsApi
+
+/**
+ * 长按抑制原生选词的时间窗：长按（静止）走「整句批注卡」，拖动才走划词。
+ * WebView 的原生选词在长按后 ~500ms 才出现，若不抑制会双开弹层（先句子卡、再划词卡）。
+ */
+let suppressSelectionUntil = 0
+
+/** 长按句子（550ms 静止）→ 打开该句的批注卡（2026-09-09 组长拍板） */
+function onLongPressSentence(idx: number) {
+  suppressSelectionUntil = Date.now() + 1200
+  selIdx.value = null
+  wordLookup.close()
+  annotationsApi.createForSentence(idx)
+}
 
 function onSelectionCreate() {
   const sel = window.getSelection()
@@ -118,8 +125,8 @@ function sentenceSegments(idx: number) {
   return s ? buildSentenceSegments(s.text, s.start, annotations.value) : []
 }
 
-/* ---------- 点击语义（词=查词 / 句=选中；分发在 useReaderTap） ---------- */
-const { selIdx, onReaderClick } = useReaderTap({
+/* ---------- 点击语义（词=查词 / 句=选中；长按=批注卡；分发在 useReaderTap） ---------- */
+const { selIdx, onReaderClick, onPointerDown, onPointerMove, onPointerUp } = useReaderTap({
   getSentence: (idx) => chapter.value?.sentences[idx],
   openWord: (word, context, idx) => void wordLookup.openFor(word, context, idx),
   openNoteById: annotationsApi.openNoteById,
@@ -127,15 +134,8 @@ const { selIdx, onReaderClick } = useReaderTap({
   ttsState,
   ttsCurrentIdx,
   playFrom: (idx) => void tts.playFrom(idx),
+  onLongPress: onLongPressSentence,
 })
-
-/** 查词卡「朗读」：词读音端点需带 token，走 blob 管道（useWordAudio） */
-const { play: playWordAudio } = useWordAudio()
-function playWord(): void {
-  const word = wordLookup.state.word
-  if (!word) return
-  void playWordAudio(word).then((ok) => !ok && ui.showToast('读音播放失败'))
-}
 
 /**
  * 句子级动作（单一入口，供两处调用）：
@@ -187,23 +187,17 @@ async function load() {
   }
 }
 
-/** selectionchange：长按/划选结束（非 collapsed）经防抖后进入批注创建 */
-let lastSelTs = 0
-function onSelectionChange() {
-  const sel = window.getSelection()
-  if (!sel || sel.isCollapsed) return
-  const now = Date.now()
-  if (now - lastSelTs < 200) return
-  lastSelTs = now
-  if (mainEl.value?.contains(sel.anchorNode ?? sel.focusNode)) onSelectionCreate()
-}
+/* 划词监听（selectionchange + 节流 + 长按抑制窗口；实现见 useReaderSelection） */
+useReaderSelection({
+  root: () => mainEl.value,
+  onSelect: onSelectionCreate,
+  suppressed: () => Date.now() < suppressSelectionUntil,
+})
 
 onMounted(() => {
   void load()
-  document.addEventListener('selectionchange', onSelectionChange)
 })
 onBeforeUnmount(() => {
-  document.removeEventListener('selectionchange', onSelectionChange)
   void readerProgress.flush()
 })
 
@@ -259,7 +253,16 @@ function nextChapter() {
     <template v-else-if="chapter">
       <MobileTopBar :title="chapter.title" back @back="goBack" />
 
-      <main ref="mainEl" class="u-rd__main" @click="onReaderClick" @scroll.passive="scheduleSave()">
+      <main
+        ref="mainEl"
+        class="u-rd__main"
+        @click="onReaderClick"
+        @pointerdown="onPointerDown"
+        @pointermove="onPointerMove"
+        @pointerup="onPointerUp"
+        @pointercancel="onPointerUp"
+        @scroll.passive="scheduleSave()"
+      >
         <p class="u-rd__chapter-title">{{ chapter.title }}</p>
         <p class="u-rd__chapter-sub">第 {{ chapter.chapter_no }} 章 · {{ Math.round(chapter.word_count / 100) / 10 }}k 词</p>
 
@@ -286,16 +289,6 @@ function nextChapter() {
             }"
             :data-idx="s.idx"
           >
-            <!-- 句首批注角标（修复「查看已批注句子困难」：正文点词优先查词，只有空格能点开批注） -->
-            <button
-              v-if="annBySentence.has(s.idx)"
-              class="u-rd__sentmark"
-              :class="{ 'is-multi': (annBySentence.get(s.idx)?.length ?? 0) > 1 }"
-              type="button"
-              :style="{ '--ur-ann-color': sentMarkColor(s.idx) }"
-              :aria-label="`查看这句的批注（${annBySentence.get(s.idx)?.length ?? 0} 条）`"
-              @click.stop="annotationsApi.openSentence(s.idx)"
-            />
             <span
               v-for="(seg, wi) in sentenceSegments(s.idx)"
               :key="wi"
@@ -308,13 +301,22 @@ function nextChapter() {
               :style="seg.ann ? { '--ur-ann-color': safeAnnColor(seg.ann.color) } : undefined"
               :data-word="seg.word ?? undefined"
               :data-ann="seg.ann ? seg.ann.id : undefined"
-            >{{ seg.text }}<span
-              v-if="seg.noteMarker && seg.ann"
-              class="u-rd__annmark"
-              :data-ann="seg.ann.id"
-              :style="{ '--ur-ann-color': safeAnnColor(seg.ann.color) }"
-              aria-hidden="true"
-            /></span>
+            >{{ seg.text }}</span>
+            <!-- 句尾上标编号标签（2026-09-09 组长实测改版：句首竖条「很奇怪、不明显」→
+                 改为句末 [1][2]…，按句内序号、按批注色区分，点标签看/改该条批注） -->
+            <span v-if="annBySentence.has(s.idx)" class="u-rd__senttags">
+              <button
+                v-for="(a, ai) in annBySentence.get(s.idx)"
+                :key="a.id"
+                class="u-rd__senttag"
+                :class="{ 'is-flash': a.id === flashAnnId }"
+                type="button"
+                :style="{ '--ur-ann-color': safeAnnColor(a.color) }"
+                :aria-label="`查看这句的第 ${ai + 1} 条批注`"
+                :data-ann="a.id"
+                @click.stop="annotationsApi.openNote(a)"
+              >{{ ai + 1 }}</button>
+            </span>
           </span>
         </p>
       </main>
