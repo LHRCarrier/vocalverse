@@ -26,6 +26,7 @@ from app.api.routes import (
     placement,
     practice,
     recommendations,
+    singing,
 )
 from app.core.config import get_settings
 from app.core.response import BizError
@@ -133,6 +134,9 @@ async def validation_error_handler(_: Request, exc: RequestValidationError) -> J
 app.include_router(health.router)
 app.include_router(audio.router)
 app.include_router(practice.router)
+app.include_router(
+    singing.router
+)  # 唱歌：整首上传/状态轮询/结果（M3 P0 D7；docs/21 §2.1 op 22~24）
 app.include_router(free_chat.router)  # 自由对话（MVP，docs/14 §12：无状态 LLM 转发器）
 app.include_router(defense.router)
 app.include_router(placement.router)

@@ -51,6 +51,7 @@ class SessionCreate(BaseModel):
     difficulty: int | None = None
     turn_limit: int | None = None
     shadow_material_id: int | None = None  # kind=shadow（DoD ④，2026-09-04）
+    song_id: int | None = None  # kind=sing（M3 唱歌 P0 D7；published+ready 校验 40905）
 
 
 @router.get("/scenarios")
@@ -110,6 +111,7 @@ async def post_session(
         difficulty=body.difficulty,
         turn_limit=body.turn_limit,
         shadow_material_id=body.shadow_material_id,
+        song_id=body.song_id,
     )
     return ok(
         {
@@ -461,11 +463,14 @@ async def get_audio(
         if path.exists():
             path.unlink(missing_ok=True)  # 惰性清理
         raise BizError(http_status=410, code=41001, message="audio expired")
-    # 归属校验：attempts / scenario_messages 任一引用即可
+    # 归属校验：attempts / scenario_messages / sing_attempts 任一引用即可
+    # （C-P1 2026-09-09 补 SingAttempt：跟唱回放此前误 403——docs/singing/22 §4）
     # docs/19 P0-2：归属查询走 to_thread（短事务，不阻塞事件循环；文件流不受影响）
     url = f"/api/v1/audio/{name}"
 
     def _owns() -> bool:
+        from app.models import SingAttempt
+
         db = get_session_factory()()
         try:
             owned = (
@@ -476,6 +481,11 @@ async def get_audio(
                     select(ScenarioMessage.id)
                     .join(DbSession, DbSession.id == ScenarioMessage.session_id)
                     .where(ScenarioMessage.audio_url == url, DbSession.user_id == user_id)
+                ).first()
+                or db.execute(
+                    select(SingAttempt.id).where(
+                        SingAttempt.audio_url == url, SingAttempt.user_id == user_id
+                    )
                 ).first()
             )
             return owned is not None

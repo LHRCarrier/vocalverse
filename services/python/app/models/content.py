@@ -290,9 +290,7 @@ class PitchExtractJob(CreatedAtMixin, Base):
             "uq_pitch_extract_jobs_lrc_active",
             "lrc_id",
             unique=True,
-            sqlite_where=text(
-                f"status IN ('{PitchJobStatus.QUEUED}', '{PitchJobStatus.RUNNING}')"
-            ),
+            sqlite_where=text(f"status IN ('{PitchJobStatus.QUEUED}', '{PitchJobStatus.RUNNING}')"),
             postgresql_where=text(
                 f"status IN ('{PitchJobStatus.QUEUED}', '{PitchJobStatus.RUNNING}')"
             ),
