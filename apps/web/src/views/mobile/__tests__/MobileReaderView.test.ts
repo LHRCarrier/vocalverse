@@ -6,7 +6,7 @@
  * bug2：批注必须在正文里看得见（底色 + 笔记角标），点批注能读到内容。
  * bug3：主题切换要落到 DOM（.u-rd-views[data-theme]）——CSS 生效由无头浏览器量测守护。
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
@@ -45,6 +45,7 @@ const fixtures = vi.hoisted(() => ({
 const api = vi.hoisted(() => ({
   lookupWord: vi.fn(),
   createAnnotation: vi.fn(),
+  patchAnnotation: vi.fn(),
   deleteAnnotation: vi.fn(),
   fetchAnnotations: vi.fn(),
 }))
@@ -55,6 +56,7 @@ vi.mock('@/api/reading', () => ({
   fetchVocab: vi.fn(async () => ({ items: [], next_cursor: null, has_more: false })),
   fetchAnnotations: (...args: unknown[]) => api.fetchAnnotations(...args),
   createAnnotation: (...args: unknown[]) => api.createAnnotation(...args),
+  patchAnnotation: (...args: unknown[]) => api.patchAnnotation(...args),
   deleteAnnotation: (...args: unknown[]) => api.deleteAnnotation(...args),
   lookupWord: (...args: unknown[]) => api.lookupWord(...args),
   addVocab: vi.fn(),
@@ -82,6 +84,15 @@ async function mountReader() {
   await flushPromises()
   return wrapper
 }
+
+/**
+ * 批注弹层都走 `Teleport to="body"`；VTU 的 unmount 不保证摘掉 teleport 目标里的节点，
+ * 残留节点会被下一条用例的 document.querySelector('.u-rd-ann') 先命中（假失败）。
+ * 每条用例后清空 body，保证选择器只看到当前用例的弹层。
+ */
+afterEach(() => {
+  document.body.innerHTML = ''
+})
 
 describe('阅读器 · 点词查义（bug1）', () => {
   beforeEach(() => {
@@ -165,7 +176,7 @@ describe('阅读器 · 点词查义（bug1）', () => {
     wrapper.unmount()
   })
 
-  it('查词卡底部「高亮这句」→ 整句高亮（句子批注的可靠入口：空格命中区仅 4.6px）', async () => {
+  it('查词卡底部「高亮这句」→ 先出选色面板，未选色不能保存（修复前直接落默认黄，用户没得选）', async () => {
     const wrapper = await mountReader()
     await wrapper.get('.u-rd__seg[data-word="Alice"]').trigger('click')
     await flushPromises()
@@ -178,10 +189,32 @@ describe('阅读器 · 点词查义（bug1）', () => {
     btn?.click()
     await flushPromises()
 
+    // 修复前：这里已经 createAnnotation 落库（默认 #fde68a）——现在必须一条都不写
+    expect(api.createAnnotation).not.toHaveBeenCalled()
+    const sheet = document.querySelector('.u-rd-ann')
+    expect(sheet).not.toBeNull()
+    expect(sheet?.textContent).toContain('选择高亮颜色')
+    expect(sheet?.textContent).toContain('Alice was here.')
+
+    // 未选色 → 保存按钮禁用
+    const save = [...sheet!.querySelectorAll('button')].find((b) => b.textContent?.trim() === '高亮') as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    save.click()
+    await flushPromises()
+    expect(api.createAnnotation).not.toHaveBeenCalled()
+
+    // 选蓝色 → 保存 → 才落库（颜色 = 用户选的那一个）
+    const blue = sheet!.querySelector('button[aria-label="高亮蓝色"]') as HTMLButtonElement
+    expect(blue).toBeTruthy()
+    blue.click()
+    await flushPromises()
+    ;[...sheet!.querySelectorAll('button')].find((b) => b.textContent?.trim() === '高亮')?.click()
+    await flushPromises()
+
     expect(api.createAnnotation).toHaveBeenCalledTimes(1)
     const payload = api.createAnnotation.mock.calls[0][0] as Record<string, unknown>
     expect(payload.kind).toBe('highlight')
-    expect(payload.color).toBe('#fde68a')
+    expect(payload.color).toBe('#bfdbfe')
     expect(payload.start_offset).toBe(0)
     expect(payload.end_offset).toBe(15)
     expect(payload.sentence_idx).toBe(0)
@@ -233,8 +266,9 @@ describe('阅读器 · 批注可见（bug2）', () => {
 
     const sheet = document.querySelector('.u-rd-ann')
     expect(sheet).not.toBeNull()
-    expect(sheet?.textContent).toContain('这里是主人公名字')
     expect(sheet?.textContent).toContain('Alice')
+    // 笔记在可编辑 textarea 里（2026-09-09 起查看即编辑），值必须预填服务端内容
+    expect((sheet?.querySelector('textarea') as HTMLTextAreaElement).value).toBe('这里是主人公名字')
     wrapper.unmount()
   })
 
@@ -287,3 +321,4 @@ describe('阅读器 · 主题切换落到 DOM（bug3）', () => {
     wrapper.unmount()
   })
 })
+

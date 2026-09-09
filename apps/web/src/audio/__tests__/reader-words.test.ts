@@ -4,6 +4,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  ANN_FALLBACK_COLOR,
+  ANNOTATION_COLORS,
+  safeAnnColor,
+} from '../annotation-colors'
+import {
   annotationsOfSentence,
   buildSentenceSegments,
   intersectSentence,
@@ -147,5 +152,37 @@ describe('sentenceHasAnnotation / annotationsOfSentence', () => {
       { id: 1, kind: 'note', note: 'x', start_offset: 10, end_offset: 12 },
     ]
     expect(annotationsOfSentence(list, 9, 20).map((a) => a.id)).toEqual([1, 2])
+  })
+})
+
+/* ---------------------------------------------------------------- 批注色白名单
+ * 2026-09-09 修复「暗黑模式下批注为粉色看不清」时引入：颜色来自后端（不可信输入），
+ * 直接写进 CSS 自定义属性会让非法值使整条声明失效（批注变透明），也是 CSS 注入面。
+ * 白名单 = 色板本身（见 audio/annotation-colors.ts），这样对比度门禁的覆盖范围
+ * 才等于「实际可能渲染的颜色集合」。 */
+describe('safeAnnColor（批注色白名单）', () => {
+  it('色板内的色原样返回（含大小写与首尾空白归一）', () => {
+    for (const c of ANNOTATION_COLORS) {
+      expect(safeAnnColor(c.value)).toBe(c.value)
+      expect(safeAnnColor(`  ${c.value.toUpperCase()}  `)).toBe(c.value)
+    }
+  })
+
+  it('色板外的值一律回退默认色（修复前非法值会让批注底色变透明）', () => {
+    for (const bad of [
+      '',
+      'pink',
+      '#ffffff',
+      '#ffff00',
+      '#123456',
+      'rgb(1,2,3)',
+      '#ff',
+      'javascript:alert(1)',
+      'red; background:url(x)',
+      null,
+      undefined,
+    ]) {
+      expect(safeAnnColor(bad as string | null | undefined)).toBe(ANN_FALLBACK_COLOR)
+    }
   })
 })
