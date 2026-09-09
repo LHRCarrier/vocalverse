@@ -49,7 +49,7 @@ const items: MenuItem[] = [
     path: null,
     children: [
       { icon: 'book', label: '我的单词', path: '/m/learn/words' },
-      { icon: 'hash', label: '社区足迹', path: '/m/learn/community' },
+      { icon: 'hash', label: '社区足迹', path: '/m/me/posts' },
       { icon: 'mic', label: '我的发音', path: '/m/learn/speaking' },
       { icon: 'flame', label: '练习情况', path: '/m/learn/practice' },
     ],

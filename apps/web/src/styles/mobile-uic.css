@@ -3296,6 +3296,16 @@ body.is-login {
   justify-content: center;
   cursor: pointer;
   transition: transform 60ms ease-out, background-color 150ms ease-out;
+  /* 2026-09-09：容器内换成 MobileAvatar（真实头像 + 首字母降级）——
+     头像填满 36px 圆，视觉基线与原首字母版一致（尺寸/圆角/hover/active 不变） */
+  padding: 0;
+  overflow: hidden;
+}
+
+.u-topbar__ava > .u-ava {
+  width: 100%;
+  height: 100%;
+  font-size: 14px;
 }
 
 .u-topbar__ava:hover {
@@ -4839,4 +4849,62 @@ body.is-login {
   background: transparent;
   color: var(--u-sub);
   cursor: pointer;
+}
+
+/* ---------- 我的发帖（/m/me/posts · 社区 S3 补） ---------- */
+.u-myp {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--u-paper);
+}
+
+.u-myp__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px calc(28px + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
+}
+
+.u-myp__row {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.u-myp__del {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 0 8px;
+  padding: 6px 12px;
+  border: 1.5px solid var(--u-track);
+  border-radius: var(--u-r-pill);
+  background: transparent;
+  color: var(--u-error);
+  font: 600 12px var(--u-font);
+  cursor: pointer;
+}
+
+.u-myp__del:active {
+  background: color-mix(in srgb, var(--u-error) 8%, transparent);
+}
+.u-pf__link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 22px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--u-track);
+  border-radius: var(--u-r-chip);
+  background: var(--u-card);
+  color: var(--u-ink);
+  font: 600 14px var(--u-font);
+  cursor: pointer;
+}
+
+.u-pf__link-go {
+  margin-left: auto;
+  color: var(--u-weak);
 }

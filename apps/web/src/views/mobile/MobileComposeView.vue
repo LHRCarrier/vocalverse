@@ -13,6 +13,7 @@ import MobileMediaPicker from '@/components/mobile/MobileMediaPicker.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { createPost } from '@/api/community'
 import { mediaUrl } from '@/api/media'
+import { useCommunityStore } from '@/stores/community'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
@@ -21,6 +22,7 @@ import type { PostMediaInput } from '@/api/community'
 
 const router = useRouter()
 const ui = useUiStore()
+const community = useCommunityStore()
 
 const text = ref('')
 const MAX = 280
@@ -86,12 +88,14 @@ async function post() {
   if (!canPost.value) return
   submitting.value = true
   try {
-    await createPost({
+    const created = await createPost({
       body: text.value.trim(),
       kind: kind.value,
       domain: domain.value as string,
       media: buildMedia(),
     })
+    // 立即插到 feed 列表头（否则回首页命中 domain 缓存 → 看不到刚发的帖，2026-09-09 组长实测）
+    community.prepend(created)
     ui.showToast('已发布')
     void router.push('/m/home')
   } catch (e) {

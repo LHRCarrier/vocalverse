@@ -83,6 +83,11 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '我的资料', requiresAuth: true },
   },
   {
+    path: '/m/me/posts',
+    component: () => import('@/views/mobile/MobileMyPostsView.vue'),
+    meta: { title: '我的发帖', requiresAuth: true },
+  },
+  {
     path: '/m/notes',
     component: () => import('@/views/mobile/MobileNotesView.vue'),
     meta: { title: '笔记', requiresAuth: true },

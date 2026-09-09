@@ -9,6 +9,7 @@
  * 头像 URL 只接受本服务媒体地址（后端二次校验，前端先拦一道）。
  */
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import MobileAvatar from '@/components/mobile/MobileAvatar.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
@@ -22,6 +23,7 @@ import '@/styles/mobile-uic.css'
 
 import type { MediaAssetView } from '@/api/media'
 
+const router = useRouter()
 const auth = useAuthStore()
 const ui = useUiStore()
 const goBack = useMobileBack('/m/home')
@@ -112,6 +114,13 @@ async function save() {
           {{ saving ? '保存中…' : '保存' }}
         </button>
       </div>
+
+      <!-- 我的发帖入口（2026-09-09 组长实测补：发完帖没有「我的」通道回看） -->
+      <button class="u-pf__link" type="button" @click="router.push('/m/me/posts')">
+        <MobileIcon name="hash" :size="18" />
+        <span>我的发帖</span>
+        <MobileIcon name="chevron" :size="16" class="u-pf__link-go" />
+      </button>
     </main>
 
     <MobileMediaPicker

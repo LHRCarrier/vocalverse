@@ -74,10 +74,21 @@ const asCommentPage = (raw: RawCommentPage): CommentPage => ({
   hasMore: raw.hasMore ?? false,
 })
 
-/** feed（keyset 游标；domain 空 = 全量混排；后端返回 current user liked/coined 态） */
-export async function fetchFeed(domain: string | null, cursor: string | null, limit = 10, signal?: AbortSignal) {
+/** feed（keyset 游标；domain 空 = 全量混排；mine=true = 只看本人发帖；后端回带 liked/coined 态） */
+export async function fetchFeed(
+  domain: string | null,
+  cursor: string | null,
+  limit = 10,
+  signal?: AbortSignal,
+  mine = false,
+) {
   const res = await request<RawFeedPage>(
-    `/api/v1/community/posts${qs({ domain: domain ?? '', cursor: cursor ?? '', limit })}`,
+    `/api/v1/community/posts${qs({
+      domain: domain ?? '',
+      cursor: cursor ?? '',
+      limit,
+      mine: mine ? 'true' : '',
+    })}`,
     signal ? { signal } : undefined,
     JAVA_BASE,
   )
