@@ -1896,6 +1896,7 @@ export interface operations {
                 domain?: string;
                 cursor?: string;
                 limit?: number;
+                mine?: boolean;
             };
             header?: never;
             path?: never;

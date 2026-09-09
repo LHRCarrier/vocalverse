@@ -762,6 +762,14 @@
             "format" : "int32",
             "default" : 10
           }
+        }, {
+          "name" : "mine",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
         } ],
         "responses" : {
           "200" : {
