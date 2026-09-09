@@ -283,12 +283,13 @@ async def test_worker_completes_and_writes_immutable_row(monkeypatch, tmp_path):
     assert result["pron"] == 82.0  # 抽样句 ISE（Fake 引擎 82）
     assert result["is_complete"] is True
     assert result["expected_lines"] == 3
-    assert result["scoring_version"] == "v1"
+    assert result["scoring_version"] == "v2"  # 口径 v2（A3/B2/C1；docs/10 §4.3 留痕）
     assert result["ref_version"] == "pyin-v1"
-    assert result["alignment"]["method"] == "dtw-sakoe-chiba-v1"
+    assert result["alignment"]["method"] == "dtw-local-sakoe-chiba-v2"
     assert len(result["lines"]) == 3
     assert result["lines"][0]["user_f0"] != []  # D4：逐帧 F0 落库
     assert "user_f0" in result["lines"][0]
+    assert "onset_dev_ms" in result["lines"][0]  # v2：起唱偏差落库（报告/排障用）
     assert result["lines"][0]["pron_score"] == 82.0
 
 
