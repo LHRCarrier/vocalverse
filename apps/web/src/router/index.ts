@@ -71,6 +71,17 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/mobile/MobileComposeView.vue'),
     meta: { title: '发帖', requiresAuth: true },
   },
+  /* ---- 社区 S3（docs/47 §5.1）：帖子详情 / 我的资料；均沉浸页（无底栏） ---- */
+  {
+    path: '/m/post/:postId',
+    component: () => import('@/views/mobile/MobilePostDetailView.vue'),
+    meta: { title: '内容', requiresAuth: true },
+  },
+  {
+    path: '/m/me/profile',
+    component: () => import('@/views/mobile/MobileProfileView.vue'),
+    meta: { title: '我的资料', requiresAuth: true },
+  },
   {
     path: '/m/notes',
     component: () => import('@/views/mobile/MobileNotesView.vue'),

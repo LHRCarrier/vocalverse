@@ -89,7 +89,31 @@ export async function fetchPost(id: number) {
   return asPost(res.data)
 }
 
-export async function createPost(body: { title?: string; body: string; kind: 'article' | 'video'; domain: string }) {
+export interface CreatePostInput {
+  title?: string
+  body: string
+  kind: 'article' | 'video'
+  domain: string
+  /** 媒体引用（社区 S3 · docs/47 §4.3）；纯文本帖不传 */
+  media?: PostMediaInput | null
+}
+
+/** 发帖 media 载荷（与后端 MediaRefValidator 同形状） */
+export interface PostMediaInput {
+  type: 'image' | 'video'
+  items: Array<{
+    id?: string
+    url: string
+    width?: number | null
+    height?: number | null
+    size?: number | null
+    mimeType?: string | null
+  }>
+  coverUrl?: string | null
+  durationS?: number | null
+}
+
+export async function createPost(body: CreatePostInput) {
   const res = await request<RawCommunityPostView>(
     '/api/v1/community/posts',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },

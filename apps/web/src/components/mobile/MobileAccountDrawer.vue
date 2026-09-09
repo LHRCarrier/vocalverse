@@ -8,6 +8,7 @@
  * 展开项右侧 chevron 在展开时旋转 180°（下拉指示与功能一致）。
  */
 import { reactive } from 'vue'
+import MobileAvatar from '@/components/mobile/MobileAvatar.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import { useProgressStore } from '@/stores/progress'
 import { useUiStore } from '@/stores/ui'
@@ -101,13 +102,27 @@ function go(item: MenuItem, child?: MenuChild) {
         <aside class="u-drawer" role="dialog" aria-label="账户菜单" @keydown.esc="emit('update:open', false)">
           <!-- 用户卡 -->
           <header class="u-drawer__head">
-            <span class="u-drawer__ava">{{ (props.me?.nickname ?? props.me?.username ?? '同').slice(0, 1).toUpperCase() }}</span>
+            <MobileAvatar
+              :src="props.me?.avatarUrl"
+              :name="props.me?.nickname ?? props.me?.username"
+              :tint="props.me?.tint"
+              size="md"
+            />
             <span class="u-drawer__who">
               <strong class="u-drawer__name">{{ props.me?.nickname ?? props.me?.username ?? '同学' }}</strong>
               <span class="u-drawer__sub">
-                {{ props.me ? `@${props.me.username} · ${progress.lvLabel}` : '未登录' }}
+                {{ props.me ? `@${props.me.handle ?? props.me.username} · ${progress.lvLabel}` : '未登录' }}
               </span>
             </span>
+            <button
+              class="u-drawer__edit"
+              type="button"
+              title="编辑资料"
+              aria-label="编辑资料"
+              @click="emit('navigate', '/m/me/profile')"
+            >
+              <MobileIcon name="settings" :size="16" />
+            </button>
           </header>
 
           <!-- 菜单 -->

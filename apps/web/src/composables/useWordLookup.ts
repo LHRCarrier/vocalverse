@@ -42,15 +42,19 @@ export function useWordLookup() {
     state.open = false
   }
 
-  async function addToVocab(
-    ctx: { bookId: number; chapterId: number },
-  ): Promise<boolean> {
+  async function addToVocab(ctx: {
+    bookId?: number
+    chapterId?: number
+    /** 生词来源（docs/47 §5.5）：阅读器 reading（默认）/ 社区划词 community */
+    scene?: 'reading' | 'community' | 'manual'
+  }): Promise<boolean> {
     if (!state.word) return false
     try {
       await addVocab(state.word, {
         book_id: ctx.bookId || undefined,
-        chapter_id: ctx.chapterId,
+        chapter_id: ctx.chapterId || undefined,
         context: state.context.slice(0, 500),
+        scene: ctx.scene ?? 'reading',
       })
       state.open = false
       return true

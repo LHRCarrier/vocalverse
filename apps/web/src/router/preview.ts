@@ -46,6 +46,10 @@ export const previewRoute: RouteRecordRaw | null = import.meta.env.DEV
           component: () => import('@/views/preview/CommunityPreview.vue'),
         },
         {
+          path: 'community-s3',
+          component: () => import('@/views/preview/CommunityS3Preview.vue'),
+        },
+        {
           path: 'reading',
           component: () => import('@/views/preview/ReadingPreview.vue'),
         },

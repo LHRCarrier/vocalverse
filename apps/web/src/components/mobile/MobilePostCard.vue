@@ -7,6 +7,10 @@
  * kind=checkin：打卡卡分支——整体分 + 今日练习次数 + 日期 mark（docs/37 §8）。
  * 互动状态由 store 维护（乐观更新，docs/34 §7.2）。
  */
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+
+import MobileAvatar from '@/components/mobile/MobileAvatar.vue'
 import MobilePostActions from '@/components/mobile/MobilePostActions.vue'
 import MobilePostMedia from '@/components/mobile/MobilePostMedia.vue'
 import { authorDisplay, domainLabel, timeAgo } from '@/api/community'
@@ -25,17 +29,27 @@ const emit = defineEmits<{
   'open-comments': []
 }>()
 
+const router = useRouter()
+
 /** 打卡卡：整体分展示（后端只回公开面 {overall, practice_count}，C-08） */
-const checkinScore = props.post.checkinOverall
-const checkinCount = props.post.checkinPracticeCount ?? 0
+const checkinScore = computed(() => props.post.checkinOverall)
+const checkinCount = computed(() => props.post.checkinPracticeCount ?? 0)
+
+/** 整卡点击 → 详情页（2026-09-09 修复「点帖子无查看方式」） */
+function openDetail() {
+  void router.push(`/m/post/${props.post.id}`)
+}
 </script>
 
 <template>
   <section class="u-comm-item" :aria-label="`${props.post.author.nickname} 的动态`">
     <header class="u-comm-item__head">
-      <span class="u-comm-item__ava" :style="{ background: props.post.author.tint ?? '#37546e' }">{{
-        props.post.author.nickname.slice(0, 1)
-      }}</span>
+      <MobileAvatar
+        :src="props.post.author.avatarUrl"
+        :name="props.post.author.nickname"
+        :tint="props.post.author.tint"
+        size="md"
+      />
       <span class="u-comm-item__who">
         <span class="u-comm-item__name">
           {{ props.post.author.nickname }}
@@ -47,28 +61,32 @@ const checkinCount = props.post.checkinPracticeCount ?? 0
       </span>
     </header>
 
-    <!-- 打卡卡（当日聚合：整体分 + 次数 + 日期） -->
-    <template v-if="props.post.kind === 'checkin'">
-      <h3 class="u-comm-item__title">今日打卡</h3>
-      <p class="u-comm-item__desc">
-        完成 {{ checkinCount }} 次口语练习 · 今日综合分
-        <strong class="u-comm-item__score">{{ checkinScore == null ? '—' : checkinScore.toFixed(0) }}</strong>
-        <time class="u-comm-item__time">{{ props.post.checkinDate }}</time>
-      </p>
-    </template>
+    <!-- 整卡可点 → 详情页（互动按钮各自 @click.stop，避免误跳） -->
+    <div class="u-comm-item__tap" role="button" tabindex="0" :aria-label="`查看内容：${props.post.title ?? props.post.body ?? ''}`" @click="openDetail" @keydown.enter="openDetail">
+      <!-- 打卡卡（当日聚合：整体分 + 次数 + 日期） -->
+      <template v-if="props.post.kind === 'checkin'">
+        <h3 class="u-comm-item__title">今日打卡</h3>
+        <p class="u-comm-item__desc">
+          完成 {{ checkinCount }} 次口语练习 · 今日综合分
+          <strong class="u-comm-item__score">{{ checkinScore == null ? '—' : checkinScore.toFixed(0) }}</strong>
+          <time class="u-comm-item__time">{{ props.post.checkinDate }}</time>
+        </p>
+      </template>
 
-    <template v-else>
-      <h3 v-if="props.post.title" class="u-comm-item__title">{{ props.post.title }}</h3>
-      <p v-if="props.post.body" class="u-comm-item__desc">{{ props.post.body }}</p>
-    </template>
+      <template v-else>
+        <h3 v-if="props.post.title" class="u-comm-item__title">{{ props.post.title }}</h3>
+        <p v-if="props.post.body" class="u-comm-item__desc">{{ props.post.body }}</p>
+      </template>
 
-    <MobilePostMedia
-      v-if="props.post.media || props.post.kind === 'video'"
-      :media="props.post.media"
-      :kind="props.post.kind"
-      :tint-gradient="props.tintGradient"
-      :duration-s="props.post.media?.durationS ?? null"
-    />
+      <MobilePostMedia
+        v-if="props.post.media || props.post.kind === 'video'"
+        :media="props.post.media"
+        :kind="props.post.kind"
+        :tint-gradient="props.tintGradient"
+        :duration-s="null"
+        compact
+      />
+    </div>
 
     <MobilePostActions
       :like-count="props.post.likeCount"

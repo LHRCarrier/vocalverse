@@ -21,7 +21,7 @@ import { fetchChapter, fetchVoices } from '@/api/reading'
 import { buildSentenceSegments, safeAnnColor, sentenceHasAnnotation } from '@/audio/reader-words'
 import { useMobileBack } from '@/composables/useMobileBack'
 import { useReaderAnnotationUi } from '@/composables/useReaderAnnotationUi'
-import { useReaderBackLayers } from '@/composables/useReaderBackLayers'
+import { useBackLayers } from '@/composables/useBackLayers'
 import { useReaderProgress } from '@/composables/useReaderProgress'
 import { useReaderSettings } from '@/composables/useReaderSettings'
 import { useReaderTap } from '@/composables/useReaderTap'
@@ -213,9 +213,9 @@ const settingsOpen = ref(false)
 
 /**
  * 原生返回手势/按键：按「最上层到最下层」顺序关弹层，全关完才交给原生回退历史
- * （否则滑动返回会连带退页/退到桌面；实现见 useReaderBackLayers）
+ * （否则滑动返回会连带退页/退到桌面；实现见 useBackLayers）
  */
-useReaderBackLayers([
+useBackLayers([
   { open: () => selIdx.value !== null, close: () => (selIdx.value = null) },
   { open: () => noteSheet.open, close: () => (noteSheet.open = false) },
   { open: () => wordLookup.state.open, close: () => wordLookup.close() },

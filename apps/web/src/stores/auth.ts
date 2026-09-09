@@ -19,6 +19,12 @@ export interface MeView {
   username: string
   nickname: string
   level: string
+  /** 社区展示名（社区 S3 · docs/47 §4.2；GET /auth/me 扩展字段） */
+  handle?: string | null
+  /** 头像色板（无 avatarUrl 时的兜底底色） */
+  tint?: string | null
+  /** 真实头像（相对路径，渲染前过 mediaUrl） */
+  avatarUrl?: string | null
 }
 
 const TOKEN_KEY = 'vv_token'

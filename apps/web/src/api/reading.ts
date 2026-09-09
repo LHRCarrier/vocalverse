@@ -162,7 +162,7 @@ export async function lookupWord(word: string): Promise<WordLookupResult> {
 
 export async function addVocab(
   word: string,
-  ctx?: { book_id?: number; chapter_id?: number; context?: string },
+  ctx?: { book_id?: number; chapter_id?: number; context?: string; scene?: 'reading' | 'community' | 'manual' },
 ): Promise<{ added: boolean; vocab: VocabItem }> {
   const res = await request<{ added: boolean; vocab: VocabItem }>('/api/v1/reading/vocab', {
     method: 'POST',

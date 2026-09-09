@@ -35,6 +35,12 @@ export const previewPages: PreviewPage[] = [
     layout: 'gallery',
   },
   {
+    path: '/preview/community-s3',
+    label: '社区内容 S3 · 媒体闭环联调台（docs/47）',
+    group: '用户端',
+    layout: 'gallery',
+  },
+  {
     path: '/preview/reading',
     label: '读书域 · 查词/书架联调台（docs/45）',
     group: '用户端',

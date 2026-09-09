@@ -22,7 +22,25 @@ export type RawFollowSummary = components['schemas']['FollowSummary']
 export type RawFollowRecommend = components['schemas']['FollowRecommend']
 export type RawNotificationsPage = components['schemas']['NotificationsPage']
 
-/** 媒体元数据（后端 media jsonb；字段集对齐 MediaItem——duration 存秒，C-06） */
+/**
+ * 媒体元数据（后端 media jsonb）。
+ *
+ * 2026-09-09（社区 S3）扩展为**多图** + 兼容 S1 存量数据：
+ * - S1 种子写的是 `{"type":"video","duration_s":240}`（snake_case、无 url）；
+ * - S1 真实帖写 `{type,url,coverUrl,durationS}`；
+ * - S3 新帖写 `{type,items:[{id,url,width,height,size,mimeType}],coverUrl,durationS}`。
+ * `normalizeMedia()` 把三种形状统一成 `items[]` + camelCase，渲染层只认归一后的形状
+ * （docs/48 B8：此前前端只读 durationS，种子视频的时长角标一直是空的）。
+ */
+export interface PostMediaItem {
+  id?: string | null
+  url: string
+  width?: number | null
+  height?: number | null
+  size?: number | null
+  mimeType?: string | null
+}
+
 export interface PostMedia {
   type?: 'image' | 'video' | 'none' | string
   url?: string | null
@@ -32,6 +50,55 @@ export interface PostMedia {
   height?: number | null
   size?: number | null
   mimeType?: string | null
+  /** 多图/视频项（S3）；缺省时由 normalizeMedia 从 url 归一 */
+  items?: PostMediaItem[]
+  /** 原始 snake_case 时长（S1 种子；normalizeMedia 会转成 durationS） */
+  duration_s?: number | null
+  cover_url?: string | null
+}
+
+/** 归一后的媒体（渲染层唯一形状） */
+export interface NormalizedMedia {
+  kind: 'image' | 'video' | 'none'
+  items: PostMediaItem[]
+  coverUrl: string | null
+  durationS: number | null
+}
+
+/** 三种历史形状 → 统一形状（纯函数，供渲染层与单测共用） */
+export function normalizeMedia(media: PostMedia | null | undefined, postKind?: string): NormalizedMedia {
+  if (!media) {
+    return { kind: postKind === 'video' ? 'video' : 'none', items: [], coverUrl: null, durationS: null }
+  }
+  const rawItems = Array.isArray(media.items) ? media.items : []
+  const items: PostMediaItem[] = rawItems
+    .filter((i): i is PostMediaItem => !!i && typeof i.url === 'string' && i.url.length > 0)
+    .map((i) => ({
+      id: i.id ?? null,
+      url: i.url,
+      width: i.width ?? null,
+      height: i.height ?? null,
+      size: i.size ?? null,
+      mimeType: i.mimeType ?? null,
+    }))
+  if (items.length === 0 && typeof media.url === 'string' && media.url) {
+    items.push({
+      id: null,
+      url: media.url,
+      width: media.width ?? null,
+      height: media.height ?? null,
+      size: media.size ?? null,
+      mimeType: media.mimeType ?? null,
+    })
+  }
+  const kind: NormalizedMedia['kind'] =
+    media.type === 'video' || postKind === 'video' ? 'video' : items.length ? 'image' : 'none'
+  return {
+    kind,
+    items,
+    coverUrl: media.coverUrl ?? media.cover_url ?? null,
+    durationS: media.durationS ?? media.duration_s ?? null,
+  }
 }
 
 export interface AuthorView {
@@ -40,6 +107,8 @@ export interface AuthorView {
   handle: string | null
   tint: string | null
   level: string
+  /** 真实头像（社区 S3 新增；随 AuthorView 一次带回，零额外请求） */
+  avatarUrl?: string | null
 }
 
 /** 严格视图类型（服务端保证全量返回；cast 在 api/community.ts 边界） */
