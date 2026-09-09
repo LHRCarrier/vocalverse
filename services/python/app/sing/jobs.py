@@ -247,8 +247,7 @@ def claim_job(job_id: int) -> bool:
     db = get_session_factory()()
     try:
         job = db.execute(
-            select(PitchExtractJob)
-            .where(
+            select(PitchExtractJob).where(
                 PitchExtractJob.id == job_id,
                 PitchExtractJob.status == PitchJobStatus.QUEUED,
             )

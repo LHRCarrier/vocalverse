@@ -54,13 +54,21 @@ def upgrade() -> None:
         sa.Column("attempts", sa.SmallInteger(), server_default=sa.text("0"), nullable=False),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.CheckConstraint(
             "status IN ('queued', 'running', 'done', 'failed')",
             name=op.f("ck_pitch_extract_jobs_status"),
         ),
         sa.ForeignKeyConstraint(
-            ["lrc_id"], ["lrc.id"], name=op.f("fk_pitch_extract_jobs_lrc_id_lrc"), ondelete="CASCADE"
+            ["lrc_id"],
+            ["lrc.id"],
+            name=op.f("fk_pitch_extract_jobs_lrc_id_lrc"),
+            ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["song_id"],
