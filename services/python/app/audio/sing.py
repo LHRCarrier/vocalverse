@@ -58,7 +58,12 @@ def _hz_to_series_cent(f0: np.ndarray, ref_f0: np.ndarray) -> np.ndarray:
 
 
 def _cent_deviation(user_f0: np.ndarray, ref_f0: np.ndarray) -> float | None:
-    """逐帧 cent 偏差（|user-ref| 取中位数，抗局部颤音）。
+    """逐帧 cent 偏差（**八度无关**：频率比折叠到 ±600 cent 后取 |偏差| 中位数）。
+
+    八度折叠的理由：演唱者常用低/高八度唱（男声唱童谣常低 2 个八度——2026-09-09 真机
+    实测用户 78~110Hz vs 参考 341Hz），绝对频率比较会恒判 0 分；KTV/唱吧类评分同样按
+    「八度等价」判音准（docs/06 §9.4「音高轮廓先归一化」）。折叠后仍能区分跑调：
+    偏差 ≤50 cent 优秀、>300 cent 不及格。
 
     有效帧（双端有声）不足 3 帧 → None（该句按缺失降权处理，D5）。
     """
@@ -68,8 +73,13 @@ def _cent_deviation(user_f0: np.ndarray, ref_f0: np.ndarray) -> float | None:
     mask = (u > 0) & (r > 0)
     if mask.sum() < 3:
         return None
-    d = np.abs(1200.0 * np.log2(np.maximum(u[mask], 1e-9) / np.maximum(r[mask], 1e-9)))
-    return float(np.median(d))
+    d = _fold_cent(1200.0 * np.log2(np.maximum(u[mask], 1e-9) / np.maximum(r[mask], 1e-9)))
+    return float(np.median(np.abs(d)))
+
+
+def _fold_cent(cents: np.ndarray | float):
+    """频率比 cent → 折叠到 [-600, 600]（八度等价；+1200 与 0 视为同一音高）。"""
+    return ((np.asarray(cents, dtype=float) + 600.0) % 1200.0) - 600.0
 
 
 def pitch_score_from_cent(cent: float) -> float:
@@ -364,12 +374,14 @@ class PyinSingScorer(SingScorer):
             # 节奏：句起点与 LRC 窗口偏差（bpm_ratio 时钟补偿）
             dev = time_deviation_ms(a["start_ms"], window["start_ms"], bpm_ratio)
             rhythm = rhythm_score_from_dev(dev)
+            # 帧级 cent 偏差（D3 图辅助）：八度折叠 + 窗口取整按短侧截断
+            n_cmp = min(len(user_win), len(ref_win))
             cent_dev = [
                 float(c)
-                for c in np.abs(
+                for c in _fold_cent(
                     1200.0
                     * np.log2(
-                        np.maximum(user_win, 1e-9) / np.maximum(ref_win[: len(user_win)], 1e-9)
+                        np.maximum(user_win[:n_cmp], 1e-9) / np.maximum(ref_win[:n_cmp], 1e-9)
                     )
                 )
             ]

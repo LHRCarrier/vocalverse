@@ -30,8 +30,12 @@ PYIN_FMIN = 65.0
 PYIN_FMAX = 800.0
 FRAME_LENGTH = 2048
 HOP_LENGTH = 512
-# 清浊门限：voiced_prob > 此值视为有声帧（滤静音/呼吸/伴奏残留）
-VOICING_THRESHOLD = 0.6
+# 清浊门限（**可选叠加**）：librosa 的 voiced_flag 已含 viterbi 平滑判决（滤静音/呼吸），
+# 是清浊的权威来源；再叠加 voiced_prob 下限过滤会误杀真人歌声（颤音/气声/手机麦下
+# voicing prob 普遍 < 0.6——2026-09-09 实测用户录音 vprob max 0.43~0.76 / mean 0.01~0.04，
+# 叠加 0.6 门限导致全句 no_pitch）。默认 0 = 关闭叠加过滤（只信 voiced_flag）；
+# 需要更激进的静音剔除时经 APP_PITCH_VOICING_THRESHOLD 调高（如 0.2~0.3）。
+VOICING_THRESHOLD = 0.0
 # 提取算法世代（写入 song_pitch_refs.version / sing_attempts.ref_version）
 EXTRACTOR_VERSION = "pyin-v1"
 
@@ -54,6 +58,24 @@ class TrackF0:
     duration_ms: float = 0.0
 
 
+def apply_voicing_gate(voiced_flag, voiced_prob, threshold: float):
+    """清浊判决合成（纯函数，可单测）。
+
+    - ``voiced_flag``：librosa pyin 的 viterbi 平滑判决（**权威**；已滤静音/无音高段）；
+    - ``voiced_prob``：逐帧浊音概率；``threshold > 0`` 时**额外**要求 prob 超过门限
+      （默认 0 = 不叠加——真人歌声 vprob 偏低，叠加会误杀整句）；
+    - ``voiced_prob is None``（全静音序列）→ 全 False。
+    """
+    import numpy as np
+
+    if voiced_prob is None:
+        return np.zeros(len(voiced_flag), dtype=bool)
+    flag = np.asarray(voiced_flag, dtype=bool).copy()
+    if threshold > 0:
+        flag &= np.asarray(voiced_prob, dtype=float) > float(threshold)
+    return flag
+
+
 class PitchExtractor(abc.ABC):
     """参考旋律提取抽象（CI 零真 Key/零模型：APP_TESTING 时注入 Fake；docs/06 第 6 章）。"""
 
@@ -64,7 +86,14 @@ class PitchExtractor(abc.ABC):
 
 
 class PyinPitchExtractor(PitchExtractor):
-    """librosa.pyin 实现（docs/06 §9.4 参数：fmin 65 / fmax 800 / frame 2048 / hop 512）。"""
+    """librosa.pyin 实现（docs/06 §9.4 参数：fmin 65 / fmax 800 / frame 2048 / hop 512）。
+
+    :param voicing_threshold: 可选叠加的 voiced_prob 下限（0=只用 librosa voiced_flag，
+        默认；真人歌声 voicing prob 偏低，叠加高门限会整句误判清音——见模块常量注释）。
+    """
+
+    def __init__(self, voicing_threshold: float = VOICING_THRESHOLD):
+        self._voicing_threshold = float(voicing_threshold)
 
     def extract_track(self, wav_path: str) -> TrackF0:
         try:
@@ -90,14 +119,9 @@ class PyinPitchExtractor(PitchExtractor):
             )
         except Exception as exc:
             raise PitchExtractError(f"pyin 提取失败: {exc}") from exc
-        # voiced_prob 可能为 None（全部帧静音时 librosa 返回 None 序列）；按清浊门限二值化
-        if voiced_prob is None:
-            voiced_flag = np.zeros_like(f0, dtype=bool)
-        else:
-            voiced = np.asarray(voiced_prob, dtype=float) > VOICING_THRESHOLD
-            voiced_flag = np.asarray(voiced_flag, dtype=bool) & voiced
+        flag = apply_voicing_gate(voiced_flag, voiced_prob, self._voicing_threshold)
         f0 = np.asarray(f0, dtype=float)
-        f0[~voiced_flag] = 0.0  # 清浊门限：清音帧统一置 0（滤静音/混响/和声残留）
+        f0[~flag] = 0.0  # 清音帧统一置 0（静音/无音高段）
 
         times = np.arange(len(f0)) * (HOP_LENGTH / sr * 1000.0)
         midi: list[int | None] = []
@@ -163,7 +187,7 @@ def get_pitch_extractor() -> PitchExtractor:
         return FakePitchExtractor()
     if (settings.pitch_extractor or "pyin").lower() != "pyin":
         raise PitchExtractError(f"未知 pitch_extractor={settings.pitch_extractor}")
-    return PyinPitchExtractor()
+    return PyinPitchExtractor(voicing_threshold=settings.pitch_voicing_threshold)
 
 
 def resolve_audio_path(url: str | None, audio_dir: str = "./data/audio") -> str | None:

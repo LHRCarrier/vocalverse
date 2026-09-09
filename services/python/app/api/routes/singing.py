@@ -112,6 +112,9 @@ def _song_summary(s: Song, expected_lines: int) -> dict:
         "bpm": float(s.bpm) if s.bpm is not None else None,
         "musical_key": s.musical_key,
         "cover_url": s.cover_url,
+        # 参考旋律音频（共享卷路径）：前端取 basename 走 /api/v1/audio/{name} 回放——
+        # 2026-09-09 真机反馈：无参考音时用户凭记忆清唱，音准普遍偏低
+        "audio_url": s.audio_url,
         "pitch_ref_status": s.pitch_ref_status,
         "expected_lines": expected_lines,
     }

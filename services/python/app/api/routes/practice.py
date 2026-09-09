@@ -38,7 +38,16 @@ from app.practice.state import get_state_store
 router = APIRouter(prefix="/api/v1", tags=["practice"])
 logger = logging.getLogger("vocalverse")
 
-_SAFE_NAME = re.compile(r"^[0-9a-f]{32}\.mp3$")
+# 音频文件名白名单：用户录音（32 位 sha1 + .mp3）+ 歌曲参考旋律（song_*.wav 等演示素材）；
+# 仅白名单字符 + 音频扩展名（防路径穿越；目录拼接用 Path(settings.audio_dir) / name）
+_SAFE_NAME = re.compile(r"^[0-9a-zA-Z_-]{1,64}\.(mp3|wav|m4a|ogg|webm)$")
+_AUDIO_MEDIA_TYPE = {
+    "mp3": "audio/mpeg",
+    "wav": "audio/wav",
+    "m4a": "audio/mp4",
+    "ogg": "audio/ogg",
+    "webm": "audio/webm",
+}
 
 #: R-13 恢复端点回带最近消息条数（UI 重建够用；完整历史以 scenario_messages 为准）
 RESTORE_MESSAGES_LIMIT = 12
@@ -463,13 +472,16 @@ async def get_audio(
         if path.exists():
             path.unlink(missing_ok=True)  # 惰性清理
         raise BizError(http_status=410, code=41001, message="audio expired")
-    # 归属校验：attempts / scenario_messages / sing_attempts 任一引用即可
-    # （C-P1 2026-09-09 补 SingAttempt：跟唱回放此前误 403——docs/singing/22 §4）
+    # 归属校验：attempts / scenario_messages / sing_attempts 任一引用即可；
+    # 2026-09-09 增：已发布歌曲的参考旋律音频（唱吧「听参考旋律」——公有领域演示素材，
+    # 所有登录用户可播放；音频文件本身不在 attempts 引用里，否则前端无法跟唱）
+    # （C-P1 补 SingAttempt：跟唱回放此前误 403——docs/singing/22 §4）
     # docs/19 P0-2：归属查询走 to_thread（短事务，不阻塞事件循环；文件流不受影响）
     url = f"/api/v1/audio/{name}"
 
     def _owns() -> bool:
-        from app.models import SingAttempt
+        from app.models import SingAttempt, Song
+        from app.models.base import ContentStatus
 
         db = get_session_factory()()
         try:
@@ -487,6 +499,12 @@ async def get_audio(
                         SingAttempt.audio_url == url, SingAttempt.user_id == user_id
                     )
                 ).first()
+                or db.execute(
+                    select(Song.id).where(
+                        Song.status == ContentStatus.PUBLISHED,
+                        Song.audio_url.like(f"%/{name}"),
+                    )
+                ).first()
             )
             return owned is not None
         finally:
@@ -500,6 +518,7 @@ async def get_audio(
             while chunk := f.read(64 * 1024):
                 yield chunk
 
+    media_type = _AUDIO_MEDIA_TYPE.get(path.suffix.lstrip(".").lower(), "audio/mpeg")
     return StreamingResponse(
-        _file_stream(), media_type="audio/mpeg", headers={"Cache-Control": "private, max-age=0"}
+        _file_stream(), media_type=media_type, headers={"Cache-Control": "private, max-age=0"}
     )

@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     # =========================================================================
     # 参考旋律提取器：pyin（librosa，65~800Hz/frame 2048/hop 512/清浊门限）；fake 仅测试
     pitch_extractor: str = "pyin"
+    # 清浊叠加门限（0=只用 librosa voiced_flag，默认）：真人歌声 voicing prob 偏低
+    # （2026-09-09 实测用户录音 max 0.43~0.76 / mean 0.01~0.04），叠加高门限会整句误判
+    # 清音 → 全句 no_pitch；仅在需要更激进剔除静音时调高（0.2~0.3）。
+    pitch_voicing_threshold: float = 0.0
     pitch_extract_concurrency: int = 2  # 提取并行信号量（与 whisper/ISE/sing 相互独立）
     pitch_extract_scan_interval_s: int = 60  # lifespan 周期扫描间隔（秒）
     pitch_extract_max_attempts: int = 3  # 单 job 重试上限（超限置 failed，不再自动重建）
