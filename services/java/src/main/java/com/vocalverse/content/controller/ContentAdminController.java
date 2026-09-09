@@ -90,12 +90,12 @@ public class ContentAdminController {
       BigDecimal bpm,
       @Size(max = 8) String musicalKey,
       @NotBlank @Size(max = 512) String audioUrl,
+      @Size(max = 512) String vocalRefUrl,
       @Size(max = 512) String lrcUrl,
       @Size(max = 512) String coverUrl,
       String interestTags,
       @Pattern(regexp = "public_domain|original|demo_only") String source,
-      @Pattern(regexp = "draft|published|archived") String status,
-      @Pattern(regexp = "missing|building|ready|invalid") String pitchRefStatus) {}
+      @Pattern(regexp = "draft|published|archived") String status) {}
 
   public record SongView(
       Long id,
@@ -106,6 +106,7 @@ public class ContentAdminController {
       BigDecimal bpm,
       String musicalKey,
       String audioUrl,
+      String vocalRefUrl,
       String lrcUrl,
       String coverUrl,
       String interestTags,
@@ -265,12 +266,15 @@ public class ContentAdminController {
     e.setBpm(body.bpm());
     e.setMusicalKey(body.musicalKey());
     e.setAudioUrl(body.audioUrl());
+    e.setVocalRefUrl(body.vocalRefUrl());
     e.setLrcUrl(body.lrcUrl());
     e.setCoverUrl(body.coverUrl());
     e.setInterestTags(body.interestTags() == null ? "[]" : body.interestTags());
     e.setSource(body.source() == null ? "public_domain" : body.source());
     e.setStatus(body.status() == null ? "draft" : body.status());
-    e.setPitchRefStatus(body.pitchRefStatus() == null ? "missing" : body.pitchRefStatus());
+    // D-G4（2026-09-09）：pitchRefStatus 移出 SongUpsert（防客户端直写伪造就绪门禁）——
+    // 新建一律 missing（就绪只能经内部 REST /internal/song/{id}/pitch-status 翻转）
+    e.setPitchRefStatus("missing");
     e.setCreatedAt(now);
     e.setUpdatedAt(now);
     return Envelope.ok(toView(songs.save(e)));
@@ -291,6 +295,7 @@ public class ContentAdminController {
     e.setBpm(body.bpm());
     e.setMusicalKey(body.musicalKey());
     e.setAudioUrl(body.audioUrl());
+    e.setVocalRefUrl(body.vocalRefUrl());
     e.setLrcUrl(body.lrcUrl());
     e.setCoverUrl(body.coverUrl());
     if (body.interestTags() != null) {
@@ -302,9 +307,7 @@ public class ContentAdminController {
     if (body.status() != null) {
       e.setStatus(body.status());
     }
-    if (body.pitchRefStatus() != null) {
-      e.setPitchRefStatus(body.pitchRefStatus());
-    }
+    // D-G4：pitchRefStatus 不走客户端直写（更新不触碰该列——就绪翻转只经内部 REST）
     e.setUpdatedAt(Instant.now());
     return Envelope.ok(toView(songs.save(e)));
   }
@@ -345,12 +348,12 @@ public class ContentAdminController {
       e.setCreatedAt(now);
       saved.add(lrcs.save(e));
     }
-    // 触发 Python 离线重提取（docs/10 §3.2-2：ready → missing）
-    if ("ready".equals(song.getPitchRefStatus())) {
-      song.setPitchRefStatus("missing");
-      song.setUpdatedAt(now);
-      songs.save(song);
-    }
+    // 触发 Python 离线重提取（docs/10 §3.2-2 + D-G4 2026-09-09：**无条件**置 missing——
+    // 含 building/ready/invalid 任一态，LRC 整首重写即参考旋律作废；配合 Python 侧
+    // pitch_extract_jobs 世代重建（lrc_id 级联删旧 job → 扫描按新世代重建），无去抖必要）
+    song.setPitchRefStatus("missing");
+    song.setUpdatedAt(now);
+    songs.save(song);
     return Envelope.ok(saved.stream().map(ContentAdminController::toView).toList());
   }
 
@@ -473,6 +476,7 @@ public class ContentAdminController {
         e.getBpm(),
         e.getMusicalKey(),
         e.getAudioUrl(),
+        e.getVocalRefUrl(),
         e.getLrcUrl(),
         e.getCoverUrl(),
         e.getInterestTags(),

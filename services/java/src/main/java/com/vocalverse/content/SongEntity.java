@@ -14,8 +14,9 @@ import org.hibernate.type.SqlTypes;
 /**
  * 歌曲库（**Java 写**；demo 只用公有领域/自创曲，商用音乐不入库 docs/06 §9.7）。
  *
- * <p>pitch_ref_status：LRC 重写后由 Java 置回 missing，Python 离线任务提取完翻转 ready/INVALID （docs/10
- * §3.2-2）；跟唱请求见 status != ready 返回「生成中」，不静默算分。
+ * <p>pitch_ref_status：LRC 重写后由 Java 置回 missing；Python 离线提取任务完成经内部 REST
+ * /internal/song/{id}/pitch-status 委托翻转 ready/invalid（docs/06 §9.4 D2 拍板——songs 属 Java 独占写 + M-1 只授
+ * vv_python SELECT，Python 不直写）；跟唱请求见 status != ready 返回「生成中」，不静默算分。管理端客户端**不得**直写该列（防伪造就绪门禁，D-G4）。
  */
 @Entity
 @Table(name = "songs")
@@ -45,6 +46,11 @@ public class SongEntity {
 
   @Column(name = "audio_url", nullable = false, length = 512)
   private String audioUrl;
+
+  // 独立参考人声轨（2026-09-09 唱歌 P0 D1：pyin 提取输入「vocal_ref 优先 → audio_url 回退」；
+  // 可空——demo 清唱/旋律主导约定下无独立人声轨）
+  @Column(name = "vocal_ref_url", length = 512)
+  private String vocalRefUrl;
 
   @Column(name = "lrc_url", length = 512)
   private String lrcUrl;
@@ -129,6 +135,14 @@ public class SongEntity {
 
   public void setAudioUrl(String audioUrl) {
     this.audioUrl = audioUrl;
+  }
+
+  public String getVocalRefUrl() {
+    return vocalRefUrl;
+  }
+
+  public void setVocalRefUrl(String vocalRefUrl) {
+    this.vocalRefUrl = vocalRefUrl;
   }
 
   public String getLrcUrl() {
