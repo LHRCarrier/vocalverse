@@ -3,6 +3,18 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-09 唱歌素材物化 + 曲目播种（SG-13/D-G2 · 组长拍板 A+B 方案）· 3 op
+
+- **背景**：M3 唱歌全链路落地后，**歌曲库为空**（`songs/lrc=0`）——`data/seed/` 只有 scenarios，`app/db/seed.py` 不播种歌曲；且 pyin 提取需「旋律主导」音频输入（D1 拍板），而仓库红线禁止提交原始音频/商用音乐。组长拍板：**A+B**（先由 AI 合成素材跑通，后续用真人清唱素材替换）+ **Java 侧 SongSeeder**（songs/lrc 属 Java 独占写）。
+- **素材物化（code）**：`scripts/setup-assets.py`——确定性合成 3 首「旋律主导」演示曲（Twinkle Twinkle Little Star / Ode to Joy / Mary Had a Little Lamb；旋律与歌词均**公有领域**，演奏为脚本合成音色 → `source=original`），输出 `data/audio/song_*.wav`（**gitignored，不入库**）+ `data/seed/songs.json`（元数据 + 逐句时间戳，入库）+ `data/seed/lrc/*.lrc`（入库）。**实测 pyin 提取音符与设计旋律完全吻合**（C4/G4/F4/E4/D4/A4；逐句窗口分布正确）。
+- **播种（code）**：Java `SongSeeder`（CommandLineRunner @Order(3)，与 CommunitySeeder/DemoSeeder 同型）读 `data/seed/songs.json` 播种 songs+lrc，按 title 幂等（只增不改），`vocalverse.song.seed`/`VOICEVERSE_SONG_SEED` 开关（测试关闭）；`SongRepository.findByTitle`；`docker-compose.yml` java-api 增挂 `./data/seed:/app/data/seed:ro`（容器内可读种子；音频仍只在 python 侧共享卷，Java 只存路径字符串）。
+- **测试（test）**：`SongSeederTest` +3（字段契约：audio_url 共享卷路径/pitch_ref_status=missing/source=original；逐句 6 句 seq/时间轴单调/source 继承；幂等二次跑不新增；开关关闭不播种）。`mvn -B test -Dtest=SongSeederTest` **3/3 绿**。
+- **端到端实测（真 PG + 真音频 + 真 pyin）**：本地 8081 起新 Java（不动运行中容器）→ Seeder 播种 3 首（6+4+4 句）→ Python `scan_due_jobs` 建 3 job → `run_job_sync` pyin 提取 → refs 写入（6/6、4/4、4/4，version=pyin-v1）→ 内部 REST 委托 → **3 首 `pitch_ref_status=ready`**。重建容器后经 HTTP 复核：登录 → `GET /api/v1/songs` 返回 3 首全 ready；`GET /songs/1` 逐句含参考 f0s（155 帧/句）；nginx 网关（8088）同口径可用；`/m/sing` HTTP 200。
+- **踩坑**：① 首次提取全失败——本地裸跑 cwd=`services/python` 而素材在**仓库根** `data/audio`，`APP_AUDIO_DIR` 默认 `./data/audio` 解析错位（A-G7 路径三义性既有登记项）；容器内 `/app/data/audio` 正确，本地验证需显式 `APP_AUDIO_DIR=<仓库根>/data/audio`；② 失败 job 由扫描自动恢复（failed 且 attempts<上限 → 重置 queued），无需手工清库；③ `docker compose up -d --build` 首次 python 镜像下载依赖期间健康检查窗口超时 → 依赖它的 java/web 被跳过（Created 未启动），**再跑一次 `up -d java-api web`** 即恢复（非代码缺陷，登记为部署注意项）。
+- **遗留**：真人清唱素材替换路径已备（组长提供音频 + 歌词后：放 `data/audio/` → 在 `data/seed/songs.json` 追加条目（`vocal_ref_url` 可填独立人声轨）→ Java Seeder 幂等新增 → 提取自动 ready）；`scripts/setup-assets.ps1`（原计划 PowerShell 形态）以 Python 形态落地（跨平台 + 复用 numpy/soundfile）；素材仅 3 首童谣（演示足够，扩展由管理端 CRUD 或追加 seed 条目）。
+
+—— 执行人：AI 代签（正式署名待组长确认），2026-09-09
+
 ## 2026-09-09 M3 唱歌 P0 六项全链路落地（D1~D7 组长拍板 · feat/sing-m3 分支 · 未推送）· 12 op
 
 - **背景与拍板**：按 `local/唱歌P0六项实施计划书` 六项 P0（A-G1/B-1/D-G1/B-3/F-G1/A-G2）与 `local/M3阶段任务清单` SG-1~SG-7，组长确认 D1~D7 全部推荐项——清唱/旋律主导 + `vocal_ref_url` 预留（不引 Demucs）；`pitch_ref_status` 写归属 = **Java 内部 REST 委托**（`pitch_extract_jobs` 为 Python 事实源，状态列只作读侧门禁）；独立 `sing` 桶 5/h + ISE 对齐 ADR 30/h（R-16 闭合）+ 发音抽样句（默认前 3）；用户逐帧 F0 落库（D3 双序列图）；有效句均分 + `is_complete ≥80%`；评分任务态 = Redis+内存兜底、提取任务态 = DB 表（不引队列）；复用 `POST /sessions` 加 song_id + audio/status/result 三端点（选歌另补 `GET /songs(/id)`）。
