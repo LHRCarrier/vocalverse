@@ -20,3 +20,5 @@ vocalverse:
   community:
     post-enabled: true # 测试默认开（专测「关闭=403」的用例单独覆盖）
     seed: false # 测试库干净：单测自建数据，命令行走种直接关掉
+  song:
+    seed: false # 曲目种子同口径：测试库干净（SongSeederTest 自行开启验证）

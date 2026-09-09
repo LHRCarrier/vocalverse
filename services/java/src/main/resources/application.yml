@@ -30,6 +30,10 @@ vocalverse:
     post-enabled: ${VOICEVERSE_COMMUNITY_POST_ENABLED:false}
     # 演示内容种子（虚构作者 + 8 帖 + 历史打卡卡；仅演示环境）
     seed: ${VOICEVERSE_COMMUNITY_SEED:true}
+  song:
+    # 演示曲目种子（M3 唱歌 P0 D-G2：读 data/seed/songs.json 播种 songs+lrc；
+    # 音频由 scripts/setup-assets.py 物化到 data/audio/，不入库）
+    seed: ${VOICEVERSE_SONG_SEED:true}
 
 management:
   endpoints:

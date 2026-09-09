@@ -105,6 +105,10 @@ services:
       SERVICE_TOKEN: ${SERVICE_TOKEN:?required}
     ports:
       - "8080:8080"
+    volumes:
+      # 曲目种子元数据（M3 唱歌 P0 D-G2）：SongSeeder 读 data/seed/songs.json 播种 songs+lrc；
+      # 音频本体在共享卷 ./data/audio（python-api 挂载；Java 只存路径字符串，不读音频）
+      - ./data/seed:/app/data/seed:ro
     depends_on:
       postgres:
         condition: service_healthy
