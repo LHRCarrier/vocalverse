@@ -82,13 +82,13 @@ class ContentAdminApiTest extends AbstractAdminApiTest {
   }
 
   @Test
-  void songAndLrcRewriteResetsPitchRef() throws Exception {
+  void songLifecycleAndLrcRewriteResetsPitchRef() throws Exception {
     String admin = adminToken();
     String songBody =
         """
         {"title":"Twinkle","artist":"Public Domain","level":1,"durationS":60,"bpm":90.0,
-         "audioUrl":"/data/audio/twinkle.wav","interestTags":"[]","source":"public_domain",
-         "status":"published","pitchRefStatus":"ready"}
+         "audioUrl":"/data/audio/twinkle.wav","vocalRefUrl":"/data/audio/twinkle_vocal.wav",
+         "interestTags":"[]","source":"public_domain","status":"published","pitchRefStatus":"ready"}
         """;
     String created =
         mockMvc
@@ -98,10 +98,27 @@ class ContentAdminApiTest extends AbstractAdminApiTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(songBody))
             .andExpect(status().isOk())
+            // D-G4：pitchRefStatus 已移出 SongUpsert（客户端直写被忽略）——新建恒 missing，
+            // 就绪只能经内部 REST /internal/song/{id}/pitch-status 翻转（防伪造就绪门禁）
+            .andExpect(jsonPath("$.data.pitchRefStatus").value("missing"))
+            .andExpect(jsonPath("$.data.vocalRefUrl").value("/data/audio/twinkle_vocal.wav"))
             .andReturn()
             .getResponse()
             .getContentAsString();
     long songId = objectMapper.readTree(created).path("data").path("id").asLong();
+
+    // 模拟 Python 提取完成（内部委托翻转 ready）→ 验证「无条件置 missing」路径
+    mockMvc
+        .perform(
+            post("/internal/song/{id}/pitch-status", songId)
+                .header("Authorization", "Bearer change-me-internal-service-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ("{\"songId\":"
+                            + songId
+                            + ",\"status\":\"ready\",\"version\":\"pyin-v1\"}")
+                        .getBytes(StandardCharsets.UTF_8)))
+        .andExpect(status().isOk());
 
     // 整首重写 LRC（seq 重排；source 继承 songs.source）
     mockMvc
@@ -117,7 +134,7 @@ class ContentAdminApiTest extends AbstractAdminApiTest {
         .andExpect(jsonPath("$.data[1].seq").value(2))
         .andExpect(jsonPath("$.data[0].source").value("public_domain"));
 
-    // pitch_ref_status 被重置为 missing（触发 Python 离线重提取，docs/10 §3.2-2）
+    // pitch_ref_status 被无条件重置为 missing（含 ready 态；触发 Python 离线重提取，D-G4）
     mockMvc
         .perform(get("/api/v1/admin/songs/{id}", songId).header("Authorization", "Bearer " + admin))
         .andExpect(status().isOk())
