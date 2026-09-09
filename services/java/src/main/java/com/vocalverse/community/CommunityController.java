@@ -51,8 +51,10 @@ public class CommunityController {
       @RequestAttribute("userId") Long userId,
       @RequestParam(required = false) String domain,
       @RequestParam(required = false) String cursor,
-      @RequestParam(defaultValue = "10") int limit) {
-    return Envelope.ok(service.feed(userId, domain, cursor, limit));
+      @RequestParam(defaultValue = "10") int limit,
+      /** mine=true → 只看本人发帖（「我的发帖」，docs/47 §5.1） */
+      @RequestParam(defaultValue = "false") boolean mine) {
+    return Envelope.ok(service.feed(userId, domain, cursor, limit, mine));
   }
 
   @PostMapping

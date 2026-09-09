@@ -98,14 +98,16 @@ public class CommunityService {
   // ------------------------------------------------------------------ feed
 
   @Transactional(readOnly = true)
-  public FeedPage feed(Long actorId, String domain, String cursor, int limit) {
+  public FeedPage feed(Long actorId, String domain, String cursor, int limit, boolean mine) {
     String normalized = normalizeDomain(domain);
     Cursor c = decodeCursor(cursor);
     int pageSize = clampLimit(limit);
+    // mine=true → 只看本人发帖（「我的发帖」页，docs/47 §5.1 · 2026-09-09 补）
+    Long authorFilter = mine ? actorId : null;
     // 多取一条判 hasMore（docs/37 §5 keyset 约定）；DESC 排序由 Pageable 携带（Criteria 执行）
     PageRequest pageable =
         PageRequest.of(0, pageSize + 1, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
-    List<PostEntity> rows = posts.feed(normalized, c.ts(), c.id(), pageable);
+    List<PostEntity> rows = posts.feed(normalized, authorFilter, c.ts(), c.id(), pageable);
     boolean hasMore = rows.size() > pageSize;
     List<PostEntity> page = hasMore ? rows.subList(0, pageSize) : rows;
     List<CommunityPostView> views = buildViews(page, actorId);

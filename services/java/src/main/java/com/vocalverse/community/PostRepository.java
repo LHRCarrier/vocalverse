@@ -28,14 +28,21 @@ public interface PostRepository
   Optional<PostEntity> findFirstByAuthorIdAndCheckinDateAndKind(
       Long authorId, java.time.LocalDate date, String kind);
 
-  /** keyset 分页（(created_at, id) DESC）：domain 为 null = 全量混排；ts/id 为 null = 首页。 */
-  default List<PostEntity> feed(String domain, Instant ts, Long id, Pageable pageable) {
+  /**
+   * keyset 分页（(created_at, id) DESC）：domain 为 null = 全量混排；ts/id 为 null = 首页； authorId 非 null =
+   * 只看该作者（「我的发帖」，docs/47 §5.1 · 2026-09-09 组长实测补）。
+   */
+  default List<PostEntity> feed(
+      String domain, Long authorId, Instant ts, Long id, Pageable pageable) {
     return findAll(
             (root, query, cb) -> {
               List<jakarta.persistence.criteria.Predicate> ps = new ArrayList<>();
               ps.add(cb.equal(root.get("status"), "visible"));
               if (domain != null) {
                 ps.add(cb.equal(root.get("domain"), domain));
+              }
+              if (authorId != null) {
+                ps.add(cb.equal(root.get("authorId"), authorId));
               }
               if (ts != null) {
                 ps.add(
