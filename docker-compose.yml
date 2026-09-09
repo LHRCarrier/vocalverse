@@ -55,6 +55,9 @@ services:
       - "8000:8000"
     volumes:
       - ./data/audio:/app/data/audio
+      # 媒体卷（社区 S3 · docs/47 §4.1）：缺卷时容器重建 → DB 行指向已消失文件 → 全部 404
+      # （docs/48 B10）
+      - ./data/media:/app/data/media
     depends_on:
       postgres:
         condition: service_healthy
