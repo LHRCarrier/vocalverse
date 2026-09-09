@@ -64,7 +64,7 @@ def test_align_frames_recovers_shift():
     """用户序列延迟 shift 帧 → offset ≈ shift × hop（DTW 对齐可解释性）。"""
     base = np.concatenate([np.full(10, 220.0), np.full(40, 440.0), np.full(10, 330.0)])
     shift = 5
-    shifted = np.concatenate([np.zeros(shift, dtype=float), base[: -shift]])
+    shifted = np.concatenate([np.zeros(shift, dtype=float), base[:-shift]])
     ratio, offset = align_frames(shifted, base, 32.0)
     assert abs(offset - shift * 32.0) <= 32.0
 

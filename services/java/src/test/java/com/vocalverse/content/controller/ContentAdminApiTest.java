@@ -114,9 +114,7 @@ class ContentAdminApiTest extends AbstractAdminApiTest {
                 .header("Authorization", "Bearer change-me-internal-service-token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    ("{\"songId\":"
-                            + songId
-                            + ",\"status\":\"ready\",\"version\":\"pyin-v1\"}")
+                    ("{\"songId\":" + songId + ",\"status\":\"ready\",\"version\":\"pyin-v1\"}")
                         .getBytes(StandardCharsets.UTF_8)))
         .andExpect(status().isOk());
 

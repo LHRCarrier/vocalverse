@@ -154,7 +154,13 @@ def _seed_song_with_lrc(session) -> tuple[int, int]:
     song = m.Song(title="Twinkle", level=1, audio_url="/data/audio/twinkle.wav")
     session.add(song)
     session.flush()
-    lrc = m.Lrc(song_id=song.id, seq=1, offset_ms=0, end_offset_ms=2000, line_text="Twinkle twinkle")
+    lrc = m.Lrc(
+        song_id=song.id,
+        seq=1,
+        offset_ms=0,
+        end_offset_ms=2000,
+        line_text="Twinkle twinkle",
+    )
     session.add(lrc)
     session.flush()
     return song.id, lrc.id
@@ -207,9 +213,7 @@ def test_sing_attempts_scoring_version_default(sqlite_engine):
 
     with Session(sqlite_engine) as session:
         song_id, _ = _seed_song_with_lrc(session)
-        attempt = m.SingAttempt(
-            user_id=1, song_id=song_id, duration_s=90, lines=[], alignment={}
-        )
+        attempt = m.SingAttempt(user_id=1, song_id=song_id, duration_s=90, lines=[], alignment={})
         session.add(attempt)
         session.commit()
         assert attempt.scoring_version == "v1"
