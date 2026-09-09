@@ -493,9 +493,13 @@ async def get_progress(
     book_id: int,
     user_id: int = Depends(get_current_user_id),
 ) -> Envelope:
+    def _q():
+        # 在会话内序列化（会话关闭后访问 ORM 属性可能触发过期刷新 → DetachedInstanceError）
+        return _progress_dict(service.get_progress(db, user_id, book_id))
+
     async with _db() as db:
-        row = await _thread(lambda: service.get_progress(db, user_id, book_id))
-    return ok(_progress_dict(row))
+        data = await _thread(_q)
+    return ok(data)
 
 
 @router.put("/progress/{book_id}", response_model=Envelope[ProgressView])
@@ -520,11 +524,15 @@ async def put_progress(
             content_version=chapter.content_version,
         )
         db.commit()
-        return row
+        # 必须在会话内序列化：updated_at 是 onupdate 服务端生成列，commit 后被标记过期，
+        # 会话关闭（_db 退出）后再访问即 DetachedInstanceError → 500。
+        # 只在**更新**路径过期（INSERT 走 RETURNING 已取值），所以「第 2 次起的进度保存全挂」
+        # 而单次 PUT 的单测永远绿（2026-09-09 联调发现，归档 BUG实测/读书进度-二次保存500.md）。
+        return _progress_dict(row)
 
     async with _db() as db:
-        row = await _thread(_q)
-    return ok(_progress_dict(row))
+        data = await _thread(_q)
+    return ok(data)
 
 
 @router.get("/voices", response_model=Envelope[list[VoiceView]])

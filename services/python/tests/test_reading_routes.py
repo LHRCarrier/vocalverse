@@ -243,6 +243,48 @@ class TestProgress:
         assert resp3.status_code == 404
         assert resp3.json()["code"] == 45001
 
+    def test_put_twice_update_path(self, client, auth_headers, reading_seed):
+        """第二次保存走 UPDATE 路径（修复前必红：updated_at 过期 → DetachedInstanceError → 500）。
+
+        复现（2026-09-09 联调实测）：第 1 次 PUT 走 INSERT（RETURNING 已取 updated_at）→ 200；
+        第 2 次 PUT 走 UPDATE（onupdate 服务端生成列在 commit 后被标记过期）→ 路由在会话外
+        访问该属性 → DetachedInstanceError → 500。阅读器每次滚动都保存进度，因此「只有第一次
+        保存生效」而前端静默吞掉后续失败。
+        """
+        bid = reading_seed["book_id"]
+        cid = reading_seed["chapter_id"]
+        first = client.put(
+            f"/api/v1/reading/progress/{bid}",
+            headers=auth_headers,
+            json={"chapter_id": cid, "char_offset": 10},
+        )
+        assert first.status_code == 200
+        assert first.json()["data"]["updated_at"] is not None
+
+        second = client.put(
+            f"/api/v1/reading/progress/{bid}",
+            headers=auth_headers,
+            json={"chapter_id": cid, "char_offset": 120},
+        )
+        assert second.status_code == 200, second.text
+        body = second.json()["data"]
+        assert body["char_offset"] == 120
+        assert body["updated_at"] is not None  # 修复前这里在服务端就已 500
+
+        # 第三次仍然可写（幂等 upsert，无状态残留）
+        third = client.put(
+            f"/api/v1/reading/progress/{bid}",
+            headers=auth_headers,
+            json={"chapter_id": cid, "char_offset": 300},
+        )
+        assert third.status_code == 200
+        assert (
+            client.get(f"/api/v1/reading/progress/{bid}", headers=auth_headers).json()["data"][
+                "char_offset"
+            ]
+            == 300
+        )
+
 
 class TestVoices:
     def test_voices_always_has_edge(self, client, auth_headers):
