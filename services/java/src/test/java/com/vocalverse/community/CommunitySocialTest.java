@@ -10,7 +10,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.vocalverse.support.AbstractAdminApiTest;
+import com.vocalverse.user.UserEntity;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -26,6 +31,7 @@ class CommunitySocialTest extends AbstractAdminApiTest {
 
   @Autowired private PostRepository posts;
   @Autowired private PostCommentRepository comments;
+  @Autowired private PostInteractionRepository interactions;
   @Autowired private jakarta.persistence.EntityManagerFactory entityManagerFactory;
 
   private static final int CODE_OK = 0;
@@ -355,5 +361,100 @@ class CommunitySocialTest extends AbstractAdminApiTest {
                     get("/api/v1/community/notifications").header("Authorization", bearer(author)))
                 .andReturn());
     assertEquals(0, after2.path("data").path("items").size(), "隐藏评论不得出现在通知：\n" + after2);
+  }
+
+  // ------------------------------------------------------------------ J-03：通知分页跨窗口（DB 层 keyset +
+  // SQL 聚合）
+
+  /**
+   * J-03：通知必须能**跨窗口翻页**——旧实现取「近 50 条互动/评论」后在内存里按游标重筛， 第 51 条及更早的数据永远不可见（docs/41 §1 登记）。修复前：第 2
+   * 页为空（游标落在窗口外，窗口内所有行都比游标新）。
+   */
+  @Test
+  void notifications_paging_beyond_window_no_loss() throws Exception {
+    String author = registerUser("j03_a");
+    long postId = createPost(author);
+
+    // 60 个独立聚合组：60 个不同 actor、60 个不同 UTC 日期（mergeKey = post|action|当日）
+    for (int i = 0; i < 60; i++) {
+      UserEntity actor = newUser("j03_actor" + i);
+      interactions.insertIgnoreConflict(
+          actor.getId(), postId, "like", Instant.now().minus(i, ChronoUnit.DAYS));
+    }
+    entityManagerFactory.unwrap(org.hibernate.SessionFactory.class).getStatistics().clear();
+
+    Set<String> seen = new HashSet<>();
+    String cursor = null;
+    int pages = 0;
+    while (pages < 12) {
+      String url =
+          "/api/v1/community/notifications?limit=10" + (cursor == null ? "" : "&cursor=" + cursor);
+      JsonNode page =
+          json(mockMvc.perform(get(url).header("Authorization", bearer(author))).andReturn());
+      JsonNode items = page.path("data").path("items");
+      if (items.isEmpty()) break;
+      for (JsonNode it : items) {
+        assertTrue(seen.add(it.path("id").asText()), "通知 id 不得重复：" + it);
+      }
+      pages++;
+      if (!page.path("data").path("hasMore").asBoolean()) break;
+      cursor = page.path("data").path("nextCursor").asText();
+    }
+
+    assertEquals(60, seen.size(), "通知应能跨窗口翻完全部 60 组（修复前窗口只含最近 50 条、第 2 页即空）：pages=" + pages);
+    assertTrue(pages >= 6, "60 组 / 每页 10 应至少 6 页，实际 " + pages);
+  }
+
+  /** J-03：评论流同样跨窗口（评论逐条，不受互动窗口截断）。 */
+  @Test
+  void notifications_comments_beyond_window_no_loss() throws Exception {
+    String author = registerUser("j03_c_a");
+    String commenter = registerUser("j03_c_b");
+    long postId = createPost(author);
+    long commenterId = userIdOf("j03_c_b");
+
+    for (int i = 0; i < 60; i++) {
+      PostCommentEntity c = new PostCommentEntity();
+      c.setPostId(postId);
+      c.setAuthorId(commenterId);
+      c.setBody("跨窗口评论 " + i);
+      c.setStatus("visible");
+      c.setCreatedAt(Instant.now().minus(i, ChronoUnit.HOURS));
+      c.setUpdatedAt(c.getCreatedAt());
+      comments.save(c);
+    }
+    comments.flush();
+
+    Set<String> seen = new HashSet<>();
+    String cursor = null;
+    for (int page = 0; page < 12; page++) {
+      String url =
+          "/api/v1/community/notifications?limit=10" + (cursor == null ? "" : "&cursor=" + cursor);
+      JsonNode body =
+          json(mockMvc.perform(get(url).header("Authorization", bearer(author))).andReturn());
+      JsonNode items = body.path("data").path("items");
+      if (items.isEmpty()) break;
+      for (JsonNode it : items) {
+        if ("comment".equals(it.path("type").asText())) {
+          seen.add(it.path("id").asText());
+        }
+      }
+      if (!body.path("data").path("hasMore").asBoolean()) break;
+      cursor = body.path("data").path("nextCursor").asText();
+    }
+    assertEquals(60, seen.size(), "评论通知应跨窗口翻全 60 条（修复前窗口 50 条封顶）");
+  }
+
+  private UserEntity newUser(String username) {
+    Instant now = Instant.now();
+    UserEntity u = new UserEntity();
+    u.setUsername(username);
+    u.setPasswordHash(passwordEncoder.encode("password123"));
+    u.setNickname(username);
+    u.setRole("user");
+    u.setStatus("active");
+    u.setCreatedAt(now);
+    u.setUpdatedAt(now);
+    return users.save(u);
   }
 }

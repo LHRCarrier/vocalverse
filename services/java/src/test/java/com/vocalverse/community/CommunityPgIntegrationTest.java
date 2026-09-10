@@ -200,6 +200,66 @@ class CommunityPgIntegrationTest {
     exec("SET enable_seqscan = on");
   }
 
+  /**
+   * J-03（2026-09-10）：通知分页改为 DB 层聚合后，证据链补齐——互动组聚合查询命中 {@code
+   * ix_post_interactions_post_action}（(post_id, action, created_at) 前两列等值 + 第三列可反向）、评论流命中 {@code
+   * ix_post_comments_status_post}（(status, post_id, created_at, id) 等值 + 反向）。
+   *
+   * <p>小表 planner 默认 seqscan → {@code SET enable_seqscan=off} 验证「该查询形状可命中索引」这一事实（同 J-07 feed 口径）。
+   */
+  @Test
+  void explain_notification_queries_use_indexes() throws Exception {
+    long author = insertUser("j03_pgexplain");
+    long post = insertPost(author, "article", "news", null);
+    // 互动唯一键 (actor, post, action) → 每天用不同 actor
+    for (int i = 0; i < 6; i++) {
+      long actor = insertUser("j03_pgexplain_a" + i);
+      exec(
+          "INSERT INTO post_interactions (actor_id, post_id, action, created_at) VALUES ("
+              + actor
+              + ", "
+              + post
+              + ", 'like', now() - interval '"
+              + i
+              + " day')");
+      exec(
+          "INSERT INTO post_comments (post_id, author_id, body, status, created_at, updated_at) VALUES ("
+              + post
+              + ", "
+              + actor
+              + ", 'c"
+              + i
+              + "', 'visible', now() - interval '"
+              + i
+              + " hour', now())");
+    }
+    exec("SET enable_seqscan = off");
+    String planInteractions =
+        queryText(
+            "EXPLAIN (FORMAT TEXT) SELECT post_id || '|' || action || '|' || CAST(created_at AS date) AS merge_key, "
+                + "COUNT(*) FROM post_interactions WHERE action = 'like' AND actor_id <> "
+                + author
+                + " AND post_id IN (SELECT id FROM posts WHERE author_id = "
+                + author
+                + " AND status = 'visible') GROUP BY post_id, action, CAST(created_at AS date)");
+    assertTrue(
+        planInteractions.contains("ix_post_interactions_post_action"),
+        "互动组聚合应命中 ix_post_interactions_post_action：\n" + planInteractions);
+    String planComments =
+        queryText(
+            "EXPLAIN (FORMAT TEXT) SELECT id, post_id, author_id, body, created_at FROM post_comments "
+                + "WHERE status = 'visible' AND post_id IN (SELECT id FROM posts WHERE author_id = "
+                + author
+                + " AND status = 'visible') ORDER BY created_at DESC, id DESC LIMIT 11");
+    assertTrue(
+        planComments.contains("ix_post_comments_status_post"),
+        "评论流应命中 ix_post_comments_status_post：\n" + planComments);
+    // 注：本查询 ORDER BY (created_at DESC, id DESC) 走「Index Scan + Sort」而非 Backward——断言只锁「命中索引」
+    // （索引键序为 (status, post_id, created_at, id)，等值列前缀命中即可；Backward 只在键序与排序完全一致时出现，
+    //  feed 侧 J-11 即此形态）。断言索引名可复现、不因 planner 选择排序策略而脆断。
+    exec("SET enable_seqscan = on");
+  }
+
   // ------------------------------------------------------------------ 工具
 
   /** schema 真源（Alembic）迁移到 head：env APP_DATABASE_URL 指向容器（迁移 env.py 同款约定）。 */
