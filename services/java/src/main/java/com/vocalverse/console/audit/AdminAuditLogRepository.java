@@ -26,16 +26,22 @@ public interface AdminAuditLogRepository extends JpaRepository<AdminAuditLogEnti
    * 避免两个参数同时给出时产生「或」的语义歧义（调用方本意不明时不该猜）。 前缀用 {@code concat(:actionPrefix, '%')} 而不是 {@code like
    * :actionPrefix} 拼字符串 —— 参数化前缀不会让调用方能注入通配符位置（{@code %}/{@code _} 仍会被当作通配符，
    * 但审计动作名是服务端常量，不来自用户输入，风险面为零）。
+   *
+   * <p><b>⚠️ 每个空值判断都必须写 {@code cast(:p as …)}</b>（2026-09-10 真 PG 实测，本仓同类第三次）： PostgreSQL 在 Parse
+   * 阶段就要求确定每个 {@code $n} 的类型，而 `{@code ? is null}` 不提供类型线索； 参数为 NULL 时驱动也不补类型 OID（非 NULL 会补 ——
+   * 所以**不带筛选反而必炸**， 「带筛选正常、清空筛选就 500」这种表现极容易把人引向错误方向）。 本查询 7 个参数全可空 ⇒ {@code GET
+   * /api/v1/console/audit-logs} 清空筛选即 {@code could not determine data type of parameter $N} → 500。加
+   * cast 后 PG 拿到 `{@code cast(? as varchar) is null}`，类型确定、语义逐字不变。
    */
   @Query(
       "select a from AdminAuditLogEntity a "
-          + "where (:action is null or a.action = :action) "
-          + "and (:actionPrefix is null or a.action like concat(:actionPrefix, '%')) "
-          + "and (:targetType is null or a.targetType = :targetType) "
-          + "and (:adminUserId is null or a.adminUserId = :adminUserId) "
-          + "and (:result is null or a.result = :result) "
-          + "and (:from is null or a.createdAt >= :from) "
-          + "and (:to is null or a.createdAt <= :to) "
+          + "where (cast(:action as string) is null or a.action = :action) "
+          + "and (cast(:actionPrefix as string) is null or a.action like concat(cast(:actionPrefix as string), '%')) "
+          + "and (cast(:targetType as string) is null or a.targetType = :targetType) "
+          + "and (cast(:adminUserId as long) is null or a.adminUserId = :adminUserId) "
+          + "and (cast(:result as string) is null or a.result = :result) "
+          + "and (cast(:from as timestamp) is null or a.createdAt >= :from) "
+          + "and (cast(:to as timestamp) is null or a.createdAt <= :to) "
           + "order by a.id desc")
   Page<AdminAuditLogEntity> search(
       @Param("action") String action,
@@ -47,13 +53,20 @@ public interface AdminAuditLogRepository extends JpaRepository<AdminAuditLogEnti
       @Param("to") Instant to,
       Pageable pageable);
 
-  /** 上架/下架流水（docs/50 §10.2 GET /content/publish-events）。 */
+  /**
+   * 上架/下架流水（docs/50 §10.2 GET /content/publish-events）。
+   *
+   * <p>{@code cast} 的理由见 {@link #search} 的长注释（PG 在 Parse 阶段要求参数类型）。
+   * 本接口**没有**"参数为空就绕开查询"的分支（流水视图永远走这一条），所以清空筛选必然踩到 —— 实测 {@code GET
+   * /content/publish-events?page_size=8} → 500 + {@code could not determine data type of parameter
+   * $3}。
+   */
   @Query(
       "select a from AdminAuditLogEntity a "
           + "where a.action like 'content.%.publish' "
-          + "and (:targetType is null or a.targetType = :targetType) "
-          + "and (:from is null or a.createdAt >= :from) "
-          + "and (:to is null or a.createdAt <= :to) "
+          + "and (cast(:targetType as string) is null or a.targetType = :targetType) "
+          + "and (cast(:from as timestamp) is null or a.createdAt >= :from) "
+          + "and (cast(:to as timestamp) is null or a.createdAt <= :to) "
           + "order by a.id desc")
   Page<AdminAuditLogEntity> publishEvents(
       @Param("targetType") String targetType,

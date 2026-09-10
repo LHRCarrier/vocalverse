@@ -13,10 +13,11 @@ import org.springframework.data.repository.query.Param;
 /** 举报仓库（docs/50 §5.3.9）。处理同样是条件 UPDATE（{@code WHERE status='pending'}），重复处理 → 46015。 */
 public interface ModerationReportRepository extends JpaRepository<ModerationReportEntity, Long> {
 
+  /** 列表查询；空值判断的 {@code cast} 理由见 {@code AdminAuditLogRepository#search}（真 PG 实测缺陷）。 */
   @Query(
       "select r from ModerationReportEntity r "
-          + "where (:status is null or r.status = :status) "
-          + "and (:targetType is null or r.targetType = :targetType) "
+          + "where (cast(:status as string) is null or r.status = :status) "
+          + "and (cast(:targetType as string) is null or r.targetType = :targetType) "
           + "order by r.id desc")
   Page<ModerationReportEntity> search(
       @Param("status") String status, @Param("targetType") String targetType, Pageable pageable);

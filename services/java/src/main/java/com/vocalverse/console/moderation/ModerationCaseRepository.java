@@ -19,12 +19,20 @@ import org.springframework.data.repository.query.Param;
  */
 public interface ModerationCaseRepository extends JpaRepository<ModerationCaseEntity, Long> {
 
+  /**
+   * 列表查询（docs/50 §10.2 GET /moderation/cases）。
+   *
+   * <p><b>⚠️ 空值判断都要 {@code cast}</b>（2026-09-10 真 PG 实测）：PostgreSQL 在 Parse 阶段就要确定 每个 {@code $n}
+   * 的类型，而 `{@code ? is null}` 不提供任何线索、参数为 NULL 时驱动也不补类型 OID （非 NULL 会补 —— 于是"带筛选正常、清空筛选
+   * 500"，表现极具误导性）。 加 cast 后类型确定、语义不变。**H2 测试抓不到这一类**（本仓同类已第四次）， 详见 {@code
+   * AdminAuditLogRepository#search} 的说明。
+   */
   @Query(
       "select c from ModerationCaseEntity c "
-          + "where (:status is null or c.status = :status) "
-          + "and (:targetType is null or c.targetType = :targetType) "
-          + "and (:priority is null or c.priority = :priority) "
-          + "and (:assigneeId is null or c.assigneeId = :assigneeId) "
+          + "where (cast(:status as string) is null or c.status = :status) "
+          + "and (cast(:targetType as string) is null or c.targetType = :targetType) "
+          + "and (cast(:priority as short) is null or c.priority = :priority) "
+          + "and (cast(:assigneeId as long) is null or c.assigneeId = :assigneeId) "
           + "order by c.priority asc, c.id desc")
   Page<ModerationCaseEntity> search(
       @Param("status") String status,

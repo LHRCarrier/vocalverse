@@ -20,13 +20,22 @@ public interface AdminUserRepository extends JpaRepository<AdminUserEntity, Long
 
   long countByRoleId(Long roleId);
 
-  /** 管理端列表：q/roleId/status 三参可空过滤（docs/50 §10.2 GET /admins）。 */
+  /**
+   * 管理端列表：q/roleId/status 三参可空过滤（docs/50 §10.2 GET /admins）。
+   *
+   * <p><b>⚠️ 每个空值判断都写了 {@code cast(:p as …)}，不是冗余</b>（2026-09-10 真 PG 实测）： PostgreSQL 在 **Parse
+   * 阶段**就要求确定每个 {@code $n} 的类型，而 `{@code ? is null}` 这个用法 本身不提供任何类型线索 —— 参数为 NULL 时驱动也不会补类型 OID（非
+   * NULL 时会补，所以**带筛选反而正常**）。 结果是 {@code GET /api/v1/console/users?page_size=1}（不带任何筛选）**必然 500**
+   * （{@code could not determine data type of parameter $1}），而 H2 上一切正常 —— 现有 Java 测试跑在
+   * H2，**结构上抓不到这一类缺陷**（同类已出现三次：审核单 CAS 的 {@code coalesce}、 审计 {@code from/to}、本处）。加显式 cast 后 PG 拿到
+   * `{@code cast(? as varchar) is null}`， 类型确定，语义与原来逐字相同。
+   */
   @Query(
       "select a from AdminUserEntity a "
-          + "where (:q is null or lower(a.username) like lower(concat('%', :q, '%')) "
-          + "       or lower(a.displayName) like lower(concat('%', :q, '%'))) "
-          + "and (:roleId is null or a.roleId = :roleId) "
-          + "and (:status is null or a.status = :status) "
+          + "where (cast(:q as string) is null or lower(a.username) like lower(concat('%', cast(:q as string), '%')) "
+          + "       or lower(a.displayName) like lower(concat('%', cast(:q as string), '%'))) "
+          + "and (cast(:roleId as long) is null or a.roleId = :roleId) "
+          + "and (cast(:status as string) is null or a.status = :status) "
           + "order by a.id desc")
   Page<AdminUserEntity> search(
       @Param("q") String q,
