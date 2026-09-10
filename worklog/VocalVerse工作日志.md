@@ -3,6 +3,44 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 管理端后台（补漏）：一键启动里没有管理端 + 控制台密钥的静默 401 陷阱
+
+- **起因**：需求方问「README 里 `pwsh -File scripts/dev-up.ps1 start` 能起管理端吗」。**答案是：不能。**
+  查证结论 —— `scripts/dev-up.ps1` 只起三端（python:8000 / java:8080 / vite:5173 = `apps/web`），
+  `status` / `stop` 也各自硬编码 `8000, 8080, 5173`，全文没有 `apps\admin` 或 `5174` 任一字样。
+  这是本次交付留下的**集成缺口**：我把 `apps/admin` 写进了 README 的目录树与文档索引，
+  却没有写它怎么启动，也没接进一键脚本。
+
+- **补法（按需求方选择的方案）**：
+  1. `dev-up.ps1` 加**显式开关** `-WithConsole`（默认三端行为**一字不变**，不影响组员日常）：
+     `start/status/stop` 三处都支持；并把受管端口收敛成**一处真源** `$Ports`
+     —— 原先 status 与 stop 各写一遍端口列表，加第四端必然漏掉一处（漏 status 看不到、漏 stop 杀不干净）。
+     控制台分支还包含"缺 `node_modules` 时先 `pnpm install`"与"健康等待把 5174 纳入"。
+  2. 根 `README.md` 补 `-WithConsole` 用法 + 两个前置条件；`apps/admin/README.md` 补一句交叉引用。
+  3. 根 `.env.example` 补 `VOICEVERSE_CONSOLE_JWT_SECRET` 与**同值警告**（见下）。
+
+- **查证过程中发现的真陷阱（比"脚本漏一端"更要紧）**：根 `.env.example` 原先只登记了 Python 侧的
+  `APP_CONSOLE_JWT_SECRET`，而 Java 读的是 `VOICEVERSE_CONSOLE_JWT_SECRET`（只写在
+  `services/java/.env.example` 里）。关键在于：方式 B 只注入**根** `.env`，而
+  **Spring Boot 根本不读 `.env` 文件**（`application.yml` 无 `spring.config.import`，
+  也没有 dotenv 的 `EnvironmentPostProcessor`）—— 那个文件在方式 B 下没人加载。
+  于是"照根 `.env.example` 抄"的开发者会得到：Java 拿不到控制台密钥 → **回退用 `JWT_SECRET` 签发**
+  （`ConsoleJwtService:77-90` 有显式回退分支），Python 却用 `APP_CONSOLE_JWT_SECRET` 验签
+  → **运维 / LLM trace / 书籍 / 媒体等 Python 侧控制台端点全量 401，且报错里不会提示"密钥不一致"**。
+  这正是各文档反复警告的"生产脚枪"，**而警告原先只写在没人加载的那个文件里**。
+  处置：两个键名与同值要求在根 `.env.example` 写清；`start -WithConsole` 时做一次**密钥自检**
+  （只告警不中止 —— Java 侧留空的回退期本身是设计允许的中间状态）。
+
+- **验证（实跑）**：脚本 `Parser::ParseFile` → **0 syntax errors**；`status` → 三端、
+  `status -WithConsole` → 四端 + console 健康行；在 `apps/admin` 实跑 `pnpm dev` →
+  **HTTP 200，标题「VocalVerse 控制台」**（Vite 1.33s ready，5174 监听），此时
+  `status -WithConsole` 报 `5174: LISTENING` / `health: console=True`，不带开关只列三端（开关隔离成立）；
+  `Test-ConsoleSecret` 用**从 AST 取出的真实函数体**跑五种环境组合，四个异常组合各自告警、同值安静。
+  ⚠️ **未跑**：`start -WithConsole` 全流程（会拉起 Docker 容器 + 四个进程，属对开发机的实际启停）
+  —— 每个部件单独验证过，但"一次跑通"没有证据。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 管理端后台（闭环）：G-17 内容创作 UI 四个域全部接通 + 题库零入口缺口（I-14）
 
 - **这一段把 `docs/50 §15.2 G-17` 从"部分闭合"推到**✅ 闭合**，并且是在收尾自查里又抓到一个 P0 缺口**。

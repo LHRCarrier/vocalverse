@@ -118,6 +118,23 @@ mvn spring-boot:run
 > pwsh -File scripts/dev-up.ps1 stop     # 按端口杀三端
 > ```
 > 注意：Windows PowerShell 5.1 会因 UTF-8 解析报错，必须用 `pwsh`（7）执行。
+>
+> 🖥️ **管理端控制台（`apps/admin` · docs/50）默认不在上面这三端里**，需要时加 `-WithConsole`：
+> ```powershell
+> pwsh -File scripts/dev-up.ps1 start -WithConsole    # 三端 + 控制台 :5174（首次自动 pnpm install）
+> pwsh -File scripts/dev-up.ps1 status -WithConsole   # 连带列出 5174
+> pwsh -File scripts/dev-up.ps1 stop  -WithConsole    # 连带杀 5174
+> ```
+> 为什么不并进默认：控制台是独立 pnpm 项目（首次要 install）、还要有自己的管理员账号，
+> 塞进默认动作会拖慢所有组员的日常三端启动。
+> **两个前置条件**（否则起来了也进不去）：
+> 1. **首个管理员要 bootstrap**：`VOICEVERSE_CONSOLE_BOOTSTRAP_USERNAME` / `..._PASSWORD` 都非空
+>    （`admin_users` 表为空时才建号，弱口令会被拒）——变量清单见 `services/java/.env.example`；
+> 2. **控制台密钥必须两端同值**：Java 读 `VOICEVERSE_CONSOLE_JWT_SECRET`、Python 读
+>    `APP_CONSOLE_JWT_SECRET`。方式 B 只注入**根** `.env`（Spring Boot 不读 `.env` 文件），
+>    所以两个键都要写在根 `.env` 里；只配一个会让 Python 侧控制台端点（运维 / trace / 书籍 / 媒体）
+>    **静默全量 401**。`start -WithConsole` 会对此做一次自检并告警。
+> 控制台**依赖 Java 与 Python 都在**（两个上游代理：`/manage`→8080、`/api/v1`→8000），不能单独起。
 
 ### 3.5 手机端（Android APK · 今日交付形态）
 

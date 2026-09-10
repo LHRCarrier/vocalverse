@@ -36,6 +36,10 @@ pnpm dev                             # http://localhost:5174
 
 **端口 5174**（避开 `apps/web` 的 5173），两者可同时起。生产入口是 `/console/`（自带 nginx server 块，见 `nginx.conf`）。
 
+> 💡 也可以让一键脚本连带起它（含首次 `pnpm install` 与密钥自检）：
+> `pwsh -File scripts/dev-up.ps1 start -WithConsole`。默认的三端启动**不含**控制台 ——
+> 见根 `README.md` 的「一键起停」小节。
+
 ### 两个上游不是失误
 
 | 前缀 | 上游 | 域 |
