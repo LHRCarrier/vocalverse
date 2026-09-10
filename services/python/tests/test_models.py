@@ -64,6 +64,22 @@ EXPECTED_TABLES = {
     "user_vocabulary",
     "reading_annotations",
     "tts_tasks",
+    # 管理端控制台域（docs/50 §5 · 迁移 0013：RBAC 7 + 审核 2 + 运维遥测/LLM Trace 6）
+    "admin_users",
+    "admin_roles",
+    "admin_permissions",
+    "admin_role_permissions",
+    "admin_sessions",
+    "admin_login_attempts",
+    "admin_audit_logs",
+    "moderation_cases",
+    "moderation_reports",
+    "ops_metric_samples",
+    "ops_alert_rules",
+    "ops_alert_events",
+    "llm_traces",
+    "llm_spans",
+    "llm_span_contents",
 }
 
 

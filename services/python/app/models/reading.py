@@ -75,7 +75,9 @@ class BookChapter(TimestampMixin, Base):
 
     - ``content`` = 段落以 ``\\n\\n`` 分隔的纯文本（**TEXT 无界**：SQLite 不强制 VARCHAR(n)
       长度而 PG 强制——正文一律 TEXT，拷问 V-3）；
-    - ``content_version`` 文本修订版本（V-4）：修订 +1；批注/进度按版本重锚。
+    - ``content_version`` 文本修订版本（V-4）：修订 +1；批注/进度按版本重锚；
+    - ``status`` 章级上下架（迁移 0013 · docs/50 §5.4）：与 ``books.status`` 同取值集，
+      ``server_default='published'`` 保证既有章节行默认可见；上架校验要求每章 published（§6.1）。
     """
 
     __tablename__ = "book_chapters"
@@ -90,10 +92,16 @@ class BookChapter(TimestampMixin, Base):
     )
     word_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     char_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("'published'")
+    )
 
     __table_args__ = (
+        CheckConstraint("status IN ('draft', 'published', 'archived')", name="status"),
         UniqueConstraint("book_id", "chapter_no", name="uq_book_chapters_no"),
         Index("ix_book_chapters_book", "book_id"),
+        # 运营侧按状态过滤（草稿/已归档章节清单）；上架校验走 (book_id, status) 前缀
+        Index("ix_book_chapters_status", "status"),
     )
 
 

@@ -60,7 +60,9 @@ class MediaAsset(TimestampMixin, Base):
 
     __table_args__ = (
         CheckConstraint("kind IN ('image', 'video', 'avatar')", name="kind"),
-        CheckConstraint("status IN ('ready', 'deleted')", name="status"),
+        # 隐藏≠删除（迁移 0013 · docs/50 §5.4）：审核处置可置 hidden（行保留、可恢复），
+        # 与 posts/post_comments 的 visible|hidden|deleted 语义对齐
+        CheckConstraint("status IN ('ready', 'hidden', 'deleted')", name="status"),
         CheckConstraint("size_bytes > 0", name="size_positive"),
         UniqueConstraint("public_id", name="uq_media_assets_public_id"),
         # 行级去重：同一 owner 的同内容只保留一条 ready 行；软删后可重新入库（docs/48 B1）
@@ -85,4 +87,5 @@ class MediaKinds:
 
 class MediaStatus:
     READY = "ready"
+    HIDDEN = "hidden"  # 审核隐藏（迁移 0013 · docs/50 §5.4）
     DELETED = "deleted"

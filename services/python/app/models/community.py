@@ -176,7 +176,8 @@ class DirectMessage(CreatedAtMixin, Base):
     """一对一私信消息（Java 写；docs/49 §1.1，迁移 0012）。
 
     只记 created_at（不可变行，无 updated_at）；会话= (sender, recipient) 对，不建会话表。
-    ``status`` 为治理预留（本轮恒 'visible'，无删除入口）。
+    ``status`` 为治理预留（本轮恒 'visible'，无删除入口）；迁移 0013 起 CHECK 另含
+    ``'hidden'``（审核隐藏，docs/50 §5.4）。
     """
 
     __tablename__ = "direct_messages"
@@ -191,7 +192,8 @@ class DirectMessage(CreatedAtMixin, Base):
 
     __table_args__ = (
         CheckConstraint("sender_id <> recipient_id", name="no_self_message"),
-        CheckConstraint("status IN ('visible', 'deleted')", name="status"),
+        # 审核隐藏（迁移 0013 · docs/50 §5.4）：本期只读列表不提供处置，约束先就位
+        CheckConstraint("status IN ('visible', 'hidden', 'deleted')", name="status"),
         Index("ix_dm_pair_time", "sender_id", "recipient_id", "created_at", "id"),
         Index("ix_dm_recipient_time", "recipient_id", "created_at", "id"),
         Index("ix_dm_sender_time", "sender_id", "created_at", "id"),

@@ -18,6 +18,24 @@ from .community import (
     PostInteraction,
     PostLike,
 )
+from .console_moderation import ModerationCase, ModerationReport
+from .console_rbac import (
+    AdminAuditLog,
+    AdminLoginAttempt,
+    AdminPermission,
+    AdminRole,
+    AdminRolePermission,
+    AdminSession,
+    AdminUser,
+)
+from .console_telemetry import (
+    LlmSpan,
+    LlmSpanContent,
+    LlmTrace,
+    OpsAlertEvent,
+    OpsAlertRule,
+    OpsMetricSample,
+)
 from .content import (
     ListeningMaterial,
     Lrc,
@@ -88,6 +106,24 @@ __all__ = [
     # 私信域（Java 写方 · Python 只读映射，docs/49 §1 · 迁移 0012）
     "DirectMessage",
     "DmReadState",
+    # 管理端控制台 RBAC 域（Java 写方 · Python 只读映射，docs/50 §5.3.1~§5.3.7 · 迁移 0013）
+    "AdminUser",
+    "AdminRole",
+    "AdminPermission",
+    "AdminRolePermission",
+    "AdminSession",
+    "AdminLoginAttempt",
+    "AdminAuditLog",
+    # 管理端控制台审核域（Java 写方 · Python 只读映射，docs/50 §5.3.8~§5.3.9）
+    "ModerationCase",
+    "ModerationReport",
+    # 管理端控制台运维遥测 / LLM Trace 域（Python 写方，docs/50 §5.3.10~§5.3.15）
+    "OpsMetricSample",
+    "OpsAlertRule",
+    "OpsAlertEvent",
+    "LlmTrace",
+    "LlmSpan",
+    "LlmSpanContent",
     # 媒体域（社区 S3 · Python 写方，docs/47 §3.1）
     "MediaAsset",
     "MediaKinds",
