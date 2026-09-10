@@ -180,43 +180,10 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/LoginView.vue'),
     meta: { title: '登录' },
   },
-  {
-    path: '/admin',
-    component: () => import('@/layouts/AdminLayout.vue'),
-    redirect: '/admin/users',
-    children: [
-      {
-        path: 'users',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: { title: '用户管理' },
-        meta: { title: '用户管理' },
-      },
-      {
-        path: 'scenes',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: { title: '场景库' },
-        meta: { title: '场景库' },
-      },
-      {
-        path: 'songs',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: { title: '歌曲库' },
-        meta: { title: '歌曲库' },
-      },
-      {
-        path: 'tickets',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: { title: '工单' },
-        meta: { title: '工单' },
-      },
-      {
-        path: 'dashboard',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: { title: '评价看板' },
-        meta: { title: '评价看板' },
-      },
-    ],
-  },
+  // ⚠️ 旧管理端路由（`/admin` + AdminLayout + 5 个 PlaceholderView 子路由）已**删除**，
+  // 不再保留兼容壳：旧管理端已废弃，管理端唯一形态是独立控制台 `apps/admin`（入口 `/console/`）。
+  // 设计依据 docs/50 §2（ADR 修订申请 1）、docs/51 §1.3 C-1/C-9。删除 `/admin` 后该路径落到
+  // 底部 catch-all；如仍需旧书签可用，应在网关层把 `/admin` 302 到 `/console/`（部署侧处理，不在本路由表）。
 ]
 
 // 前端预览画廊：仅 DEV 注入（router/preview.ts 内 import.meta.env.DEV 三元，生产构建整支剔除）；

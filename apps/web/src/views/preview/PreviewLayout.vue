@@ -5,20 +5,21 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import type { MenuOption } from 'naive-ui'
 
-import AdminLayout from '@/layouts/AdminLayout.vue'
 import UserLayout from '@/layouts/UserLayout.vue'
 
 import { previewPages } from './registry'
 
-type PreviewMode = 'gallery' | 'user' | 'admin'
+// ⚠️ 已删除 `admin` 布局模式（原实现用 `AdminLayout.vue` 包裹）：
+// 旧管理端已废弃，`/admin` 路由与 `AdminLayout.vue` 一并移除（docs/50 §2 ADR 修订申请 1、docs/51 §1.3）。
+// 新控制台是**独立 SPA**（`apps/admin`），与用户端不共享布局，因此画廊里也没有"管理端布局"可模拟。
+type PreviewMode = 'gallery' | 'user'
 
 const route = useRoute()
 const router = useRouter()
 
 /**
  * 布局模拟模式（docs/13 §8 盲点修正）：
- * - 默认 = 当前预览页登记的 layout（用户端页→UserLayout、管理端页→AdminLayout），
- *   保证"所见即生产"（TopNav/侧边栏与集成后一致）；
+ * - 默认 = 当前预览页登记的 layout（用户端页→UserLayout），保证"所见即生产"；
  * - 可手动切换任意模式对比；切页时按登记值重置。
  */
 const mode = ref<PreviewMode>('gallery')
@@ -39,7 +40,6 @@ const groups = ['用户端', '管理端'] as const
 const modeOptions = [
   { label: '画廊模式', value: 'gallery' },
   { label: '用户端布局', value: 'user' },
-  { label: '管理端布局', value: 'admin' },
 ]
 
 function renderMenu(): MenuOption[] {
@@ -61,8 +61,7 @@ function renderMenu(): MenuOption[] {
 <template>
   <!-- 布局模拟：以真实布局包裹预览页（所见即生产） -->
   <template v-if="mode !== 'gallery'">
-    <UserLayout v-if="mode === 'user'" />
-    <AdminLayout v-else />
+    <UserLayout />
     <div class="fixed right-4 top-4 z-50 flex items-center gap-2">
       <NSelect
         v-model:value="mode"
