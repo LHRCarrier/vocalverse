@@ -3,6 +3,33 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 管理端后台（联调入口）：README 登记控制台账号 + 功能分支推送
+
+- **需求**：把管理端账号写进 `README.md` 方便组员测试；远端直推。
+
+- **口径裁决（没有把随机口令写进公开库）**：我先前给本机生成的是**随机 48 位控制台密钥 + 随机管理员口令**——
+  属密钥类，而本仓 `AGENTS.md` 安全节与 `.env.example` 开头都明写"公开仓库永远不出现真实密钥"，
+  写进去还会被 `secret-scan.yml` 拦。改用本仓**已有先例**：README 第 52/151 行早就公开写着
+  App 演示账号 `demoadult`/`demoteen`/`demosenior` + 口令 `demo123456`。
+  于是控制台联调账号复用**同一个已公开的演示口令** —— 不引入任何新秘密，同时做到"组员拿来就能登"。
+
+- **落地**：`README.md`「一键起停」小节内新增 🔑 段落（入口 / 账号口令 / 角色与权限数 /
+  为什么它不算密钥 / 可复制的根 `.env` bootstrap 两行 / 一次性语义 / 两条改口令路径 /
+  口令下限与弱口令规则 / 生产必须改掉）；根 `.env.example` 补上同样的可复制 bootstrap 值
+  —— 那里原先只有一句"变量清单见 `services/java/.env.example`"，而**那正是方式 B 下没人加载的文件**
+  （同类坑本轮已踩两次：控制台密钥、CORS 源）。
+
+- **本机同步 + 验证**：用控制台自己的 API 重置口令（不是改库）
+  `POST /api/v1/console/admins/1/password` → 200 `{reset:true,self:true}`；
+  经 Vite 代理（浏览器真实路径）登录 **200 / role=super**；**旧口令已失效（404）**。
+
+- **推送**：`feat/admin-console` → `origin`（45 个提交，已建立跟踪）。
+  按需求方选择**只保留功能分支**，未建 PR、未动 main（远端 main 与本地一致，无分叉）。
+  组员测试路径：`git fetch && git switch feat/admin-console` → 根 `.env` 配 `VOICEVERSE_CONSOLE_JWT_SECRET`
+  与 `APP_CONSOLE_JWT_SECRET`（同值）→ `pwsh -File scripts/dev-up.ps1 start -WithConsole` → http://localhost:5174 用 `admin`/`demo123456`。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 管理端后台（"工作台没数据"）：真 PG 的可空参数类型推断 —— 同类第四次（I-18）
 
 - **起因**：需求方反馈"点击工作台里面没数据，其他几个页面也是"，网络面板里有一条红色请求返回
