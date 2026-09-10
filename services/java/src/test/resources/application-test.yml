@@ -20,3 +20,6 @@ vocalverse:
   community:
     post-enabled: true # 测试默认开（专测「关闭=403」的用例单独覆盖）
     seed: false # 测试库干净：单测自建数据，命令行走种直接关掉
+  dm:
+    # 私信 SSE 心跳：测试档关闭——固定节奏的 `:ping` 帧会让「事件序列断言」不稳定（docs/49 §3.1）
+    heartbeat-enabled: false
