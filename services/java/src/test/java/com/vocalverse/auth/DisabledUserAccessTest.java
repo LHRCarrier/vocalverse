@@ -15,20 +15,18 @@ import org.springframework.test.web.servlet.MvcResult;
 /**
  * J-02 禁用即时生效回归：已签发未过期 token 在 {@code users.status=disabled} 后立即 401。
  *
- * <p>修复前：JwtAuthFilter 只验签不查库（application.yml access-ttl=3600），disabled 用户在 token
- * 有效窗口（最长 1 小时）内仍可访问全部受保护端点 —— 本测试改前即红（/auth/me 与社区 feed 仍 200）。
- * 本类不挂 {@code @Transactional}：禁用必须提交后由过滤器（独立事务）读到。
+ * <p>修复前：JwtAuthFilter 只验签不查库（application.yml access-ttl=3600），disabled 用户在 token 有效窗口（最长 1
+ * 小时）内仍可访问全部受保护端点 —— 本测试改前即红（/auth/me 与社区 feed 仍 200）。 本类不挂
+ * {@code @Transactional}：禁用必须提交后由过滤器（独立事务）读到。
  *
  * <h2>2026-09-10 适配（旧管理端退役）</h2>
  *
- * <p>本用例原来靠 {@code PATCH /api/v1/admin/users/{id}/status} 禁用 App 用户（旧管理端的
- * {@code AdminUserController}）。该端点随旧管理端退役，但「停用 App 用户」这个**能力**并未消失 ——
- * 它现在归控制台（{@code ConsoleUserController} 的 {@code PATCH /api/v1/console/users/{id}/status}）。
+ * <p>本用例原来靠 {@code PATCH /api/v1/admin/users/{id}/status} 禁用 App 用户（旧管理端的 {@code
+ * AdminUserController}）。该端点随旧管理端退役，但「停用 App 用户」这个**能力**并未消失 —— 它现在归控制台（{@code
+ * ConsoleUserController} 的 {@code PATCH /api/v1/console/users/{id}/status}）。
  *
- * <p>所以本类改为继承 {@link AbstractConsoleApiTest}：被验证的**被测行为完全没变**
- * （App 侧过滤器对 disabled 用户立即 401），只是「谁去改状态」换成了控制台。
- * 用控制台改状态比在测试里直接写库更强 —— 它同时证明那条控制台路径真的能改到
- * App 用户可见的状态（否则会以「状态没改成」的方式红）。
+ * <p>所以本类改为继承 {@link AbstractConsoleApiTest}：被验证的**被测行为完全没变** （App 侧过滤器对 disabled 用户立即
+ * 401），只是「谁去改状态」换成了控制台。 用控制台改状态比在测试里直接写库更强 —— 它同时证明那条控制台路径真的能改到 App 用户可见的状态（否则会以「状态没改成」的方式红）。
  */
 class DisabledUserAccessTest extends AbstractConsoleApiTest {
 
@@ -43,7 +41,8 @@ class DisabledUserAccessTest extends AbstractConsoleApiTest {
     MvcResult reg =
         mockMvc
             .perform(
-                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/auth/register")
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                        "/auth/register")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(body.getBytes(StandardCharsets.UTF_8)))
             .andReturn();
@@ -54,10 +53,12 @@ class DisabledUserAccessTest extends AbstractConsoleApiTest {
     MvcResult login =
         mockMvc
             .perform(
-                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/auth/login")
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                        "/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        String.format("{\"username\":\"%s\",\"password\":\"password123\"}", username)
+                        String.format(
+                                "{\"username\":\"%s\",\"password\":\"password123\"}", username)
                             .getBytes(StandardCharsets.UTF_8)))
             .andReturn();
     String token = json(login).path("data").path("accessToken").asText();
@@ -79,10 +80,7 @@ class DisabledUserAccessTest extends AbstractConsoleApiTest {
                     .content(String.format("{\"status\":\"%s\"}", status)))
             .andReturn();
     JsonNode root = json(r);
-    assertEquals(
-        0,
-        root.path("code").asInt(),
-        "控制台停用/启用 App 用户应成功（退役后这是唯一封禁路径）：" + root);
+    assertEquals(0, root.path("code").asInt(), "控制台停用/启用 App 用户应成功（退役后这是唯一封禁路径）：" + root);
   }
 
   @Test

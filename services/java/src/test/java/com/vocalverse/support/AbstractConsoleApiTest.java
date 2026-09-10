@@ -132,11 +132,10 @@ public abstract class AbstractConsoleApiTest {
   /**
    * 每次调用一个**新的** X-Forwarded-For，避免测试之间互相污染同 IP 限流窗口。
    *
-   * <p>踩坑（实测）：控制台登录有「同 IP 20 次 / 5 分钟」限流，而它的计数落在**共享的 H2 库**里，
-   * 默认 remoteAddr 恒为同一个值 → 整个测试套件跑下来前 20 次登录成功、之后**所有**控制台测试
-   * 全部 46008（包括那些根本不测限流的用例）。这不是偶发：只要套件里再有第 21 次登录就必然发生。
-   * 单测里「每个用例用自己的 IP」既隔离了限流状态，又不削弱限流用例本身
-   * （{@code login_same_ip_throttled_after_twenty_attempts} 显式钉一个固定 IP 并打满窗口）。
+   * <p>踩坑（实测）：控制台登录有「同 IP 20 次 / 5 分钟」限流，而它的计数落在**共享的 H2 库**里， 默认 remoteAddr 恒为同一个值 → 整个测试套件跑下来前 20
+   * 次登录成功、之后**所有**控制台测试 全部 46008（包括那些根本不测限流的用例）。这不是偶发：只要套件里再有第 21 次登录就必然发生。 单测里「每个用例用自己的
+   * IP」既隔离了限流状态，又不削弱限流用例本身 （{@code login_same_ip_throttled_after_twenty_attempts} 显式钉一个固定 IP
+   * 并打满窗口）。
    */
   private static final AtomicLong IP_SEQ = new AtomicLong(1);
 

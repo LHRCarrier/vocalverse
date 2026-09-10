@@ -45,11 +45,10 @@ class ConsoleCrossTokenTest extends AbstractConsoleApiTest {
   /**
    * 断言「被拒」，以 **HTTP 状态** 为主要证据。
    *
-   * <p><b>为什么不能只断言 {@code code != 0}</b>（2026-09-10 实测踩坑）：过滤器层与安全层的
-   * 401/403 **不是 Envelope**（docs/api/envelope.md 的既有登记：过滤器层不经 {@code @RestControllerAdvice}），
-   * 路径不存在时更是 Spring 默认 404 体。这些响应体里**没有 `code` 字段**，而 Jackson 的
-   * {@code MissingNode.asInt()} 返回 **0** —— 于是 {@code assertNotEquals(0, code)} 会在
-   * 「确实被拒」的情况下报 `expected: not equal but was: <0>`，把通过的闸门读成失败的闸门。
+   * <p><b>为什么不能只断言 {@code code != 0}</b>（2026-09-10 实测踩坑）：过滤器层与安全层的 401/403 **不是
+   * Envelope**（docs/api/envelope.md 的既有登记：过滤器层不经 {@code @RestControllerAdvice}）， 路径不存在时更是 Spring 默认
+   * 404 体。这些响应体里**没有 `code` 字段**，而 Jackson 的 {@code MissingNode.asInt()} 返回 **0** —— 于是 {@code
+   * assertNotEquals(0, code)} 会在 「确实被拒」的情况下报 `expected: not equal but was: <0>`，把通过的闸门读成失败的闸门。
    *
    * <p>正确写法：状态码是硬证据；**若**响应体带 Envelope（控制台链显式写的 46001 等），再额外校验 code 非 0。
    */
@@ -146,13 +145,10 @@ class ConsoleCrossTokenTest extends AbstractConsoleApiTest {
 
     // 但拿它打 App 端点必须是「未认证」，绝不能变成那个 App 用户
     MvcResult r =
-        mockMvc
-            .perform(get("/auth/me").header("Authorization", bearer(consoleToken)))
-            .andReturn();
+        mockMvc.perform(get("/auth/me").header("Authorization", bearer(consoleToken))).andReturn();
     assertRejected("控制台令牌绝不能通过 App 鉴权（sub 数值相同也不行）", r);
     assertFalse(
-        json(r).path("data").path("username").asText("").equals(appUsername),
-        "绝不能返回那个 App 用户的资料");
+        json(r).path("data").path("username").asText("").equals(appUsername), "绝不能返回那个 App 用户的资料");
   }
 
   // ------------------------------------------------------------------ (b)
@@ -179,9 +175,9 @@ class ConsoleCrossTokenTest extends AbstractConsoleApiTest {
   /**
    * (b′) 控制台令牌也拿不到旧管理端的 ADMIN 权限。
    *
-   * <p>注意断言口径：`/api/v1/admin/**` 的**控制器已随旧管理端退役全部删除**，所以这个路径现在返回
-   * **404**（不是 401/403）——「控制台令牌在这里什么也拿不到」正是要证明的事。因此本用例断言
-   * 「不是 2xx 成功」，而不是套用 {@link #assertRejected}（它要求 401/403）。
+   * <p>注意断言口径：`/api/v1/admin/**` 的**控制器已随旧管理端退役全部删除**，所以这个路径现在返回 **404**（不是
+   * 401/403）——「控制台令牌在这里什么也拿不到」正是要证明的事。因此本用例断言 「不是 2xx 成功」，而不是套用 {@link #assertRejected}（它要求
+   * 401/403）。
    */
   @Test
   void console_token_cannot_reach_legacy_admin_endpoints() throws Exception {
@@ -262,9 +258,7 @@ class ConsoleCrossTokenTest extends AbstractConsoleApiTest {
             .compact();
 
     MvcResult r =
-        mockMvc
-            .perform(get("/auth/me").header("Authorization", bearer(foreign)))
-            .andReturn();
+        mockMvc.perform(get("/auth/me").header("Authorization", bearer(foreign))).andReturn();
     assertRejected("外来 aud 必须被拒（否则任何同密钥服务的令牌都能冒充用户）", r);
   }
 

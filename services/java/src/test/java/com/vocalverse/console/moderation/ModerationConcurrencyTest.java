@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.vocalverse.console.ConsoleErrorCodes;
 import com.vocalverse.console.ConsoleException;
 import com.vocalverse.support.AbstractConsoleApiTest;
@@ -48,11 +47,9 @@ class ModerationConcurrencyTest extends AbstractConsoleApiTest {
   /**
    * 直接建帖（不走 MockMvc）。
    *
-   * <p>踩坑（实测）：早先版本用 MockMvc 发帖，然后把返回的 postId 交给带 `@Transactional` 的
-   * `ModerationService.create` —— 但那两条路径的**可见性不同**：MockMvc 请求走真实过滤器/事务，
-   * 而测试方法自身没有注解，服务层直调读到的是另一个持久化上下文，表现为
-   * `46009 审核对象不存在`（明明刚建成功）。这里直接走仓库，让建帖与建单在同一个上下文里，
-   * 消除与「并发」无关的噪音 —— 本类要验证的是**决定**的并发，不是建帖的可见性。
+   * <p>踩坑（实测）：早先版本用 MockMvc 发帖，然后把返回的 postId 交给带 `@Transactional` 的 `ModerationService.create` ——
+   * 但那两条路径的**可见性不同**：MockMvc 请求走真实过滤器/事务， 而测试方法自身没有注解，服务层直调读到的是另一个持久化上下文，表现为 `46009
+   * 审核对象不存在`（明明刚建成功）。这里直接走仓库，让建帖与建单在同一个上下文里， 消除与「并发」无关的噪音 —— 本类要验证的是**决定**的并发，不是建帖的可见性。
    */
   private long createPost(String token, String title) {
     var e = new com.vocalverse.community.PostEntity();

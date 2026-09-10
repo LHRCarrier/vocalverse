@@ -76,7 +76,9 @@ class ModerationHiddenContentTest extends AbstractConsoleApiTest {
   private JsonNode postJson(String path, String token, String body) throws Exception {
     var req = post(path).header("Authorization", bearer(token));
     if (body != null) {
-      req = req.contentType(MediaType.APPLICATION_JSON).content(body.getBytes(StandardCharsets.UTF_8));
+      req =
+          req.contentType(MediaType.APPLICATION_JSON)
+              .content(body.getBytes(StandardCharsets.UTF_8));
     }
     return json(mockMvc.perform(req).andReturn());
   }

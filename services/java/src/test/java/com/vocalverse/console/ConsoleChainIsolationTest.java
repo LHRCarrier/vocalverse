@@ -51,10 +51,9 @@ class ConsoleChainIsolationTest extends AbstractConsoleApiTest {
   /**
    * 构造可被 {@code AntPathRequestMatcher} 命中的请求。
    *
-   * <p>必须显式设 `servletPath`：{@code AntPathRequestMatcher} 取的是
-   * `getServletPath() + getPathInfo()`，而直接 `new MockHttpServletRequest(method, uri)`
-   * 只填了 requestURI、servletPath 为空 → 匹配恒为 false（本测试第一版就栽在这里，
-   * 表现为「前置断言失败」，让人误以为链的顺序错了）。
+   * <p>必须显式设 `servletPath`：{@code AntPathRequestMatcher} 取的是 `getServletPath() + getPathInfo()`，而直接
+   * `new MockHttpServletRequest(method, uri)` 只填了 requestURI、servletPath 为空 → 匹配恒为
+   * false（本测试第一版就栽在这里， 表现为「前置断言失败」，让人误以为链的顺序错了）。
    */
   private static HttpServletRequest req(String path) {
     var r = new org.springframework.mock.web.MockHttpServletRequest("GET", path);

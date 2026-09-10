@@ -40,14 +40,16 @@ class PermissionCatalogTest {
     assertEquals(
         EXPECTED_TOTAL,
         PermissionCatalog.size(),
-        "权限码总数必须恰为 36（推导见 PermissionCatalog 类注释）；实际："
-            + PermissionCatalog.allCodes());
+        "权限码总数必须恰为 36（推导见 PermissionCatalog 类注释）；实际：" + PermissionCatalog.allCodes());
   }
 
   @Test
   void module_counts_are_consistent_with_the_total() {
     Map<String, Integer> byModule = PermissionCatalog.countByModule();
-    assertEquals(7, byModule.get(PermissionCatalog.MODULE_CONSOLE), "console 模块（5 账号/角色/审计 + 2 App 用户）：" + byModule);
+    assertEquals(
+        7,
+        byModule.get(PermissionCatalog.MODULE_CONSOLE),
+        "console 模块（5 账号/角色/审计 + 2 App 用户）：" + byModule);
     assertEquals(18, byModule.get(PermissionCatalog.MODULE_CONTENT), "content 模块：" + byModule);
     assertEquals(
         4,
