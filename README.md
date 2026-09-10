@@ -19,7 +19,7 @@ VocalVerse 面向不同年龄段英语学习者，产品形态 = **「练」+「
 |---|---|
 | 前端 | **Vue 3 + TypeScript(strict) + Vite 6 + pnpm**；移动端真形态页面 + Capacitor 手机壳（Android 首发） |
 | Python 服务 | **FastAPI**：ASR（faster-whisper small/int8/CPU）、TTS（edge-tts，Azure 备胎）、讯飞评测（发音评分基线）+ wav2vec2 微调（门禁化自研加分项）、唱歌评分（pyin + DTW）、DeepSeek LLM 对话 Agent（TTS 播报）、推荐；社区流由既有会话/尝试数据派生（docs/10 注记） |
-| Java 服务 | **Spring Boot 3.3 / Java 21**（薄服务端：管理端 + 社区内容 C 端 + JWT 签发）：用户管理、场景/歌曲库 CRUD、工单、**社区 feed/发帖/评论/点赞/支持/分享（5 表单写方，docs/37）**、JWT 签发 |
+| Java 服务 | **Spring Boot 3.3 / Java 21**（薄服务端：**管理端控制台 API（`com.vocalverse.console`）** + 社区内容 C 端 + JWT 签发）：**控制台身份/RBAC/审计/审核/内容（docs/50）**、场景/歌曲库数据层、工单、**社区 feed/发帖/评论/点赞/支持/分享（5 表单写方，docs/37）**、JWT 签发。⚠️ **旧管理端 HTTP 面（`/api/v1/admin/**`）已随 docs/50 退役**——控制台是管理端唯一形态，数据层保留复用 |
 | 大模型 | DeepSeek API（场景扮演、自由对话、语法判定、评分报告生成、答辩） |
 | 模型训练 | **PyTorch**（CPU 推理；云 GPU 训练隔离环境）+ **Scikit-learn**（推荐、水平预测） |
 | 数据 | PostgreSQL（Alembic 唯一 schema 真源）· Redis（会话/缓存/限流） |
@@ -171,12 +171,13 @@ cd apps/mobile/android; .\gradlew.bat assembleDebug
 
 ```
 apps/web/         前端（Vue3+TS+Vite6；录音 / SSE / 埋点 / PWA manifest）
+apps/admin/       管理端控制台（独立 SPA：Vue3+TS+Vite6+naive-ui；运维/运营/审核三角色 RBAC；docs/50）
 apps/mobile/      Capacitor 手机壳（Android 首发；server.url 型加载线上全栈，详见 apps/mobile/README.md）
 services/python/  语音管线 + LLM Agent + 推荐（FastAPI；Alembic 唯一 schema 真源）
-services/java/    薄管理端（Spring Boot；JWT 签发）
+services/java/    薄服务端（Spring Boot；JWT 签发；社区 C 端；`com.vocalverse.console` 管理端控制台模块）
 infra/            部署与 nginx 配置
 scripts/          dev.ps1 / bootstrap.ps1（Windows 一键）
-docs/             00~05 规划文档 + 06 技术框架决策（ADR 唯一权威）+ 07/08 拷问报告 + 09 框架评审 + 10/11 数据库 + 12 同构Monorepo对比裁决 + 13 前端设计系统 + 14 功能规格（v2 拍板）+ 15/16 双子拷问报告 + 17 合流与拍板记录 + 18 实施计划 + 19 六路拷问报告 + 20/21 系统设计说明书（架构/接口）+ 42 App功能说明书 + 44 TTS整改计划 + 45/46 英文小说阅读（设计/拷问）+ api/ 契约
+docs/             00~05 规划文档 + 06 技术框架决策（ADR 唯一权威）+ 07/08 拷问报告 + 09 框架评审 + 10/11 数据库 + 12 同构Monorepo对比裁决 + 13 前端设计系统 + 14 功能规格（v2 拍板）+ 15/16 双子拷问报告 + 17 合流与拍板记录 + 18 实施计划 + 19 六路拷问报告 + 20/21 系统设计说明书（架构/接口）+ 42 App功能说明书 + 44 TTS整改计划 + 45/46 英文小说阅读（设计/拷问）+ 47~49 社区 S3/私信 + 50/51 管理端后台（设计/拷问）+ api/ 契约
 worklog/          团队工作日志（主线 VocalVerse工作日志.md + App 线 安卓开发日志.md，按日追加）
 ```
 
@@ -241,6 +242,8 @@ worklog/          团队工作日志（主线 VocalVerse工作日志.md + App �
 | `docs/47-社区内容闭环（S3）实施设计.md` | **社区内容闭环 S3 实施设计（定稿 v2 · 六路拷问后）**：媒体上传（图/视频/头像）+ 帖子详情页 + 真实头像 + 社区正文划词查义；`media_assets` 迁移 0011（随机 `public_id` 对外 / 行级去重键 `(owner_id,sha256) WHERE ready` / 软删不动物理文件）+ `posts.media` jsonb 多图形状与 S1 向后兼容 + 3 新错误码（40403/41501/42205）+ Python `FileResponse` Range 读 + 前端 7 组件/2 页面/4 composable + 联调测试页与删除清单 |
 | `docs/48-社区内容S3拷问报告.md` | **社区 S3 六路拷问合流与拍板**：并发性能/日志可观测/数据模型/业务联动/模块设计/前端 UI-UX 六角度共 128 条，其中**阻断级 23 条**逐条裁定（sha256 全局唯一与软删互斥、`bigserial` URL 可枚举、64MB 撞 nginx 20m、Python logger 无 handler、媒体相对路径在打包壳必破、错误码未登记且自相矛盾…）+ 6 项待定项裁定 + 未采纳登记 |
 | `docs/49-私信（IM）实施设计.md` | **私信（IM）实施设计（定稿 · 两路拷问回填）**：一对一私信真实化（会话列表/会话消息/发送/已读 + SSE 长连实时推送）；迁移 0012 `direct_messages` + `dm_read_state`（水位 = `last_read_id`，防并发漏未读）；实时通道裁决 **A · Java SSE 长连 + 进程内广播 + 轮询兜底**（含三条阻断级前置：ADR 限定修订 / nginx `/manage` 缺 SSE 四件套 / Tomcat asyncTimeout 30s）；未读口径 **A+**（会话列表数字 + 私信 tab 提示，不碰全局件；底栏红点下轮）；联调页豁免登记 |
+| `docs/50-管理端后台设计.md` | **管理端后台设计（独立控制台 · 运维/运营/审核三角色 RBAC）**：独立 SPA `apps/admin`（参考万玄阁 admin 模式，零源码耦合）+ 权限模型（独立 `admin_users` 身份 / 4 内置角色 / 权限码目录 / 反提权规则）+ 15 张新表（迁移 0013，Java 写 9 / Python 写 6，单写方不破）+ 按**数据归属方**分服务（`/manage/api/v1/console/**` 与 `/api/v1/console/**` 子路径不重叠）+ **LLM Trace 对齐 DSH GenAI span 树**（`ENTRY→AGENT→STEP→{LLM,TOOL}`，内容与结构分离且默认关）+ 并发/日志/UI/图表（**lieflat Mono 单一色彩系统** + 17 张图逐图审计 + Mono 偏离清单）+ ADR 修订申请（§2.1-4 / §9.6 / §9.7，待拍板） |
+| `docs/51-管理端后台拷问报告.md` | **管理端后台拷问报告（四路对抗 + 合流裁决）**：并发性能+日志 / 数据模型+业务联动 / 架构模块+范围取舍 / 前端 UI-UX+图表 四路共 **33 条 P0**，合流去重后 **30 项逐条裁决**（采纳/部分采纳/驳回附理由）；**8 条属可当场复现的硬缺陷**（迁移在真 PG 上装不上、指标分位数无法存储且门禁必红、`aud` 跨令牌闸门根本不存在、隐藏内容 18 处泄漏含通知面、依赖方向规则与埋点自相矛盾、内容捕获推翻 §9.7 已写红线、TraceWaterfall 脚注说谎、仓库 `pnpm typecheck` 从未检查过任何代码）+ 12 条自相矛盾清单 + v1→v2 修订清单 + 无法验证清单 + 残余风险；**§1.5** 记录需求方"旧管理端已废弃"澄清带来的退役决议 |
 
 ## 里程碑（详见 docs/04、docs/06；状态随工作日志滚动更新）
 
