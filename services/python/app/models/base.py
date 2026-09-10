@@ -141,6 +141,15 @@ class PitchRefStatus:
     INVALID = "invalid"
 
 
+class PitchJobStatus:
+    """参考旋律提取任务状态（pitch_extract_jobs，2026-09-09 唱歌 P0 D2/D6）。"""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
 class PlacementQuestionKind:
     READ = "read"
     QA = "qa"

@@ -22,6 +22,10 @@
   | 46015 | `{caseId: number}` | 重复举报命中既有审核单，前端直接跳转 |
   实现侧为 `Envelope.error(int, String, T)` 纯新增重载，原 `error(int, String)` 行为不变（既有 `ErrorEnvelopeTest` 不受影响）。**其余所有错误码的 `data` 仍恒为 `null`**——不要因为有了这个重载就随手塞调试信息，`data` 是对前端的契约，不是日志。
 - HTTP 状态码负责传输层错误（404/413/429/5xx），`code` 负责业务语义，两者并存
+- **Python 错误体统一（2026-09-10 · P0-5 修复）**：Python 侧 `HTTPException` 一律经全局 `http_error_handler`（`app/main.py`）翻译为 `{code, message, data:null}`；映射**只取已登记码**——400→40001 / 401→40101 / 403→40301 / 404→40401 / 405→40501 / 409→40902 / 410→41001 / 413→41301 / 422→42201 / 429→42901 / 502·503→50301，未登录 4xx 兜底 40001、5xx 兜底 50002；**响应头透传**（429 的 `Retry-After` 必须保留，error-codes.md:28 契约）。
+  - 修复前：鉴权/限流等 24 处 `raise HTTPException(...)` 走 FastAPI 默认 handler，返回 `{"detail": ...}` → `40101/42901` 永不出现、前端只能显示 `HTTP 429`（拷问报告 §1 Top 5）。
+  - 唱歌评分任务失败：任务态已回带 `code=50003`（算法失败）+ 可读文案，异常细节只进服务端日志（不再回传容器路径）；「任务态丢失」回 `code=50002`。
+- 时间字段一律 UTC ISO-8601
 - 时间字段一律 UTC ISO-8601（**控制台例外**：`/api/v1/console/**` 出参带 offset，便于运维/审核在本地时区直接判读时间线，docs/50 §10.1）
 - 分页（offset 型）：`data = { items: [], total, page, page_size }`
 - 分页（**keyset 游标例外 · 社区流专用**，2026-09-06 登记）：`data = { items: [], next_cursor, has_more }`——无 `total/page/page_size`（无限长流分页无法也不必要总数）；请求参数 `cursor`（`base64(created_at_iso|id)`）+ `limit ≤ 20`，服务端取 `limit+1` 判 `has_more`；`next_cursor` 为 null 表示到尾

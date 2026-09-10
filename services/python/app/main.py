@@ -6,12 +6,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -29,9 +30,11 @@ from app.api.routes import (
     reading,
     reading_tts,
     recommendations,
+    singing,
 )
 from app.console.api.deps import ConsoleBizError
 from app.console.ops.middleware import HttpMetricsMiddleware
+from app.core.body_limit import BodySizeLimitMiddleware
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.core.response import BizError
@@ -108,9 +111,26 @@ async def lifespan(app: FastAPI):
 
     await get_sink().start()
     await start_collector()
+    # 参考旋律提取扫描（唱歌 P0 D2/D6：启动扫描 + 周期扫描；testing 跳过）
+    extract_stop = asyncio.Event()
+    scanner_task: asyncio.Task | None = None
+    if not settings.testing:
+        from app.sing.jobs import run_due_jobs_until_stopped
+
+        scanner_task = asyncio.create_task(run_due_jobs_until_stopped(extract_stop))
+        logger.info(
+            "pitch extract scanner started (interval=%ss)",
+            settings.pitch_extract_scan_interval_s,
+        )
     try:
         yield
     finally:
+        if scanner_task is not None:
+            extract_stop.set()
+            try:
+                await asyncio.wait_for(scanner_task, timeout=5)
+            except TimeoutError:
+                scanner_task.cancel()
         # docs/50 §8.3 的排水必须在 finally：
         # uvicorn 会先等完在途连接再跑 lifespan shutdown，且 --timeout-graceful-shutdown
         # 默认无限 → 正常退出路径**也可能**根本不走到这里。故：
@@ -162,9 +182,53 @@ async def validation_error_handler(_: Request, exc: RequestValidationError) -> J
     )
 
 
+# HTTP 层异常（HTTPException）→ 统一 envelope（2026-09-10 · P0-5 修复）
+#
+# 背景：鉴权（core/auth.py）、限流（core/ratelimit.py）等 24 处走 `raise HTTPException(...)`，
+# 而 FastAPI 默认 handler 返回 `{"detail": ...}`（非 envelope）→ **已登记的 40101/42901 永不出现**，
+# 前端 `client.ts` 只能拿到 `body.code === undefined` → 抛 `ApiError(-1, 'HTTP 429')`，
+# `api/sing.ts` 里「每小时 5 次」的 42901 分支成为死代码（拷问报告 §1 Top 5，
+# 见 `local/唱歌模块全链路拷问报告-2026-09-10.md`）。
+#
+# 映射目标**全部取自已登记码表**（docs/api/error-codes.md，本 handler 不新增任何码）；
+# 未登记的 4xx 兜底 40001、5xx 兜底 50002（安全网，实际抛出的状态码集合见下表注释）。
+# `headers` 必须透传：42901 的契约要求携带 `Retry-After`（docs/api/error-codes.md:28）。
+# 依据：docs/api/envelope.md（所有端点统一 envelope）、docs/21 §1.1 例外登记与 §6 码集对账。
+_HTTP_STATUS_TO_CODE: dict[int, int] = {
+    400: 40001,  # 参数错误
+    401: 40101,  # 未登录 / token 失效（auth.py 三处）
+    403: 40301,  # 无权限 / 非本资源归属
+    404: 40401,  # 资源不存在（defense/placement/service 共 9 处）
+    405: 40501,  # 方法不允许（Starlette 路由层）
+    409: 40902,  # 会话状态不允许（站点语义更细者应改抛 BizError）
+    410: 41001,  # 音频过期
+    413: 41301,  # 音频超过 20MB（唱歌 41302 由 service 层 BizError 给出）
+    422: 42201,  # 请求体校验（audio/placement：text required / no scored attempts 等）
+    429: 42901,  # 限流（ratelimit.py；必须回 Retry-After）
+    502: 50301,  # 上游（TTS/ASR）失败
+    503: 50301,  # ASR/TTS 服务不可用
+}
+
+
+@app.exception_handler(HTTPException)
+async def http_error_handler(_: Request, exc: HTTPException) -> JSONResponse:
+    """HTTPException → envelope（保留 Retry-After 等响应头）。"""
+    code = _HTTP_STATUS_TO_CODE.get(exc.status_code)
+    if code is None:
+        code = 50002 if exc.status_code >= 500 else 40001
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"code": code, "message": str(exc.detail), "data": None},
+        headers=getattr(exc, "headers", None),
+    )
+
+
 app.include_router(health.router)
 app.include_router(audio.router)
 app.include_router(practice.router)
+app.include_router(
+    singing.router
+)  # 唱歌：整首上传/状态轮询/结果（M3 P0 D7；docs/21 §2.1 op 22~24）
 app.include_router(free_chat.router)  # 自由对话（MVP，docs/14 §12：无状态 LLM 转发器）
 app.include_router(defense.router)
 app.include_router(placement.router)
@@ -199,6 +263,22 @@ if get_settings().shadow_preview_enabled:
 
     app.include_router(shadow_preview.router)
 app.add_middleware(RequestIdMiddleware)  # X-Request-Id 透传（docs/06 §11）
+
+# 请求体大小护栏（2026-09-10 · P0-6）：**必须在路由/依赖之前拦截**——FastAPI 解析 body
+# （`request.form()`）早于鉴权依赖，Starlette 会把 >1MB 的 part spool 到临时盘且无总量上限，
+# 匿名大 body 可打爆容器（细节与依据见 app/core/body_limit.py 模块说明）。
+# 上限 = 音频上限 + 1MB：`max_upload_bytes`(20MB) 约束的是**音频文件本身**，multipart 封装
+# （boundary/头部/其它字段）天然多出若干字节，留 1MB 余量避免"合规上传被边界拒绝"。
+# 与 nginx `client_max_body_size 21m`（apps/web/nginx.conf）构成纵深防御：nginx 挡边缘、
+# 本中间件挡直连（vite dev / 容器内网 / 其它入口）。
+# 上限 = max(音频 20MB, 视频 64MB) + 1MB：护栏必须**放行全部合法上传**
+# （社区 S3 视频 64MB，docs/47 §4.1），只负责挡住「远超任何合法请求」的匿名大 body；
+# 细分额度由各端点自己校验。与 nginx `client_max_body_size 65m` 同源。
+app.add_middleware(
+    BodySizeLimitMiddleware,
+    max_bytes=max(get_settings().max_upload_bytes, get_settings().media_max_video_bytes)
+    + 1024 * 1024,
+)
 # HTTP 指标（docs/50 §8.4：http.request.* / http.inflight）——纯 ASGI，不缓冲 SSE 响应
 app.add_middleware(HttpMetricsMiddleware)
 # CORS（2026-09-10 打包壳方案 B：页面源 https://localhost、API 打到本机 http://<IP>:8000，

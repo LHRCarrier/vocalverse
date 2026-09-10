@@ -39,6 +39,7 @@ from .console_telemetry import (
 from .content import (
     ListeningMaterial,
     Lrc,
+    PitchExtractJob,
     PlacementQuestion,
     Scenario,
     ScenarioMessage,
@@ -50,7 +51,7 @@ from .defense import DefenseProfile
 from .difficulty import MaterialDifficulty
 from .mastery import UserCorpusMastery, UserMastery
 from .media import MediaAsset, MediaKinds, MediaStatus
-from .practice import Attempt, Score, Session, SingAttempt
+from .practice import Attempt, Score, Session, SingAttempt, SongFavorite
 from .reading import (
     Book,
     BookChapter,
@@ -81,6 +82,7 @@ __all__ = [
     "Song",
     "Lrc",
     "SongPitchRef",
+    "PitchExtractJob",
     "ListeningMaterial",
     "PlacementQuestion",
     # 练习域
@@ -88,6 +90,7 @@ __all__ = [
     "Attempt",
     "Score",
     "SingAttempt",
+    "SongFavorite",
     # 读书域（docs/45 · Python 写方；Java 零改动）
     "Book",
     "BookChapter",

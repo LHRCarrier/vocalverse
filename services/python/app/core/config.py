@@ -86,8 +86,11 @@ class Settings(BaseSettings):
     # 限流（docs/06 §7：30 次/时；POC 失败回退两调用时提高至 60 - 沿用值不变）
     llm_rate_per_hour: int = 30
     asr_rate_per_hour: int = 60
-    ise_rate_per_hour: int = 60
+    # 2026-09-09 唱歌 P0 D3 拍板：ISE 桶对齐 ADR 口径 30/h（R-16 闭合）
+    ise_rate_per_hour: int = 30
     tts_rate_per_hour: int = 60
+    # 唱歌独立子资源桶（docs/06 §7 注记 2026-09-09）：整首跟唱评分计 1 次/用户/时
+    sing_rate_per_hour: int = 5
     # TTS 预合成缓存（docs/44 P1-B）：每键 TTL 与容量上限（写入时按 mtime 裁剪最旧）。
     # TTL 默认 24h 与 audio_ttl_hours 同窗；容量兜底防长时间运行/多参数组合撑爆磁盘。
     tts_cache_ttl_s: int = 86400
@@ -95,6 +98,22 @@ class Settings(BaseSettings):
     # SSE 心跳间隔（R-18 / 审计 R-18：协议上限 30s，取 15s 留一倍余量；
     # 静默 ≥ 此值推 ': ping' 注释行，防中间代理断流/客户端误判死链；0=关闭心跳）
     sse_heartbeat_seconds: float = 15.0
+
+    # =========================================================================
+    # 唱歌（docs/06 §9.4 + 2026-09-09 P0 D1~D7；local/唱歌P0六项实施计划书）
+    # =========================================================================
+    # 参考旋律提取器：pyin（librosa，65~800Hz/frame 2048/hop 512/清浊门限）；fake 仅测试
+    pitch_extractor: str = "pyin"
+    # 清浊叠加门限（0=只用 librosa voiced_flag，默认）：真人歌声 voicing prob 偏低
+    # （2026-09-09 实测用户录音 max 0.43~0.76 / mean 0.01~0.04），叠加高门限会整句误判
+    # 清音 → 全句 no_pitch；仅在需要更激进剔除静音时调高（0.2~0.3）。
+    pitch_voicing_threshold: float = 0.0
+    pitch_extract_concurrency: int = 2  # 提取并行信号量（与 whisper/ISE/sing 相互独立）
+    pitch_extract_scan_interval_s: int = 60  # lifespan 周期扫描间隔（秒）
+    pitch_extract_max_attempts: int = 3  # 单 job 重试上限（超限置 failed，不再自动重建）
+    # 发音=整首抽样句（D3）：默认前 3 句 + weak 句优先；0 = 关闭发音维度（发音分 None）
+    sing_pron_samples: int = 3
+    sing_concurrency: int = 2  # 唱歌评分并发信号量（docs/06 §8⑤：CPU 密集排队不雪崩）
 
     # 音频保留（合规：默认 24h 清理）
     audio_ttl_hours: int = 24

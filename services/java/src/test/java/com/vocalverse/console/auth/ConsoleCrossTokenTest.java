@@ -285,11 +285,20 @@ class ConsoleCrossTokenTest extends AbstractConsoleApiTest {
 
   private record AdminUserEntityRow(Long id, String username) {}
 
-  /** 用原生 SQL 插入指定 id 的 admin_users 行（显式 id 插入 IDENTITY 列，H2/PG 均支持）。 */
+  /**
+   * 用原生 SQL 插入指定 id 的 admin_users 行（显式 id 插入 IDENTITY 列，H2/PG 均支持）。
+   *
+   * <p>2026-09-10（合并期修复）：显式 id 可能与**同 JVM 其它测试类**已建的 admin_users 行撞主键 （测试上下文共享同一个 H2
+   * 库，跨类不隔离）——调用场景要的是「控制台 sub 与某个 App 用户 id 数值相同」，所以先删掉该 id 上的既有控制台账号再插入；删除在测试的
+   * {@code @Transactional} 回滚范围内，不影响其它用例。
+   */
   private AdminUserEntityRow insertAdminWithExplicitId(Long id, String username, String roleCode) {
     var role = adminRoles.findByCode(roleCode).orElseThrow();
     String hash = passwordEncoder.encode(FIXTURE_PASSWORD);
     Instant now = Instant.now();
+    em.createNativeQuery("DELETE FROM admin_users WHERE id = :id")
+        .setParameter("id", id)
+        .executeUpdate();
     em.createNativeQuery(
             "INSERT INTO admin_users (id, username, display_name, password_hash, role_id, status,"
                 + " failed_attempts, token_epoch, created_at, updated_at)"

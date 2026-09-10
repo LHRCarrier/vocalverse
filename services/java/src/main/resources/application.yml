@@ -72,6 +72,10 @@ vocalverse:
     media-url-prefix: ${VOICEVERSE_COMMUNITY_MEDIA_URL_PREFIX:/api/v1/media/}
     # 单帖媒体条数上限（与 Python APP_MEDIA_MAX_ITEMS_PER_POST 同口径）
     media-max-items: ${VOICEVERSE_COMMUNITY_MEDIA_MAX_ITEMS:9}
+  song:
+    # 演示曲目种子（M3 唱歌 P0 D-G2：读 data/seed/songs.json 播种 songs+lrc；
+    # 音频由 scripts/setup-assets.py 物化到 data/audio/，不入库）
+    seed: ${VOICEVERSE_SONG_SEED:true}
 
 management:
   endpoints:

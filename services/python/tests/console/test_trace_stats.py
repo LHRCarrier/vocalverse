@@ -126,13 +126,20 @@ def test_legacy_fields_unchanged_and_new_blocks_present(client) -> None:
 
 
 def test_trend_is_dense_and_zero_filled(client) -> None:
-    """4 天窗口只有 1 天有数据 → trend 仍是 4 条，缺日计数补 0。"""
+    """4 天窗口只有 1 天有数据 → trend 仍是 4 条，缺日计数补 0。
+
+    时间无关性（2026-09-10 合并期修复）：原写法 `day0 = (now - 3d).replace(hour=12)`
+    与窗口起点 `from = now - 3d` 同一天——当 UTC 小时 > 12 时 day0 早于 from，
+    该日数据落在窗口外 → 断言恒失败（实测 UTC 16:0x 时 `trace_count` 为 0）。
+    改为按窗口起点 + 12h 取种子时刻，任何小时都稳定落在窗口内。
+    """
     now = datetime.now(UTC).replace(microsecond=0)
-    day0 = (now - timedelta(days=3)).replace(hour=12, minute=0, second=0)
+    window_from = now - timedelta(days=3)
+    day0 = (window_from + timedelta(hours=12)).replace(minute=0, second=0)
     _seed_trace(day0)
     _seed_trace(day0 + timedelta(minutes=5), status="error")
 
-    data = _get(client, {"from": (now - timedelta(days=3)).isoformat(), "to": now.isoformat()})
+    data = _get(client, {"from": window_from.isoformat(), "to": now.isoformat()})
 
     trend = data["trend"]
     assert len(trend) >= 4, "trend 必须覆盖整个窗口（稠密），不能只返回有数据的天"
