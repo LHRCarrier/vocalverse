@@ -268,6 +268,11 @@ public class ConsoleContentWriteController {
     Instant now = Instant.now();
     SongEntity e = new SongEntity();
     applySong(e, body);
+    // 新建时参考旋律尚未提取：`applySong` 已不再回落该字段（见那里的长注释），默认值在这里显式写。
+    // 字面量与 `replaceLrc` 里重置该字段时用的是同一个值（该列有 CHECK 约束，取值域见 0001 迁移）。
+    if (e.getPitchRefStatus() == null) {
+      e.setPitchRefStatus("missing");
+    }
     e.setCreatedAt(now);
     e.setUpdatedAt(now);
     SongEntity saved = songs.save(e);
@@ -598,7 +603,20 @@ public class ConsoleContentWriteController {
     e.setInterestTags(b.interestTags() == null ? "[]" : b.interestTags());
     e.setSource(b.source() == null ? "public_domain" : b.source());
     e.setStatus(b.status() == null ? PublishService.STATUS_DRAFT : b.status());
-    e.setPitchRefStatus(b.pitchRefStatus() == null ? "missing" : b.pitchRefStatus());
+    // pitchRefStatus **只在显式传值时覆盖**，缺省保留库里的值。
+    //
+    // 这一列不是人填的：它由离线音高提取任务（Python 侧 `song_pitch_refs`）驱动，控制台的四个
+    // 内容弹窗里根本没有这个输入框。而它又是**上架前置条件**（`PublishService.validateSong`
+    // 要求 `ready`）与跟唱评分的参考旋律来源。
+    //
+    // 曾经的写法是 `b.pitchRefStatus() == null ? "missing" : b.pitchRefStatus()`，与上面几个字段
+    // 保持"缺省 = 回落默认值"的形式一致 —— 但语义错了：`applySong` 同时被 create 与 update 调用，
+    // 于是**任何一次运营改歌（哪怕只改歌手名）都会把已就绪的参考旋律打回 `missing`**，
+    // 表现为"这首歌明明能上架，某次编辑后就再也上不了架，且没有任何报错线索"。
+    // 新建时的初始值改由 `createSong` 显式写入，语义不变。
+    if (b.pitchRefStatus() != null) {
+      e.setPitchRefStatus(b.pitchRefStatus());
+    }
   }
 
   private void applyMaterial(ListeningMaterialEntity e, MaterialUpsert b) {
