@@ -107,12 +107,17 @@ export const LICENSE_MAX = 64
 
 // ── Java 字段名 → 表单 field ──────────────────────────────────────────────
 //
-// ⚠️ 派发规则：`ConsoleContentWriteController` 的请求体带 `@Valid`，但
-// `ConsoleExceptionHandler` **没有**声明 `MethodArgumentNotValidException`（它的类注释明说
-// "控制台控制器不加 Bean Validation 注解"—— 而本控制器确实加了），于是校验失败落到
+// ⚠️ 派发规则：`ConsoleContentWriteController` 的请求体带 `@Valid`，而
+// `ConsoleExceptionHandler` **没有**声明 `MethodArgumentNotValidException`，于是校验失败落到
 // `GlobalExceptionHandler.handleFallback`：返回 **42201** + 文案
 // `"请求体校验失败：" + 第一个字段名 + " " + 注解默认 message`。
 // 字段名是 **Java 属性名**，与表单 key 不一定同名，所以必须走这张表翻译。
+//
+// 2026-09-10 实测补注：这条链路**曾经是断的** —— `ConsoleExceptionHandler` 当时还带着一个
+// `@Order(HIGHEST_PRECEDENCE)` 的兜底 `@ExceptionHandler(Exception.class)`，它在 advice 顺序上
+// 压过了全局映射，把控制台路径上的 42201 统一变成了 **500 + 50002**（`docs/51` I-11）。
+// 也就是说：本文件下面这套"字段名翻译"在修掉那个兜底之前**永远走不到**。
+// 现在兜底已删，这条注释描述的派发规则才是真的。
 
 /** 字段元数据表：校验遍历它，错误归位也遍历它 —— 一份声明，两处使用 */
 export const FIELD_META = {
