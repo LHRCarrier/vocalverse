@@ -3,6 +3,51 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 修 main 上的 python-ci：Python 契约快照缺 21 条控制台路由
+
+- **起因**：直推 main 后 CI 报 `Some checks were not successful`——`python-ci / lint · test · alembic` 1 分钟后失败，
+  其余 4 项（docker-build ×3、secret-scan）成功。
+
+- **定位**：用 `gh run view --json jobs` 看到**失败步骤是 `Contract: OpenAPI snapshot in sync`**
+  （前面 11 步全绿，含 bench 预算门禁、单写方探针、开关三处对账）。本地复现该步骤的比对逻辑：
+
+  | 项 | 结果 |
+  |---|---|
+  | 快照**缺失**的路径 | **21 条 `/api/v1/console/**`**（ops 的 overview/services/concurrency/metrics/alerts/traces + library 的 books/chapters/media） |
+  | `components.schemas` | 48 → 50 |
+  | `/readyz` | schema 有变化 |
+
+  即 **Python 侧控制台路由从未进过契约快照**（历史 commit `813a934` 声称"控制台 37 op 接入"，
+  实际只覆盖了 Java 侧 41 条 / Python 侧 0 条）——CI 直接用 `app.openapi()` 比对，所以一推上来就红。
+
+- **修法**：按仓内官方路径 `scripts/refresh-openapi.ps1` 刷新，然后**刻意只留两个文件**：
+  `apps/web/src/api/specs/python-openapi.json`（+21 路由）+ `apps/web/src/api/generated/python-api.d.ts`（重生成）。
+
+- **刻意回退的 5924 行**：脚本对 Java 侧是 HTTP 原文落盘（紧凑单行），而 Java 的**规范生成器**
+  `ContractSnapshotTest`（`CONTRACT_SNAPSHOT_GENERATE=1`）写的是 `writerWithDefaultPrettyPrinter()` 美化版。
+  实测两者 JSON **语义完全相同**（68 路径 / 92 operation / 125 schema，零增删），
+  直接落盘会把提交版 5924 行压成一行 —— 纯噪音，故 `git checkout` 回退。
+  两者用 `JsonNode` 比对（格式无关），所以 java-ci 不受影响。
+  ⚠️ **登记工具缺陷（未修）**：`refresh-openapi.ps1` 写紧凑格式与规范生成器不一致 ——
+  任何人按文档跑该脚本都会得到这次 5924 行伪 diff；修它要让脚本改走 `CONTRACT_SNAPSHOT_GENERATE=1`
+  （自己缩进对不上 Jackson 的 `" : "` 分隔符），属行为变更，另立。
+
+- **验证（实跑）**：进程内 `app.openapi()` 与快照**逐字节一致**；`pnpm gen:api` **幂等**
+  （再跑一次 `git status` 无新改动，满足 frontend-ci 的 `git diff --exit-code`）；
+  推 main 后**手动 dispatch** `python-ci` → **success**。
+  另发现 `frontend-ci` / `admin-ci` **只挂 `pull_request` + `workflow_dispatch`**（没有 push:main），
+  即主线上平时根本不会跑 → 一并手动补跑：**frontend-ci success、admin-ci success**。
+  最终 `7c2a958` 上 **5/5 全绿**：admin-ci / frontend-ci / python-ci / docker-build / secret-scan。
+
+- **踩坑（我自己踩的，记下来）**：为验证"本地 `.env` 是否影响契约"，我用
+  `Push-Location` + `cd` + **相对路径** 在 `finally` 里恢复文件，结果 Pop 回的是内层目录，
+  恢复语句找不到目标 → **`services/python/.env` 一度被改名成 `.env.bak`**（若就此放着，
+  后续进程会读不到 DeepSeek key 而**静默走 Fake**）。已即时用绝对路径修回并校验
+  （2258 字节、`APP_DEEPSEEK_API_KEY`/`APP_CONSOLE_JWT_SECRET` 均在）。
+  **教训：脚本里一律用绝对路径，`try/finally` 里不要依赖当前目录。**
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 管理端后台（联调入口）：README 登记控制台账号 + 功能分支推送
 
 - **需求**：把管理端账号写进 `README.md` 方便组员测试；远端直推。
