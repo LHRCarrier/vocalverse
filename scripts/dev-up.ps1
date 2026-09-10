@@ -59,7 +59,9 @@ function Test-ConsoleSecret {
         Write-Host "  [console] ⚠️ 两个控制台密钥**不一致**：Java 签发 / Python 验签必然 401。"
     } elseif ($java -and -not $py) {
         Write-Host "  [console] ⚠️ VOICEVERSE_CONSOLE_JWT_SECRET 已配但 APP_CONSOLE_JWT_SECRET 为空："
-        Write-Host "      Python 侧将回退/拒绝（见 services/python/.env.example），控制台运维域可能不可用。"
+        Write-Host "      Python 侧是 **fail-closed**（console_jwt_secret 为空 → 控制台端点一律 46001，"
+        Write-Host "      app/console/api/deps.py）：表现为能登录进控制台，但运维 / LLM trace / 书籍 /"
+        Write-Host "      媒体页面全报错，报错里不提密钥。处置：两个键配成同一个值（≥32 字节）。"
     }
 }
 

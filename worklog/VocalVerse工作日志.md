@@ -3,6 +3,38 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 管理端后台（配置）：本地 .env 补齐控制台密钥 + 修正上一轮的机制描述错误
+
+- **背景**：需求方要求"帮我填一下 .env 里密钥"。范围按"让控制台真能跑起来"来定，**不动**任何第三方密钥。
+
+- **做了三件事**（改的都是 **gitignored 的本地文件**，入库的只有文档与脚本措辞）：
+  1. 根 `.env` 补 `VOICEVERSE_CONSOLE_JWT_SECRET` / `APP_CONSOLE_JWT_SECRET`（**同一个值**，48 hex 字符，
+     与 `JWT_SECRET` 不同）；`services/python/.env` 同步补后者（不经 dev-up、直接跑 uvicorn 时也能验签）。
+  2. 根 `.env` 补首个管理员的 bootstrap（`admin` + 随机强口令；`admin_users` 非空时不建号，属幂等）。
+  3. 改前先备份两个 `.env` 到 `local/env-backup/<时间戳>/`（gitignored）。
+
+- **实证（当前环境下能做的都做了）**：
+  - Python 运行期：`get_settings().console_jwt_secret` **非空（48）、≠ App 密钥**，且**不再**出现
+    "APP_CONSOLE_JWT_SECRET 未设置（development 档）：控制台端点将 46001" 的告警；
+  - 取值一致性：根 `.env` 值的 `sha256` 前 12 位与 Python 读到的一致（证明就是写进去那个值）；
+  - dev-up 的 `.env` 解析器：能取到该键且**非空**（非空才不会被脚本"空值键跳过"的语义丢掉）；
+  - 跨服务常量：Java `ConsoleJwtService.AUDIENCE/ISSUER` = `vocalverse-console` / `vocalverse-java`，
+    与 Python `console_jwt_audience/issuer` **逐字相同**；Java 侧读的是
+    `application.yml` 里的**显式占位符** `${VOICEVERSE_CONSOLE_JWT_SECRET:}`（不依赖 Spring 松散绑定，
+    故 `VOICEVERSE_` 而非 `VOCALVERSE_` 前缀这件事不会踩坑）。
+  - ⚠️ **未做**：端到端登录验证 —— **Docker 引擎当前不可用**（`docker info` 连不上 npipe），
+    5432/6379 均 down，Java/PG/Redis 都起不来。所以"填完密钥后能真正登录并访问运维页"这件事
+    **没有证据**，只验证到"配置链路正确"这一层。
+
+- **修正上一轮自己写错的地方（重要）**：我把"只配一个键"的后果描述成"Python 也会回退"，**这是错的**。
+  逐行读 `app/core/config.py` 与 `app/console/api/deps.py` 的真实语义是**两侧不对称**：
+  Java 侧留空 → **回退**用 `JWT_SECRET` 签发（登录看起来完全正常）；Python 侧留空 →
+  **fail-closed**，控制台端点一律 46001（development 档只 warn 一行）。生产档才额外断言
+  "控制台密钥 ≠ App 密钥"。已改对根 `.env.example` 与 `dev-up.ps1` 的自检文案
+  （自检函数用 AST 取真实函数体重跑，确认新文案生效）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 管理端后台（补漏）：一键启动里没有管理端 + 控制台密钥的静默 401 陷阱
 
 - **起因**：需求方问「README 里 `pwsh -File scripts/dev-up.ps1 start` 能起管理端吗」。**答案是：不能。**
