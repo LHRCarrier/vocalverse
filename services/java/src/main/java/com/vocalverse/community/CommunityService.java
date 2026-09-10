@@ -682,7 +682,13 @@ public class CommunityService {
         .toList();
   }
 
-  private Map<Long, AuthorView> loadAuthors(List<Long> authorIds) {
+  /**
+   * 批量作者视图（昵称/handle/tint/LV/头像）：一次 users + 一次 profiles（防 N+1）。
+   *
+   * <p>包级可见（2026-09-10）：私信服务 {@link DirectMessagingService} 复用本方法组装对端 {@code
+   * AuthorView}，避免第二份同构实现漂移。
+   */
+  Map<Long, AuthorView> loadAuthors(List<Long> authorIds) {
     Map<Long, UserEntity> userMap =
         users.findAllById(authorIds).stream()
             .collect(Collectors.toMap(UserEntity::getId, Function.identity()));

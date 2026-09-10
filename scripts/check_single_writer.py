@@ -47,6 +47,8 @@ JAVA_WRITTEN_MODELS = frozenset(
         "PostLike",  # post_likes
         "PostInteraction",  # post_interactions
         "Follow",  # follows
+        "DirectMessage",  # direct_messages（私信 IM · docs/49 §1 · 迁移 0012）
+        "DmReadState",  # dm_read_state（同上）
     }
 )
 

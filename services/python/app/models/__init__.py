@@ -9,7 +9,15 @@ from __future__ import annotations
 
 from .analytics import Event, Report
 from .base import Base, jsonb
-from .community import Follow, Post, PostComment, PostInteraction, PostLike
+from .community import (
+    DirectMessage,
+    DmReadState,
+    Follow,
+    Post,
+    PostComment,
+    PostInteraction,
+    PostLike,
+)
 from .content import (
     ListeningMaterial,
     Lrc,
@@ -77,6 +85,9 @@ __all__ = [
     "PostLike",
     "PostInteraction",
     "Follow",
+    # 私信域（Java 写方 · Python 只读映射，docs/49 §1 · 迁移 0012）
+    "DirectMessage",
+    "DmReadState",
     # 媒体域（社区 S3 · Python 写方，docs/47 §3.1）
     "MediaAsset",
     "MediaKinds",
