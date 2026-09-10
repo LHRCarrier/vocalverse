@@ -92,12 +92,20 @@ async def _tts_url_from_bytes(
 
 
 def save_audio_bytes(data: bytes) -> str:
-    """写入 data/audio/{sha1}.mp3，返回 /api/v1/audio/{sha1}.mp3（惰性过期见 routes）。"""
+    """写入 data/audio/{sha1}.{ext}，返回 /api/v1/audio/{sha1}.{ext}（惰性过期见 routes）。
+
+    **BUG-5（2026-09-10）**：扩展名按**魔数嗅探**决定（浏览器录音是 WebM/Opus；
+    历史实现一律 `.mp3` → 回放 Content-Type 与内容不符）。嗅探不出（未知容器）回落 `.mp3`
+    保持旧行为；内容相同的重复上传哈希一致 → 仍幂等。
+    """
     import os
+
+    from app.audio.upload import DEFAULT_AUDIO_EXT, sniff_audio_ext
 
     settings = get_settings()
     os.makedirs(settings.audio_dir, exist_ok=True)
-    name = hashlib.sha1(data).hexdigest()[:32] + ".mp3"
+    ext = sniff_audio_ext(data) or DEFAULT_AUDIO_EXT
+    name = hashlib.sha1(data).hexdigest()[:32] + f".{ext}"
     path = os.path.join(settings.audio_dir, name)
     if not os.path.exists(path):
         with open(path, "wb") as f:

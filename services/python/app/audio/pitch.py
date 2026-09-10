@@ -37,7 +37,12 @@ HOP_LENGTH = 512
 # 需要更激进的静音剔除时经 APP_PITCH_VOICING_THRESHOLD 调高（如 0.2~0.3）。
 VOICING_THRESHOLD = 0.0
 # 提取算法世代（写入 song_pitch_refs.version / sing_attempts.ref_version）
-EXTRACTOR_VERSION = "pyin-v1"
+# **pyin-v2（2026-09-10）**：pitch_ref 增 `onsets_ms`（参考侧音符级起音）——口径 v3 item7 要求
+# 「两侧同源、同量纲的 onset」才能算真实节奏比（v1 只存 F0，评分侧被迫用 LRC 句间隔
+# ≈ 秒级，与用户音符级 onset 不同量纲 → bpm_source 恒 duration，特性形同虚设）。
+# 版本升级 → jobs 扫描 `_refs_ready` 自动判定"世代旧"并重建（Python 侧判断，
+# 不触碰 Java 独占写的 songs 表）。
+EXTRACTOR_VERSION = "pyin-v2"
 
 
 class PitchExtractError(RuntimeError):
@@ -59,6 +64,14 @@ class TrackF0:
     # 逐帧能量（RMS，与 f0 同帧对齐）：起唱检测的能量兜底用（sing.py A3 拍板；
     # 气声/低信噪比时 F0 全清音但确有发声，需能量定位起唱点）
     rms: list[float] = field(default_factory=list)
+    # 起音时刻（ms，librosa.onset_detect）：**能量/频谱起音**——用户侧评分直接用它；
+    # 参考侧经 slice_window 落入 pitch_ref.onsets_ms 入库（sing.py 口径 v3 item7：
+    # 两侧同量纲才能算真实 bpm_ratio；docs/06 §9.4）
+    onsets_ms: list[float] = field(default_factory=list)
+    # **F0 起音（2026-09-10 · 评估结论）**：音高跳变 + 有声段起点——与上面的频谱起音互补：
+    # 频谱起音精于"同音重复"（能量突变），F0 起音精于"连唱/柔起音/噪声"（假起音少），
+    # 两者在 sing.py:combine_bpm 内做 BPM 层仲裁（见 scripts/poc/onset_eval.py 实测）
+    f0_onsets_ms: list[float] = field(default_factory=list)
 
 
 def apply_voicing_gate(voiced_flag, voiced_prob, threshold: float):
@@ -136,6 +149,11 @@ class PyinPitchExtractor(PitchExtractor):
         except Exception:  # 能量计算失败不阻塞（起唱检测退化为 F0 单路径）
             rms = np.zeros(len(f0), dtype=float)
 
+        # 起音检测（口径 v3 item7：真实 BPM 估计用；失败返回 [] → 评分层回退时长截断比）
+        onsets_ms = detect_onsets_ms(y, sr)
+        # F0 起音（2026-09-10 评估结论：与频谱起音互补，评分层做 BPM 仲裁）
+        f0_onsets = f0_onsets_ms(f0, HOP_LENGTH / sr * 1000.0)
+
         times = np.arange(len(f0)) * (HOP_LENGTH / sr * 1000.0)
         midi: list[int | None] = []
         names: list[str | None] = []
@@ -156,7 +174,102 @@ class PyinPitchExtractor(PitchExtractor):
             names=names,
             duration_ms=float(len(y)) / sr * 1000.0,
             rms=[float(v) for v in rms],
+            onsets_ms=onsets_ms,
+            f0_onsets_ms=f0_onsets,
         )
+
+
+def detect_onsets_ms(y, sr: int, hop_length: int = HOP_LENGTH) -> list[float]:
+    """librosa.onset_detect 起音检测（docs/06 §9.4 节奏=onset 与 LRC 时间戳的偏差；口径 v3 item7）。
+
+    输出起音时刻（ms）；任何失败 → []（非致命——评分层按　bpm_source="duration" 回退
+    时长截断比，见 sing.py:bpm_ratio_info）。
+    """
+    try:
+        import librosa
+
+        frames = librosa.onset.onset_detect(y=y, sr=sr, hop_length=hop_length, backtrack=True)
+        return [round(float(f * hop_length / sr * 1000.0), 1) for f in frames]
+    except Exception as exc:  # pragma: no cover - 依赖已在 pyproject 固定；防御性回退
+        logger.warning("onset detect failed (bpm falls back to duration ratio): %s", exc)
+        return []
+
+
+#: F0 起音参数（2026-09-10 评估标定，见 scripts/poc/onset_eval.py）
+F0_ONSET_JUMP_CENT = 60.0  # 相邻有声帧（含跨短静音）音高跳变阈值：≥60 cent 视为换音
+F0_ONSET_MIN_GAP_MS = 120.0  # 起音最小间隔（去抖）
+F0_ONSET_BRIDGE_FRAMES = 3  # 跨静音桥接帧数（≈96ms）：断奏的音符间隔 80ms 内仍可比音高
+F0_ONSET_MIN_RUN_FRAMES = 3  # 有声段最短帧数（短于此视为噪声）
+F0_ONSET_SILENCE_GAP_MS = 150.0  # 判"新句起点"的前置静音
+
+
+def f0_onsets_ms(
+    f0,
+    hop_ms: float,
+    *,
+    jump_cent: float = F0_ONSET_JUMP_CENT,
+    min_gap_ms: float = F0_ONSET_MIN_GAP_MS,
+    bridge_frames: int = F0_ONSET_BRIDGE_FRAMES,
+    min_run_frames: int = F0_ONSET_MIN_RUN_FRAMES,
+    silence_gap_ms: float = F0_ONSET_SILENCE_GAP_MS,
+) -> list[float]:
+    """**F0 起音**（纯函数）：① 有声段起点（前置静音 ≥150ms）② 音高跳变点。
+
+    与频谱起音（:func:`detect_onsets_ms`）互补——评估实测（6 类合成素材 + 6 段真实录音）：
+
+    | 形态 | 频谱起音 F1 | F0 起音 F1 | 说明 |
+    |---|---|---|---|
+    | 断奏 | 0.47 | 0.92 | 频谱假点极多（39 检出 / 12 真值） |
+    | 连奏 | 0.65 | 0.82 | F0 跳变可靠 |
+    | 柔起音 300ms | 0.12 | 0.92 | 频谱几乎全漏 |
+    | 连奏+柔起音 | 0.46 | 0.88 | — |
+    | 断奏+噪声 | 0.28 | 0.88 | — |
+    | **同音重复** | 0.44（BPM 倍速） | **0.15（全漏）** | F0 盲区：音高不变无跳变 |
+
+    → 结论：**谁都替代不了谁**，故在评分层做 BPM 仲裁（sing.py:combine_bpm），
+    而不是在 onset 列表层融合（union 实测更差）。
+    音高跳变允许跨越 ≤``bridge_frames`` 帧的短静音（断奏的音符间隔 ≈80ms，
+    严格相邻有声帧比较会全部漏检）。
+    """
+    import numpy as np
+
+    arr = np.asarray(f0, dtype=float)
+    if arr.size == 0:
+        return []
+    voiced = arr > 0
+    gap_frames = max(1, int(round(silence_gap_ms / hop_ms)))
+    out: list[float] = []
+    i = 0
+    while i < len(voiced):
+        if not voiced[i]:
+            i += 1
+            continue
+        start = i
+        while i < len(voiced) and voiced[i]:
+            i += 1
+        if i - start >= min_run_frames and (
+            start == 0 or not voiced[max(0, start - gap_frames) : start].any()
+        ):
+            out.append(round(start * hop_ms, 1))
+    last_voiced = -1
+    for idx in range(len(arr)):
+        if not voiced[idx]:
+            continue
+        if last_voiced >= 0 and idx - last_voiced <= bridge_frames + 1:
+            cents = abs(1200.0 * float(np.log2(arr[idx] / arr[last_voiced])))
+            if cents >= jump_cent:
+                out.append(round(idx * hop_ms, 1))
+        last_voiced = idx
+    return _dedupe(out, min_gap_ms)
+
+
+def _dedupe(vals: list[float], min_gap_ms: float) -> list[float]:
+    """排序 + 相邻 <min_gap_ms 合并（保留最早）——F0 跳变在颤音/滑音处会密集触发。"""
+    out: list[float] = []
+    for v in sorted(vals):
+        if not out or v - out[-1] >= min_gap_ms:
+            out.append(v)
+    return out
 
 
 class FakePitchExtractor(PitchExtractor):
@@ -238,9 +351,11 @@ async def to_16k_mono_wav(src: str, dst: str, timeout_s: float = 15.0) -> None:
 def slice_window(track: TrackF0, start_ms: float, end_ms: float | None) -> dict:
     """按句窗口切片（linspace 区间采样：窗口内帧保留，端点外剔除）。
 
-    返回 JSON 兼容 dict（song_pitch_refs.pitch_ref 契约）：
-    ``{"f0s": [...], "notes": [...], "midi": [...], "start_ms": ..., "end_ms": ...}``
-    窗口内全清音 → f0s 全 0（评分层按缺失降权处理，D5）。
+    返回 JSON 兼容 dict（song_pitch_refs.pitch_ref 契约，**pyin-v2**）：
+    ``{"f0s", "notes", "midi", "start_ms", "end_ms", "onsets_ms"}``
+    窗口内全清音 → f0s 全 0（评分层按缺失降权处理，D5）；
+    ``onsets_ms`` = 落在本句窗口内的参考**音符级起音**绝对时刻（评分侧拼接各句 →
+    与用户侧 onset_detect 同量纲，算真实 bpm_ratio；docs/06 §9.4 口径 v3 item7）。
     """
     hop = track.hop_ms or 32.0
     i0 = max(0, int(start_ms / hop))
@@ -252,12 +367,16 @@ def slice_window(track: TrackF0, start_ms: float, end_ms: float | None) -> dict:
     seg = track.f0[i0:i1]
     if not seg:
         seg = [0.0]
+    hi = float("inf") if end_ms is None else float(end_ms)
+    win_onsets = [round(float(t), 1) for t in (track.onsets_ms or []) if start_ms <= float(t) < hi]
     return {
         "f0s": seg,
         "notes": track.names[i0:i1] or [None],
         "midi": track.midi[i0:i1] or [None],
         "start_ms": int(start_ms),
         "end_ms": int(end_ms) if end_ms is not None else None,
+        # 参考音符级起音（pyin-v2 新增；口径 v3 item7 的参考侧数据源）
+        "onsets_ms": win_onsets,
         # 帧索引（v2 新增）：调用方按同一区间取能量包络（起唱检测兜底，sing.py A3）
         "frame_start": i0,
         "frame_end": i1,

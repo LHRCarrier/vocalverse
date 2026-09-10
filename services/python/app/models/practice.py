@@ -1,9 +1,10 @@
-"""练习域：sessions / attempts / scores / sing_attempts（均 **Python 写**）。
+"""练习域：sessions / attempts / scores / sing_attempts / song_favorites（均 **Python 写**）。
 
 - ``sessions``：一次练习会话头（对话/唱歌），承载「完成率/互动率」等的会话级事实；
   只存原始事实（turn_count、duration_s），口径判定（5 轮或 2min）在报表层算，口径可重算；
 - ``attempts``：一次录音评分的完整结果（口语）；``scores`` 为其音素级明细；
-- ``sing_attempts``：一次跟唱评分的逐句结果（音准/节奏/发音 + 对齐信息，docs/06 §9.4）。
+- ``sing_attempts``：一次跟唱评分的逐句结果（音准/节奏/发音 + 对齐信息，docs/06 §9.4）；
+- ``song_favorites``：跟唱收藏（用户 × 歌曲，唱吧「收藏」tab 的事实源，2026-09-10）。
 """
 
 from __future__ import annotations
@@ -246,7 +247,37 @@ class SingAttempt(CreatedAtMixin, Base):
     alignment: Mapped[dict] = mapped_column(jsonb(), nullable=False, server_default=text("'{}'"))
 
     __table_args__ = (
+        # 2026-09-10 · P1-3（迁移 0012）：同一 (user, session) 只允许一行——
+        # 幂等/重试语义的**地基**（service 层"先查后插"在并发双击下会插出两行：
+        # 两份 pyin/DTW 计算 + 重复 attempt 干扰看板；拷问报告 B-F7/C-#3/G-#9）。
+        # 语义：草稿行（分数 NULL）可被**就地重置**重跑，定稿行（有 lines/有分）不再改写。
+        UniqueConstraint("user_id", "session_id", name="uq_sing_attempts_user_session"),
         Index("ix_sing_attempts_user_created", "user_id", "created_at"),
         Index("ix_sing_attempts_song_id", "song_id"),
         Index("ix_sing_attempts_lrc_id", "lrc_id"),
+    )
+
+
+class SongFavorite(CreatedAtMixin, Base):
+    """跟唱收藏（Python 写；用户 × 歌曲 交互表）。
+
+    - 2026-09-10 组长需求：唱吧「收藏」tab 必须是**用户自主选择**的结果，而不是难度等
+      启发式过滤；每首歌一个收藏按钮，再点取消（存在=收藏，删除=取消，无软删状态列）；
+    - 唯一键 ``uq_song_favorites_user_song``：同一用户同一首歌只有一行（重复收藏幂等，
+      取消幂等——见 app/sing/favorites.py）；
+    - ``song_id`` FK CASCADE：歌曲行删除（内容下架只置 archived，不删行；真删为管理端
+      例外操作）时收藏随之清理，不留悬空引用；``user_id`` 无 ondelete——users 只禁用不删。
+    """
+
+    __tablename__ = "song_favorites"
+
+    id: Mapped[int] = bigint_pk()
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    song_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("songs.id", ondelete="CASCADE"), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "song_id", name="uq_song_favorites_user_song"),
+        Index("ix_song_favorites_user_created", "user_id", "created_at"),
     )

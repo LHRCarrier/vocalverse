@@ -115,7 +115,7 @@ def scan_due_jobs() -> int:
 def _resume_or_create(
     db, song, max_lrc_id: int, lrc_ids: list[int], revision: str, settings
 ) -> bool:
-    """refs 缺失/旧版 → 建新任务；已有 failed 任务且未达重试上限 → 重置重建。
+    """refs 缺失/旧版 → 建新任务；已有 failed 任务且**世代未变**且未达重试上限 → 重置重建。
 
     返回是否实际创建/恢复了任务（供扫描计数，仅计数用）。
     """
@@ -130,8 +130,9 @@ def _resume_or_create(
         .order_by(PitchExtractJob.id.desc())
         .limit(1)
     ).scalar_one_or_none()
-    if last_failed is not None and last_failed.attempts >= settings.pitch_extract_max_attempts:
-        # 已达重试上限：保留 failed 证据（payload 有错误快照），不无限重建
+    decision = retry_decision(last_failed, revision, settings.pitch_extract_max_attempts)
+    if decision == RETRY_SKIP:
+        # 已达重试上限且世代未变：保留 failed 证据（payload 有错误快照），不无限重建
         logger.warning(
             "pitch extract job failed beyond attempts song=%s (attempts=%s)",
             song.id,
@@ -144,6 +145,14 @@ def _resume_or_create(
         last_failed.revision = revision
         last_failed.lrc_id = max_lrc_id
         last_failed.finished_at = None
+        if decision == RETRY_RESET:
+            # P1-12：提取器换代 / LRC 换代 → 旧世代的失败次数不该消耗新世代的预算
+            last_failed.attempts = 0
+            logger.info(
+                "pitch extract job retry budget reset (new generation) song=%s prev_revision=%s",
+                song.id,
+                revision,
+            )
         return True
     db.add(
         PitchExtractJob(
@@ -155,6 +164,39 @@ def _resume_or_create(
         )
     )
     return True
+
+
+# 失败任务的重建决策（P1-12）
+RETRY_SKIP = "skip"  # 世代未变且已达上限：不自动重建（保留失败证据）
+RETRY_REQUEUE = "requeue"  # 同世代未达上限：常规重试（attempts 不清零）
+RETRY_RESET = "reset"  # 世代变化：重置 attempts，给新世代完整预算
+RETRY_PROBE = "probe"  # 世代不明（历史失败行未记版本）：只放行一次探针（attempts 不清零）
+
+
+def retry_decision(last_failed: PitchExtractJob | None, revision: str, max_attempts: int) -> str:
+    """failed 任务是否值得重建（P1-12 修复）。
+
+    修复前：`attempts >= max_attempts` → **永久**跳过。于是「提取器世代升级」后（例如
+    BUG-2 的 pyin-v1 → pyin-v2：旧代码 upsert 撞唯一键导致 3 首 demo 全 failed、重试至上限），
+    即使失败原因已随换代修好，扫描也再不会重建 → 该歌永久停在 `pitch_ref_status=missing`，
+    只能人工改库（拷问报告 P1-12 / 2-C）。
+    现判据按"世代是否变化"分级：
+
+    - payload 记了 `extractor_version` 且 != 当前 → **换代**（`reset`，完整新预算）；
+    - 行上 `revision` != 当前 LRC 世代 → **LRC 变了**（追加/重写，`reset`）；
+    - 未记版本的历史失败行 → 世代不明，`probe`：放行**一次**（不重置 attempts，失败即回到上限）。
+    """
+    if last_failed is None:
+        return RETRY_REQUEUE  # 无 failed 行 → 调用方走新建分支（返回值仅作语义占位）
+    attempts = int(last_failed.attempts or 0)
+    attempted = (last_failed.payload or {}).get("extractor_version")
+    if last_failed.revision != revision or (
+        attempted is not None and attempted != EXTRACTOR_VERSION
+    ):
+        return RETRY_RESET
+    if attempts >= max_attempts:
+        return RETRY_SKIP if attempted is not None else RETRY_PROBE
+    return RETRY_REQUEUE  # 同世代未达上限：常规重试（attempts 不清零）
 
 
 def _resend_delegation_for_ready_songs(db) -> None:
@@ -224,14 +266,19 @@ async def _drain_queue() -> None:
         db.close()
     if not jobs:
         return
-    # 并发闸门：提取信号量（与评分/whisper 相互独立）
+    # 并发闸门：**逐任务**取信号量（P1-12 修复）。
+    # 修复前是 `async with _sem(): await gather(...)`——信号量包住整批，只限制"批次数"而非
+    # "并发任务数"：`pitch_extract_concurrency=2`（docs/06 §8③ 的 CPU 队列语义）时，一批 8 个
+    # queued 任务会**同时**进线程池跑 pyin（8×CPU 密集 + 各自 ffmpeg/内存峰值）→ 打满容器。
+    await asyncio.gather(
+        *(_run_one_job(int(j.id), settings.pitch_extract_max_attempts) for j in jobs)
+    )
+
+
+async def _run_one_job(job_id: int, max_attempts: int) -> None:
+    """单个提取任务：取信号量 → 线程池执行（并发上限 = `pitch_extract_concurrency`）。"""
     async with _sem():
-        await asyncio.gather(
-            *(
-                asyncio.to_thread(run_job_sync, int(j.id), settings.pitch_extract_max_attempts)
-                for j in jobs
-            )
-        )
+        await asyncio.to_thread(run_job_sync, job_id, max_attempts)
 
 
 def claim_job(job_id: int) -> bool:
@@ -278,6 +325,9 @@ def run_job_sync(job_id: int, max_attempts: int = 3) -> None:
         fail_payload = {
             "error": str(exc),
             "failed_at": datetime.now(UTC).isoformat(),
+            # P1-12：记录**本次尝试所用提取器世代**——扫描据此区分"换代重试"与"同世代撞上限"
+            # （否则换代后该歌永久停在 missing；见 retry_decision）。
+            "extractor_version": EXTRACTOR_VERSION,
         }
         _finish_job(job_id, fail_payload)
         return
@@ -330,24 +380,40 @@ def _run_job_inner(job_id: int, audio_dir: str) -> None:
             end = start + max(500, int(track.hop_ms * 4))
         line_windows.append((start, end))
 
-    # 写 refs（Python 写方；lrc_id 唯一 → 幂等覆盖）
+    # 写 refs（Python 写方；lrc_id 唯一 → **幂等 upsert**）
+    #
+    # BUG-2（2026-09-10）：原实现只 `db.add(...)`，依赖「LRC 重写 → CASCADE 清空旧行」
+    # 这条路径；但**提取器世代升级重提取**（pyin-v1 → pyin-v2）时旧行仍在同一 lrc_id 上
+    # → UniqueViolation(uq_song_pitch_refs_lrc_id) → 整首失败、重试至上限后永久放弃
+    # （3 首 demo 实测全 failed）。改为：先按 lrc_id 查已有行 → 有则就地更新（ORM 属性
+    # 赋值），无则新增——同 LRC 世代的任意次重提取/世代升级均幂等。
     db = get_session_factory()()
     try:
         for line, (start, end) in zip(lines, line_windows, strict=True):
             payload = slice_window(track, start, end)
             # frame_start/frame_end 是 slice_window 的辅助键（起唱检测取能量用），
-            # 不属参考旋律契约（song_pitch_refs.pitch_ref = {f0s,notes,midi}），剔除
+            # 不属参考旋律契约（song_pitch_refs.pitch_ref = {f0s,notes,midi,onsets_ms}），剔除
             pitch_ref = {k: v for k, v in payload.items() if k not in ("frame_start", "frame_end")}
-            db.add(
-                SongPitchRef(
-                    lrc_id=int(line.id),
-                    start_ms=payload["start_ms"],
-                    end_ms=payload["end_ms"] or end,
-                    pitch_ref=pitch_ref,
-                    extractor="pyin",
-                    version=EXTRACTOR_VERSION,
+            ref = db.execute(
+                select(SongPitchRef).where(SongPitchRef.lrc_id == int(line.id))
+            ).scalar_one_or_none()
+            if ref is None:
+                db.add(
+                    SongPitchRef(
+                        lrc_id=int(line.id),
+                        start_ms=payload["start_ms"],
+                        end_ms=payload["end_ms"] or end,
+                        pitch_ref=pitch_ref,
+                        extractor="pyin",
+                        version=EXTRACTOR_VERSION,
+                    )
                 )
-            )
+            else:
+                ref.start_ms = payload["start_ms"]
+                ref.end_ms = payload["end_ms"] or end
+                ref.pitch_ref = pitch_ref
+                ref.extractor = "pyin"
+                ref.version = EXTRACTOR_VERSION
         db.commit()
     finally:
         db.close()

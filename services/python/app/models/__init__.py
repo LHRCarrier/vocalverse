@@ -24,7 +24,7 @@ from .content import (
 from .defense import DefenseProfile
 from .difficulty import MaterialDifficulty
 from .mastery import UserCorpusMastery, UserMastery
-from .practice import Attempt, Score, Session, SingAttempt
+from .practice import Attempt, Score, Session, SingAttempt, SongFavorite
 from .skill import UserSkillState
 from .tickets import Ticket
 from .usage import UsageLog
@@ -53,6 +53,7 @@ __all__ = [
     "Attempt",
     "Score",
     "SingAttempt",
+    "SongFavorite",
     # 社区域（Java 写方 · Python 只读映射，docs/37 §3）
     "Post",
     "PostComment",

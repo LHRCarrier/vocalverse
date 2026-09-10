@@ -30,10 +30,11 @@ from app.audio.sing import (
     LineScore,
     SingScoreResult,
     get_sing_scorer,
+    window_scale,
 )
 from app.audio.upload import validate_audio_bytes
 from app.core.config import get_settings
-from app.core.ratelimit import consume
+from app.core.ratelimit import consume_all
 from app.core.response import BizError
 from app.db import get_session_factory
 from app.models import Lrc, Session, SingAttempt, Song, SongPitchRef
@@ -124,19 +125,34 @@ async def submit_song_audio(user_id: int, session_id: int, audio: bytes) -> dict
                 code=40905,
                 message=f"reference pitch not ready (status={song.pitch_ref_status})",
             )
-        # 幂等：同会话重复上传 → 返回既有 attempt（不重复建任务/不重复扣桶？
-        # 扣桶防线：已存在草稿行则跳过扣桶与建任务，直接返回既有 attempt）
+        # 幂等 / 重试（2026-09-10 · P1-3 修复）：
+        # 同一 `(user, session)` **只允许一行**
+        # （唯一键 `uq_sing_attempts_user_session`，迁移 0012），
+        # 故"再来一次"必须区分三种情形：
+        #   ① 已完成（有逐句结果或有分）→ 幂等返回既有结果（不重复扣桶/建任务）；
+        #   ② 任务仍在跑（queued/processing）→ 幂等返回状态（防双击重复扣桶）；
+        #   ③ 失败/中断的草稿（lines 空、无分、任务态已丢）→ **就地重置**该行并重跑——
+        #      修复前 `.first()` 无条件复用（含 failed 行）→ 同会话永远只返回那次失败，
+        #      用户无法重试（拷问报告 P1-3 / B-F7 / C-#3）；而"新建一行"又会撞唯一键。
+        # 依据：docs/10 §4.3（sing_attempts 唯一键 + 草稿行语义：分数 NULL = 未定稿）、
+        # docs/21 §3.6（幂等语义）、docs/11 Q-B08（不伪造分数）。
         existing = (
             db.execute(
-                select(SingAttempt).where(
-                    SingAttempt.user_id == user_id, SingAttempt.session_id == session_id
-                )
+                select(SingAttempt)
+                .where(SingAttempt.user_id == user_id, SingAttempt.session_id == session_id)
+                .order_by(SingAttempt.id.desc())
             )
             .scalars()
             .first()
         )
+        reuse_attempt_id: int | None = None
         if existing is not None:
-            return await _status_payload(int(existing.id))
+            if _attempt_finished(existing):
+                return await _status_payload(int(existing.id))
+            task = await _task_get(int(existing.id))
+            if task is not None and task.get("status") in ("queued", "processing"):
+                return await _status_payload(int(existing.id))
+            reuse_attempt_id = int(existing.id)  # ③ 失败草稿：就地重置后继续走上传
     finally:
         db.close()
 
@@ -156,26 +172,48 @@ async def submit_song_audio(user_id: int, session_id: int, audio: bytes) -> dict
         )
 
     # 分桶限流（D3：sing 整首计 1 + ise 抽样句计 1；等待中不重复扣——幂等分支在上）
-    await consume("sing", settings.sing_rate_per_hour, user_id)
-    await consume("ise", settings.ise_rate_per_hour, user_id)
+    # P1-13：两桶**一起扣**（`consume_all`：任一超限 → 全量回滚 + 429）。旧写法逐桶顺序扣，
+    # ISE 桶超限时 sing 桶已扣且不回滚 → 用户重试再扣一次（同一会话的重传被计两次），
+    # 且 ISE 额度耗尽期间每次重试都白扣一个 sing（用户始终拿不到结果却在烧额度）。
+    await consume_all(
+        [("sing", settings.sing_rate_per_hour), ("ise", settings.ise_rate_per_hour)], user_id
+    )
 
     audio_url = save_audio_bytes(data)
 
     db = get_session_factory()()
     try:
-        attempt = SingAttempt(
-            user_id=user_id,
-            session_id=session_id,
-            song_id=int(session.song_id),
-            duration_s=max(1, int(dur or 0)),
-            audio_url=audio_url,
-            is_complete=False,
-            lines=[],
-            alignment={},
-        )
-        db.add(attempt)
-        db.commit()
-        attempt_id = int(attempt.id)
+        if reuse_attempt_id is not None:
+            # ③ 失败草稿**就地重置**（P1-3）：重写素材/时长并清空结果，行 id 不变
+            # （唯一键保证同会话只有一行；不可变语义仍成立——只有"未定稿"的草稿会被重写）
+            attempt = db.get(SingAttempt, reuse_attempt_id)
+            if attempt is not None:
+                attempt.audio_url = audio_url
+                attempt.duration_s = max(1, int(dur or 0))
+                attempt.is_complete = False
+                attempt.lines = []
+                attempt.alignment = {}
+                attempt.scoring_version = SCORING_VERSION
+                attempt.ref_version = None
+                db.commit()
+                attempt_id = reuse_attempt_id
+                logger.info("sing attempt=%s draft reset for retry (user=%s)", attempt_id, user_id)
+            else:  # 行被并发删掉（理论竞态）→ 回落新建
+                reuse_attempt_id = None
+        if reuse_attempt_id is None:
+            attempt = SingAttempt(
+                user_id=user_id,
+                session_id=session_id,
+                song_id=int(session.song_id),
+                duration_s=max(1, int(dur or 0)),
+                audio_url=audio_url,
+                is_complete=False,
+                lines=[],
+                alignment={},
+            )
+            db.add(attempt)
+            db.commit()
+            attempt_id = int(attempt.id)
     finally:
         db.close()
 
@@ -205,13 +243,18 @@ async def _run_attempt(attempt_id: int) -> None:
         try:
             await _run_attempt_inner(attempt_id)
         except Exception as exc:
+            # 2026-09-10 P0-5：失败对外**码化**——已登记 50003（参考旋律提取/唱歌评分算法失败）
+            # + 可读中文文案；异常细节只进服务端日志（G-#12：不再回传容器绝对路径/内部异常串）。
+            # `code` 让前端可按码映射（`api/sing.ts:singFailureMessage`），不再靠 message 匹配。
+            # 依据：docs/api/error-codes.md:31（50003）、docs/21 §3.6、docs/api/envelope.md。
             logger.exception("sing attempt=%s failed: %s", attempt_id, exc)
             await _task_set(
                 attempt_id,
                 {
                     "status": "failed",
                     "progress": {"done_lines": 0, "total": 0},
-                    "error": str(exc),
+                    "code": 50003,
+                    "error": "评分失败，请重试",
                 },
             )
 
@@ -298,6 +341,16 @@ async def _pron_sample_lines(wav: str, result: SingScoreResult, n: int) -> dict[
     scorer = None
     sampled: dict[int, float] = {}
     offset = float(result.alignment.get("offset_ms") or 0.0)
+    # 句窗缩放与评分侧同源（BUG-4：用户慢 → 句更长，见 sing.py:window_scale 的 clamp 说明）
+    scale = window_scale(result.alignment.get("bpm_ratio"))
+    # v6（2026-09-10 F1）：评分侧把每句的**用户时间轴窗口**写进 alignment.windows_ms（时间弯折），
+    # 抽样直接复用同一份映射，杜绝"评分用弯折窗、发音用仿射窗"的口径分叉；旧行（v5 及以前）无该键
+    # → 回退到 v5 公式（+offset 与 window_scale）。
+    windows = {
+        int(w[0]): (float(w[1]), float(w[2]))
+        for w in (result.alignment.get("windows_ms") or [])
+        if isinstance(w, (list, tuple)) and len(w) >= 3
+    }
     scored = [line for line in result.lines[:n] if not line.skipped]
     try:
         from app.audio.base import get_scorer_client
@@ -306,7 +359,22 @@ async def _pron_sample_lines(wav: str, result: SingScoreResult, n: int) -> dict[
     except Exception:
         scorer = None
     for line in scored:
-        seg = await _slice_wav(wav, line.start_ms - offset, line.end_ms - offset)
+        # 句窗口映射到**用户时间轴**：与评分侧完全同口径。
+        # - v6（2026-09-10 F1）：优先用评分侧下发的 `alignment.windows_ms`
+        #   （时间弯折：路径局部中位），
+        #   起点与长度同源，避免"评分用弯折窗、发音用仿射窗"的分叉；
+        # - v5 及更早的行没有该键 → 回退 `line.start_ms + offset`（+ window_scale 缩句长）。
+        # 2026-09-10 修复（P0）：旧实现写的是 `line.start_ms - offset`（**方向反**）——
+        # offset>0（用户整体晚起唱，真机实测 2272ms）时切片落在静音/别的句子上，占综合
+        # 0.3 权重的发音分与真实演唱无关，且不可复现（Fake 打分器 offset=0 使单测看不见）。
+        # 依据：docs/06 §9.4（时间轴不变式 + 句窗弯折）、docs/21 §3.6、docs/10 §4.3。
+        mapped = windows.get(int(line.seq))
+        if mapped is not None:
+            win_start, win_end = mapped
+        else:
+            win_start = float(line.start_ms) + offset
+            win_end = win_start + max(1.0, (float(line.end_ms) - float(line.start_ms)) * scale)
+        seg = await _slice_wav(wav, win_start, win_end)
         if seg is None:
             continue
         try:
@@ -363,12 +431,21 @@ def _read_range(wav: str, start_sample: float, end_sample: float):
 
 
 def _reaggregate_pron(result: SingScoreResult) -> None:
-    """发音抽样后重算 pron + overall（评分器聚合时 pron 未知；缺失降权语义不变）。"""
+    """发音抽样后重算 pron + overall（评分器聚合时 pron 未知；缺失降权语义不变）。
+
+    音准权重用 ``result.pitch_weight``（口径 v3 · item8 动态权重：参考缺失多时
+    aggregate 已按三段政策降/清零）；综合分再乘 ``result.coverage_conf``
+    （口径 v4 · R3：用户有效句覆盖率置信度，<40% → 0 → overall None 不给分）——
+    与 ``aggregate_result`` 同口径复算，否则两处口径不一致。
+    """
     from app.audio.sing import _mean, _weighted_overall
 
     prons = [line.pron_score for line in result.lines if line.pron_score is not None]
     result.pron = _mean(prons)
-    result.overall = _weighted_overall(result.pitch, result.rhythm, result.pron, 0.5, 0.2, 0.3)
+    wp = result.pitch_weight if result.pitch_weight is not None else 0.5
+    weighted = _weighted_overall(result.pitch, result.rhythm, result.pron, wp, 0.2, 0.3)
+    conf = result.coverage_conf if result.coverage_conf is not None else 1.0
+    result.overall = None if (weighted is None or conf <= 0) else round(weighted * conf, 2)
 
 
 async def _finish_attempt(
@@ -422,8 +499,11 @@ def _line_dict(line: LineScore) -> dict:
         "reason": line.reason,
         "ref_seq": line.ref_seq,
         "no_ref": line.no_ref,
-        # v2：该句起唱偏差 ms（相对「LRC 时间戳 + 整首对齐偏移」；None = 未检出）
+        # v2：该句起唱偏差 ms（相对「LRC 时间戳 + 整首对齐偏移」；None = 未检出
+        # 或句前已在持续发声——口径 v4 · R1 起唱判据）
         "onset_dev_ms": line.onset_dev_ms,
+        # v4 · R2：音符命中率（是否唱在参考旋律上；<0.5 → 该句 off_melody 降权）
+        "note_hit_rate": line.note_hit_rate,
         "user_f0": line.user_f0,
         "cent_dev": line.cent_dev,
     }
@@ -450,6 +530,20 @@ async def get_attempt_status(attempt_id: int, user_id: int) -> dict:
     return await _status_payload(attempt_id)
 
 
+def _attempt_finished(attempt: SingAttempt) -> bool:
+    """评分是否**已终结**（任务态丢失后的 DB 兜底判据，与结果端点同口径）。
+
+    2026-09-10 P1 修复：v4/v5 口径**允许 `overall_score` 为 NULL**（覆盖率 <40% 不给综合分，
+    `sing.py:overall = None if conf <= 0`），而旧判据「`overall_score is not None` 才算 done」
+    会把这批**已经算完**的 attempt 判成 `failed` +「评分任务中断」——用户看到"失败"、报告入口
+    消失，重录还要再扣一次额度（拷问报告 P1-1，B/C/G 三路交叉；`docs/21:175` 曾把错判据写成契约）。
+    现判据 = 「有逐句结果（`lines` 非空，逐句唯一真源）**或**有综合分」，与 `get_attempt_result`
+    的可读判据一致；真正未算完的（两者皆无）仍返回 50002 中断。
+    依据：docs/06 §9.4（v4 R3 / v5）、docs/10 §4.3（lines 为逐句唯一真源）、docs/21 §3.6。
+    """
+    return bool(attempt.lines) or attempt.overall_score is not None
+
+
 async def _status_payload(attempt_id: int) -> dict:
     task = await _task_get(attempt_id)
     if task is not None:
@@ -458,7 +552,7 @@ async def _status_payload(attempt_id: int) -> dict:
     db = get_session_factory()()
     try:
         attempt = db.get(SingAttempt, attempt_id)
-        if attempt is not None and attempt.overall_score is not None:
+        if attempt is not None and _attempt_finished(attempt):
             return {
                 "attempt_id": attempt_id,
                 "status": "done",
@@ -474,7 +568,10 @@ async def _status_payload(attempt_id: int) -> dict:
         "attempt_id": attempt_id,
         "status": "failed",
         "progress": {"done_lines": 0, "total": 0},
-        "error": "task lost (server restarted); please retry",
+        # 2026-09-10 P0-5：码化 + 中文（原文 task lost 英文串直接透给用户）。
+        # 判据见 :func:`_attempt_finished`（P1 起与结果端点同口径）。
+        "code": 50002,
+        "error": "评分任务中断（服务重启或结果超时），请重试",
     }
 
 
