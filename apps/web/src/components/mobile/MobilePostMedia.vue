@@ -1,76 +1,53 @@
 <script setup lang="ts">
 /**
- * 社区卡片 · 配图/视频封面（docs/34 §4：tweetImage 粒度对照；S1 真实流）
+ * 社区卡片 · 单媒体兼容层（docs/34 §4；S1 调用点不破）
  *
- * 媒体来自后端 media jsonb（字段集对齐 MediaItem：type/url/coverUrl/duration_s…，
- * C-06/D-Q1）；无 url 时渐变占位（作者 tint 派生）；视频=封面+时长+播放角标
- * （点击给「视频播放 S3 上线」反馈，A-13）；外链失效 onerror 降级渐变（B-12）。
+ * 2026-09-09（社区 S3）：真正的渲染已下沉到 `MobileMediaGrid`（多图宫格 + 视频封面），
+ * 本组件保留原 props 形状（`media` / `kind` / `durationS`）作为兼容壳：
+ * 老调用点无需改，新代码直接用 `MobileMediaGrid`。
+ *
+ * `normalizeMedia()` 兼容三种历史形状（S1 种子 `duration_s` / S1 真实 `url` / S3 `items[]`，
+ * docs/48 B8）——修复前前端只读 `durationS`，种子视频的时长角标一直是空的。
  */
 import { computed } from 'vue'
 
-import MobileIcon from '@/components/mobile/MobileIcon.vue'
-import { formatDuration } from '@/api/community'
+import MobileMediaGrid from '@/components/mobile/MobileMediaGrid.vue'
 import { useUiStore } from '@/stores/ui'
+import { normalizeMedia } from '@/types/community'
 
-import type { CommunityPostView } from '@/types/community'
+import type { CommunityPostView, PostMedia } from '@/types/community'
 
-const props = defineProps<{
-  media: CommunityPostView['media'] | null
-  kind: CommunityPostView['kind']
-  tintGradient: string
-  durationS?: number | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    media: PostMedia | null
+    kind: CommunityPostView['kind']
+    tintGradient: string
+    durationS?: number | null
+    /** 列表卡：只渲首图 + 「+N」角标 */
+    compact?: boolean
+  }>(),
+  { compact: false, durationS: null },
+)
 
 const ui = useUiStore()
 
-/** 媒体类型（后端 type；无媒体时按 kind 兜底） */
-const mediaType = computed<'video' | 'image' | 'none'>(() => {
-  if (props.media?.type === 'video' || props.kind === 'video') return 'video'
-  if (props.media?.type === 'image' || props.media?.url) return 'image'
-  return 'none'
+const normalized = computed(() => {
+  const m = normalizeMedia(props.media, props.kind)
+  // 兼容旧调用点传入的 durationS 覆盖（S1 的 MobilePostCard 曾显式传它）
+  return props.durationS != null ? { ...m, durationS: props.durationS } : m
 })
 
-const label = computed(() => {
-  if (mediaType.value === 'video') return '🎬 VIDEO'
-  if (mediaType.value === 'image') return '🖼️ PHOTO'
-  return props.kind === 'checkin' ? '🔥 CHECK-IN' : '📰 POST'
-})
-
-const durationText = computed(() => formatDuration(props.durationS ?? props.media?.durationS))
-
-function onPlayClick() {
-  ui.showToast('视频播放 S3 上线')
+/** 列表卡点视频：进详情页播放（不再弹「S3 上线」占位 toast） */
+function onPlay() {
+  if (props.compact) ui.showToast('打开内容即可播放')
 }
 </script>
 
 <template>
-  <div
-    class="u-comm-media"
-    :class="{ 'u-comm-media--video': mediaType === 'video' }"
-    :style="{ background: props.tintGradient }"
-  >
-    <!-- 真实图片（外链；onerror 降级渐变占位） -->
-    <img
-      v-if="mediaType === 'image' && (props.media?.url || props.media?.coverUrl)"
-      class="u-comm-media__img"
-      :src="props.media?.coverUrl ?? props.media?.url ?? ''"
-      :alt="props.kind === 'video' ? '视频封面' : '配图'"
-      loading="lazy"
-      @error="($event.target as HTMLImageElement).style.display = 'none'"
-    >
-
-    <!-- 视频封面：播放钮（可点，反馈占位 toast） -->
-    <button
-      v-if="mediaType === 'video'"
-      class="u-comm-media__play"
-      type="button"
-      aria-label="播放视频"
-      @click="onPlayClick"
-    >
-      <MobileIcon name="play" :size="22" />
-    </button>
-
-    <span v-if="mediaType === 'video' && durationText" class="u-comm-media__dur">{{ durationText }}</span>
-    <span class="u-comm-media__label">{{ label }}</span>
-  </div>
+  <MobileMediaGrid
+    :media="normalized"
+    :compact="props.compact"
+    :tint-gradient="props.tintGradient"
+    @play="onPlay"
+  />
 </template>

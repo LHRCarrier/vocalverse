@@ -1,4 +1,6 @@
 import { fileURLToPath, URL } from 'node:url'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 import vue from '@vitejs/plugin-vue'
 import UnoCSS from 'unocss/vite'
@@ -44,6 +46,18 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    /**
+     * HTTPS（可选，2026-09-10 组长拍板「方案 A」：手机端录音 getUserMedia 要求安全上下文）。
+     * 默认关闭（局域网 HTTP 仍可用）；要开就设 VITE_HTTPS_CERT/VITE_HTTPS_KEY 指向证书。
+     * 证书用 mkcert 生成（含 192.168.0.104/localhost/127.0.0.1 的 SAN）→ 手机装一次 CA 即信任。
+     */
+    https:
+      process.env.VITE_HTTPS_CERT && process.env.VITE_HTTPS_KEY
+        ? {
+            cert: readFileSync(resolve(process.env.VITE_HTTPS_CERT)),
+            key: readFileSync(resolve(process.env.VITE_HTTPS_KEY)),
+          }
+        : undefined,
     proxy: {
       // 语音/LLM 热路径：直连 Python（docs/06 第 1 章）
       '/api/v1': {

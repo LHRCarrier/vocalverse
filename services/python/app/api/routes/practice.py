@@ -18,6 +18,7 @@ from sqlalchemy import func, select
 
 from app.audio.base import get_llm_client
 from app.audio.upload import resolve_media_type, validate_audio_bytes
+from app.console.trace.recorder import span, trace
 from app.core.auth import get_current_user_id
 from app.core.config import get_settings
 from app.core.ratelimit import bucket_limits, consume_all
@@ -377,16 +378,21 @@ async def _require_session_owner(session_id: int, user_id: int) -> None:
 
 async def _summary_for(llm, session_id: int) -> str:
     try:
-        return await llm.chat(
-            [
-                {
-                    "role": "user",
-                    "content": "Summarize this speaking practice in one friendly sentence.",
-                }
-            ],
-            temperature=0.4,
-            max_tokens=80,
-        )
+        # docs/50 §7.2：收尾一句话摘要 = 一次独立 LLM 尝试（kind=summary，独立 trace）
+        with (
+            trace(kind="summary", session_id=session_id),
+            span("LLM", retry_index=0, purpose="complete_summary"),
+        ):
+            return await llm.chat(
+                [
+                    {
+                        "role": "user",
+                        "content": "Summarize this speaking practice in one friendly sentence.",
+                    }
+                ],
+                temperature=0.4,
+                max_tokens=80,
+            )
     except Exception:
         return "Well done! Keep practicing."
 

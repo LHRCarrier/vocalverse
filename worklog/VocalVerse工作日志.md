@@ -3,6 +3,18 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 合并 main 到唱歌分支（PR #34 解冲突）：迁移编号重排 + 合并期修复 · 1 op
+
+- **背景**：PR #34（`feat/sing-m3-hardening`）因分支落后 `origin/main` 59 个提交而 **CONFLICTING**——GitHub 对冲突 PR 不生成 merge ref ⇒ **一个 CI check 都不会跑**。组长拍板由我合 main 解冲突。共 23 处冲突（`git merge origin/main`）。
+- **迁移编号重排（阻塞级）**：两侧都用了 0010/0011/0012（main：reading / media / direct_messages；本分支：sing_p0 / song_favorites / 幂等键）→ alembic `Revision present more than once` + 多头，`test_alembic_*`、`test_pg_integration` 全红。本分支三支改为 **0014_sing_p0 / 0015_song_favorites / 0016_sing_attempt_idempotency_key**（接 main 的 0013_console），同步 20 处 docs/测试/代码引用。⚠️ **旧编号下已跑过迁移的开发库无法前滚**（0012 语义已变，直接前滚会跳过 main 的 0010~0013）→ 需重建库；本机已 drop/create + `migrate` 跑通 **0001→0016 全链 + 种子**，并顺带在**全新库**上复验了 F2 修复（3 首歌自动提取 → `pitch_ref_status=ready`，无需人工干预）。
+- **旧管理端退役（跟随 main 决议）**：`ContentAdminController` / `ContentAdminApiTest` 随 main 删除（能力已在 `ConsoleContentWriteController` 重建；`replaceLrc` 仍无条件置 `missing` 的 D2 语义保留）；前端 preview 的 `admin-dashboard` / `admin-users` 入口一并移除（页面已删、`layout:'admin'` 类型已废）——双侧新增的 preview 路由与 registry 条目（唱歌联调台 / 社区 S3 / 读书）都保留。
+- **体量护栏取并集**：main 为社区视频把 nginx 放宽到 64m，本分支的应用层守卫原为 20MB+1MB → 改为 `max(音频 20MB, 视频 64MB) + 1MB`（否则 30MB 视频会被自己的护栏挡掉）；nginx `client_max_body_size 65m` + `error_page 413` JSON envelope 保留。两条路径均在容器实测。
+- **契约重生成**：Python 快照 **66 ops**（main 48 + 本分支唱歌端点）；Java 快照 **69 ops**（main 68 + `/internal/song/{songId}/pitch-status`），并与**合并后真容器** `/v3/api-docs` 去 `servers` 后**逐字段核对一致**（CI 同款判据）；`pnpm gen:api` 重生成双 d.ts。
+- **合并期修复（3 条）**：① 容器启动时 `uv run` 默认带上 dev 组 → 每次启动去 PyPI 下载 ruff/mypy（实测网络慢时卡住 → 健康检查失败 → 依赖它的 web 起不来）→ compose 置 `UV_NO_DEV=1`，启动从分钟级回到秒级；② main 的 `test_trend_is_dense_and_zero_filled` 有时区/小时依赖（`day0 = (now-3d).replace(hour=12)` 在 UTC 小时 >12 时落在窗口外 → 恒失败）→ 改为按窗口起点 +12h 取种子时刻；③ 本分支 `test_oversized_body_end_to_end_413` 随上限口径更新（否则新上限下不再触发 413）。
+- **验证（合并后全套）**：Python `ruff` + `pytest -q` **653 passed**；前端 `lint`/`typecheck`/**285 passed**/`build`/`check-bundle` 全绿；容器复测脚本 `scripts/sing_container_test.py` **42/42 PASS**（含应用层 41301 与**网关层 65m+JSON envelope** 两条路径）；Java 契约与运行态一致；PG 单头 **0016**。
+- **踩坑**：① 两侧各自新建迁移必然撞号——**跨分支合并时先看 `alembic heads` 再谈其它**，并把「重排 + 引用同步 + 重建库」当作合并的一部分；② "keep both sides" 的机械合并对**代码块**不成立（preview 路由/registry 被拼成非法 TS），必须逐块看内容；③ 生成物（快照/类型）永远重生成，不手改；④ 冲突 PR 无 CI 是**平台行为**，不是工作流写错（本地 YAML 合法 + main 上工作流正常）。
+- **产出**：合并提交（本记录所属）+ PR #34 更新（冲突已解、CI 可跑）。
+
 ## 2026-09-10 口径 v6（F1 修复）：句窗时间弯折 + 起唱判据换能量口径（组长拍板方案 A）· 1 op
 
 - **背景**：全方面复测发现的 F1——**用户唱得比参考慢（`bpm_ratio<1`）时整首没有节奏分**（`reason='no_onset'` 6/6 句，`overall` 静默按 0.5/0.3 重算）。PG 历史 26 条 attempt 中 `ratio<1` 的**全部**无 `rhythm_score`、`ratio>1` 的都有（方向性明确）；演示素材 `local/sing_test_user.wav` 正是 `ratio=0.826`，演示链路「节奏」维度长期为空。
@@ -298,6 +310,530 @@
 - **遗留登记**：发音「weak 句优先」为 P2 增强（当前前 N 句）；重唱薄弱句（SG-15）M3 弹性未做；人工抽检 5 首×5 句 r≥0.7 排期在 W3（SG-14）；评分信号量观测与 60s 部署预热未跑（M4）；`sing_attempts` 无 (user_id,session_id) 唯一约束（幂等为应用层查重，DB 级守护留 P2）。
 
 —— 执行人：AI 代签（正式署名待组长确认），2026-09-09
+## 2026-09-10 修 main 上的 python-ci：Python 契约快照缺 21 条控制台路由
+
+- **起因**：直推 main 后 CI 报 `Some checks were not successful`——`python-ci / lint · test · alembic` 1 分钟后失败，
+  其余 4 项（docker-build ×3、secret-scan）成功。
+
+- **定位**：用 `gh run view --json jobs` 看到**失败步骤是 `Contract: OpenAPI snapshot in sync`**
+  （前面 11 步全绿，含 bench 预算门禁、单写方探针、开关三处对账）。本地复现该步骤的比对逻辑：
+
+  | 项 | 结果 |
+  |---|---|
+  | 快照**缺失**的路径 | **21 条 `/api/v1/console/**`**（ops 的 overview/services/concurrency/metrics/alerts/traces + library 的 books/chapters/media） |
+  | `components.schemas` | 48 → 50 |
+  | `/readyz` | schema 有变化 |
+
+  即 **Python 侧控制台路由从未进过契约快照**（历史 commit `813a934` 声称"控制台 37 op 接入"，
+  实际只覆盖了 Java 侧 41 条 / Python 侧 0 条）——CI 直接用 `app.openapi()` 比对，所以一推上来就红。
+
+- **修法**：按仓内官方路径 `scripts/refresh-openapi.ps1` 刷新，然后**刻意只留两个文件**：
+  `apps/web/src/api/specs/python-openapi.json`（+21 路由）+ `apps/web/src/api/generated/python-api.d.ts`（重生成）。
+
+- **刻意回退的 5924 行**：脚本对 Java 侧是 HTTP 原文落盘（紧凑单行），而 Java 的**规范生成器**
+  `ContractSnapshotTest`（`CONTRACT_SNAPSHOT_GENERATE=1`）写的是 `writerWithDefaultPrettyPrinter()` 美化版。
+  实测两者 JSON **语义完全相同**（68 路径 / 92 operation / 125 schema，零增删），
+  直接落盘会把提交版 5924 行压成一行 —— 纯噪音，故 `git checkout` 回退。
+  两者用 `JsonNode` 比对（格式无关），所以 java-ci 不受影响。
+  ⚠️ **登记工具缺陷（未修）**：`refresh-openapi.ps1` 写紧凑格式与规范生成器不一致 ——
+  任何人按文档跑该脚本都会得到这次 5924 行伪 diff；修它要让脚本改走 `CONTRACT_SNAPSHOT_GENERATE=1`
+  （自己缩进对不上 Jackson 的 `" : "` 分隔符），属行为变更，另立。
+
+- **验证（实跑）**：进程内 `app.openapi()` 与快照**逐字节一致**；`pnpm gen:api` **幂等**
+  （再跑一次 `git status` 无新改动，满足 frontend-ci 的 `git diff --exit-code`）；
+  推 main 后**手动 dispatch** `python-ci` → **success**。
+  另发现 `frontend-ci` / `admin-ci` **只挂 `pull_request` + `workflow_dispatch`**（没有 push:main），
+  即主线上平时根本不会跑 → 一并手动补跑：**frontend-ci success、admin-ci success**。
+  最终 `7c2a958` 上 **5/5 全绿**：admin-ci / frontend-ci / python-ci / docker-build / secret-scan。
+
+- **踩坑（我自己踩的，记下来）**：为验证"本地 `.env` 是否影响契约"，我用
+  `Push-Location` + `cd` + **相对路径** 在 `finally` 里恢复文件，结果 Pop 回的是内层目录，
+  恢复语句找不到目标 → **`services/python/.env` 一度被改名成 `.env.bak`**（若就此放着，
+  后续进程会读不到 DeepSeek key 而**静默走 Fake**）。已即时用绝对路径修回并校验
+  （2258 字节、`APP_DEEPSEEK_API_KEY`/`APP_CONSOLE_JWT_SECRET` 均在）。
+  **教训：脚本里一律用绝对路径，`try/finally` 里不要依赖当前目录。**
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 管理端后台（联调入口）：README 登记控制台账号 + 功能分支推送
+
+- **需求**：把管理端账号写进 `README.md` 方便组员测试；远端直推。
+
+- **口径裁决（没有把随机口令写进公开库）**：我先前给本机生成的是**随机 48 位控制台密钥 + 随机管理员口令**——
+  属密钥类，而本仓 `AGENTS.md` 安全节与 `.env.example` 开头都明写"公开仓库永远不出现真实密钥"，
+  写进去还会被 `secret-scan.yml` 拦。改用本仓**已有先例**：README 第 52/151 行早就公开写着
+  App 演示账号 `demoadult`/`demoteen`/`demosenior` + 口令 `demo123456`。
+  于是控制台联调账号复用**同一个已公开的演示口令** —— 不引入任何新秘密，同时做到"组员拿来就能登"。
+
+- **落地**：`README.md`「一键起停」小节内新增 🔑 段落（入口 / 账号口令 / 角色与权限数 /
+  为什么它不算密钥 / 可复制的根 `.env` bootstrap 两行 / 一次性语义 / 两条改口令路径 /
+  口令下限与弱口令规则 / 生产必须改掉）；根 `.env.example` 补上同样的可复制 bootstrap 值
+  —— 那里原先只有一句"变量清单见 `services/java/.env.example`"，而**那正是方式 B 下没人加载的文件**
+  （同类坑本轮已踩两次：控制台密钥、CORS 源）。
+
+- **本机同步 + 验证**：用控制台自己的 API 重置口令（不是改库）
+  `POST /api/v1/console/admins/1/password` → 200 `{reset:true,self:true}`；
+  经 Vite 代理（浏览器真实路径）登录 **200 / role=super**；**旧口令已失效（404）**。
+
+- **推送**：`feat/admin-console` → `origin`（45 个提交，已建立跟踪）。
+  按需求方选择**只保留功能分支**，未建 PR、未动 main（远端 main 与本地一致，无分叉）。
+  组员测试路径：`git fetch && git switch feat/admin-console` → 根 `.env` 配 `VOICEVERSE_CONSOLE_JWT_SECRET`
+  与 `APP_CONSOLE_JWT_SECRET`（同值）→ `pwsh -File scripts/dev-up.ps1 start -WithConsole` → http://localhost:5174 用 `admin`/`demo123456`。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 管理端后台（"工作台没数据"）：真 PG 的可空参数类型推断 —— 同类第四次（I-18）
+
+- **起因**：需求方反馈"点击工作台里面没数据，其他几个页面也是"，网络面板里有一条红色请求返回
+  `{"code":50002,"message":"服务内部错误"}`。
+
+- **先排除"是不是真没数据"**：
+  - `uvicorn` 访问日志显示浏览器的 ops 请求**全是 200**（`overview`、`services`、`traces/stats` 都 200），
+    后端返回的载荷里依赖探测**有 2 项**（database/redis 均 ok）、uptime 有值、self-monitoring 齐全；
+  - `ops_metric_samples` 真库里有 **570 行**（15:43→16:14，每分钟一条）→ 采集器**是好的**
+    （err 日志里的 `ops_metric_samples does not exist` 是**迁移前**的旧行，时间戳早于 15:42）；
+  - 性能指标页 UI 自己写着"本次扫描 67 行样本"，只是 30 分钟数据 + step=1800s ⇒ 每个序列只有 1 个桶
+    → "暂无足够数据点"。**这是诚实行为，不是 bug**。
+  - ⇒ 真正坏的是 **Java 三个端点**（`publish-events` / `audit-logs` / `users`）。
+
+- **根因（I-18）**：JPQL 里 `(:p is null or col = :p)` 与 `concat('%', :q, '%')` 两类写法，
+  在 **PostgreSQL** 上让参数**没有类型线索** —— PG 在 **Parse 阶段**就要求确定每个 `$n` 的类型，
+  而参数为 NULL 时 JDBC 驱动也不补类型 OID（非 NULL 会补）。于是出现极具误导性的表现：
+  **带筛选正常、清空筛选必炸**。三个端点的真实报错：
+  - `publish-events` → `could not determine data type of parameter $3`（$3 是 `from` 的空值判断）；
+  - `audit-logs` → 同款 + `operator does not exist: character varying ~~ bytea`（`like (?||'%')`）；
+  - `users` → `function lower(bytea) does not exist`（`'%'||?||'%'` 被 PG 解析成 bytea 版本）。
+
+- **为什么测试一直绿**：Java 测试跑在 **H2**，对这两类写法一概接受 ——
+  **H2 与 PG 的差异不在 SQL 方言，而在参数类型推断**。本仓同类已第四次（审核单 CAS 的 `coalesce`、
+  审计 `from/to`、`users` 的 concat、以及本次全仓普查）。
+
+- **修法**：全仓 **9 个文件 / 19 处**统一给"空值判断"与"拼接"里的参数加显式 cast
+  （`cast(:p as string|long|short|timestamp)`），比较那一侧仍由列提供类型，**语义逐字不变**；
+  并把 `TicketRepository` 里"该写法 PG 也能推断"的**错误注释**改成实测结论。
+  `mvn -B clean verify` → **169 tests / 0 failures / 0 errors**，spotless `154 files clean`。
+
+- **新增静态门禁 `scripts/check_pg_typed_params.py`**（这一类缺陷 H2 测不出，只能用门禁钉住）：
+  扫描 `services/java/src/main` 的 117 个文件，命中裸空值判断或拼接裸参数即失败并给出修法。
+  **正向 ok（exit 0）；反向**把 `SongRepository` 一处 cast 改回旧写法 → 精确报出
+  `SongRepository.java:13` 且 **exit 1**。已接入 `java-ci.yml`（按 AGENTS 要求本地 `yaml.safe_load` 通过）。
+
+- **真栈复验（修复后）**：清空筛选 10 条 + 带筛选 4 条端点**全部 HTTP 200**
+  （`publish-events` / `audit-logs` / `users` / `songs` / `scenarios` / `listening-materials` /
+  `questions` / `tickets` / `moderation/cases` / `moderation/reports`）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 管理端后台（浏览器登录 403）：CORS 用错源清单 + 覆盖项从未生效（I-17）
+
+- **起因**：需求方截图 —— 控制台登录页报「**服务返回非标准响应（HTTP 403）**」，请求载荷正常
+  （`{username:"admin", password:"…"}`）。403 + 非 Envelope ⇒ **过滤器层**拒的，不是业务层。
+
+- **定位过程（记下来，因为第一直觉是错的）**：
+  1. 直连 8080 不带 `Origin` → **200**；带上 `Origin: http://localhost:5174` → **403**。
+     ⇒ 是 CORS。**注意**：控制台 dev 走 Vite 代理，直觉"同源、不涉及 CORS"是错的 ——
+     代理 `changeOrigin: true` 把 Host 改写成 8080 后**原样转发 `Origin`**，Java 侧按跨源处理。
+  2. 于是把 `http://localhost:5174` 加进 `ConsoleSecurityConfig.EXISTING_ORIGINS` → **仍然 403**
+     （响应体解码后是 `Invalid CORS request`；此前看到代理响应里的 `Access-Control-Allow-Origin`
+     是 **Vite 自己加的**，不是 Java）。
+  3. 真因：两条控制台链都写 `.cors(Customizer.withDefaults())`，而 Spring Security 的 `CorsConfigurer`
+     **按 bean 名遍历容器取第一个** `CorsConfigurationSource`，**不看 `@Primary`** ——
+     所以控制台链用的是 `SecurityConfig` 那份（8 个源、不含 5174）。
+  4. **连带发现**：本模块的 `VOICEVERSE_CONSOLE_CORS_ORIGINS` 挂在**没人用的那个 bean** 上，
+     **从来没有生效过**（文档却把它当作"控制台源可配置"的能力）。
+
+- **修法**：`consoleFilterChain` 显式按 bean 名注入 —— 
+  `@Qualifier("consoleCorsConfigurationSource") CorsConfigurationSource` +
+  `.cors(cors -> cors.configurationSource(consoleCors))`（两条链都改）；
+  5174 / 127.0.0.1:5174 进默认清单（与既有 `apps/web` 的 5173 并列）；
+  类注释里那句"用 `@Primary` 让它成为首选"是**错误认知**，已改写并说明原因
+  （`@Primary` 只对按类型注入生效，而这里是按 bean 名遍历）。
+
+- **验证（实跑）**：
+  - 新增 `ConsoleCorsOriginTest`（3 例）。**先红后绿**：临时把 5174 从清单拿掉 → **2/3 失败**；恢复 → 3/3 绿。
+  - **浏览器真实路径**（`POST http://localhost:5174/manage/api/v1/console/auth/login` + `Origin`）→ **HTTP 200 / code=0 / role=super**，
+    且令牌 header = `{"alg":"HS256"}`（I-15 的修复同时在线）；同一令牌打 Python 侧 `/ops/overview`、`/ops/traces/stats` → **200**。
+  - **覆盖项行为级验证**：带 `VOICEVERSE_CONSOLE_CORS_ORIGINS=http://10.9.9.9:5174` 重启 →
+    启动日志的允许源清单里出现它，且该源 **200**、`evil.example.com` **403**、`localhost:5174` **200**
+     —— 证明覆盖链路真的通了（修复前它是死的）。
+  - Java `mvn -B clean verify` → **169 tests / 0 failures / 0 errors / BUILD SUCCESS**，spotless `154 files clean`。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 管理端后台（真启动）：Java 起不来 → 迁移缺失；修好后又暴露两个跨服务 P0（I-15/I-16）
+
+- **起因**：需求方报"java 端启动失败，查看日志"。日志末尾是
+  `org.postgresql.util.PSQLException: ERROR: relation "admin_permissions" does not exist`
+  → `BUILD FAILURE`。
+
+- **根因 1（环境，非代码）**：**本地 PG 停在迁移 0012，没有 0013 的 15 张控制台表**。
+  Java 是 `ddl-auto: none`（Alembic 是 schema 唯一真源），而 `RbacBootstrap` 启动期就要查
+  `admin_permissions` → 直接起不来。处置：先 `pg_dump` 备份（5.4 MB → `local/db-backup/`），
+  再 `uv run alembic upgrade head`（0012 → 0013），真库复查 **15/15 表到位**、
+  `alembic_version=0013`；重启后 `RbacBootstrap` 写入权限码 37 行、`ConsoleAdminBootstrap` 建出账号 `admin`。
+
+- **根因 2（代码，P0）· I-15：JJWT 按密钥长度自动换算法，Python 固定 HS256**。
+  登录成功了（Java 侧 200），但**同一枚令牌打 Python 侧控制台端点全部 46001 `bad signature`**。
+  逐步取证：Java 日志无回退告警 → 令牌 claims 全对 → 用项目自己的验签实现验不过 →
+  **按 HMAC 反推候选密钥，一个都不匹配** → 打印令牌 header 得 **`alg: HS384`**。
+  机制：`Keys.hmacShaKeyFor(bytes)` 按密钥长度选算法（≥64B→HS512、≥48B→HS384、≥32B→HS256），
+  而 `.signWith(key)`（不带参数）用的就是它；Python `app/core/auth.py` 是**手写验签**、只算 HMAC-SHA256。
+  我生成的密钥是 **48 个 hex 字符 = 48 字节**，正好落进 384 位档 —— 而 `.env` 模板写的是
+  "≥32 字节"，**最自然的选法「64 个 hex 字符」更是直接落进 512 位档**，也就是"照着模板配就会踩"。
+  影响面不止控制台：App 学习者令牌走同一条 Python 验签路径。
+  修：Java 两处签发**显式钉 `Jwts.SIG.HS256`** + 解析侧拒绝非 HS256（避免"Java 认、Python 不认"的半可用令牌）；
+  Python `decode_jwt` 增加**显式 alg 检查并报出实际算法**（把"算法不一致"从"bad signature"里拆出来）。
+
+- **根因 3（代码，P0）· I-16：`aud` 形态两端不一致**。alg 修好后报错变成
+  `bad audience: ['vocalverse-console']` —— Java 用 JJWT `.audience().add(x).and()` 签发，产出的是**数组**
+  （RFC 7519 允许），Python 却拿它跟裸字符串比。Python 自己的单测全用 `create_jwt` 产出的**字符串** aud，
+  所以一直绿。修：Python 增加 `_audience_matches()`，字符串/数组两种形态都认（放行的是**形态**，
+  不是放宽校验：数组里没有控制台 aud 仍拒），`is_console_token` 同步。
+
+- **本轮最该记住的一条**：**「Java 签发、Python 验签」这句话在此之前从未被真正执行过一次。**
+  两侧单测各测各的（Java 用 JJWT 自签自验、Python 自签字符串 aud），
+  没有一条测试跨越进程边界，于是两个 100% 复现的缺陷同时藏了一整轮 —— 文档写"已就位"、实际"从未接通"。
+  触发它的只是一次**本地真启动**。已登记缺口 **G-18**：缺"跨服务一跳"的冒烟门禁
+  （Java CI / Python CI / admin-ci 结构上都不可能发现它）。
+
+- **验证（实跑）**：
+  - **修复前先红**：把两处 `.signWith(key, Jwts.SIG.HS256)` 临时改回 `.signWith(key)` 跑新测试 →
+    **2/4 失败**（正是那两条"算法必须 HS256"的断言）；改回后 4/4 绿。
+  - **Java**：`mvn -B clean verify` → **166 tests / 0 failures / 0 errors / BUILD SUCCESS**（162 → 166），spotless `153 files clean`。
+  - **Python**：`ruff check` 通过、`format --check` 203 files、`pytest -m "not gpu"` → **491 passed / 0 skipped**
+    （上一轮是 483 passed + 4 skipped：Docker 恢复后真 PG ×2、真 Redis ×2 **这次真的跑了**）。
+  - **端到端（首次真跑通）**：Java 登录 → 同一令牌打 Python 侧
+    `/ops/overview`、`/ops/metrics/catalog`、`/ops/traces`、`/ops/traces/stats`、`/ops/alerts/rules`、`/library/books`
+    **全部 HTTP 200 / code=0**；App 侧 `POST /auth/login` → Python `/api/v1/reading/books` **200**
+    （确认改签发算法没伤到学习者链路）。
+  - `dev-up.ps1 start -WithConsole` 全流程也**首次真跑通**（四端健康检查全绿），
+    上一轮"未跑全流程"的标注据此解除。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 管理端后台（配置）：本地 .env 补齐控制台密钥 + 修正上一轮的机制描述错误
+
+- **背景**：需求方要求"帮我填一下 .env 里密钥"。范围按"让控制台真能跑起来"来定，**不动**任何第三方密钥。
+
+- **做了三件事**（改的都是 **gitignored 的本地文件**，入库的只有文档与脚本措辞）：
+  1. 根 `.env` 补 `VOICEVERSE_CONSOLE_JWT_SECRET` / `APP_CONSOLE_JWT_SECRET`（**同一个值**，48 hex 字符，
+     与 `JWT_SECRET` 不同）；`services/python/.env` 同步补后者（不经 dev-up、直接跑 uvicorn 时也能验签）。
+  2. 根 `.env` 补首个管理员的 bootstrap（`admin` + 随机强口令；`admin_users` 非空时不建号，属幂等）。
+  3. 改前先备份两个 `.env` 到 `local/env-backup/<时间戳>/`（gitignored）。
+
+- **实证（当前环境下能做的都做了）**：
+  - Python 运行期：`get_settings().console_jwt_secret` **非空（48）、≠ App 密钥**，且**不再**出现
+    "APP_CONSOLE_JWT_SECRET 未设置（development 档）：控制台端点将 46001" 的告警；
+  - 取值一致性：根 `.env` 值的 `sha256` 前 12 位与 Python 读到的一致（证明就是写进去那个值）；
+  - dev-up 的 `.env` 解析器：能取到该键且**非空**（非空才不会被脚本"空值键跳过"的语义丢掉）；
+  - 跨服务常量：Java `ConsoleJwtService.AUDIENCE/ISSUER` = `vocalverse-console` / `vocalverse-java`，
+    与 Python `console_jwt_audience/issuer` **逐字相同**；Java 侧读的是
+    `application.yml` 里的**显式占位符** `${VOICEVERSE_CONSOLE_JWT_SECRET:}`（不依赖 Spring 松散绑定，
+    故 `VOICEVERSE_` 而非 `VOCALVERSE_` 前缀这件事不会踩坑）。
+  - ⚠️ **未做**：端到端登录验证 —— **Docker 引擎当前不可用**（`docker info` 连不上 npipe），
+    5432/6379 均 down，Java/PG/Redis 都起不来。所以"填完密钥后能真正登录并访问运维页"这件事
+    **没有证据**，只验证到"配置链路正确"这一层。
+
+- **修正上一轮自己写错的地方（重要）**：我把"只配一个键"的后果描述成"Python 也会回退"，**这是错的**。
+  逐行读 `app/core/config.py` 与 `app/console/api/deps.py` 的真实语义是**两侧不对称**：
+  Java 侧留空 → **回退**用 `JWT_SECRET` 签发（登录看起来完全正常）；Python 侧留空 →
+  **fail-closed**，控制台端点一律 46001（development 档只 warn 一行）。生产档才额外断言
+  "控制台密钥 ≠ App 密钥"。已改对根 `.env.example` 与 `dev-up.ps1` 的自检文案
+  （自检函数用 AST 取真实函数体重跑，确认新文案生效）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 管理端后台（补漏）：一键启动里没有管理端 + 控制台密钥的静默 401 陷阱
+
+- **起因**：需求方问「README 里 `pwsh -File scripts/dev-up.ps1 start` 能起管理端吗」。**答案是：不能。**
+  查证结论 —— `scripts/dev-up.ps1` 只起三端（python:8000 / java:8080 / vite:5173 = `apps/web`），
+  `status` / `stop` 也各自硬编码 `8000, 8080, 5173`，全文没有 `apps\admin` 或 `5174` 任一字样。
+  这是本次交付留下的**集成缺口**：我把 `apps/admin` 写进了 README 的目录树与文档索引，
+  却没有写它怎么启动，也没接进一键脚本。
+
+- **补法（按需求方选择的方案）**：
+  1. `dev-up.ps1` 加**显式开关** `-WithConsole`（默认三端行为**一字不变**，不影响组员日常）：
+     `start/status/stop` 三处都支持；并把受管端口收敛成**一处真源** `$Ports`
+     —— 原先 status 与 stop 各写一遍端口列表，加第四端必然漏掉一处（漏 status 看不到、漏 stop 杀不干净）。
+     控制台分支还包含"缺 `node_modules` 时先 `pnpm install`"与"健康等待把 5174 纳入"。
+  2. 根 `README.md` 补 `-WithConsole` 用法 + 两个前置条件；`apps/admin/README.md` 补一句交叉引用。
+  3. 根 `.env.example` 补 `VOICEVERSE_CONSOLE_JWT_SECRET` 与**同值警告**（见下）。
+
+- **查证过程中发现的真陷阱（比"脚本漏一端"更要紧）**：根 `.env.example` 原先只登记了 Python 侧的
+  `APP_CONSOLE_JWT_SECRET`，而 Java 读的是 `VOICEVERSE_CONSOLE_JWT_SECRET`（只写在
+  `services/java/.env.example` 里）。关键在于：方式 B 只注入**根** `.env`，而
+  **Spring Boot 根本不读 `.env` 文件**（`application.yml` 无 `spring.config.import`，
+  也没有 dotenv 的 `EnvironmentPostProcessor`）—— 那个文件在方式 B 下没人加载。
+  于是"照根 `.env.example` 抄"的开发者会得到：Java 拿不到控制台密钥 → **回退用 `JWT_SECRET` 签发**
+  （`ConsoleJwtService:77-90` 有显式回退分支），Python 却用 `APP_CONSOLE_JWT_SECRET` 验签
+  → **运维 / LLM trace / 书籍 / 媒体等 Python 侧控制台端点全量 401，且报错里不会提示"密钥不一致"**。
+  这正是各文档反复警告的"生产脚枪"，**而警告原先只写在没人加载的那个文件里**。
+  处置：两个键名与同值要求在根 `.env.example` 写清；`start -WithConsole` 时做一次**密钥自检**
+  （只告警不中止 —— Java 侧留空的回退期本身是设计允许的中间状态）。
+
+- **验证（实跑）**：脚本 `Parser::ParseFile` → **0 syntax errors**；`status` → 三端、
+  `status -WithConsole` → 四端 + console 健康行；在 `apps/admin` 实跑 `pnpm dev` →
+  **HTTP 200，标题「VocalVerse 控制台」**（Vite 1.33s ready，5174 监听），此时
+  `status -WithConsole` 报 `5174: LISTENING` / `health: console=True`，不带开关只列三端（开关隔离成立）；
+  `Test-ConsoleSecret` 用**从 AST 取出的真实函数体**跑五种环境组合，四个异常组合各自告警、同值安静。
+  ⚠️ **未跑**：`start -WithConsole` 全流程（会拉起 Docker 容器 + 四个进程，属对开发机的实际启停）
+  —— 每个部件单独验证过，但"一次跑通"没有证据。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 管理端后台（闭环）：G-17 内容创作 UI 四个域全部接通 + 题库零入口缺口（I-14）
+
+- **这一段把 `docs/50 §15.2 G-17` 从"部分闭合"推到**✅ 闭合**，并且是在收尾自查里又抓到一个 P0 缺口**。
+
+- **缺陷 I-14（P0）· 权限码"发不出去也测不到"**：题库的 `content:question:read/write` 从控制台模块第一天起就登记在 `PermissionCatalog`，后端 `POST/PUT/DELETE /content/questions` 也齐 —— 但**前端既没有题库列表页，也没有路由/导航**。后果比"少一个页面"重得多：① 运营拿不到入口，`QuestionUpsert`/`QuestionPatch` 的全部能力无人可用；② 这两个权限码**永远不可能被真实使用**，`PermissionCatalogTest` 只能证明"码存在"，证明不了"码有用"。这与 I-9 是同一个道理的两面：**只删旧入口不算完，还要逐个确认每个能力都有新入口**（退役清单必须配"能力迁到哪"那一列）。
+
+- **落地**：四个内容域全部接上「内容维护」列（写权限 `content:{song,scenario,listening,question}:write`，与上下架的 `:publish` 分开——一个改字段、一个改状态，合成一列会让"这个按钮要不要填原因"变成看着按钮猜）：
+  - **歌曲**：编辑 / 歌词 / 新建（LRC 编辑器整首重写，界面常驻三条服务端事实：保存歌词会让 `ready` 的参考旋律失效、提交前按 offsetMs 重排、结束毫秒留空 = 与起始同值）；
+  - **场景**：编辑 / 新建（`targetCorpus` 按 `English phrase|中文释义` 逐行解析且上架要求 ≥3 条，故用多行输入并把权威格式写在提示里，而不是让运营提交后吃 46011 才知道格式）；
+  - **听力素材**：编辑 / 新建（列表行只有 `hasTranscript` 布尔位，**必须**回读单条，否则保存会把已有转写清成空串）；
+  - **题库**：**新增页面**（列表 + 筛选 + 新建/编辑/归档）。题库与其它三域的结构性差异如实落进 UI：没有 `content:question:publish` 权限码、`status` 只有 `published|archived` 两态（无 draft），所以页面**不挂**上下架按钮（挂上去会得到一个永远 46002 的按钮），归档走独立的确认框 + 必选原因；编辑态下 `examRevision`/`itemIndex` 禁用并写明原因（后端 `QuestionPatch` 不接受身份字段——改题号等于换一道题，会让历史作答对不上）。
+  - 共用件：`authoringColumn.ts`（四个域共用"内容维护"列，避免某个域漏套 `PermissionGate` 变成越权入口）、`NavIcon` 补 `list-check` 登记（未登记的图标名会**静默渲染空位**，这个坑写在组件注释里）。
+
+- **补上单测（此前这一层零覆盖）**：`authoring/__tests__/contentForm.test.ts` **24 例**，钉住三类最贵的字符串↔线格式转换：① 空的可选字段必须发 `null` 而不是 `""`（`""` 会被服务端当真实值写库）；② 必填的 `@NotNull` 字段不能发 null（吃 42201，且文案读起来像"不能为 null"，运营看不懂）；③ LRC 提交前按 `offsetMs` 升序重排（服务端按**数组下标**重排 `seq`，乱了会让整首歌的歌词与时间轴错位）。顺带覆盖了此前无人调用的 `*FromForm`（"只发改动字段"的补丁构造器）——它当前**未用于提交**（服务端 `applyXxx` 无条件覆盖，发补丁会把未提交字段写成 null，所以实际发全量 + 编辑前先回读），但口径必须在。
+
+- **验证（实跑）**：`apps/admin` `pnpm typecheck` **0 error** / `pnpm lint` **0 error 0 warning** / `pnpm test:run` **68 passed（5 files，44 → 68）** / `pnpm build` 成功。产物取证：`QuestionsView-*.js` 等分包落盘。
+  - **踩坑（记一条）**：`vitest` **不做类型检查**（只转译），所以"测试全绿"不代表类型通过 —— 本轮新增测试里一个 `status: null`（DTO 正确地把它标成非空，对应列 `NOT NULL`）就是被 `pnpm build` 里的 `vue-tsc -b` 抓到的，而不是被 `pnpm test:run`。**顺序必须是 typecheck 之后再 build，两者不可互相替代。**
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 管理端后台（收尾）：三处安全控制静默失效 + 参考旋律静默损坏 + 两道门禁自身的漏洞（Java 全绿）
+
+- **这一段的价值不在"又写了一堆代码"，而在"把已经写完、且读起来完全正确的代码跑起来"**。三个 P0 全部满足同一个特征：**代码逐行看都对，只有跑起来才暴露**；而它们又都是**既有测试**抓到的（`ConsoleAuthApiTest` 三条 + 新增回归），说明"把设计里的承诺写成断言"是有回报的。
+
+- **缺陷 1（P0）· 认证风控三处控制全是空的**：`ConsoleAuthApiTest` 此前 3 例红（5 次锁号、同 IP 20 次/5 分限流、refresh 重放吊销全族），表象像"功能没实现"，**实际代码里三条逻辑都写着**。根因一条：`ConsoleAuthService.login/refresh` 是 `@Transactional`，而它们**写完安全状态之后必然要抛 `ConsoleException`**（RuntimeException → Spring 回滚整个事务），把刚写的尝试流水、刚累加的失败计数、刚盖的锁定时间、刚吊销的会话**一起丢掉**。后果逐条：① 失败计数不落库 → **口令爆破不受任何限制**；② 尝试流水不落库 → **撞库不受限**；③ 会话族吊销被回滚 → 重放旧 refresh 虽回 46001，但轮换出的**新 refresh 照样可用**（"检测到泄漏就全族下线"= 空话），更糟的是旁边那行走独立事务的审计**如实写着"已吊销 N 条会话"，而实际一条都没吊销** —— 日志与事实相反。修：新增 `ConsoleAuthIndependentWriter`，把这三类"**已经发生的事实**"放进 `REQUIRES_NEW` 独立事务（与既有 `IndependentAuditWriter` 同源、同理由）；单独一个类而不是同类私有方法，因为 Spring 事务代理不拦自调用。判据写进类注释：**这个写入是"事实"还是"业务结果的一部分"？是事实就必须独立提交。**
+
+- **缺陷 2（P0）· 改歌会静默损坏参考旋律**：`applySong` 把 `songs.pitch_ref_status` 按"缺省 = 回落默认值"写成 `b.pitchRefStatus() == null ? "missing" : …`，而该列**不是人填的**（由离线音高提取任务驱动，控制台四个内容弹窗里没有输入框），同时又是**上架前置条件**（`validateSong` 要求 `ready`）与逐句跟唱评分的参考旋律来源。于是**任何一次运营改歌（哪怕只改歌手名）都会把它打回 `missing`**：接口 200、无任何报错线索，但这首歌从此上不了架 —— 现象（上架被拦）与原因（某次无关编辑）离得极远。修：只在显式传值时覆盖，新建的初值移到 `createSong` 显式写入。**取证**：新增 `SongPitchRefPreservationTest`（3 例），把 `applySong` 临时改回旧写法后跑 → 用例 1 红在 `assertEquals("ready", …getPitchRefStatus())`；改回修复实现 → 3/3 绿。**先红后绿，不是我事后补的测试。**
+
+- **缺陷 3（P0）· 控制台的 42201 被自己的兜底吃掉**：`ConsoleExceptionHandler` 是 `@Order(HIGHEST_PRECEDENCE)` + `basePackages=console`，却带一个兜底 `@ExceptionHandler(Exception.class)`。Spring 选 advice **只按 advice order 找第一个"有匹配方法"者，不比较异常类型精确度** —— 于是控制台路径上所有 `@Valid @RequestBody` 失败（运营域 4 个写入端点的入参校验**正是**靠 Bean Validation）由「400 + 42201 + 字段名」变成 **500 + 50002**；`HttpMessageNotReadable` 同理由 40001 变 50002。后果：前端 `serverFieldErrors` 里"把 42201 的字段名浮回输入框"那套映射**在生产上永远走不到**，运营只看到「服务内部错误」。修：删掉兜底 —— 当初加它的理由（"保证 500 有堆栈"）已不成立，因为 `GlobalExceptionHandler.handleFallback` 自 2026-09-10 起同样打完整堆栈。
+
+- **缺陷 4（P0）· 两道门禁自身的漏洞**（这类最难发现，因为它让缺陷长期不可见）：
+  1. **`apps/admin/src/env.d.ts` 的 `declare module '*.vue'` 通配声明**使"导入一个**不存在**的 .vue 文件"也能过类型检查（解析成 `DefineComponent<Record<string, unknown>, …>`）。实测：`SongFormModal.vue` 导入的 `LrcEditorModal.vue` **根本不存在**，而 `pnpm typecheck` 绿、`pnpm build` 也绿 —— 因为该弹窗当时没有任何页面引用它，**Rollup 根本不去解析这个 import**。两处门禁同时失效，只有真正接线的那一刻才炸。修：删掉通配声明（vue-tsc/Volar 自己就能解析 `.vue`），立刻报出 `TS2307` 且无其它误报 → 补齐 `LrcEditorModal.vue` 并把 authoring 模块真正接进歌曲库。
+  2. **Java 的 `spotless:check` 绑在 `verify` 阶段、排在 `test` 之后** → Java 测试红了整整一轮期间，**格式门禁从未执行过**（构建在 test 阶段就停了）。等测试全绿它第一次跑起来，报出 **15 个文件**不合规。教训：**门禁的"阶段顺序"决定它是不是真门禁**。
+
+- **顺带补上的活儿**：① 工单状态机 `TicketWorkflowService` 上一轮 commit 被 `git add` 漏掉、一直躺在工作区（本轮补提）；② `apps/admin` 的 lint 从 6 warning + 4 error 收到 **0/0**（补 prop 默认值、属性引号内层改 `&quot;`、把 665 行的 payload 单文件按**改动原因**拆成 `contentFormTypes/Model/Payload` 三个文件 —— 原单文件触发 ESLint `max-lines`）；③ `apps/admin` 上游基址改为按 `import.meta.env.PROD` 在代码里给默认值（原先只写在 gitignore 的 `.env.*` 里，新克隆的仓库构建出来会打到错误路径）。
+
+- **验证（全部实跑；未跑的一律标注）**：
+  - **Java**：`mvn -B clean verify` → **BUILD SUCCESS：162 tests / 0 failures / 0 errors**（同一命令内 `spotless:check` = **152 files clean, 0 needs changes**）。定向复跑：`ConsoleAuthApiTest` **11/11 绿**（此前 3 红）、`SongPitchRefPreservationTest` **3/3 绿**（修复前 1 红）。
+  - **Python**：`ruff check` All checks passed / `ruff format --check` **203 files** / `pytest -m "not gpu" -q` **483 passed + 4 skipped** / `alembic heads` **0013 (head) 单头**。⚠️ **4 个 skip 的口径**：Docker 当前不可用 → `test_pg_integration.py` ×2（真 PG）与 `test_redis_state_store.py` ×2（真 Redis）跳过（`pytest -rs` 逐条打印原因）。**取证时点**：Docker 在本会话中途一度可用（`ServerVersion 29.4.0`），真 PG 迁移取证与 testcontainers 用例是在**那个窗口内**跑出来的；收尾复跑时 Docker 又不可用，故这 4 例**当前不可复现** —— 它们不是"已通过"，也不是"被忽略"。
+  - **`apps/admin`**：`lint` **0 error / 0 warning**、`typecheck` **0 error**（**去掉通配声明之后仍然绿，这个绿才有意义**）、`test:run` **44 passed / 4 files**、`build` 成功。产物取证：`正在读取歌曲详情`/`整首保存`/`至少 1 行歌词` 三个串出现在 `dist/SongsView-*.js` → authoring 模块**真的被打进构建**（此前它零引用、Rollup 不解析）。
+  - **`apps/web`**：`lint` 0 error、`test:run` **223 passed（40 files）**、`build` 成功、`node scripts/check-bundle.mjs` **exit 0**（四条断言：preview 树零体积 / manualChunks 专块齐 / 入口块无 p5 / echarts 零残留）。
+  - **记录更正**：`docs/51 §7` 原先写 `pnpm check-bundle`，而该门禁**不是** package.json script，必须用 `node scripts/check-bundle.mjs` 调（照抄会得到 `Command "check-bundle" not found`）。**失实之处在命令写法，不在脚本缺失** —— 已在文档里改对并写明这一点。
+
+- **仍未闭合（不得当成已完成）**：① **G-17 内容创作 UI 只接了歌曲域**（听力素材 / 场景 / 题库三个域的表单弹窗未做；值类型、预检、payload 映射在 `authoring/` 层已就绪，缺弹窗与列接线）——**在补齐前不得宣称"运营管理已闭环"**；② ADR 修订申请（`docs/06 §2.1-4` / `§9.6` / `§9.7` 受控例外 + 6 处同步性修订）**仍待组长签核**，批准前不改 `docs/06` 正文（本轮只把 `§17` 开关表里一处**悬空引用**（"见 §9.7 受控例外"指向尚不存在的例外）改为指向 `docs/50 §2.3 修订 3` 并标注"待签核"）；③ `apps/web` 的 `pnpm typecheck` **仍是空跑**（solution-style 根 tsconfig → 零文件受检，另立工单）；④ `-Pintegration` 真 PG Java 集成测试未跑；⑤ 控制台浏览器端冒烟未跑（无浏览器自动化）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 管理端后台（独立控制台）：三角色 RBAC + LLM trace + 四路拷问闭环
+
+- **需求（用户口径）**：做**独立 web 端**管理端后台，参考万玄阁 `apps/admin` 的设计模式，**模块化隔离、不与既有业务代码耦合**；要有权限控制台，分**运维（服务器运行/预警/性能 + LLM trace 供调优）／运营（音乐/书籍/音频上下架）／审核（社区帖子/评论/视频）**三角色；要求自己跑闭环——分析→设计→**子代理拷问**（怎么做/如何做/该做什么、并发性能、日志记录、数据模型、业务逻辑联动、模块设计、前端 UI/UX 与布局统一）；图表参考 lieflat-charts skill。
+
+- **交付物**：设计 `docs/50-管理端后台设计.md` + 拷问 `docs/51-管理端后台拷问报告.md`；前端 `apps/admin`（独立 SPA，独立 pnpm 项目/端口 5174/产物/nginx/Dockerfile，零 import `apps/web` 源码）；Java `com.vocalverse.console`（独立包，终端模块）；Python `app/console/**`（运维采集 + trace + 书籍/媒体）+ 迁移 `0013`（15 张表）；CI `admin-ci.yml`；compose `admin-console`（`console` profile）；联调桥接页 `apps/web/src/views/preview/AdminConsolePreview.vue`（含删除清单）。
+
+- **关键设计裁决**：
+  1. **独立身份** `admin_users`，**不复用 `users.role`**（既有 CHECK 只允许 `user/admin`，扩词表会把改动外溢到 App 登录/种子/16 个 Java 测试类）；控制台账号与 App 账号**互不能登**。
+  2. **按数据归属方分服务**而非按界面：Java 管身份/RBAC/审计/审核/内容（`/manage/api/v1/console/**`），Python 管运维/trace/书籍/媒体（`/api/v1/console/**`，**子路径不重叠**，复用既有 nginx 路由 → 用户端 nginx 零改动）。避免 Java 读写 Python 的表（破坏 `docs/06 §10` 写方矩阵）。
+  3. **单一审计流**：不建 `moderation_actions`，审核决定的前后状态写进 `admin_audit_logs.detail`；`@Audited` 必须显式 `@Order` 与业务写**同事务**（`@EnableTransactionManagement.order` 默认 `LOWEST_PRECEDENCE`，不显式设就有一半概率回滚后仍留痕）。
+  4. **LLM trace 移植 DSH GenAI span 树**（`loongsuite/dsh-plugin`，Apache-2.0）：`ENTRY→AGENT→STEP→{LLM,TOOL}`，一次 turn 一个 trace、每次真实 LLM 尝试一个 span（重试可见）、异常路径也关 span；**结构元数据与内容分表**（`llm_span_contents` 独立表 + 独立 72h TTL + 独立权限码 + 读取写审计），**默认关**，并**硬排除 `kind='defense'`**（答辩论文文本）。
+  5. **前端独立设计语言**：色彩**继承产品 `u-*` 纸墨**（`ink #1c1c1a` 与 lieflat Mono 的 `INK #1C1C1A` **完全相同**），圆角降级到控制台尺度（控件 8 / UI 卡 16），图表卡按 Mono 契约走**纸底 24px**；图标 Tabler only；naive-ui 单注入点，主色用现行 `#2f6bff`（**不用已退役的绿 `#16A34A`**）。
+  6. **图表锁 Mono 单一色彩系统**，17 张图逐图审计（体系/编号/gallery 卡内标题/淘汰理由），1 张库外图（trace 瀑布）走 SKILL §6 翻译流程；含 **Mono 偏离清单**（5 条）。
+
+- **四路拷问（子代理对抗，报告在 `local/`，不入库）**：并发性能+日志 / 数据模型+业务联动 / 架构模块+范围取舍 / 前端 UI-UX+图表，共报 **33 条 P0**，合流去重后 **30 项逐条裁决**（采纳 / 部分采纳 / 驳回附理由）。**8 条可当场复现的硬缺陷**，其中由拷问直接暴露、随后修复并取证的：
+  1. **迁移 `0013` 在真 PG 上装不上**：`DROP CONSTRAINT ck_media_assets_status` 名不存在——`0011`/`0012` 用裸全名建约束，而 `base.py` 的 `ck` 约定含 `%(constraint_name)s` → 二次套用成 `ck_media_assets_ck_media_assets_status`。**离线渲染与 SQLite `create_all` 都抓不到**；真 PG 实测 0012 时点正好 6 条错名。修：4 条 `RENAME` + 2 条双名 `DROP IF EXISTS` + 按正确名 `NOT VALID`+`VALIDATE` 重建。
+  2. **`aud` 跨令牌闸门根本不存在**：实现注释声称"App 侧会拒绝控制台令牌"，而 `JwtService`/`JwtAuthFilter` **既不签发也不校验 `aud`**，控制台又默认回退共享密钥 → **控制台令牌可被当成真实 App 用户身份**。修：App 侧**只拒绝携带外来 `aud`** 的令牌（既有无 `aud` 令牌零影响）；**严禁**给 App 令牌补 `aud`（`AuthController:224` 复用 access 作 refresh，补了会**全体在线用户强制登出**）；Python 侧补 `aud/typ/iss` 三闸 + `get_current_user_id` 拒控制台令牌。
+  3. **隐藏生效清单是 18 处不是 8 处**，漏的含**通知中心**（`PostInteractionRepository` 3 处 native SQL + `DirectMessageRepository` 6 处）→ 只改 `PostRepository` 时 hidden 帖仍经通知露出标题/评论正文，而 v1 用例不覆盖通知 → **自测会通过**。
+  4. **指标分位数无处可存**：DDL 只有 `avg/max/min` 却要 p50/p95/p99；跨桶取平均得到的是"平均的分位数"，v1 自己的验收用例必红。修：加 `buckets jsonb` 直方图，跨桶**求和后插值**；可加型/分布型分列且不得混用。
+  5. **内容捕获推翻已写红线**（`docs/06 §9.7`「只存评分/转写/元数据」「不 log 论文/转写/请求体」）→ 补 §9.7 受控例外 ADR 申请 + 答辩域硬排除。
+  6. **依赖方向规则与埋点位置自相矛盾**（§3.1 断言"领域模块不得 import console"vs §7.3 把埋点放进领域模块）→ 规则精确化 + 白名单 `app.console.trace`。
+  7. **`TraceWaterfall` 脚注在说谎**（脚注"未截断"，代码有 `MIN_BAR=1.5px`）→ 保留下限但**在界面写明当前比例尺与最小宽度对应毫秒数**（SKILL §7 第 ③ 条"撕柱不撕轴"）。
+  8. **仓库 `pnpm typecheck` 从未检查过任何代码**：`apps/web` 根 `tsconfig.json` 是 solution-style（`files: []`），`vue-tsc --noEmit` 零文件可查。**实测：故意写入类型错误，退出码 0**。→ `apps/admin` 改为显式 `-p tsconfig.app.json` 并用探针验证会报错；**`apps/web` 的同类修正另立工单**（会一次性暴露大量历史类型错误）。
+  - 其他采纳项：`ops_alert_events.rule_id` CASCADE→**RESTRICT**（原写法删规则会删光预警历史）、举报建单并发 `ON CONFLICT DO NOTHING` + `46015`、Java `Semaphore(4)` **删掉**（限不住连接，连接由事务持有到 commit）、sink 跨线程提交改 `call_soon_threadsafe`、nginx 每个 location 单独写 `X-Request-Id`（漏写会让浏览器/Java 审计/Python 日志是三个 uuid）、Tomcat access log **不认 MDC**（`%{x}r` 是 RequestAttributeElement）→ 改 `request.setAttribute` + `%{adminUserId}r`、对比度实测修正（焦点环 `#e8edff` 在白底 **1.17:1 等于隐形**）。
+  - **驳回项（附理由）**：砍运维整域（与需求冲突，改为限定覆盖范围并登记 Java 进程指标缺口）、砍 trace 内容捕获（需求要"调优参考"，改为默认关 + 多层隐私闸）、砍 `admin_login_attempts`（状态与事件流语义不同，风控排查要后者）、砍 13 张图（图表是三角色的实际决策依据，改为每页 ≤6 张 + 只做被消费的图）。
+
+- **ADR 修订申请（待组长拍板，批准前不改 `docs/06` 正文）**：① `§2.1-4` 管理端 UI 改为独立 SPA（**维持**不建根 workspace/共享包、不新增网关容器）；② `§9.6` Java 管理端权限由"简单 admin/user 角色"改为四角色 RBAC + 全量审计；③ **`§9.7` 新增 LLM trace 内容捕获的受控例外**；④ 同步修订 `docs/12`/`docs/04`/`docs/13`/`docs/20`/`docs/21`/`docs/06 §2+§14`；⑤ 15 张表按 §18/§19 体例**新开 §20 登记**（非修订）。
+
+- **登记**：`docs/50`、`docs/51`（README 文档索引已登记）；`docs/api/error-codes.md` 新增 **`46xxx` 管理端段 15 码**；`docs/api/envelope.md` 新增「错误 data 的结构化例外」（46002/46003/46008/46011/46015 的 data 形状）+ 控制台端点前缀 + **控制台鉴权专节**；`docs/06 §17` 登记 5 个新开关（`APP_LLM_TRACE_ENABLED` / `APP_LLM_TRACE_CONTENT_CAPTURE` / `APP_OPS_TELEMETRY_ENABLED` / `VOICEVERSE_CONSOLE_ENABLED` / `VOICEVERSE_CONSOLE_LLM_CONTENT_CAPTURE`）；`VOICEVERSE_CONSOLE_JWT_SECRET` 是**密钥**不入功能位表并标注"只配一处会让 Python 侧控制台端点全量 401"的生产脚枪。
+
+- **验证（真跑过的，未跑的一律标注）**：
+  - **迁移**：`alembic heads` → `0013 (head)` 单头；离线 `upgrade 0012:head --sql` 18,204 字节，逐条核对 4 处 P0（约束名/RESTRICT/部分索引 WHERE/`buckets`）；**真 PG16 取证**（Docker 会话中途转为可用）：0012 时点实测 6 条双前缀错名 → 0013 后全部正名、`alembic check` **零 diff**、**19 张表模型↔真库零漂移**、行为探针（CHECK 拒 `bogus` 收 `hidden`、部分唯一索引幂等、RESTRICT 拦下删规则、既有章节读 `published`）、有 `hidden` 行时 downgrade **按设计失败**、归一化后回退→重放零 diff；SQLite `create_all` 56 张表 + `sqlite_master` 原文含 `WHERE` 谓词；`check_single_writer.py` → 25 张表受守护无越权。
+  - **Python**：`pytest -m "not gpu" -q` → **392 passed**（含 2 个真 PG testcontainers 用例，非 skip）。
+  - **前端 `apps/admin`**：`lint` **0 error**（6 条 `vue/require-default-prop` warning，均在共享组件）；`typecheck` **0 error**（显式 `-p tsconfig.app.json`，非空跑）；`test:run` **28 passed**（`mono.test.ts` 15 例 + 12 张图渲染烟测 13 例）；`build` **成功**（入口 46.8 kB / `vendor-naive` 787.9 kB，按路由分包）。
+  - **前端 `apps/web`（含新增的 preview 桥接页）**：`lint` 0 error、`test:run` **223 passed**、`build` 成功、`node scripts/check-bundle.mjs` **exit 0**（桥接页被生产构建整枝剔除，证明零体积零路由）。⚠️ `pnpm typecheck` 仍是**空跑**（见上 §8 条）。
+  - **图表接线自查（一个不好看但必须写的数字）**：14 个图型组件里**只有 6 个被页面消费**（`docs/50 §12.7` 逐个交代）。4 个建议删除（F3 与 F2 冗余 / F11 选型已被拷问证伪 / L4 消费者已在审计中合并掉 / L17 要一整年数据而保留期只有 30 天），3 个缺聚合端点（F9 净变化 / F15 五数概括 / F10 星期×小时），1 个与"不做实时推送"冲突（G17）。**得到的教训**：组件完成 ≠ 能力交付；凡"做了一组组件"的交付必须附"谁在消费"的清单，否则交付的是库不是功能。
+  - **集成期反向发现的 4 处契约不一致**（前端按 `docs/50 §10.2` 实装后与 Java 实装对账出来的，已回派实现方）：①②`/moderation/reports/{id}/handle` 字段名（`decision` vs `@NotNull action`）与 `CaseAssign.assigneeId` 不可空 → **举报处理必然 400、取消认领服务端失败**；③`/moderation/stats` 缺 `approvedToday/rejectedToday/trend/decisions` → **审核工作台首屏空白**（界面如实降级显示 `—`，不编造数字）；④`/moderation/cases/{id}` 与列表不同形。**这类问题只有真正接线才暴露**——正是闭环要求的价值。
+  - **安全闸门代码级复核（我独立看的，不是听报告）**：`JwtAuthFilter` 已实现「**任何携带外来 `aud` 的令牌一律拒绝**」并明确论证**不给 App 令牌补 `aud`** 的理由（`AuthController:224` 复用 access 作 refresh，补了会让**全体在线用户强制登出**）；`ConsoleSecurityConfig` 用 `@Order(1)` + `securityMatcher("/api/v1/console/**")`，并给出**两条独立证据**说明既有 `JwtAuthFilter` 不会跑在控制台路径上（它不是 `@Component`，而是 `new` 出来只加进既有链 → 既不在匹配到的链里，也不在 Servlet 容器注册表里）；`ConsoleCrossTokenTest` 用 `@SpringBootTest` 真实上下文断言双向拒绝。
+  - **YAML 门禁（AGENTS 硬要求）**：6 份 workflow + `docker-compose.yml` 全部 `yaml.safe_load` 通过（`admin-ci.yml` jobs=`['admin']`；compose services 含 `admin-console`，profiles=`['console']`）。
+
+- **未做 / 已登记缺口**：① 保留期清理（trace 30d / 内容 72h / 指标 7d / 审计 365d / 登录尝试 90d）**只有索引、无调度器**（本仓确实没有后台清理先例，24h 音频是"读时惰性删"）；② Java 进程级指标（JVM/线程池/Hikari）未采集，本期只覆盖 Python 进程 + Java `/actuator/health` 探活；③ `shadow_materials` 无管理端点；④ 作者可见性/审核原因下发通道需扩 C 端 DTO + `docs/21` + 契约快照，本期不做半成品；⑤ 图表候选审计深度仍有 8 行不达标（已如实标注，未假装审完）；⑥ `apps/web` 的 `typecheck` 空跑修正另立工单；⑦ 媒体存储占用/孤儿清理只读视图；⑧ ~~双轨管理面（既有 `/api/v1/admin/**` 与新的控制台）需评估既有面下线~~ → **已决议：旧管理端整体退役**（见下）。
+
+- **需求方澄清与随之的范围变更（2026-09-10 追加）**：澄清"**之前写的旧管理端是废弃的，不需要重复用**"。据此把原"旧壳保留为兼容壳、后端双轨共存"的保守处置**升级为旧管理端整体退役**：
+  - **前端（已完成并复跑门禁）**：删除 `apps/web` 的 `/admin` 路由子树（`AdminLayout` + 5 个 `PlaceholderView` 子路由，从未实现过）、`layouts/AdminLayout.vue`、`views/preview/AdminDashboardPreview.vue`、`views/preview/AdminUsersPreview.vue`，并把预览画廊的布局枚举由 `'user'|'admin'|'gallery'` 收窄为 `'user'|'gallery'`（独立控制台不共享用户端布局，无可模拟）。复跑：`lint` 0 error、`test:run` **223 passed**、`build` 成功、`check-bundle` **exit 0**。保留 `/preview/admin-console` 桥接页（新控制台的联调入口）与 `LieflatPreview` 资产（图表风格参考，服务的不是旧管理端）。
+  - **后端（已回派，随本 PR 执行）**：删 `AdminUserController`/`ContentAdminController`/`QuestionAdminController`/`AdminTicketController`（27 op）+ 只测它们的测试 + `SecurityConfig` 的 `hasRole("ADMIN")` matcher + 契约快照重生成；**保留**其 Repository/Service（`com.vocalverse.console` 复用的是数据层，只删 HTTP 面）；**不动** `users.role` 的 CHECK（用户域资产，改它属另一件事，仅记录 `ROLE_ADMIN` 失去消费者）。
+  - **退役后必须复核**：① 没有控制台功能因此回退（尤其工单——控制台 `/content/tickets/**` 成为唯一工单面）；② 没有别的调用方指向 `/api/v1/admin/**`（Python 内部调用走 `/internal/**`，应不受影响，但要**验证而非假设**）；③ `/admin` 旧书签若需平滑，应在**网关层** 302 到 `/console/`（不写进 `apps/web` 路由表）。
+  - **这次澄清简化了设计**：少一套权限语义（`ROLE_ADMIN` vs 控制台权限码）、少一处"同一份数据两个改法"的双写面，`docs/50 §15.2` 的 G-1/G-10 两条缺口**闭合**；代价是本 PR 删除面变大，故删除清单（`docs/50 §15.5`）明确区分"删 HTTP 面"与"留数据层"。
+
+- **退役复核期发现并修复的真缺陷（2026-09-10 追加二）** —— 这一段是"闭环"真正起作用的地方，逐条都值得记：
+  1. **工单零 UI（我自查抓到）**：控制台只有工单 **API**（`listTickets`/`setTicketStatus`）**却没有工单页面**；旧 `AdminTicketController` 一删，用户在 App 提交的反馈/报错/纠误就**没人能处理**。已补 `views/content/TicketsView.vue` + `content/ticketFlow.ts`（状态机可达性 + 处置弹窗含**回复用户**）+ 导航项 + 路由；并把 `TicketRow` 从**臆造字段**（后端根本没有 `subject`）改为与 Java `TicketView` 逐字对齐，接口从 `POST /{id}/status` 改为 `PATCH /{id}` + `adminReply`。
+  2. **内容域连 API 都没有（实现方发现，比我那条更严重）**：控制台内容面只有"读 + 上下架"，**没有增删改**。照 v1 的 §10.2 退役旧 `ContentAdminController`/`QuestionAdminController`，会让**全系统没有任何 HTTP 面能新建/编辑歌曲·LRC·场景·听力素材·题目**——运营失去写入路径，`PublishService` 也成半个废功能。**裁决：不删能力，迁到 `/api/v1/console/content/**`**（控制台权限码 + 审计），再删 `/api/v1/admin/**` 原版。**退役原则修正为一句话：「删的是入口与第二套权限，不是产品的写入能力」**（`docs/51 §1.7`）。
+  3. **实现方自查抓到 4 个"整条功能静默失效"级缺陷**（`docs/51 §1.6`）：`AuditFieldAllowlist` 的 `Set.of` 重复元素 → `ExceptionInInitializerError` → **每一次审计写入都失败**（而所有不碰审计的测试照样全绿）；`super` 的 `*` 通配在 `admin_permissions` 里无对应行 → **引导出来的超管权限为零**；控制台 CORS bean 名与 `SecurityConfig` 冲突 → `BeanDefinitionOverrideException` → **整个应用起不来**；独立审计路径 `REQUIRES_NEW`/`MANDATORY` 互斥。要求每个都补**在旧代码上会失败**的回归测试。
+  4. **前端 DTO 系统性失真（我自查抓到）**：控制台 DTO 是**照设计文档写、在实现之前写的**，于是大面积与真实接口不符——`OpsOverview` 用 camelCase 而 Python 返回 snake_case（运维页运行时全是空值）；`CaseView` 的认领人/决定人是**标量 id** 而 DTO 写成 `{id,displayName}` 对象；`ContentRow` 用**一个形状套四个内容域**而真实是四套不同字段（导致"元数据"列恒空）。已派两路对齐（Python 侧 / Java 侧），并**清理掉 `as unknown as` 兜底**——那种写法是掩盖不是修复。
+  5. **权限码数量三处互相打脸**：文档先写 35、又写 36，而 §4.2 表格逐条数是 36、删掉无端点的 `moderation:word:*` 后是 **34**。处置：**数字不在散文里写死，由 `PermissionCatalog` 常量表 + 单测钉死**（`docs/50 §4.2` 已改）。
+
+- **本轮教训（值得写进 SOP）**：① **"设计通过评审"≠"能跑"**——4 个 P0 全是实现期才暴露的；② **凡"退役/删除"清单，每一行都必须配一列"能力迁到哪"**，没有这一列就不算清单（我在 `docs/50 §15.5` 亲手写下"必须复核无功能回退"，然后在同一份文档里**自己违反了它**）；③ **凡能被代码推导的事实，不要在文档里重复声明**（权限码数量是最好的例子）；④ **DTO 必须在实现之后对着源码核一遍**，照文档写的 DTO 会"看起来合理、运行时全空"。
+
+- **DTO 系统性失真：两路对齐完成（2026-09-10 追加三）** —— 这是本轮最贵也最有价值的一段。
+  - **根因**：控制台的 DTO 是**照 `docs/50` 写、在实现之前写**的。于是成批出现"看着合理、后端没有"的字段，以及**根本不存在的端点**。危害形态是**静默空白**而不是报错——比崩溃更难发现。
+  - **发现量**（两路对齐各自独立发现，完整清单见 `docs/51 §7.3`）：**不存在的端点 3 个**（`PATCH /auth/me`、`POST /auth/password`、`GET /admins/{id}/sessions`）；**请求体字段名错 1 个**（`{newPassword}` vs `{password}` → 恒 46007）；**形状/字段不符 12 处**（`ContentRow` 一个形状套四个内容域且 `meta` 不存在 → 元数据列恒空；`OpsOverview` 全 camelCase 而 Python 全 snake_case；`Violation` 写 `reason` 实际是 `message` → 渲染成 `· lrc：undefined`；`MediaKind` 写了后端 CHECK 根本没有的 `audio`；上架流水是 `operator` 不是 `adminUsername`，`publishedAt` 不存在；会话的 `current` 标记不存在……）。
+  - **结构性修复（比逐个改更重要）**：新增 **16 例契约测试**（`api/__tests__/console.contract.test.ts` 8 + `ops.contract.test.ts` 8）。它们**桩掉 `fetch`、捕获真实的 URL/method/body 再断言**（如「metrics 用重复 `metric` + `labels_key` 而不是 `labelsKey`」「`ack` 不带请求体」「overview 键原样 snake_case」），**修复前必红**。审计从 28 → **44 passed**。**纪律在这个问题上已被证明无效**（同类错误连续出现四次都没被拦住），只有会红的测试能拦住第五次。
+  - **写进设计文档的契约纪律**（`docs/50 §10.1.1`）：① 端点清单**只承诺路径/方法/权限码，字段形状以实现为准**；② 每个域必须由契约测试钉住；③ 后端不提供的字段**不许在前端编**——要么删显示项并写明"后端未提供"，要么**回头扩后端**。
+  - **一个我拒绝的处置**：对齐过程中，控制台的两张运维图（调用量/错误率趋势、按模型调用量）因 `/ops/traces/stats` 不返回 `trend`/`by_model` 而被**删除**，改成"后端未提供"说明卡。技术上诚实，但需求里运维的本职就是"看运行情况/性能 + trace 用于调优参考"，没有趋势、没有按模型拆分的 trace 页答不了"这几天在恶化吗""哪个模型扛的活最多"。**已回派 Python 侧扩接口**（dense 按天分桶 + 按模型聚合 + 直方图重算 p95，禁止平均分位数）。**原则写进文档：「删掉一个功能」与「加一个后端聚合」是两种完全不同的处置——前者要登记为缺口，后者才叫闭环。**
+
+- **顺带修掉一个 CI 阻断（验证时发现）**：Java 契约快照重新生成后，`apps/web/src/api/generated/java-api.d.ts` **没有跟着重新生成** → `frontend-ci.yml:47` 的 `pnpm gen:api && git diff --exit-code -- src/api/generated/` **必红**。已重新生成并验证**幂等**（二次运行文件 hash 不变）。教训：**快照与生成物是一对，改一个必须跑另一个**。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 社区 S2 收口（一）：J-03 通知分页改 DB 层 keyset + SQL 聚合（去 50 条内存窗口）
+
+- **背景**：J-03（docs/41 §1 登记「未实施」）——通知原为「近 50 条互动/评论 → 内存聚合 → 窗口内按游标重筛」：第 51 条及更早**永不可见**（翻页是窗口内反复重筛，与「游标分页可翻页」契约不符）+ 每页 O(窗口) 重算；
+- **修复（code 独立提交 `439f5a0`）**：互动组在 SQL 层 `GROUP BY post_id|action|当日UTC` + keyset `(latest_at DESC, merge_key ASC)` + LIMIT 下推；「最新互动者」用 `ROW_NUMBER() OVER (PARTITION BY merge_key …)` 取组内第一行；评论流改原生 keyset `(created_at DESC, id DESC)`（保留 J-04 的 `c.status='visible'` 与排除自身动作）；游标语义不变（`base64(micro(ts)|mergeKey)`）→ **契约零变更**；删掉无调用方的两条旧窗口查询（`findMine`）；
+- **测试（`e130d97`）**：`CommunitySocialTest` 跨窗口 2 例（**改前必红**：60 组翻页 seen=10 / 评论 50 封顶）+ PG 集成 EXPLAIN 断言（命中 `ix_post_interactions_post_action` / `ix_post_comments_status_post`）；
+- **踩坑**：① H2 的 GROUP BY 校验不接受「SELECT 里 CAST 出来的 merge_key 不参与 GROUP BY」→ 改子查询先算 merge_key、外层按 merge_key 分组；② 接口投影 `Instant getLatestAt()` 在 H2 抛 `Cannot project OffsetDateTime to Instant`（方言差异，见下条统一修复）；
+- **门禁**：`mvn verify` 72→**79** 绿、`-Pintegration` PG 集成 7→**8** 绿；契约快照零 diff（`@Hidden` 不计）。
+
+## 2026-09-10 社区 S2 收口（二）：私信 IM 真实化（4 端点 + SSE 长连 + 移动端接真 + 演示种子）
+
+- **背景与拍板（组长 2026-09-10）**：翻 `docs/41`/`docs/02`/`docs/42` 三处「私信不做/演示帧」口径，**私信真实化**、要「和常用社交平台一样的 IM 体感」、只做移动端；联调测试页**不新增**（登记豁免）；模块组织**维持现行规范**（不引入新目录形态）。设计先行：`docs/49-私信（IM）实施设计.md`（定稿）+ 两路子代理拷问（实时通道 / 未读口径，报告在 `local/`，不入库）；
+- **设计裁决**：实时通道 = **A · Java SSE 长连（`SseEmitter`）+ 进程内广播 + 轮询兜底**（否决 Redis pub/sub、WebSocket、纯轮询——写方在 Java、写与推同进程零跨服务通道；依据：100 长连内存 <10MB、空闲 0 DB 查询，而轮询 1320 请求/小时/人）；未读 = **会话级水位（`last_read_id`，非时间戳**——时间戳水位在并发提交下会跨过未渲染消息造成永久漏未读）；可见面 = 会话列表未读数字 + 私信 tab 提示（**不碰全局底栏**；底栏红点登记下轮，前置=全局未读聚合 + 实时通道定稿 + bell 语义）；
+- **后端（Java 社区主服务）**：迁移 **0012**（`direct_messages` + `dm_read_state`，Python 侧只读映射）→ 4 端点（会话列表 / 未读合计 / 会话消息 keyset / 发送 / 已读，自聊 42203、对端不存在 40402、1~1000 字）+ **SSE** `GET /messages/stream?since`（`@Hidden` 不进契约；连接注册表单用户 ≤3 流、全局 ≤500，超限 429 + `event:error`；心跳 25s；`since` 游标回放断线来信；`@EnableScheduling` 首次启用）；演示种子 `DirectMessageSeeder`（demoadult ↔ demoteen/demosenior，按会话对幂等）；
+- **ADR 限定修订（阻断项）**：`docs/06 §1/§8`、`docs/20`、`docs/21 §1.1 例外⑤`、`docs/api/envelope.md` —— 「Java 严禁进 语音/SSE/LLM 热路径」按原意收窄为**语音/LLM 热路径（含其 SSE）；社区域单向 SSE 归 Java**；
+- **前端（移动端 only）**：`api/community.ts` 5 函数 + 独立 `openMessageStream`（`audio/sse.ts` 硬绑 PYTHON_BASE/丢弃 `id:` 行 → 本函数 GET+Bearer+`since`）；`stores/messages.ts`（服务端水位真源、乐观发送回滚、SSE 优先→失败降级轮询、双通道按 id 去重）；通知中心私信 tab 与 `/m/messages`、`/m/messages/:id` 接真；删 `data/messages-demo.ts`；搜索页「用户」改真实源；
+- **门禁**：Java **79** 绿（私信 7 例）+ PG 集成 **8** 绿；前端 lint/typecheck/**test 223**/build/check-bundle 全绿；pytest **392** 绿；`alembic check` 零漂移；契约快照 55→**60 op** + `gen:api`；
+- **三端实测（dev 真栈）**：私信冒烟全绿——会话列表/发送/**未读 +1 → 已读归零**/自聊 42203/对端 40402/空正文 42203/**SSE `event:open` + 实时 `event:message` 帧**；J-03 冒烟——通知 9 条无重复翻页 + `EXPLAIN` 命中两条索引（脚本留 `local/smoke_im.ps1` / `local/smoke_j03.ps1`，gitignored）；
+- **真 PG 才暴露的三处方言坑（已修复 + 补集成回归 `399a197`）**：
+  1. **未类型化 NULL 游标**：`(:cursorTs IS NULL OR … :cursorKey)` → PG `could not determine data type of parameter $4`（H2 放过）→ 首页改传**哨兵值**（9999-12-31 + 空串 / `Long.MAX_VALUE`）；
+  2. **哨兵不能用 `Instant.MAX`**：驱动渲染 `169104627-12-11 … BC` → PG `timestamp out of range`；
+  3. **原生投影的时间列类型随方言而变**：同一条查询 PG 给 `Instant`、H2 给 `OffsetDateTime`，写死任一端都抛 `Cannot project …`（本轮两端各撞一次）→ 新增 `NativeProjections.toInstant(Object)` 归一，投影列声明 `Object`；
+  - 教训：**H2 绿 ≠ 真机绿**；凡新增原生 SQL（含游标/NULL 参数/时间列投影）必须过 `-Pintegration` 真 PG。
+- **登记**：`docs/49`（新，README 索引）、`docs/21`（Java 60 op + 私信行 + 例外⑤）、`docs/10`（待补表清单 38→40 与写方矩阵行）、`docs/13 §8`（联调页豁免）、`README`（能测段/私信 IM）、UI 与交互记录见 `worklog/安卓开发日志.md`；
+- **未做/登记**：群聊、消息撤回编辑、图片/语音消息、已读回执给对方看、推送、底栏红点、多副本广播（单实例内存广播；升级走 Redis pub/sub）、消息级已读、发布开关（`VOICEVERSE_COMMUNITY_POST_ENABLED` 默认关，私信不受其影响）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-09 联调发现并修复：读书进度「第二次保存起 500」（ORM 过期属性跨会话访问）
+
+- **怎么发现的**：S3 验收时翻 `local/dev-logs/python-8000.err.log`，看到一串 `DetachedInstanceError`；随后用 live PG 复现：PUT 进度第 1 次 200、第 2 次起 500。
+- **根因**：`app/api/routes/reading.py` 的 `put_progress` 在 `_db()` 退出（session 已 close）后访问 `row.updated_at`。该列是 `onupdate=func.now()` 服务端生成列，**UPDATE 路径** commit 后被标记过期 → detached 实例触发刷新 → `DetachedInstanceError` → 500。INSERT 路径（第 1 次）走 RETURNING 已取值，所以既有单测（只 PUT 一次）永远绿。
+- **影响**：阅读器每次滚动都保存进度 → **只有每本书的第一次保存生效**，后续静默失败（前端 fire-and-forget 不报错）。
+- **修复**：改为**会话内序列化**（`return _progress_dict(row)` 移进 `_q()`，与 `list_annotations`/`create_annotation` 同式）；`get_progress` 一并统一（它此前只是「碰巧没 commit」）。
+- **验证**：新增 `TestProgress::test_put_twice_update_path`（连续 3 次 PUT + `updated_at` 非空 + GET 末值，修复前必红）；live PG 三次 PUT 全部 `code=0` 且 GET 返回 300；ruff + 全量 pytest 绿。归档 `BUG实测/读书进度-二次保存500.md`。
+- **教训**：ORM 实例不要跨会话边界返回；用例必须覆盖**第二条**写入。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-09）
+## 2026-09-09 社区内容 S3 闭环落地：媒体上传（图/视频/头像）+ 帖子详情 + 划词查义（六路拷问后实施）
+
+- **需求**：社区从「只读流 + 纯文本发帖」补成闭环——发帖（图文/视频）、点帖子有查看方式、用户头像、社区正文划词查义。
+- **设计先行**：`docs/47-社区内容闭环（S3）实施设计.md`（v1）→ **六路子代理拷问**（并发性能 / 日志可观测 / 数据模型 / 业务联动 / 模块设计 / 前端 UI-UX，各写报告到 `local/拷问-*.md`，共 128 条）→ `docs/48-社区内容S3拷问报告.md` 合流裁定 **23 条阻断级** → `docs/47` v2 定稿。拷问抓到三处「照稿实现即坏产物」：① `sha256` 全局唯一 + 软删会让「传→删→再传」永久失败；② 暴露 `bigserial` 的 URL 与「不可猜」的匿名读理由自相矛盾（逐号 curl 可枚举全站媒体）；③ 64MB 视频上限被 `nginx.conf` 的 `client_max_body_size 20m` 挡在网关。
+- **Python（媒体服务，新域）**：迁移 **0011**（`media_assets`：随机 `public_id` 对外 / 行级去重键 `(owner_id, sha256) WHERE status='ready'` / 物理文件按 sha256 内容寻址共享 / 软删不动物理文件）+ `user_profiles` 补 `lower(handle)` 唯一索引（迁移内先去重）；`app/media/{sniff,storage,service}.py` + `app/api/routes/media.py`（POST 上传 / GET 裸流 **Range 由 Starlette FileResponse 提供** / DELETE 软删 / GET 我的上传）；魔数嗅探白名单（图 jpeg/png/webp/gif、视频 mp4/webm）、分块写盘 + uuid 临时名 + `os.replace`、新限流桶 `media` 60/时；生词本 `POST /reading/vocab` 补 `scene` 入参（`community` 划词来源）并把 check-then-act 改唯一键兜底。
+- **日志可观测（阻断修复）**：新增 `app/core/logging.py` 的 `dictConfig` —— 此前全仓无 `basicConfig/dictConfig`，`vocalverse` logger **无 handler，所有 `logger.info` 零输出**（`APP_LOG_LEVEL` 也是死配置）；现在格式含 `%(request_id)s`，媒体域按「上传成功/被拒/404/软删」分级别记录。
+- **Java**：`AuthorView` 末尾增 `avatarUrl`（feed/详情/评论/关注一次带回，零额外请求；通知不带，登记 S4）；发帖 `CreatePostRequest` 增 `media` + 新 `MediaRefValidator`（形状/条数/URL 前缀白名单，**拒绝外链**；不强制 kind 与 media 一致，保住既有 `kind=video` 无 media 的契约）；新增 `PATCH /api/v1/users/me`（昵称/@handle/tint/头像；handle 撞唯一键 40904），`GET /auth/me` 扩 `avatarUrl/handle`（**不新增重复 GET**）；`CommunitySeeder` 的 media 时长键改 camelCase（种子视频时长角标此前一直是坏的）。
+- **前端**：`api/media.ts`（XHR 上传带进度 + `mediaUrl()` 拼 `PYTHON_BASE`，修复「打包壳里相对路径打到 https://localhost」）+ `api/users.ts`；`types/community.ts` 增 `normalizeMedia()` 兼容三种历史形状；新组件 `MobileAvatar`（收敛 8 套头像实现）/`MobileMediaGrid`/`MobileMediaLightbox`/`MobileVideoPlayer`/`MobileMediaPicker`；新页面 `/m/post/:postId`（详情：作者头像 + 多图 + 视频 + 互动 + 内联评论 + 删自己的帖）与 `/m/me/profile`（头像上传 + 资料编辑）；发帖接媒体选择器；**社区划词**：`useCommunityWordLookup` 复用读书域查词卡/生词本/朗读，来源 `scene=community`；灯箱/播放器/词卡全注册进 `useBackLayers`（否则安卓返回直接退页）。
+- **门禁与验证**：Python `ruff check`/`format --check`/**pytest 388 passed**（含 18 条媒体用例：嗅探/超限/元数据/越权/软删/去重与再传/匿名读 + Range 206/416）；Java **mvn verify 65+ 用例**（`CommunityMediaApiTest` 10 条 + `UserMeApiTest` 6 条）；前端 `lint`/`typecheck`/**test:run 202 passed**/`build`/`check-bundle.mjs`（preview 树零体积）全绿；契约快照双端刷新 + `pnpm gen:api`，Python 快照与 `app.openapi()` 对账一致、Java `ContractSnapshotTest` 绿；`check_feature_flags.py` / `check_single_writer.py` 均 ok（本域**不新增功能位**：媒体是真实功能，边界=鉴权+限流+白名单，与音频上传同口径）。
+- **基础设施**：`nginx.conf` `client_max_body_size 20m → 64m`（与 `APP_MEDIA_MAX_VIDEO_BYTES` 双写项）、`docker-compose.yml` 补 `./data/media` 卷、`.env.example` 补 `APP_MEDIA_DIR`/`APP_MEDIA_MAX_VIDEO_BYTES`。
+- **登记**：`docs/21`（Python 48 ops / Java 端点表 + 限流桶 + 裸流例外第 4 条）、`docs/api/error-codes.md`（新增 40403/41501/42205，拓宽 41301）、`docs/06 §19`（媒体存储/读取口径/上限三处同步/日志/跨服务边界）、`docs/13`（3 个新 token）、`docs/35`（沉浸页例外）、`README` 文档索引；联调测试页 `/preview/community-s3`（含可删清单）。
+- **登记的不做项**：媒体物理文件 GC（三条件设计见 docs/48 B19）、签名 URL、作者主页、通知带头像、列表页划词、社区批注（无服务端权威 char offset）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-09）
+
+## 2026-09-09 阅读器批注四连修复（组长实测 BUG记录 → 归档 BUG实测，后端零改动）
+
+- **来源**：`worklog/BUG记录/读书域系列BUG9-09/`（组长手机实测 4 条），修复后**该目录已删除**，逐条归档到 `worklog/BUG实测/读书域批注-*.md`（4 份）。
+- **缺陷与修法**（详见归档；UI 细节另见 `worklog/安卓开发日志.md`）：
+  1. **暗黑模式批注不可读**：批注色裸写 `background` + night 浅灰墨色 → 对比度 1.05~1.23；改 `--ur-ann-color` + 按主题 `color-mix`（night 24%）+ 文字统一 `--ur-theme-ink`（修复后 5.59~5.95）。
+  2. **只能删除、改不了色/笔记**：批注卡改「查看即编辑」→ 走既有 `PATCH /api/v1/reading/annotations/{id}`（`patchAnnotation` 此前全仓零调用，**后端无需改动**）。
+  3. **查看批注只能点空格（命中区 4.6px）**：新增句首批注角标（任何 kind 都有；单条直开、多条开本句列表）+ 选中句动作条「看批注」大热区入口。
+  4. **点「高亮这句」不等选色**：不传色 → 先开选色面板（未选色禁用保存）；动作条色点仍直出。
+- **附带修复**：`createFromSelection` 用 `range.startOffset`（相对选区容器）当句内偏移 → 句内嵌套词块时批注错位，改 Range 前缀长度法；色板收成单一真源 + `safeAnnColor` 白名单（封 CSS 注入/非法值使声明失效）。
+- **门禁**：新增「解析 CSS 源文件算 WCAG 对比度」门禁（三主题 × 色板全色 + 最坏色兜底）；**修复前必红证据**：HEAD `63fcaee` worktree + 新测试文件 → 14 条红；修复后前端 lint/typecheck/test:run（178 passed）/build 全绿；`MobileReaderView` 抽 3 个 composable 回到 350 行门禁内。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-09）
+
+## 2026-09-10 自由对话「internal」复发：手动起 python 漏 APP_ASR_MODEL（ASR 模型脱绑）
+
+- **复现**：手机自由对话（语音）提示 internal；python `err.log` 见 `LocalEntryNotFoundError: Cannot find an appropriate cached snapshot folder ... outgoing traffic disabled`（HF 离线 + 按 repo_id 找模型）。
+- **根因**（归档类与 `方式B-Python-ASR-HF缓存失配` 同源）：python 进程环境缺 `APP_ASR_MODEL`（dev-up.ps1 会把其指向 `%USERPROFILE%\.cache\huggingface\hub\models--Systran--faster-whisper-small\snapshots\<rev>` 本地快照；手动 `uvicorn` 启动会漏注入）→ `settings.asr_model=""` → `WhisperModel(repo_id)` → 离线下载失败。
+- **修复/验证**：以 `scripts/dev-up.ps1 start` 重启 python（自动注入 APP_ASR_MODEL/HF_HUB_OFFLINE/根 .env）→ `readyz` 的 `asr` 字段已绑定本地快照；机器侧文本回合冒烟 SSE `text_delta` 正常。
+- **教训**：**起 python 一律用 dev-up.ps1**（或至少带 APP_ASR_MODEL + HF_HUB_OFFLINE=1）；漏注入的表现是「启动成功、ASR 调用时失败」（预热失败只警告不阻塞）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 后端联调可观测性：java Tomcat accesslog + python 绑 0.0.0.0（手机联调支撑）
+
+- **java**：`application.yml` 开启 `server.tomcat.accesslog`（pattern `%h %t "%r" %s %b %Dms`）。
+  踩坑：embedded Tomcat 的 accesslog 相对目录基于 `catalina.base`（TEMP 下随机目录）
+  → 用 `${user.dir}/logs` 显式固定到进程工作目录（dev-up 方式 B 即 `services/java/logs/`）。
+- **python**：`scripts/dev-up.ps1` 的 uvicorn 补 `--host 0.0.0.0`——打包壳 Web 直调 `http://<局域网IP>:8000`，
+  只绑 127.0.0.1 时手机连不到（health 检查仍走 127.0.0.1，不受影响）。
+- **背景**：2026-09-10 手机联调「Failed to fetch」排查需要「请求是否到达后端」的确定性证据，
+  这条链路（accesslog + python 访问日志）后续所有联调通用（详见 `docs/30` §2 排查顺序）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 打包壳跨域（CORS）补齐：Python + Java 允许 https://localhost 来源（方案 B 直连后端必有）
+
+- **背景**：方案 B 打包壳（页面源 `https://localhost`）直接调本机后端 `http://192.168.0.104:8000/8080`（跨域）。开发时靠 Vite 代理同源、容器靠 nginx 同源，故此前从不需要 CORS——打包壳直连后，浏览器对 `Origin: https://localhost` 发 CORS 预检（OPTIONS），两个后端均无 CORS 处理 → python 405 / java 被安全链拦截（手机端实测日志现 `OPTIONS /api/v1/events → 405`）。
+- **修复**：python `app/main.py` 加 `CORSMiddleware`（精确 origins 列表含 `https://localhost`，`allow_credentials=True`——凭据不允许 `*`）；java `SecurityConfig` 加 `.cors(Customizer.withDefaults())` + `CorsConfigurationSource` bean（同名单）。
+- **验证**：预检 `OPTIONS /api/v1/events`、`OPTIONS /auth/login`（Origin=https://localhost）→ 均 200 + `Access-Control-Allow-Origin: https://localhost` + `Allow-Credentials: true`；python `uv run pytest -q` **370 passed** + ruff/format 全绿；java 编译运行正常（mvn spring-boot:run 重编译生效）。
+- **踩坑**：① CORS 与「安全上下文」是两回事——打包壳解决了 getUserMedia，但跨域请求仍需后端 CORS；② `allow_credentials=True` 时 `allow_origins` 禁止 `["*"]`，必须精确列来源（含 `https://localhost`）；③ 干净重启后端用 `scripts/dev-up.ps1 stop` + `start`（按端口杀进程树；之前手动杀 uvicorn --reload 的父进程留下孤儿 worker 占端口 8000，netstat 显示已死 PID 的僵尸 LISTENING——需按端口 taskkill /T /F 并核实真释放）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 读书域合入 main（组长手机验收后直合 · 15 提交 · 分支 feat/novel-reading-main）
+
+- 组长手机端验收（Web 5173 → APK 壳均已跑通）后授权直合：`git merge --no-ff` → `main 5c10d19..15f774b` 推送成功（CI 三套门禁由 push 触发）。
+- 内容：读书域 12 功能提交（模型/迁移/种子/20 端点/听书/前端 4 页/契约/docs45-46）+ 2 组热修复 3 提交（0010 迁移 `_bigint_pk` PK 缺失、登录 40904 refresh token 唯一性）——两组热修复均为组长实跑复现 → 修复 + 回归守卫 + BUG 实测归档。
+- 后续排期登记：听书词级时间轴/跨句批注/章节内 TOC/crossfade 见 docs/45 §11（P2 后置）；本地 KittenTTS 启用方式见 README（`uv sync --extra local-tts` + `APP_VOICE_MODELS_DIR`）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 登录偶发 40904 热修复：refresh token 加 UUID 随机因子（组长手机端实测复现 → 修复 + 回归测试 + 真机链路验证）· 3 op
+
+- **复现**：手机（WebView → 5173）登录 `xiaoqing` 报红字「数据冲突：唯一键或约束（重复提交/并发写入）」（Java 40904）。
+- **根因**（既有并发竞态，非读书域引入）：`AuthController.issue()` 的 refresh = `jwt.generateAccessToken(...) + "-" + System.currentTimeMillis()`；而 JwtService 令牌 payload 仅 {sub, role, iat, exp}（秒级精度、无随机字段）→ **同一毫秒**双登录/双刷新（双击/WebView 双请求）产出相同 refresh 串 → SHA-256 相同 → 撞 `uq_refresh_tokens_token_hash` → DataIntegrityViolation → 40904。报错发生在密码校验之后，说明 xiaoqing 密码本身正确。
+- **修复（code 独立提交）**：`AuthController.buildRefreshToken(jwtToken, nowMillis)` 追加 `UUID.randomUUID()`（refresh 为不透明串、服务端只存哈希，格式变更零兼容影响）；抽 package-private 纯静态便于确定性测试。
+- **测试（test 独立提交）**：`RefreshTokenUniquenessTest`（同输入两次构造 → 断言不同；修复前同输入必同串 → 红）；`mvn -Dtest=RefreshTokenUniquenessTest,AuthFlowTest test` 6 passed + `spotless:check` 通过。
+- **验证**：重建并重启本机 Java（8080；从根 .env 注入 JWT_SECRET/SERVICE_TOKEN——Maven 子进程不读 .env，手动起服务易漏 P0-9 fail-fast）→ 连续两次 POST /auth/login（demoadult）均 code=0 且 refreshToken 互异、含 `-\d+-<uuid>` 后缀 → 手机端可重试登录。
+- **踩坑**（已归档 `worklog/BUG实测/登录-并发refresh-token撞唯一键.md`）：①去重键必须随机源，不可用「无随机令牌+时间戳」拼串；②40904 映射面宽（任何 DataIntegrityViolation），排查看 Java 栈；③本地起 Java 记得 root .env 的 JWT_SECRET/SERVICE_TOKEN。
+- **门禁**：Java 子集 6 passed + spotless 绿；Python/前端零改动。未 push（分支 feat/novel-reading-main）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 读书域迁移 0010 热修复：`_bigint_pk()` 补 `primary_key=True`（组长实跑复现 → 修复 + 真 PG 验证）· 3 op
+
+- **复现**：组长本机 `uv run alembic upgrade head` → `psycopg.errors.InvalidForeignKey: no unique constraint matching given keys for referenced table "books"`（建 book_chapters 时 FK 引用 books(id) 被拒；迁移事务回滚后 seed 报 `relation "books" does not exist` 为连锁）。
+- **根因**：`alembic/versions/0010_reading.py::_bigint_pk()` 漏 `primary_key=True` → books.id 为普通 BIGINT；PG 对 FK 引用列要求 UNIQUE/PK。模型侧 `base.py::bigint_pk()` 有主键，故 **SQLite 单测（create_all）与离线 SQL 渲染（test_alembic_offline_pg_render 只拼串）都不暴露 → CI 绿真库红**。
+- **修复（code 独立提交）**：辅助函数补 `primary_key=True`（8 表共享一处修复）；**回归守卫**（test 独立提交）：`test_models.py` 的离线渲染断言后追加逐表检查——抽取每张读书域表的 CREATE 块断言含 `PRIMARY KEY`（修复前必失败；`READING_TABLES` 常量 8 表）。
+- **验证（真 PG16 容器）**：`upgrade head` ✅（原错消除）→ `alembic check` ✅ 零漂移 → `downgrade 0009` + `upgrade head` 往返 ✅ → `seed_reading` ✅（books 3 / dictionary 10,612 / forms 11,501）→ `pg_tables` 8 表齐 → pytest 全量 **366 passed / 4 skipped**。
+- **踩坑（已归档 `worklog/BUG实测/读书域迁移0010-PK缺失.md`）**：①离线渲染 ≠ 可执行验证——新建表迁移合入前必须在真 PG 跑 upgrade+downgrade 往返；②迁移辅助函数与模型辅助函数必须同构（base.py::bigint_pk 即为范本）；③seed 报「表不存在」先查 `alembic current`，别先改 seed。
+- **门禁**：ruff/format 全绿、pytest 366 passed；前端零改动。未 push（分支 feat/novel-reading-main）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 读书域（英文小说阅读）· 后端 + 契约 + 文档（组长午间委托 AI 全自动闭环：需求→四官拷问→实现→测试→文档，分支 feat/novel-reading-main，未 push）· 多 op
+
+- **背景与需求（组长口述 + 截图）**：加「书籍」功能——纯文本阅读、听书（参考 https://github.com/debpalash/VoiceStudio；语音模型可选用 `F:\WorkingL\VoiceStudio\OmniVoiceStudio-Data\data\models`）、点击选词看释义（截图形态：音标+释义+加入生词本+外链）、笔记/生词/划词/批注；**前端只做移动端**；全自动闭环（需求→设计→子代理拷问[数据模型/业务逻辑联动/模块设计/UI-UX]→实现）；新分支不 push。
+- **侦察**：VoiceStudio 0.5.1 本机源码复核（`F:\WorkingL\VoiceStudio\OmniVoiceStudio-Data\env\project`——**AGPL-3.0-only**，只借思路：jobs 状态机/进度事件/内容寻址缓存/句级对齐；`/v1/audio/speech` :3900 无鉴权仅 loopback）；本地模型能力清单（**KittenTTS mini 0.8**＝78MB ONNX/CPU 实时/8 英文音色/Apache-2.0 → 本地引擎选型；OmniVoice **CC-BY-NC 禁商用**；CosyVoice3/VoxCPM2 需 GPU；GPT-SoVITS 中文优先）。既有基建：`textproc/sentence_splitter`（分句）、`tts_cache_key/tts_synthesize_cached`（缓存）、SSE helper（practice/events.py + 前端 openSseFetch）、`loadAudioBlob/useBlobAudio`（音频管道）、Agent Lab 式联调页范式。
+- **四官拷问（6 子代理并行，docs/46 C-1…C-10 裁决）**：数据模型 V-1…V-20（**P0：content_version 版本守卫**——文本修订后批注/进度不静默错位；events.event_type 硬编码 CHECK 需扩值；tts_tasks.error 用 jsonb 对齐惯例；+ dictionary_forms 词形反向索引——"inventions"→"invention"）；业务逻辑 B-1…B-22（**只扣真实合成**·命中缓存 0 扣·prepare 按章扣 1；按 provider 分缓存目录防 wav/mp3 混标；埋点四处同步；SSE 独立协议 task_start→sentence_progress*→task_done + 快照兜底）；模块工程 M-1…M-18（reading/ 三件套；迁移 0010 一次 8 表；契约 21→41 ops；**联调页 A 落法**＝ReadingPreview 直调真路由，CommunityPreview 前例，无 test-only 端点；前端 fe-08 行数门禁——阅读器拆 5 composables + 3 弹层组件，不进灰名单）；UI-UX U-1…U-22（**设计语言定 u-*（当前 14 页实况）**，新类 u-rd-*/u-bs-*/u-bd-*/u-vb-* 前缀；词卡＝底部 sheet；生词本 /m/vocab 唯一入口；TabBar group 增补；正文衬线豁免）。
+- **实现（code）**：`app/models/reading.py` 8 表（books/book_chapters/dictionary_entries/dictionary_forms/user_reading_progress/user_vocabulary/reading_annotations/tts_tasks）+ 迁移 `0010_reading.py`（0007 双方言风格 + events CHECK 扩 5 值，0006 NOT VALID 姿势）；`app/reading/`（split 纯函数[服务端权威句切分+offset 坐标系]/normalize[词归一化]/service[DB 函数组]/tts_cache[provider 分目录]/tts_client[DI·auto=edge|kitten]/orchestrator[asyncio 后台任务+进度+取消+启动扫孤儿]/events[SSE 模型]）；`app/audio/tts_local.py`（KittenTTSClient：lazy import、三要素探测、24kHz wav 输出）；`routes/reading.py` + `routes/reading_tts.py`（20 op；音频端点裸流 audio/mpeg|wav；prepare SSE 经 heartbeat_stream）；`seed_reading.py`（公版书 3 本：Alice 12 章/傲慢与偏见 49 章/绿野仙踪 24 章，`data/seed/reading_books.json` 916KB；ECDICT 子集 10,612 行 2.4MB `data/seed/ecdict_subset.csv`）；config 增 reading_tts_provider/rate 600/voice_models_dir；pyproject optional `local-tts`（kittentts）。
+- **测试（test）**：新 45 例（split/normalize 纯函数·service 词形/幂等/越界/归属·routes 四件套·tts 缓存命中 0 扣/SSE 序列/快照/取消/sweep）；修复前必失败（全新实现全红→绿）；基线用例同步（事件 15→20 类断言、EXPECTED_TABLES +8）；全量 **366 passed / 5 skipped**（基线 318+7）；契约快照 `app.openapi()` 离线导出 + `pnpm gen:api`（零手改）；冒烟 `services/python/data/smoke_reading.py`（建表+种子+全端点：lookup 词形解析/vocab 幂等/批注 45004/进度/segment 缓存命中/voices 全通）。
+- **踩坑（供复盘）**：① `body.get('start_offset') or -1` 把 0 变 -1（falsy 短路）→ 45004 假阳性；② orchestrator `_update_task` 签名缺 `total` 参数 → SSE 卡死（**任务级异常被通用 except 兜住但事件未发**——测试要断言「终态必达」；另修复「消费方在任务瞬时完成后按 id 取队列拿空队列」竞态：`start_task` 返回队列引用）；③ 测试 `iter_lines(decode_unicode=True)` 与 httpx 版本不兼容；④ `:memory:` StaticPool 下 Session 跨线程（loop↔to_thread）在既有 practice 语义内可用（创建/关闭在 loop、查询在 worker，勿在 loop 线程操作查询结果）；⑤ **日志更新教训：工作日志必须「先读全量 + edit 置顶插入」，禁止整文件 write 覆盖**（本批曾误用 write 覆盖两条日志，已 `git checkout` 无损恢复并按正确姿势重写）。
+- **文档（docs）**：docs/45 设计定稿 + docs/46 四官合流 + docs/10（写方矩阵 +8 表 + 30→38 口径更正）+ docs/21（ops 21→41、限流表 reading_tts、§1.1 例外）+ docs/api/error-codes.md（45001~45007 先登记）+ docs/06 §18 登记（provider 链/桶/事件/合规）+ README（功能行/演进方向①落地标注/文档索引 45-46/仓库结构/能测清单）；UI 部分记录见 `worklog/安卓开发日志.md`（2026-09-10 读书域前端）。
+- **门禁**：Python ruff+format 全绿、pytest **366 passed**；前端 lint/typecheck/test **129 passed**/build 全绿、check-bundle ✓（preview 树零体积含 ReadingPreview 剔除断言）；单写探针/功能位对账零改动。**未 push**（组长验收后推）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
 
 ## 2026-09-09 fe-09：vite 构建拆分（manualChunks）+ 包体积门禁（组长继续遗留项）· 2 op
 

@@ -127,7 +127,7 @@ async def submit_song_audio(user_id: int, session_id: int, audio: bytes) -> dict
             )
         # 幂等 / 重试（2026-09-10 · P1-3 修复）：
         # 同一 `(user, session)` **只允许一行**
-        # （唯一键 `uq_sing_attempts_user_session`，迁移 0012），
+        # （唯一键 `uq_sing_attempts_user_session`，迁移 0016），
         # 故"再来一次"必须区分三种情形：
         #   ① 已完成（有逐句结果或有分）→ 幂等返回既有结果（不重复扣桶/建任务）；
         #   ② 任务仍在跑（queued/processing）→ 幂等返回状态（防双击重复扣桶）；

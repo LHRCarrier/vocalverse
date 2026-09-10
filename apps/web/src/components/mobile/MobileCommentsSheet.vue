@@ -9,6 +9,7 @@ import { ref, watch } from 'vue'
 import IconX from '~icons/tabler/x'
 
 import { addComment, fetchComments, timeAgo } from '@/api/community'
+import MobileAvatar from '@/components/mobile/MobileAvatar.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import { useUiStore } from '@/stores/ui'
 
@@ -125,9 +126,7 @@ async function submit() {
           <p v-if="loading" class="u-comments__empty">评论加载中…</p>
           <ul v-else-if="list.length" class="u-comments__list">
             <li v-for="c in list" :key="c.id" class="u-comments__item">
-              <span class="u-comments__ava" :style="{ background: c.author.tint ?? '#37546e' }">{{
-                c.author.nickname.slice(0, 1)
-              }}</span>
+              <MobileAvatar :src="c.author.avatarUrl" :name="c.author.nickname" :tint="c.author.tint" size="sm" />
               <span class="u-comments__body">
                 <span class="u-comments__who">
                   {{ c.author.nickname }}

@@ -12,6 +12,21 @@ spring:
 
 server:
   port: 8080
+  # 2026-09-10 手机联调排障：后端默认不记访问日志，无法确认手机请求是否到达。
+  # 开启 Tomcat access log（pattern：远端IP 时间 "方法 路径" 状态 字节 耗时ms）；
+  # 文件写到进程工作目录 logs/ 下（dev-up 方式 B 即 services/java/logs/）。
+  tomcat:
+    accesslog:
+      enabled: true
+      # 2026-09-10 管理端：追加 `%{adminUserId}r`（docs/50 §9.1「access log 增加 adminUserId」）。
+      # 必须是 **%{...}r（request attribute）而不是 %X{...}**：javap 实测 AccessLogValve 的
+      # `%{xxx}r` → RequestAttributeElement，`%{xxx}t` → 时间格式，**MDC 值在 access log 里读不到**。
+      # 所以 ConsoleSecurityFilter 同时 `request.setAttribute("adminUserId", id)`（并在 finally 里 MDC.remove，
+      # 防 Tomcat 线程复用把上一个管理员的身份带进下一行日志）。非控制台请求该属性为空 → 输出 `-`。
+      pattern: '%h %t "%r" %s %b %Dms admin=%{adminUserId}r'
+      # embedded Tomcat 的相对目录基于 catalina.base（TEMP 下随机目录）→ 显式 user.dir 固定到
+      # 进程工作目录（dev-up 方式 B 即 services/java/logs/）
+      directory: ${user.dir}/logs
 
 # 日志带 requestId（RequestIdFilter 写 MDC，docs/06 §11）
 logging:
@@ -25,11 +40,38 @@ vocalverse:
     secret: ${JWT_SECRET:}
     access-ttl-seconds: 3600
   service-token: ${SERVICE_TOKEN:}
+  console:
+    # 控制台 access token 的独立签名密钥（≥32 字节）。空 = 回退 JWT_SECRET 并打 WARN
+    # （两服务共享该密钥才能互相验签；跨端隔离由 aud/typ 双向校验承担，不靠密钥差异）。
+    # 生产建议配置独立密钥；此处**不做 fail-fast**，因为回退有明确的安全依据（见 ConsoleJwtService 注释）。
+    jwt-secret: ${VOICEVERSE_CONSOLE_JWT_SECRET:}
+    # 控制台独立 SPA 的 CORS 源（逗号分隔）。既有 8 个源恒在，此处只做追加 ——
+    # 硬编码在配置类里会让「换域名要改代码」，而 CORS 是部署形态相关的（本地 5174 / 生产域名）。
+    cors-origins: ${VOICEVERSE_CONSOLE_CORS_ORIGINS:}
+    # 控制台模块总开关（docs/50 §13.2）。false 时控制台链仍然存在但**拒绝所有控制台请求**
+    # （46014 语义的本地等价：明确告知未开启，而不是留下一个能登录的空壳）。
+    # 默认 true：控制台是本轮的交付物，关掉它需要显式理由。
+    enabled: ${VOICEVERSE_CONSOLE_ENABLED:true}
+    # LLM trace 内容捕获（docs/50 §7.5 隐私闸门）。**默认 false**：结构元数据照常采集，
+    # 但 prompt/response 内容不落库。Java 侧只登记该开关的读取值供前端展示/校验，
+    # 真正的采集在 Python 侧（docs/50 §3.2）；此处保持一致口径，避免两端默认值不同。
+    llm-content-capture: ${VOICEVERSE_CONSOLE_LLM_CONTENT_CAPTURE:false}
+    # 首个 super 管理员的一次性 bootstrap（docs/50 §4.1.1）。
+    # 两个都为空 = 什么都不做（默认）；只配一个会**拒绝执行并说明原因**；表非空则跳过；
+    # 弱口令/默认口令 → 拒绝创建并打 ERROR（详见 ConsoleAdminBootstrap）。
+    bootstrap:
+      username: ${VOICEVERSE_CONSOLE_BOOTSTRAP_USERNAME:}
+      password: ${VOICEVERSE_CONSOLE_BOOTSTRAP_PASSWORD:}
+      display-name: ${VOICEVERSE_CONSOLE_BOOTSTRAP_DISPLAY_NAME:}
   community:
     # 公众发帖开关（docs/37 A-15：公开仓库默认关闭；仅演示环境开启）
     post-enabled: ${VOICEVERSE_COMMUNITY_POST_ENABLED:false}
     # 演示内容种子（虚构作者 + 8 帖 + 历史打卡卡；仅演示环境）
     seed: ${VOICEVERSE_COMMUNITY_SEED:true}
+    # 发帖 media 只允许引用本前缀的 URL（拒绝外链：防盗链/SSRF/存储型 XSS 面，docs/47 §4.3）
+    media-url-prefix: ${VOICEVERSE_COMMUNITY_MEDIA_URL_PREFIX:/api/v1/media/}
+    # 单帖媒体条数上限（与 Python APP_MEDIA_MAX_ITEMS_PER_POST 同口径）
+    media-max-items: ${VOICEVERSE_COMMUNITY_MEDIA_MAX_ITEMS:9}
   song:
     # 演示曲目种子（M3 唱歌 P0 D-G2：读 data/seed/songs.json 播种 songs+lrc；
     # 音频由 scripts/setup-assets.py 物化到 data/audio/，不入库）

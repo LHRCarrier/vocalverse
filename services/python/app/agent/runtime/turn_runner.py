@@ -17,6 +17,7 @@ import logging
 from dataclasses import dataclass
 
 from app.audio.base import LLMClient
+from app.console.trace.recorder import span
 from app.practice.meta import MARKER, MetaResult, extract_meta
 
 logger = logging.getLogger("vocalverse")
@@ -102,7 +103,10 @@ class TurnRunner:
         splitter = MetaStreamSplitter()
         usage: dict | None = None
         rich = getattr(self._llm, "stream_rich", None)
-        try:
+        # docs/50 §7.2：每次 LLM 尝试一个独立 span（retry_index 让重试可见）。
+        # 流式调用在这里发车，span 覆盖整个迭代过程 —— ttft_ms / finish_reason
+        # 由 app/audio/llm.py 回填到"当前 span"，本层不需要知道它们怎么来。
+        with span("LLM", retry_index=0, stream=True):
             if rich is not None:
                 async for kind, payload in rich(messages):
                     if kind == "usage":
@@ -114,8 +118,6 @@ class TurnRunner:
                 async for chunk in self._llm.stream(messages):
                     for delta in splitter.push(chunk):
                         yield delta
-        except Exception:
-            raise  # 调用方决定降级（保持旧 orchestrator 双层结构）
         full, meta_buf, pending = splitter.finish()
         if pending:
             yield pending

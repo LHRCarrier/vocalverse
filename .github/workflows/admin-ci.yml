@@ -1,0 +1,58 @@
+name: admin-ci
+
+# 管理端控制台（apps/admin）独立门禁（docs/50 §14.1）。
+#
+# 为什么必须是**独立** workflow：frontend-ci 的 paths 只覆盖 apps/web/**，
+# 第二个前端加进去之前是 0 lint / 0 build / 0 test（架构拷问 P0-1）。
+# 独立 workflow 同时保证控制台改动不会触发用户端全量构建，反之亦然。
+on:
+  pull_request:
+    paths:
+      - "apps/admin/**"
+      - ".github/workflows/admin-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  admin:
+    name: lint · typecheck · test · build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/admin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: apps/admin/pnpm-lock.yaml
+
+      - name: Install (frozen)
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        # ⚠️ 这里的 typecheck 是**真的会检查**的：script 显式 `-p tsconfig.app.json`。
+        # 根 tsconfig.json 是 solution-style（`files: []` + references），
+        # 直接 `vue-tsc --noEmit` 会**一个文件都不检查**（apps/web 当前就是这种形态，
+        # 2026-09-10 实测：故意写类型错误 0 报错）。控制台不复制这个缺陷。
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test -- --run
+
+      - name: Build
+        run: pnpm build

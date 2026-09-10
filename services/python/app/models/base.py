@@ -224,6 +224,13 @@ class EventTypes:
     FREE_CHAT_SWITCH = "free_chat_switch"  # 功能行切场景（payload to: scene；docs/14 §12.3）
     FREE_CHAT_RESET = "free_chat_reset"  # 自由对话功能行：新对话（docs/14 §12.3）
     FREE_CHAT_RATE = "free_chat_rate"  # 自由对话功能行：语速切换（payload rate；docs/14 §12.3）
+    # 读书域（docs/45 §9 · docs/46 B-15：新增事件须四处同步——本常量 + analytics CHECK
+    # + 迁移扩 CHECK + 前端 EventName 联合 + docs/06 §9.1 登记）
+    WORD_LOOKUP = "word_lookup"  # 点词查义（payload word: str）
+    VOCAB_ADD = "vocab_add"  # 加入生词本（payload word: str, book_id: int）
+    ANNOTATION_ADD = "annotation_add"  # 划词批注（payload kind: str）
+    TTS_PLAY = "tts_play"  # 听书播放（payload chapter_id: int, sentence_idx: int）
+    TTS_PREPARE = "tts_prepare"  # 整章预合成（payload chapter_id: int, total: int）
 
 
 class TicketStatuses:

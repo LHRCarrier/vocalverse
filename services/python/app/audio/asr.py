@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 from app.audio.base import ASRClient, ASRResult
@@ -23,6 +24,28 @@ _ASR_SEM = asyncio.Semaphore(_ASR_CONCURRENCY)
 
 #: 转写墙钟超时（vasr-01：whisper 线程挂起 → 槽位永不释放 → 全站 ASR 死锁）。
 _ASR_TRANSCRIBE_TIMEOUT_S = 300.0
+
+
+def _observe_asr_wait(wait_ms: float) -> None:
+    """ASR 排队等待入指标（docs/50 §8.4）；观测失败绝不影响转写。"""
+    try:
+        from app.console.ops.metrics import get_registry
+
+        get_registry().observe("asr.queue.wait_ms", wait_ms)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _span(name: str, **attrs):
+    """ASR span（docs/50 §7.2）；采集层缺失时退化为空上下文管理器。"""
+    try:
+        from app.console.trace.recorder import span
+
+        return span(name, **attrs)
+    except Exception:  # noqa: BLE001
+        from contextlib import nullcontext
+
+        return nullcontext()
 
 
 class FasterWhisperClient(ASRClient):
@@ -93,30 +116,37 @@ class FasterWhisperClient(ASRClient):
         )
 
     async def transcribe(self, audio_bytes: bytes, language: str = "en") -> ASRResult:
-        import os
 
         # docs/06 §8 信号量护栏：限并发转写（排队不雪崩）；也在 /asr 裸端点与 /turns 热路径同时生效
+        # docs/50 §8.4：信号量**排队等待**此前完全不可观测（asr.queue.wait_ms.p95 无数据源），
+        # 在获取信号量前后各取一次时刻即可，零业务语义改动。
+        _wait_started = time.perf_counter()
         async with _ASR_SEM:
-            os.makedirs("data/audio/tmp", exist_ok=True)
-            with tempfile.NamedTemporaryFile(
-                suffix=".in", delete=False, dir="data/audio/tmp"
-            ) as tmp:
-                tmp.write(audio_bytes)
-                src = tmp.name
-            wav = src + ".wav"
-            try:
-                # docs/19 P0-2：ffmpeg 同步 subprocess 阻塞事件循环（音频卡死→整个进程停摆）。
-                # 改 async 子进程 + 15s 超时（超时 kill，防占资源/僵尸进程）。
-                await _run_ffmpeg_async(src, wav)
-                # vasr-01：转写本体墙钟超时 —— whisper 线程挂起时 signal 槽位可释放，
-                # 避免「挂 2 次 = 全站 ASR 永久死亡」；超时按失败处理（可降级/重试）。
-                return await asyncio.wait_for(
-                    asyncio.to_thread(self.transcribe_sync, wav, language),
-                    timeout=_ASR_TRANSCRIBE_TIMEOUT_S,
-                )
-            finally:
-                for p in (src, wav):
-                    Path(p).unlink(missing_ok=True)
+            _observe_asr_wait((time.perf_counter() - _wait_started) * 1000)
+            with _span("ASR", engine="whisper", audio_bytes=len(audio_bytes)):
+                return await self._transcribe_inner(audio_bytes, language)
+
+    async def _transcribe_inner(self, audio_bytes: bytes, language: str) -> ASRResult:
+        import os
+
+        os.makedirs("data/audio/tmp", exist_ok=True)
+        with tempfile.NamedTemporaryFile(suffix=".in", delete=False, dir="data/audio/tmp") as tmp:
+            tmp.write(audio_bytes)
+            src = tmp.name
+        wav = src + ".wav"
+        try:
+            # docs/19 P0-2：ffmpeg 同步 subprocess 阻塞事件循环（音频卡死→整个进程停摆）。
+            # 改 async 子进程 + 15s 超时（超时 kill，防占资源/僵尸进程）。
+            await _run_ffmpeg_async(src, wav)
+            # vasr-01：转写本体墙钟超时 —— whisper 线程挂起时 signal 槽位可释放，
+            # 避免「挂 2 次 = 全站 ASR 永久死亡」；超时按失败处理（可降级/重试）。
+            return await asyncio.wait_for(
+                asyncio.to_thread(self.transcribe_sync, wav, language),
+                timeout=_ASR_TRANSCRIBE_TIMEOUT_S,
+            )
+        finally:
+            for p in (src, wav):
+                Path(p).unlink(missing_ok=True)
 
 
 async def _run_ffmpeg_async(src: str, wav: str, timeout_s: float = 15.0) -> None:

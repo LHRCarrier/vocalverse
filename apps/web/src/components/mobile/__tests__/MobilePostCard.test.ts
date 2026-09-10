@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 import MobileCommentsSheet from '@/components/mobile/MobileCommentsSheet.vue'
 import MobilePostActions from '@/components/mobile/MobilePostActions.vue'
@@ -123,13 +124,55 @@ describe('MobilePostCard', () => {
     const wrapper = mountCard(
       makePost({ kind: 'video', media: { type: 'video', durationS: 383 } }),
     )
-    expect(wrapper.find('.u-comm-media--video').exists()).toBe(true)
+    // 2026-09-09（社区 S3）：单媒体渲染下沉到 MobileMediaGrid（类名 u-media--video）
+    expect(wrapper.find('.u-media--video').exists()).toBe(true)
     expect(wrapper.text()).toContain('6:23')
+  })
+
+  it('S1 种子形状（duration_s snake_case）也能出时长角标（修复前角标恒为空，docs/48 B8）', () => {
+    const wrapper = mountCard(
+      makePost({ kind: 'video', media: { type: 'video', duration_s: 383 } }),
+    )
+    expect(wrapper.text()).toContain('6:23')
+  })
+
+  it('多图帖：列表卡只渲首图 + 「+N」角标（feed 放大防护）', () => {
+    const wrapper = mountCard(
+      makePost({
+        media: {
+          type: 'image',
+          items: [
+            { id: 'a', url: '/api/v1/media/a' },
+            { id: 'b', url: '/api/v1/media/b' },
+            { id: 'c', url: '/api/v1/media/c' },
+          ],
+        },
+      }),
+    )
+    expect(wrapper.findAll('.u-media-grid__cell')).toHaveLength(1)
+    expect(wrapper.text()).toContain('+2')
+  })
+
+  it('整卡可点 → 跳详情页（修复「点帖子无查看方式」）', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/m/post/:postId', component: { template: '<div />' } }],
+    })
+    await router.push('/m/home')
+    await router.isReady()
+    const wrapper = mount(MobilePostCard, {
+      props: { post: makePost(), tintGradient: 'linear-gradient(#000,#fff)' },
+      global: { plugins: [router] },
+    })
+    await wrapper.get('.u-comm-item__tap').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/m/post/1')
   })
 
   it('无配图帖：不渲染媒体块（标题隐藏分支同样适用）', () => {
     const wrapper = mountCard(makePost({ media: null, body: null, title: null }))
-    expect(wrapper.find('.u-comm-media').exists()).toBe(false)
+    expect(wrapper.find('.u-media').exists()).toBe(false)
+    expect(wrapper.find('.u-media-grid').exists()).toBe(false)
     expect(wrapper.find('h3.u-comm-item__title').exists()).toBe(false)
   })
 })

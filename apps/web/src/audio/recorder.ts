@@ -64,7 +64,8 @@ export class VoiceRecorder {
   onStop: ((blob: Blob, mime: string, durationMs: number) => void) | null = null
 
   get supported(): boolean {
-    return typeof MediaRecorder !== 'undefined'
+    // mediaDevices 只在「安全上下文」存在：手机端经 http://局域网IP 加载时它可能为 undefined
+    return typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
   }
 
   /** 同一麦克风流：录音 + 实时分析共用（LivePitchChart 经 useSingPlay.getLiveStream 取用） */
@@ -73,14 +74,19 @@ export class VoiceRecorder {
   }
 
   async start(maxMs: number = MAX_RECORD_MS): Promise<void> {
-    if (!this.supported) throw new RecorderError('当前浏览器不支持录音')
     if (this.state === 'recording') return
 
     const gen = ++this.startGen
     this.cancelled = false
     let stream: MediaStream | null = null
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // 非安全上下文（手机端 http://局域网 访问）下 navigator.mediaDevices 为 undefined，
+      // 直接 getElement 会抛原生 TypeError（组长手机端点麦克风报错）；这里转成友好提示（2026-09-10）
+      const mediaDevices = navigator.mediaDevices
+      if (!mediaDevices?.getUserMedia) {
+        throw new RecorderError('无法访问麦克风：录音需在安全环境（HTTPS 或 localhost）下使用——手机端请改用安全访问地址')
+      }
+      stream = await mediaDevices.getUserMedia({ audio: true })
 
       // 权限提示期间调用方按了停止：释放麦克风，不进入 recording，也不产生任何回合。
       if (gen !== this.startGen) {

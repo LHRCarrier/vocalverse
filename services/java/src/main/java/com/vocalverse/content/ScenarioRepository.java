@@ -8,11 +8,14 @@ import org.springframework.data.repository.query.Param;
 
 public interface ScenarioRepository extends JpaRepository<ScenarioEntity, Long> {
 
-  /** 管理端列表：status/sceneType 可空过滤，按 id 倒序（新建在前）。 */
+  /**
+   * 管理端列表：status/sceneType 可空过滤，按 id 倒序（新建在前）。{@code cast} 理由见 {@code
+   * AdminAuditLogRepository#search}。
+   */
   @Query(
       "select s from ScenarioEntity s "
-          + "where (:status is null or s.status = :status) "
-          + "and (:sceneType is null or s.sceneType = :sceneType) "
+          + "where (cast(:status as string) is null or s.status = :status) "
+          + "and (cast(:sceneType as string) is null or s.sceneType = :sceneType) "
           + "order by s.id desc")
   Page<ScenarioEntity> search(
       @Param("status") String status, @Param("sceneType") String sceneType, Pageable pageable);

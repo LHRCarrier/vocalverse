@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from app.console.trace.recorder import span
 from app.practice.corpus import CorpusItem, match_rule
 from app.practice.meta import MetaResult
 
@@ -106,32 +107,34 @@ async def compensate_meta(
         "vocab.score = vocabulary variety & word choice (0-100); notes are short, actionable."
     )
     try:
-        fn = getattr(llm, "chat_with_usage", None)
-        if fn is not None:
-            raw, usage = await fn(
-                [
-                    {"role": "system", "content": _COMPENSATE_SYSTEM},
-                    {"role": "user", "content": user},
-                ],
-                temperature=0.2,
-                max_tokens=300,
-            )
-            if usage:
-                try:
-                    from app.agent.domains.usage import log_usage
+        # docs/50 §7.2：META 补偿是**独立的一次 LLM 尝试** → 独立 span（同一 STEP 下可见）
+        with span("LLM", retry_index=0, purpose="meta_compensate"):
+            fn = getattr(llm, "chat_with_usage", None)
+            if fn is not None:
+                raw, usage = await fn(
+                    [
+                        {"role": "system", "content": _COMPENSATE_SYSTEM},
+                        {"role": "user", "content": user},
+                    ],
+                    temperature=0.2,
+                    max_tokens=300,
+                )
+                if usage:
+                    try:
+                        from app.agent.domains.usage import log_usage
 
-                    log_usage("meta_compensate", usage, meta=None)
-                except Exception:
-                    pass
-        else:
-            raw = await llm.chat(
-                [
-                    {"role": "system", "content": _COMPENSATE_SYSTEM},
-                    {"role": "user", "content": user},
-                ],
-                temperature=0.2,
-                max_tokens=300,
-            )
+                        log_usage("meta_compensate", usage, meta=None)
+                    except Exception:
+                        pass
+            else:
+                raw = await llm.chat(
+                    [
+                        {"role": "system", "content": _COMPENSATE_SYSTEM},
+                        {"role": "user", "content": user},
+                    ],
+                    temperature=0.2,
+                    max_tokens=300,
+                )
     except Exception:
         return MetaResult(reply=reply_text, meta=None, ok=False)
     return _parse_meta_json(raw, reply_text)

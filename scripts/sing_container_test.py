@@ -452,17 +452,39 @@ def main() -> int:
             too_big.text[:120],
         )
 
-    big_nginx = httpx.post(
-        f"{WEB}/api/v1/sessions/1/audio",
+    # 经 nginx 的两级体量：① 应用层上限（20MB 音频）→ 41301；② 网关层上限（65m）→ @err413 envelope。
+    # 注意必须用**新会话**：同会话已有定稿 attempt 时，端点会先命中幂等分支直接返回结果（P1-3 语义），
+    # 根本读不到 body，也就不会触发体积校验（早期脚本用固定 session 1，合并 main 后即出现假绿）。
+    with httpx.Client(base_url=PY, timeout=120) as c3:
+        sid_e = c3.post(
+            "/api/v1/sessions", headers=H, json={"kind": "sing", "song_id": song_id}
+        ).json()["data"]["id"]
+        big_nginx = httpx.post(
+            f"{WEB}/api/v1/sessions/{sid_e}/audio",
+            headers={"Authorization": f"Bearer {owner_token}"},
+            files={"audio": ("big.wav", b"RIFF" + b"\x00" * (int(23 * 1024 * 1024)), "audio/wav")},
+            timeout=120,
+        )
+        check(
+            "体量超限（经 nginx 8088 → 应用层）→ 413 + 41301 envelope",
+            big_nginx.status_code == 413
+            and big_nginx.headers.get("content-type", "").startswith("application/json")
+            and big_nginx.json().get("code") == 41301,
+            f"HTTP {big_nginx.status_code} body={big_nginx.text[:100]}",
+        )
+    # 网关层：> 65m 由 nginx `client_max_body_size` 拦截，且必须是 JSON envelope（非 HTML 错误页）
+    huge_nginx = httpx.post(
+        f"{WEB}/api/v1/sessions/{sid_e}/audio",
         headers={"Authorization": f"Bearer {owner_token}"},
-        files={"audio": ("big.wav", b"RIFF" + b"\x00" * (int(23 * 1024 * 1024)), "audio/wav")},
-        timeout=60,
+        files={"audio": ("huge.wav", b"RIFF" + b"\x00" * (int(66 * 1024 * 1024)), "audio/wav")},
+        timeout=180,
     )
     check(
-        "体量超限（经 nginx 8088）→ 413 + JSON envelope",
-        big_nginx.status_code == 413
-        and big_nginx.headers.get("content-type", "").startswith("application/json"),
-        f"HTTP {big_nginx.status_code} body={big_nginx.text[:100]}",
+        "网关层体量超限（>65m，经 nginx）→ 413 + JSON envelope",
+        huge_nginx.status_code == 413
+        and huge_nginx.headers.get("content-type", "").startswith("application/json")
+        and huge_nginx.json().get("code") == 41301,
+        f"HTTP {huge_nginx.status_code} body={huge_nginx.text[:100]}",
     )
 
     # ---------------- G. P1-13 多桶限流（Redis 回滚路径） ----------------

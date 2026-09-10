@@ -54,12 +54,19 @@ services:
       # 在容器内指容器自己 → Connection refused（2026-09-10 复测实测：提取完成却翻不了 ready，
       # 新环境/世代重建后歌曲永久 40905）。故此处显式钉死，不受 .env 影响。
       APP_JAVA_BASE_URL: http://java-api:8080
+      # 容器只跑运行时依赖：镜像构建是 `uv sync --frozen --no-dev`，而 `uv run` 默认**带上 dev 组**
+      # → 每次容器启动都会去 PyPI 下载 ruff/mypy/pytest 等（2026-09-10 合并期实测：网络慢时启动
+      # 卡在下载、健康检查失败、依赖它的 web 起不来）。置 UV_NO_DEV=1 让 `uv run` 跳过 dev 组同步。
+      UV_NO_DEV: "1"
     # docs/06 §8：whisper 信号量 2 下多 worker 收益为负（每进程 ≈500MB 模型）；内存 ≥2GB 显式护栏
     mem_limit: 2g
     ports:
       - "8000:8000"
     volumes:
       - ./data/audio:/app/data/audio
+      # 媒体卷（社区 S3 · docs/47 §4.1）：缺卷时容器重建 → DB 行指向已消失文件 → 全部 404
+      # （docs/48 B10）
+      - ./data/media:/app/data/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -136,6 +143,25 @@ services:
         condition: service_healthy
       java-api:
         condition: service_healthy
+
+  # 管理端控制台（独立 SPA · docs/50）。
+  # 挂在 profile 里：默认 `docker compose up` **不启动**它，
+  # 因此 README 的「五服务全 healthy」验收口径与部署流程零变化；
+  # 需要时显式拉起：
+  #   docker compose --profile console up -d --build admin-console
+  #   → http://localhost:8089/console/
+  admin-console:
+    profiles: ["console"]
+    build:
+      context: ./apps/admin
+    ports:
+      - "8089:80"
+    # 控制台只是静态产物 + 反代，健康不依赖上游起来（上游不可用时页面自己报错更好排查）
+    depends_on:
+      python-api:
+        condition: service_started
+      java-api:
+        condition: service_started
 
 volumes:
   pgdata:

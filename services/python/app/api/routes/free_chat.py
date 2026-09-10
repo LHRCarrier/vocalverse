@@ -27,6 +27,7 @@ from pydantic import BaseModel
 from app.agent.runtime.turn_runner import TurnRunner
 from app.audio.base import get_asr_client, get_llm_client
 from app.audio.upload import validate_audio_bytes
+from app.console.trace.recorder import trace
 from app.core.auth import get_current_user_id
 from app.core.config import get_settings
 from app.core.ratelimit import bucket_limits, consume_all
@@ -119,8 +120,10 @@ async def free_chat_turn(
                 yield ev.TurnEnd(turn_index=turn_index, score_status="unavailable")
 
             # R-18：心跳包装（同 practice 热路径；静默 ≥15s 推 ': ping'，不取消内部流）
-            async for payload in ev.heartbeat_stream(_core(), settings.sse_heartbeat_seconds):
-                yield payload
+            # docs/50 §7.2：自由说是独立 kind（一次会话轮 = 一条 trace，含 LLM 流式 span）
+            with trace(kind="free_chat", user_id=user_id):
+                async for payload in ev.heartbeat_stream(_core(), settings.sse_heartbeat_seconds):
+                    yield payload
         except Exception as exc:
             logger.exception("free-chat turn failed: %s", exc)
             yield ev.sse_payload(ev.StreamError(code="internal", recoverable=True))

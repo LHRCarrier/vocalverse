@@ -50,16 +50,22 @@ export const previewRoute: RouteRecordRaw | null = import.meta.env.DEV
           component: () => import('@/views/preview/SingingPreview.vue'),
         },
         {
-          path: 'admin-dashboard',
-          component: () => import('@/views/preview/AdminDashboardPreview.vue'),
+          path: 'community-s3',
+          component: () => import('@/views/preview/CommunityS3Preview.vue'),
         },
         {
-          path: 'admin-users',
-          component: () => import('@/views/preview/AdminUsersPreview.vue'),
+          path: 'reading',
+          component: () => import('@/views/preview/ReadingPreview.vue'),
         },
         {
           path: 'lieflat',
           component: () => import('@/views/preview/LieflatPreview.vue'),
+        },
+        {
+          // 管理端控制台联调桥接页（docs/50 §14.4 · AGENTS 工作流程 §3）。
+          // 只探活 + 对照，不 import apps/admin 源码；删除清单见该文件尾注释。
+          path: 'admin-console',
+          component: () => import('@/views/preview/AdminConsolePreview.vue'),
         },
       ],
     }

@@ -7,6 +7,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
@@ -37,6 +38,12 @@
     </application>
 
     <!-- Permissions -->
-
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 2026-09-10：App 核心录音（WebRTC getUserMedia）依赖 RECORD_AUDIO；
+         此前缺失 → WebView 即便安全上下文也拿不到麦克风（页面 onPermissionRequest 无法被授予） -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- 2026-09-10：Capacitor BridgeWebChromeClient.onPermissionRequest 对 AUDIO_CAPTURE
+         同时申请 MODIFY_AUDIO_SETTINGS + RECORD_AUDIO，任一缺失/未授予 → request.deny()
+         → getUserMedia NotAllowedError「麦克风被拒绝」。此前只有 RECORD_AUDIO → 真机必被拒。 -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 </manifest>

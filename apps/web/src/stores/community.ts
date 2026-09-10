@@ -95,6 +95,29 @@ export const useCommunityStore = defineStore('community', () => {
     if (target) Object.assign(target, patch)
   }
 
+  /**
+   * 新发帖立即插到列表头（2026-09-09 组长实测：发完帖回社区看不到，刷新后才有）。
+   *
+   * 根因：`load()` 命中按 domain 缓存就**不发请求**，而发帖在另一个页面 —— 回首页时
+   * 拿到的是发帖前的缓存快照。这里同时更新 items 与当前 domain 的缓存，回首页即见。
+   */
+  function prepend(post: CommunityPostView) {
+    const next = [post, ...items.value.filter((p) => p.id !== post.id)]
+    items.value = next.length > LIST_CAP ? next.slice(0, LIST_CAP) : next
+    const key = keyOf(activeDomain.value)
+    const cached = cache.get(key)
+    cache.set(key, {
+      items: items.value,
+      cursor: cached?.cursor ?? cursor.value,
+      hasMore: cached?.hasMore ?? hasMore.value,
+    })
+  }
+
+  /** 失效全部缓存（下次 load 强制重拉） */
+  function invalidate() {
+    cache.clear()
+  }
+
   /** 点赞 toggle（乐观 + 回滚；以后端返回计数为准） */
   async function toggleLike(post: CommunityPostView) {
     const target = items.value.find((p) => p.id === post.id) ?? post
@@ -160,5 +183,7 @@ export const useCommunityStore = defineStore('community', () => {
     share,
     syncCommentCount,
     patchItem,
+    prepend,
+    invalidate,
   }
 })

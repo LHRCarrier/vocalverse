@@ -47,6 +47,20 @@ JAVA_WRITTEN_MODELS = frozenset(
         "PostLike",  # post_likes
         "PostInteraction",  # post_interactions
         "Follow",  # follows
+        "DirectMessage",  # direct_messages（私信 IM · docs/49 §1 · 迁移 0012）
+        "DmReadState",  # dm_read_state（同上）
+        # 管理端控制台（docs/50 §5.1 · 迁移 0013）：RBAC + 审计 + 审核工单全 Java 写，
+        # Python 侧只读映射；运维遥测/LLM Trace（ops_* / llm_*）归 Python 写，
+        # 故不在此名单（不在名单即视为 Python 写权，见模块 docstring 第 2 条）
+        "AdminUser",  # admin_users
+        "AdminRole",  # admin_roles
+        "AdminPermission",  # admin_permissions
+        "AdminRolePermission",  # admin_role_permissions
+        "AdminSession",  # admin_sessions
+        "AdminLoginAttempt",  # admin_login_attempts
+        "AdminAuditLog",  # admin_audit_logs
+        "ModerationCase",  # moderation_cases
+        "ModerationReport",  # moderation_reports
     }
 )
 

@@ -34,6 +34,7 @@ from app.audio.base import (
 from app.audio.textproc.normalize import normalize_for_tts
 from app.audio.tts import tts_synthesize_cached
 from app.audio.upload import validate_audio_bytes
+from app.console.trace.recorder import span, trace
 from app.core.auth import get_current_user_id
 from app.core.config import Settings, get_settings
 from app.core.ratelimit import consume
@@ -117,5 +118,9 @@ async def llm_chat(
     if not message.strip():
         raise HTTPException(status_code=422, detail="message required")
     await consume("llm", settings.llm_rate_per_hour, user_id)
-    reply = await client.chat([{"role": "user", "content": message}])
+    # docs/50 §7.3：一次调用 = 一条 trace（无会话上下文，kind=llm_chat）；
+    # 本端点此前**不在** docs/50 §7.3 的注入点清单里（清单给的是 usage_log 点），
+    # 但它是一次货真价实的 LLM 调用 —— 不埋就永远看不到这条路径的耗时。
+    with trace(kind="llm_chat", user_id=user_id), span("LLM", retry_index=0, purpose="llm_chat"):
+        reply = await client.chat([{"role": "user", "content": message}])
     return ok(ChatResult(reply=reply))

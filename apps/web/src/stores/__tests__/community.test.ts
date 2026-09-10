@@ -106,4 +106,43 @@ describe('community store（fe-03 竞态守卫 + fe-04 上限裁剪）', () => {
     expect(store.items).toHaveLength(60)
     expect(store.hasMore).toBe(false)
   })
+
+  /**
+   * 2026-09-09 组长手机实测：发完帖回社区看不到，电脑刷新后才出现。
+   * 根因 = `load()` 命中 domain 缓存就不发请求，而发帖在另一个页面 → 回首页看到旧快照。
+   */
+  it('prepend：新发帖立即置顶，且切回该 domain 不被旧缓存覆盖', async () => {
+    const store = useCommunityStore()
+    vi.mocked(communityApi.fetchFeed).mockResolvedValue(page([post(1)], 'c1', false))
+    await store.load(null)
+    expect(store.items.map((i) => i.id)).toEqual([1])
+    expect(vi.mocked(communityApi.fetchFeed)).toHaveBeenCalledTimes(1)
+
+    // 发帖成功 → prepend（发帖页调用）
+    store.prepend(post(99))
+    expect(store.items.map((i) => i.id)).toEqual([99, 1])
+
+    // 回首页：命中缓存也必须带上刚发的帖（修复前是 [1]）
+    await store.load(null)
+    expect(store.items.map((i) => i.id)).toEqual([99, 1])
+    expect(vi.mocked(communityApi.fetchFeed)).toHaveBeenCalledTimes(1)
+  })
+
+  it('prepend：同 id 去重（重复提交不出现两张卡）', async () => {
+    const store = useCommunityStore()
+    vi.mocked(communityApi.fetchFeed).mockResolvedValue(page([post(1)], 'c1', false))
+    await store.load(null)
+    store.prepend(post(99))
+    store.prepend(post(99))
+    expect(store.items.map((i) => i.id)).toEqual([99, 1])
+  })
+
+  it('invalidate：清缓存后 load 重新走网络', async () => {
+    const store = useCommunityStore()
+    vi.mocked(communityApi.fetchFeed).mockResolvedValue(page([post(1)], 'c1', false))
+    await store.load(null)
+    store.invalidate()
+    await store.load(null)
+    expect(vi.mocked(communityApi.fetchFeed)).toHaveBeenCalledTimes(2)
+  })
 })

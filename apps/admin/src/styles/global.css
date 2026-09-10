@@ -1,0 +1,222 @@
+/**
+ * 基础样式与组件类（docs/50 §11）。
+ * 组件类前缀统一 `c-`，与产品移动端的 `u-` / `s-` 明确区分（避免第四套设计系统混淆）。
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--vv-font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--c-link);
+  text-decoration: none;
+}
+
+/* 键盘可达性：只给键盘焦点画环，不污染鼠标点击。
+   用实心描边 + 偏移，而不是"淡色阴影环"——后者在白底上对比度实测 1.17:1，等于没有焦点提示。 */
+:focus-visible {
+  outline: 2px solid var(--c-focus-color);
+  outline-offset: 2px;
+  border-radius: var(--c-ctl-radius);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── 页面骨架 ─────────────────────────────────────────────────────────── */
+
+.c-page {
+  max-width: var(--layout-content-max);
+  margin: 0 auto;
+  padding: 20px 24px 40px;
+}
+
+.c-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.c-page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.c-page-desc {
+  margin: 4px 0 0;
+  color: var(--c-text-2);
+  font-size: 13px;
+}
+
+/* ── 卡片 / 面板 ──────────────────────────────────────────────────────── */
+
+.c-card {
+  background: var(--c-surface);
+  border-radius: var(--c-card-radius);
+  padding: 18px 20px;
+  box-shadow: var(--c-shadow-2);
+}
+
+.c-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.c-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.c-card-sub {
+  margin: 3px 0 0;
+  color: var(--c-text-2);
+  font-size: 12px;
+}
+
+/* 统计块 */
+.c-stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.c-stat {
+  background: var(--c-surface);
+  border-radius: var(--c-card-radius);
+  padding: 16px 18px;
+  box-shadow: var(--c-shadow-2);
+}
+
+.c-stat-label {
+  color: var(--c-text-2);
+  font-size: 12px;
+}
+
+.c-stat-value {
+  margin-top: 6px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.c-stat-unit {
+  margin-left: 4px;
+  color: var(--c-text-3);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.c-stat-delta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--c-text-2);
+}
+
+/* ── 徽标 / 状态 ──────────────────────────────────────────────────────── */
+
+.c-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--vv-r-pill);
+  padding: 1px 9px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.c-badge--ok {
+  background: var(--c-ok-soft);
+  color: var(--c-ok-ink);
+}
+.c-badge--warn {
+  background: var(--c-warn-soft);
+  color: var(--c-warn-ink);
+}
+.c-badge--danger {
+  background: var(--c-danger-soft);
+  color: var(--c-danger-ink);
+}
+.c-badge--info {
+  background: var(--c-primary-soft);
+  color: var(--c-info-ink);
+}
+.c-badge--muted {
+  background: var(--c-surface-sunken);
+  color: var(--c-text-2);
+}
+
+/* ── 工具类（少量，复杂布局走 UnoCSS） ────────────────────────────────── */
+
+.c-muted {
+  color: var(--c-text-2);
+}
+.c-weak {
+  color: var(--c-text-3);
+}
+.c-mono {
+  font-family: var(--vv-font-mono);
+  font-size: 12px;
+}
+.c-num {
+  font-variant-numeric: tabular-nums;
+}
+.c-hairline {
+  height: 1px;
+  background: var(--c-border);
+  border: 0;
+  margin: 14px 0;
+}
+
+/* ── 预警严重级条 ─────────────────────────────────────────────────────── */
+
+.c-sev {
+  display: inline-block;
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+.c-sev--critical {
+  background: var(--c-danger);
+}
+.c-sev--warn {
+  background: var(--c-warn);
+}
+.c-sev--info {
+  background: var(--c-primary);
+}

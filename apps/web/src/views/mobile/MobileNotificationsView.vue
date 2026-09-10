@@ -2,19 +2,22 @@
 /**
  * 移动端 · 通知中心（2026-09-09 组长反馈：消息收敛到通知——X 式一个入口 tab 分流）
  *
- * S2 真实化（docs/41 · 2026-09-06）：
+ * 三 tab 全部真实流：
+ * - 「私信」= 一对一私信会话列表（Java `/messages/conversations`；未读为服务端水位口径，docs/49 §4）；
  * - 「通知」= 互动通知：interactions/评论**派生**（不建表）——like/coin/share 按
  *   (post, action, 当日) mergeKey 聚合为「张三 等 N 人…」（docs/38 §5 模板）；评论逐条带内容；
- * - 「关注」= 我关注的人（管理：推荐关注可关注/取关）+ 关注流（被关注作者最新内容）；
- * - 「私信」= 演示帧保留（IM 范围，S3 后另议），顶部标注不变。
+ * - 「关注」= 我关注的人（管理：推荐关注可关注/取关）+ 关注流（被关注作者最新内容）。
+ *
+ * 进入私信 tab 时建立 SSE 长连（实时未读增量）；离开即收流（docs/49 §3.1 单用户 ≤3 流）。
  */
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import IconMail from '~icons/tabler/mail'
 import IconSettings from '~icons/tabler/settings'
 
 import {
+  authorDisplay,
   fetchFollowingFeed,
   fetchFollowRecommendations,
   fetchFollows,
@@ -25,7 +28,7 @@ import {
 } from '@/api/community'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
-import { createDemoConversations } from '@/data/messages-demo'
+import { useMessagesStore } from '@/stores/messages'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
@@ -55,13 +58,17 @@ watch(
 )
 
 const ui = useUiStore()
-const conversations = ref(createDemoConversations())
+const messages = useMessagesStore()
 
 function newMessage() {
-  ui.showToast('新消息 · S3 上线')
+  ui.showToast('发起新会话 · 后续版本')
 }
 function messageSettings() {
-  ui.showToast('通知设置 · S3 上线')
+  ui.showToast('通知设置 · 后续版本')
+}
+
+function unreadText(n: number): string {
+  return n > 99 ? '99+' : String(n)
 }
 
 /* ---------- S2 · 互动通知（真实派生 + mergeKey 聚合） ---------- */
@@ -163,15 +170,23 @@ async function toggleFollow(rec: FollowRecommend) {
   }
 }
 
-/* Tab 切换懒加载 */
+/* Tab 切换懒加载（私信 tab = 真实会话列表 + SSE 长连；离开即收流） */
 watch(
   activeTab,
   (t) => {
+    if (t === '私信') {
+      void messages.loadConversations()
+      messages.startStream()
+    } else {
+      messages.stopStream()
+    }
     if (t === '通知') void loadNotices()
     if (t === '关注') void loadFollows()
   },
   { immediate: true },
 )
+
+onUnmounted(() => messages.stopStream())
 
 const hasFollows = computed(() => followList.value.length > 0)
 </script>
@@ -189,7 +204,7 @@ const hasFollows = computed(() => followList.value.length > 0)
       </template>
     </MobileTopBar>
 
-    <p class="u-note u-notif__demo">私信为演示数据；通知/关注为真实流（S2）。</p>
+    <p class="u-note u-notif__demo">私信/通知/关注均为真实流（docs/49）；实时推送走长连，弱网自动降级。</p>
 
     <!-- X 式 tab（均分整行 · 激活加粗 + 下划线） -->
     <nav class="u-notif-tabs" aria-label="通知分类">
@@ -206,24 +221,39 @@ const hasFollows = computed(() => followList.value.length > 0)
       </button>
     </nav>
 
-    <!-- Tab 1 · 私信（原 /m/messages 列表收敛 · 演示帧） -->
+    <!-- Tab 1 · 私信（真实会话列表：对端 + 最后一条 + 服务端水位未读） -->
     <div v-if="activeTab === '私信'" class="u-msg">
-      <RouterLink
-        v-for="c in conversations"
-        :key="c.id"
-        :to="`/m/messages/${c.id}`"
-        class="u-msg__row"
-        :aria-label="`与 ${c.name} 的对话`"
+      <p v-if="messages.listError" class="u-note u-notif__demo">{{ messages.listError }}</p>
+      <p
+        v-else-if="!messages.loadingList && !messages.conversations.length"
+        class="u-note u-notif__demo"
+        style="text-align: center; margin-top: 20px"
       >
-        <span class="u-msg__ava" :style="{ background: c.tint }">{{ c.name.slice(0, 1) }}</span>
+        还没有私信——关注同学后即可开始聊天。
+      </p>
+      <RouterLink
+        v-for="c in messages.conversations"
+        :key="c.peer.id"
+        :to="`/m/messages/${c.peer.id}`"
+        class="u-msg__row"
+        :aria-label="`与 ${c.peer.nickname} 的对话`"
+      >
+        <span class="u-msg__ava" :style="{ background: c.peer.tint ?? '#37546e' }">
+          {{ c.peer.nickname.slice(0, 1) }}
+        </span>
         <span class="u-msg__body">
           <span class="u-msg__who">
-            <strong>{{ c.name }}<span class="u-msg__lv">LV{{ c.level.slice(1) }}</span></strong>
-            <time class="u-msg__time">{{ c.time }}</time>
+            <strong>{{ c.peer.nickname }}<span class="u-msg__lv">LV{{ c.peer.level.slice(1) }}</span></strong>
+            <time class="u-msg__time">{{ timeAgo(c.lastCreatedAt) }}</time>
           </span>
-          <span class="u-msg__last">{{ c.lastMsg }}</span>
+          <span class="u-msg__last">
+            <template v-if="c.lastMine">我：</template>{{ c.lastBody }}
+          </span>
+          <span v-if="authorDisplay(c.peer.handle)" class="u-msg__last">{{ authorDisplay(c.peer.handle) }}</span>
         </span>
-        <span v-if="c.unread" class="u-msg__dot" aria-label="未读" />
+        <span v-if="c.unreadCount > 0" class="u-msg__unread" :aria-label="`${c.unreadCount} 条未读`">
+          {{ unreadText(c.unreadCount) }}
+        </span>
       </RouterLink>
     </div>
 

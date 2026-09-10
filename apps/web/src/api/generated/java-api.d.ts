@@ -4,6 +4,102 @@
  */
 
 export interface paths {
+    "/api/v1/console/roles/{id}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["putPermissions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/content/songs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSong"];
+        put: operations["updateSong"];
+        post?: never;
+        delete: operations["archiveSong"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/content/songs/{id}/lrc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getLrc"];
+        put: operations["replaceLrc"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/content/scenarios/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getScenario"];
+        put: operations["updateScenario"];
+        post?: never;
+        delete: operations["archiveScenario"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/content/questions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getQuestion"];
+        put: operations["updateQuestion"];
+        post?: never;
+        delete: operations["archiveQuestion"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/content/listening-materials/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMaterial"];
+        put: operations["updateMaterial"];
+        post?: never;
+        delete: operations["archiveMaterial"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/community/posts/{id}/likes": {
         parameters: {
             query?: never;
@@ -36,6 +132,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/community/messages/{peerId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["markRead"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/community/follows/{userId}": {
         parameters: {
             query?: never;
@@ -52,55 +164,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/songs/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getSong"];
-        put: operations["updateSong"];
-        post?: never;
-        delete: operations["archiveSong"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/songs/{id}/lrc": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getLrc"];
-        put: operations["replaceLrc"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/scenarios/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getScenario"];
-        put: operations["updateScenario"];
-        post?: never;
-        delete: operations["archiveScenario"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/placement-questions/{id}": {
+    "/internal/level": {
         parameters: {
             query?: never;
             header?: never;
@@ -108,25 +172,9 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: operations["update"];
-        post?: never;
-        delete: operations["archive"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/listening-materials/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getMaterial"];
-        put: operations["updateMaterial"];
-        post?: never;
-        delete: operations["archiveMaterial"];
+        put?: never;
+        post: operations["setLevel"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -142,22 +190,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["setPitchStatus"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/level": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["setLevel"];
         delete?: never;
         options?: never;
         head?: never;
@@ -276,6 +308,278 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/console/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listRoles"];
+        put?: never;
+        post: operations["createRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/moderation/reports/{id}/handle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["handleReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/moderation/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listCases"];
+        put?: never;
+        post: operations["createCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/moderation/cases/{id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["decide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/moderation/cases/{id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["assign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/content/songs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSongs"];
+        put?: never;
+        post: operations["createSong"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/content/songs/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publishSong"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/content/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listScenarios"];
+        put?: never;
+        post: operations["createScenario"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/content/scenarios/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publishScenario"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/content/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listQuestions"];
+        put?: never;
+        post: operations["createQuestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/content/listening-materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listMaterials"];
+        put?: never;
+        post: operations["createMaterial"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/content/listening-materials/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publishMaterial"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["refresh_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["logout_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["login_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/admins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAdmins"];
+        put?: never;
+        post: operations["createAdmin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/admins/{id}/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/community/posts": {
         parameters: {
             query?: never;
@@ -324,71 +628,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/songs": {
+    "/api/v1/community/messages/{peerId}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listSongs"];
+        get: operations["thread"];
         put?: never;
-        post: operations["createSong"];
+        post: operations["send"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/scenarios": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listScenarios"];
-        put?: never;
-        post: operations["createScenario"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/placement-questions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["list_2"];
-        put?: never;
-        post: operations["create_2"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/listening-materials": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listMaterials"];
-        put?: never;
-        post: operations["createMaterial"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/users/{id}/status": {
+    "/api/v1/users/me": {
         parameters: {
             query?: never;
             header?: never;
@@ -401,10 +657,26 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch: operations["updateStatus"];
+        patch: operations["patchMe"];
         trace?: never;
     };
-    "/api/v1/admin/users/{id}/profile": {
+    "/api/v1/console/users/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["setStatus"];
+        trace?: never;
+    };
+    "/api/v1/console/users/{id}/profile": {
         parameters: {
             query?: never;
             header?: never;
@@ -420,7 +692,39 @@ export interface paths {
         patch: operations["updateProfile"];
         trace?: never;
     };
-    "/api/v1/admin/tickets/{id}": {
+    "/api/v1/console/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteRole"];
+        options?: never;
+        head?: never;
+        patch: operations["patchRole"];
+        trace?: never;
+    };
+    "/api/v1/console/content/tickets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getTicket"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["patchTicket"];
+        trace?: never;
+    };
+    "/api/v1/console/admins/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -433,7 +737,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch: operations["update_1"];
+        patch: operations["patchAdmin"];
         trace?: never;
     };
     "/auth/me": {
@@ -484,7 +788,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/community/posts/{id}": {
+    "/api/v1/console/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/users/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -492,6 +812,182 @@ export interface paths {
             cookie?: never;
         };
         get: operations["detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPermissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/moderation/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/moderation/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listReports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/moderation/contract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["contract"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/moderation/cases/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCase"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/content/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listTickets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/content/publish-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["publishEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["me_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/admins/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/community/posts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["detail_1"];
         put?: never;
         post?: never;
         delete: operations["delete"];
@@ -508,6 +1004,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["notifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/community/messages/unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["unread"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/community/messages/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["conversations"];
         put?: never;
         post?: never;
         delete?: never;
@@ -564,49 +1092,17 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/users": {
+    "/api/v1/console/admins/{id}/sessions": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["list"];
+        get?: never;
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/users/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["detail_1"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/tickets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["list_1"];
-        put?: never;
-        post?: never;
-        delete?: never;
+        delete: operations["kickSessions"];
         options?: never;
         head?: never;
         patch?: never;
@@ -616,6 +1112,113 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ConsolePrincipal: {
+            /** Format: int64 */
+            adminUserId?: number;
+            username?: string;
+            roleCode?: string;
+            permissions?: string[];
+            /** Format: int64 */
+            sessionId?: number;
+        };
+        EnvelopeRoleView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["RoleView"];
+        };
+        RoleView: {
+            /** Format: int64 */
+            id?: number;
+            code?: string;
+            name?: string;
+            description?: string;
+            builtin?: boolean;
+            /** Format: int32 */
+            rank?: number;
+            permissionCodes?: string[];
+            /** Format: int64 */
+            memberCount?: number;
+        };
+        SongUpsert: {
+            title: string;
+            artist?: string;
+            /** Format: int32 */
+            level: number;
+            /** Format: int64 */
+            durationS?: number;
+            bpm?: number;
+            musicalKey?: string;
+            audioUrl: string;
+            lrcUrl?: string;
+            coverUrl?: string;
+            interestTags?: string;
+            source?: string;
+            status?: string;
+            pitchRefStatus?: string;
+        };
+        EnvelopeMapStringObject: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: {
+                [key: string]: Record<string, never>;
+            };
+        };
+        LrcLine: {
+            /** Format: int64 */
+            offsetMs: number;
+            /** Format: int64 */
+            endOffsetMs?: number;
+            lineText: string;
+        };
+        LrcUpsert: {
+            lines: components["schemas"]["LrcLine"][];
+        };
+        EnvelopeListMapStringObject: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: {
+                [key: string]: Record<string, never>;
+            }[];
+        };
+        ScenarioUpsert: {
+            title: string;
+            sceneType: string;
+            /** Format: int32 */
+            difficulty: number;
+            description?: string;
+            systemPrompt: string;
+            openingLine: string;
+            targetCorpus?: string;
+            interestTags?: string;
+            /** Format: int32 */
+            promptVersion?: number;
+            /** Format: int32 */
+            estimatedTurns?: number;
+            /** Format: int32 */
+            estimatedMinutes?: number;
+            status?: string;
+        };
+        QuestionPatch: {
+            prompt: string;
+            referenceAnswer?: string;
+            status?: string;
+        };
+        MaterialUpsert: {
+            title: string;
+            /** Format: int32 */
+            level: number;
+            audioUrl: string;
+            /** Format: int64 */
+            durationS?: number;
+            transcript?: string;
+            interestTags?: string;
+            source?: string;
+            license?: string;
+            status?: string;
+        };
         EnvelopeLikeState: {
             /** Format: int32 */
             code?: number;
@@ -638,204 +1241,32 @@ export interface components {
             message?: string;
             data?: components["schemas"]["CoinState"];
         };
+        ReadRequest: {
+            /** Format: int64 */
+            upTo?: number;
+        };
+        EnvelopeReadState: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["ReadState"];
+        };
+        ReadState: {
+            /** Format: int64 */
+            peerId?: number;
+            /** Format: int64 */
+            lastReadId?: number;
+        };
         EnvelopeVoid: {
             /** Format: int32 */
             code?: number;
             message?: string;
             data?: Record<string, never>;
         };
-        SongUpsert: {
-            title: string;
-            artist?: string;
-            /** Format: int32 */
-            level: number;
+        LevelRequest: {
             /** Format: int64 */
-            durationS?: number;
-            bpm?: number;
-            musicalKey?: string;
-            audioUrl: string;
-            vocalRefUrl?: string;
-            lrcUrl?: string;
-            coverUrl?: string;
-            interestTags?: string;
-            source?: string;
-            status?: string;
-        };
-        EnvelopeSongView: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: components["schemas"]["SongView"];
-        };
-        SongView: {
-            /** Format: int64 */
-            id?: number;
-            title?: string;
-            artist?: string;
-            /** Format: int32 */
-            level?: number;
-            /** Format: int64 */
-            durationS?: number;
-            bpm?: number;
-            musicalKey?: string;
-            audioUrl?: string;
-            vocalRefUrl?: string;
-            lrcUrl?: string;
-            coverUrl?: string;
-            interestTags?: string;
-            source?: string;
-            status?: string;
-            pitchRefStatus?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        LrcLine: {
-            /** Format: int64 */
-            offsetMs: number;
-            /** Format: int64 */
-            endOffsetMs?: number;
-            lineText: string;
-        };
-        LrcUpsert: {
-            lines: components["schemas"]["LrcLine"][];
-        };
-        EnvelopeListLrcView: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: components["schemas"]["LrcView"][];
-        };
-        LrcView: {
-            /** Format: int32 */
-            seq?: number;
-            /** Format: int64 */
-            offsetMs?: number;
-            /** Format: int64 */
-            endOffsetMs?: number;
-            lineText?: string;
-            source?: string;
-        };
-        ScenarioUpsert: {
-            title: string;
-            sceneType: string;
-            /** Format: int32 */
-            difficulty: number;
-            description?: string;
-            systemPrompt: string;
-            openingLine: string;
-            targetCorpus?: string;
-            interestTags?: string;
-            /** Format: int32 */
-            promptVersion?: number;
-            /** Format: int32 */
-            estimatedTurns?: number;
-            /** Format: int32 */
-            estimatedMinutes?: number;
-            status?: string;
-        };
-        EnvelopeScenarioView: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: components["schemas"]["ScenarioView"];
-        };
-        ScenarioView: {
-            /** Format: int64 */
-            id?: number;
-            title?: string;
-            sceneType?: string;
-            /** Format: int32 */
-            difficulty?: number;
-            description?: string;
-            systemPrompt?: string;
-            openingLine?: string;
-            targetCorpus?: string;
-            interestTags?: string;
-            /** Format: int32 */
-            promptVersion?: number;
-            /** Format: int32 */
-            estimatedTurns?: number;
-            /** Format: int32 */
-            estimatedMinutes?: number;
-            status?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        QuestionPatch: {
-            kind: string;
-            prompt: string;
-            referenceAnswer?: string;
-            status: string;
-        };
-        EnvelopeQuestionView: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: components["schemas"]["QuestionView"];
-        };
-        QuestionView: {
-            /** Format: int64 */
-            id?: number;
-            /** Format: int32 */
-            examRevision?: number;
-            /** Format: int32 */
-            itemIndex?: number;
-            kind?: string;
-            prompt?: string;
-            referenceAnswer?: string;
-            status?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        MaterialUpsert: {
-            title: string;
-            /** Format: int32 */
-            level: number;
-            audioUrl: string;
-            /** Format: int64 */
-            durationS?: number;
-            transcript?: string;
-            interestTags?: string;
-            source?: string;
-            license?: string;
-            status?: string;
-        };
-        EnvelopeMaterialView: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: components["schemas"]["MaterialView"];
-        };
-        MaterialView: {
-            /** Format: int64 */
-            id?: number;
-            title?: string;
-            /** Format: int32 */
-            level?: number;
-            audioUrl?: string;
-            /** Format: int64 */
-            durationS?: number;
-            transcript?: string;
-            interestTags?: string;
-            source?: string;
-            license?: string;
-            status?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        PitchStatusRequest: {
-            /** Format: int64 */
-            songId: number;
-            status: string;
-            version?: string;
+            userId: number;
+            level: string;
         };
         EnvelopeLong: {
             /** Format: int32 */
@@ -843,11 +1274,6 @@ export interface components {
             message?: string;
             /** Format: int64 */
             data?: number;
-        };
-        LevelRequest: {
-            /** Format: int64 */
-            userId: number;
-            level: string;
         };
         CheckinRequest: {
             /** Format: int64 */
@@ -944,12 +1370,190 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
+        RoleCreate: {
+            code: string;
+            name: string;
+            description?: string;
+            /** Format: int32 */
+            rank?: number;
+            permissionCodes?: string[];
+        };
+        ReportHandle: {
+            decision?: string;
+            action?: string;
+            /** Format: int64 */
+            caseId?: number;
+            note?: string;
+        };
+        EnvelopeReportView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["ReportView"];
+        };
+        ReportView: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: int64 */
+            reporterUserId?: number;
+            targetType?: string;
+            /** Format: int64 */
+            targetId?: number;
+            reasonCode?: string;
+            detail?: string;
+            status?: string;
+            /** Format: int64 */
+            caseId?: number;
+            /** Format: int64 */
+            handledBy?: number;
+            /** Format: date-time */
+            handledAt?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        CaseCreate: {
+            targetType: string;
+            /** Format: int64 */
+            targetId: number;
+            source?: string;
+            reasonCode: string;
+            /** Format: int32 */
+            priority?: number;
+            /** Format: int64 */
+            assigneeId?: number;
+        };
+        CaseView: {
+            /** Format: int64 */
+            id?: number;
+            targetType?: string;
+            /** Format: int64 */
+            targetId?: number;
+            source?: string;
+            reasonCode?: string;
+            /** Format: int32 */
+            priority?: number;
+            status?: string;
+            snippet?: string;
+            snapshot?: Record<string, never>;
+            /** Format: int64 */
+            reporterUserId?: number;
+            /** Format: int64 */
+            assigneeId?: number;
+            /** Format: int64 */
+            decidedBy?: number;
+            /** Format: date-time */
+            decidedAt?: string;
+            decisionNote?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        EnvelopeCaseView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["CaseView"];
+        };
+        CaseDecision: {
+            decision: string;
+            reasonCode?: string;
+            note?: string;
+        };
+        CaseAssign: {
+            /** Format: int64 */
+            assigneeId?: number;
+            note?: string;
+        };
+        PublishRequest: {
+            status?: string;
+        };
+        EnvelopePublishView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["PublishView"];
+        };
+        PublishView: {
+            domain?: string;
+            /** Format: int64 */
+            id?: number;
+            prevStatus?: string;
+            nextStatus?: string;
+            /** Format: date-time */
+            publishedAt?: string;
+        };
+        QuestionUpsert: {
+            /** Format: int32 */
+            examRevision: number;
+            /** Format: int32 */
+            itemIndex: number;
+            kind: string;
+            prompt: string;
+            referenceAnswer?: string;
+            status?: string;
+        };
+        EnvelopeSessionView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["SessionView"];
+        };
+        SessionView: {
+            token?: components["schemas"]["TokenResponse"];
+            /** Format: int64 */
+            adminUserId?: number;
+            username?: string;
+            displayName?: string;
+            roleCode?: string;
+            permissions?: string[];
+        };
+        AdminCreate: {
+            username: string;
+            displayName: string;
+            password: string;
+            /** Format: int64 */
+            roleId: number;
+        };
+        AdminView: {
+            /** Format: int64 */
+            id?: number;
+            username?: string;
+            displayName?: string;
+            /** Format: int64 */
+            roleId?: number;
+            roleCode?: string;
+            roleName?: string;
+            status?: string;
+            /** Format: int32 */
+            failedAttempts?: number;
+            /** Format: date-time */
+            lockedUntil?: string;
+            /** Format: int32 */
+            tokenEpoch?: number;
+            /** Format: date-time */
+            lastLoginAt?: string;
+            lastLoginIp?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        EnvelopeAdminView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["AdminView"];
+        };
+        PasswordReset: {
+            password: string;
+        };
         CreatePostRequest: {
             title?: string;
             body: string;
             kind: string;
             domain: string;
+            media?: components["schemas"]["JsonNode"];
         };
+        JsonNode: Record<string, never>;
         AuthorView: {
             /** Format: int64 */
             id?: number;
@@ -957,6 +1561,7 @@ export interface components {
             handle?: string;
             tint?: string;
             level?: string;
+            avatarUrl?: string;
         };
         CommunityPostView: {
             /** Format: int64 */
@@ -991,7 +1596,6 @@ export interface components {
             message?: string;
             data?: components["schemas"]["CommunityPostView"];
         };
-        JsonNode: Record<string, never>;
         EnvelopeShareState: {
             /** Format: int32 */
             code?: number;
@@ -1021,80 +1625,30 @@ export interface components {
             message?: string;
             data?: components["schemas"]["CommentView"];
         };
-        QuestionUpsert: {
-            /** Format: int32 */
-            examRevision: number;
-            /** Format: int32 */
-            itemIndex: number;
-            kind: string;
-            prompt: string;
-            referenceAnswer?: string;
+        SendRequest: {
+            body?: string;
         };
-        StatusUpdate: {
-            status: string;
-        };
-        EnvelopeUserRow: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: components["schemas"]["UserRow"];
-        };
-        UserRow: {
+        DirectMessageView: {
             /** Format: int64 */
             id?: number;
-            username?: string;
-            email?: string;
-            nickname?: string;
-            role?: string;
-            status?: string;
+            /** Format: int64 */
+            peerId?: number;
+            body?: string;
+            mine?: boolean;
             /** Format: date-time */
             createdAt?: string;
         };
-        ProfileUpdate: {
-            ageGroup?: string;
-            cefrLevel?: string;
-            learningGoal?: string;
-            interestTags?: string;
-            voiceRate?: string;
-            voiceType?: string;
-            /** Format: int32 */
-            preferredDifficulty?: number;
-            avatarUrl?: string;
-        };
-        EnvelopeUserDetail: {
+        EnvelopeDirectMessageView: {
             /** Format: int32 */
             code?: number;
             message?: string;
-            data?: components["schemas"]["UserDetail"];
+            data?: components["schemas"]["DirectMessageView"];
         };
-        UserDetail: {
-            /** Format: int64 */
-            id?: number;
-            username?: string;
-            email?: string;
+        PatchMeRequest: {
             nickname?: string;
-            role?: string;
-            status?: string;
-            ageGroup?: string;
-            cefrLevel?: string;
-            learningGoal?: string;
-            interestTags?: string;
-            voiceRate?: string;
-            voiceType?: string;
-            /** Format: int32 */
-            preferredDifficulty?: number;
+            handle?: string;
+            tint?: string;
             avatarUrl?: string;
-            cefrLevelSource?: string;
-            /** Format: date-time */
-            cefrLevelAt?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        TicketPatch: {
-            status?: string;
-            adminReply?: string;
         };
         EnvelopeMeView: {
             /** Format: int32 */
@@ -1108,6 +1662,75 @@ export interface components {
             username?: string;
             nickname?: string;
             level?: string;
+            handle?: string;
+            tint?: string;
+            avatarUrl?: string;
+        };
+        StatusUpdate: {
+            status?: string;
+            reason?: string;
+        };
+        EnvelopeUserRow: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["UserRow"];
+        };
+        UserRow: {
+            /** Format: int64 */
+            id?: number;
+            username?: string;
+            nickname?: string;
+            role?: string;
+            status?: string;
+            email?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        PitchStatusRequest: {
+            /** Format: int64 */
+            songId: number;
+            status: string;
+            version?: string;
+        };
+        ProfileUpdate: {
+            ageGroup?: string;
+            cefrLevel?: string;
+            learningGoal?: string;
+            handle?: string;
+            avatarUrl?: string;
+        };
+        EnvelopeUserDetail: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["UserDetail"];
+        };
+        UserDetail: {
+            user?: components["schemas"]["UserRow"];
+            profile?: {
+                [key: string]: Record<string, never>;
+            };
+        };
+        RolePatch: {
+            code?: string;
+            name?: string;
+            description?: string;
+            /** Format: int32 */
+            rank?: number;
+            permissionCodes?: string[];
+        };
+        TicketPatch: {
+            status?: string;
+            adminReply?: string;
+        };
+        AdminPatch: {
+            displayName?: string;
+            /** Format: int64 */
+            roleId?: number;
+            status?: string;
         };
         EnvelopeListTicketView: {
             /** Format: int32 */
@@ -1124,6 +1747,264 @@ export interface components {
         PingData: {
             status?: string;
             service?: string;
+        };
+        EnvelopePageViewUserRow: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["PageViewUserRow"];
+        };
+        PageViewUserRow: {
+            items?: components["schemas"]["UserRow"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            page_size?: number;
+        };
+        EnvelopeListRoleView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["RoleView"][];
+        };
+        EnvelopePageViewReportView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["PageViewReportView"];
+        };
+        PageViewReportView: {
+            items?: components["schemas"]["ReportView"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            page_size?: number;
+        };
+        EnvelopePageViewCaseView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["PageViewCaseView"];
+        };
+        PageViewCaseView: {
+            items?: components["schemas"]["CaseView"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            page_size?: number;
+        };
+        EnvelopePageViewTicketView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["PageViewTicketView"];
+        };
+        PageViewTicketView: {
+            items?: components["schemas"]["TicketView"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            page_size?: number;
+        };
+        EnvelopePageViewSongRow: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["PageViewSongRow"];
+        };
+        PageViewSongRow: {
+            items?: components["schemas"]["SongRow"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            page_size?: number;
+        };
+        SongRow: {
+            /** Format: int64 */
+            id?: number;
+            title?: string;
+            artist?: string;
+            /** Format: int32 */
+            level?: number;
+            audioUrl?: string;
+            status?: string;
+            pitchRefStatus?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        EnvelopePageViewScenarioRow: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["PageViewScenarioRow"];
+        };
+        PageViewScenarioRow: {
+            items?: components["schemas"]["ScenarioRow"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            page_size?: number;
+        };
+        ScenarioRow: {
+            /** Format: int64 */
+            id?: number;
+            title?: string;
+            sceneType?: string;
+            /** Format: int32 */
+            difficulty?: number;
+            status?: string;
+            /** Format: int32 */
+            corpusItemCount?: number;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        EnvelopePageViewQuestionRow: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["PageViewQuestionRow"];
+        };
+        PageViewQuestionRow: {
+            items?: components["schemas"]["QuestionRow"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            page_size?: number;
+        };
+        QuestionRow: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: int32 */
+            examRevision?: number;
+            /** Format: int32 */
+            itemIndex?: number;
+            kind?: string;
+            prompt?: string;
+            status?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        EnvelopePageViewMapStringObject: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["PageViewMapStringObject"];
+        };
+        PageViewMapStringObject: {
+            items?: {
+                [key: string]: Record<string, never>;
+            }[];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            page_size?: number;
+        };
+        EnvelopePageViewMaterialRow: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["PageViewMaterialRow"];
+        };
+        MaterialRow: {
+            /** Format: int64 */
+            id?: number;
+            title?: string;
+            /** Format: int32 */
+            level?: number;
+            audioUrl?: string;
+            hasTranscript?: boolean;
+            status?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        PageViewMaterialRow: {
+            items?: components["schemas"]["MaterialRow"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            page_size?: number;
+        };
+        AuditLogView: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: int64 */
+            adminUserId?: number;
+            adminUsername?: string;
+            action?: string;
+            targetType?: string;
+            targetId?: string;
+            result?: string;
+            /** Format: int32 */
+            errorCode?: number;
+            summary?: string;
+            detail?: Record<string, never>;
+            requestId?: string;
+            ip?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        EnvelopePageViewAuditLogView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["PageViewAuditLogView"];
+        };
+        PageViewAuditLogView: {
+            items?: components["schemas"]["AuditLogView"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            page_size?: number;
+        };
+        EnvelopePageViewAdminView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["PageViewAdminView"];
+        };
+        PageViewAdminView: {
+            items?: components["schemas"]["AdminView"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            page_size?: number;
+        };
+        EnvelopePageViewSessionView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["PageViewSessionView"];
+        };
+        PageViewSessionView: {
+            items?: components["schemas"]["SessionView"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            page_size?: number;
         };
         EnvelopeFeedPage: {
             /** Format: int32 */
@@ -1171,6 +2052,35 @@ export interface components {
             nextCursor?: string;
             hasMore?: boolean;
         };
+        EnvelopeMessagePage: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["MessagePage"];
+        };
+        MessagePage: {
+            items?: components["schemas"]["DirectMessageView"][];
+            /** Format: int64 */
+            nextCursor?: number;
+            hasMore?: boolean;
+        };
+        ConversationView: {
+            peer?: components["schemas"]["AuthorView"];
+            /** Format: int64 */
+            lastMessageId?: number;
+            lastBody?: string;
+            lastMine?: boolean;
+            /** Format: date-time */
+            lastCreatedAt?: string;
+            /** Format: int64 */
+            unreadCount?: number;
+        };
+        EnvelopeListConversationView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["ConversationView"][];
+        };
         EnvelopeListFollowSummary: {
             /** Format: int32 */
             code?: number;
@@ -1192,87 +2102,6 @@ export interface components {
             author?: components["schemas"]["AuthorView"];
             followed?: boolean;
         };
-        EnvelopePageViewUserRow: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: components["schemas"]["PageViewUserRow"];
-        };
-        PageViewUserRow: {
-            items?: components["schemas"]["UserRow"][];
-            /** Format: int64 */
-            total?: number;
-            /** Format: int32 */
-            page?: number;
-            /** Format: int32 */
-            page_size?: number;
-        };
-        EnvelopePageViewTicketView: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: components["schemas"]["PageViewTicketView"];
-        };
-        PageViewTicketView: {
-            items?: components["schemas"]["TicketView"][];
-            /** Format: int64 */
-            total?: number;
-            /** Format: int32 */
-            page?: number;
-            /** Format: int32 */
-            page_size?: number;
-        };
-        EnvelopePageViewSongView: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: components["schemas"]["PageViewSongView"];
-        };
-        PageViewSongView: {
-            items?: components["schemas"]["SongView"][];
-            /** Format: int64 */
-            total?: number;
-            /** Format: int32 */
-            page?: number;
-            /** Format: int32 */
-            page_size?: number;
-        };
-        EnvelopePageViewScenarioView: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: components["schemas"]["PageViewScenarioView"];
-        };
-        PageViewScenarioView: {
-            items?: components["schemas"]["ScenarioView"][];
-            /** Format: int64 */
-            total?: number;
-            /** Format: int32 */
-            page?: number;
-            /** Format: int32 */
-            page_size?: number;
-        };
-        EnvelopeListQuestionView: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: components["schemas"]["QuestionView"][];
-        };
-        EnvelopePageViewMaterialView: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: components["schemas"]["PageViewMaterialView"];
-        };
-        PageViewMaterialView: {
-            items?: components["schemas"]["MaterialView"][];
-            /** Format: int64 */
-            total?: number;
-            /** Format: int32 */
-            page?: number;
-            /** Format: int32 */
-            page_size?: number;
-        };
     };
     responses: never;
     parameters: never;
@@ -1282,6 +2111,382 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    putPermissions: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeRoleView"];
+                };
+            };
+        };
+    };
+    getSong: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    updateSong: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SongUpsert"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    archiveSong: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    getLrc: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeListMapStringObject"];
+                };
+            };
+        };
+    };
+    replaceLrc: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LrcUpsert"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeListMapStringObject"];
+                };
+            };
+        };
+    };
+    getScenario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    updateScenario: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioUpsert"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    archiveScenario: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    getQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    updateQuestion: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestionPatch"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    archiveQuestion: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    getMaterial: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    updateMaterial: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MaterialUpsert"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    archiveMaterial: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
     like: {
         parameters: {
             query?: never;
@@ -1348,6 +2553,32 @@ export interface operations {
             };
         };
     };
+    markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                peerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReadRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeReadState"];
+                };
+            };
+        };
+    };
     follow: {
         parameters: {
             query?: never;
@@ -1392,40 +2623,16 @@ export interface operations {
             };
         };
     };
-    getSong: {
+    setLevel: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeSongView"];
-                };
-            };
-        };
-    };
-    updateSong: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SongUpsert"];
+                "application/json": components["schemas"]["LevelRequest"];
             };
         };
         responses: {
@@ -1435,265 +2642,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["EnvelopeSongView"];
-                };
-            };
-        };
-    };
-    archiveSong: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeSongView"];
-                };
-            };
-        };
-    };
-    getLrc: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeListLrcView"];
-                };
-            };
-        };
-    };
-    replaceLrc: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LrcUpsert"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeListLrcView"];
-                };
-            };
-        };
-    };
-    getScenario: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeScenarioView"];
-                };
-            };
-        };
-    };
-    updateScenario: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ScenarioUpsert"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeScenarioView"];
-                };
-            };
-        };
-    };
-    archiveScenario: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeScenarioView"];
-                };
-            };
-        };
-    };
-    update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QuestionPatch"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeQuestionView"];
-                };
-            };
-        };
-    };
-    archive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeQuestionView"];
-                };
-            };
-        };
-    };
-    getMaterial: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeMaterialView"];
-                };
-            };
-        };
-    };
-    updateMaterial: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MaterialUpsert"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeMaterialView"];
-                };
-            };
-        };
-    };
-    archiveMaterial: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeMaterialView"];
+                    "*/*": components["schemas"]["EnvelopeLong"];
                 };
             };
         };
@@ -1710,30 +2659,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PitchStatusRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeLong"];
-                };
-            };
-        };
-    };
-    setLevel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LevelRequest"];
             };
         };
         responses: {
@@ -1912,12 +2837,632 @@ export interface operations {
             };
         };
     };
+    listRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeListRoleView"];
+                };
+            };
+        };
+    };
+    createRole: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleCreate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeRoleView"];
+                };
+            };
+        };
+    };
+    handleReport: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportHandle"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeReportView"];
+                };
+            };
+        };
+    };
+    listCases: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                status?: string;
+                targetType?: string;
+                priority?: number;
+                assigneeId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePageViewCaseView"];
+                };
+            };
+        };
+    };
+    createCase: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseCreate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeCaseView"];
+                };
+            };
+        };
+    };
+    decide: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeCaseView"];
+                };
+            };
+        };
+    };
+    assign: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseAssign"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeCaseView"];
+                };
+            };
+        };
+    };
+    listSongs: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePageViewSongRow"];
+                };
+            };
+        };
+    };
+    createSong: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SongUpsert"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    publishSong: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePublishView"];
+                };
+            };
+        };
+    };
+    listScenarios: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                status?: string;
+                sceneType?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePageViewScenarioRow"];
+                };
+            };
+        };
+    };
+    createScenario: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioUpsert"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    publishScenario: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePublishView"];
+                };
+            };
+        };
+    };
+    listQuestions: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                examRevision?: number;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePageViewQuestionRow"];
+                };
+            };
+        };
+    };
+    createQuestion: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestionUpsert"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    listMaterials: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePageViewMaterialRow"];
+                };
+            };
+        };
+    };
+    createMaterial: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MaterialUpsert"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    publishMaterial: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePublishView"];
+                };
+            };
+        };
+    };
+    refresh_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeSessionView"];
+                };
+            };
+        };
+    };
+    logout_1: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    login_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeSessionView"];
+                };
+            };
+        };
+    };
+    listAdmins: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                q?: string;
+                roleId?: number;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePageViewAdminView"];
+                };
+            };
+        };
+    };
+    createAdmin: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminCreate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeAdminView"];
+                };
+            };
+        };
+    };
+    resetPassword: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordReset"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
     feed: {
         parameters: {
             query?: {
                 domain?: string;
                 cursor?: string;
                 limit?: number;
+                mine?: boolean;
             };
             header?: never;
             path?: never;
@@ -2033,15 +3578,16 @@ export interface operations {
             };
         };
     };
-    listSongs: {
+    thread: {
         parameters: {
             query?: {
-                page?: number;
-                page_size?: number;
-                status?: string;
+                cursor?: number;
+                limit?: number;
             };
             header?: never;
-            path?: never;
+            path: {
+                peerId: number;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -2052,12 +3598,38 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["EnvelopePageViewSongView"];
+                    "*/*": components["schemas"]["EnvelopeMessagePage"];
                 };
             };
         };
     };
-    createSong: {
+    send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                peerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeDirectMessageView"];
+                };
+            };
+        };
+    };
+    patchMe: {
         parameters: {
             query?: never;
             header?: never;
@@ -2066,7 +3638,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SongUpsert"];
+                "application/json": components["schemas"]["PatchMeRequest"];
             };
         };
         responses: {
@@ -2076,157 +3648,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["EnvelopeSongView"];
+                    "*/*": components["schemas"]["EnvelopeMeView"];
                 };
             };
         };
     };
-    listScenarios: {
+    setStatus: {
         parameters: {
-            query?: {
-                page?: number;
-                page_size?: number;
-                status?: string;
-                sceneType?: string;
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
             };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopePageViewScenarioView"];
-                };
-            };
-        };
-    };
-    createScenario: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ScenarioUpsert"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeScenarioView"];
-                };
-            };
-        };
-    };
-    list_2: {
-        parameters: {
-            query?: {
-                examRevision?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeListQuestionView"];
-                };
-            };
-        };
-    };
-    create_2: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QuestionUpsert"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeQuestionView"];
-                };
-            };
-        };
-    };
-    listMaterials: {
-        parameters: {
-            query?: {
-                page?: number;
-                page_size?: number;
-                status?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopePageViewMaterialView"];
-                };
-            };
-        };
-    };
-    createMaterial: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MaterialUpsert"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeMaterialView"];
-                };
-            };
-        };
-    };
-    updateStatus: {
-        parameters: {
-            query?: never;
             header?: never;
             path: {
                 id: number;
@@ -2252,7 +3683,9 @@ export interface operations {
     };
     updateProfile: {
         parameters: {
-            query?: never;
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
             header?: never;
             path: {
                 id: number;
@@ -2276,9 +3709,85 @@ export interface operations {
             };
         };
     };
-    update_1: {
+    deleteRole: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    patchRole: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RolePatch"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeRoleView"];
+                };
+            };
+        };
+    };
+    getTicket: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeTicketView"];
+                };
+            };
+        };
+    };
+    patchTicket: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
             header?: never;
             path: {
                 id: number;
@@ -2298,6 +3807,34 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["EnvelopeTicketView"];
+                };
+            };
+        };
+    };
+    patchAdmin: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPatch"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeAdminView"];
                 };
             };
         };
@@ -2362,7 +3899,287 @@ export interface operations {
             };
         };
     };
+    list: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                q?: string;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePageViewUserRow"];
+                };
+            };
+        };
+    };
     detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeUserDetail"];
+                };
+            };
+        };
+    };
+    listPermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeListMapStringObject"];
+                };
+            };
+        };
+    };
+    stats: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    listReports: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                status?: string;
+                targetType?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePageViewReportView"];
+                };
+            };
+        };
+    };
+    contract: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    getCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
+                };
+            };
+        };
+    };
+    listTickets: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                status?: string;
+                kind?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePageViewTicketView"];
+                };
+            };
+        };
+    };
+    publishEvents: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                targetType?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePageViewMapStringObject"];
+                };
+            };
+        };
+    };
+    me_1: {
+        parameters: {
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMeView"];
+                };
+            };
+        };
+    };
+    list_1: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                action?: string;
+                actionPrefix?: string;
+                targetType?: string;
+                adminUserId?: number;
+                result?: string;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePageViewAuditLogView"];
+                };
+            };
+        };
+    };
+    listSessions: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopePageViewSessionView"];
+                };
+            };
+        };
+    };
+    detail_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -2425,6 +4242,48 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["EnvelopeNotificationsPage"];
+                };
+            };
+        };
+    };
+    unread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeLong"];
+                };
+            };
+        };
+    };
+    conversations: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeListConversationView"];
                 };
             };
         };
@@ -2494,34 +4353,11 @@ export interface operations {
             };
         };
     };
-    list: {
+    kickSessions: {
         parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                status?: string;
-                search?: string;
+            query: {
+                me: components["schemas"]["ConsolePrincipal"];
             };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopePageViewUserRow"];
-                };
-            };
-        };
-    };
-    detail_1: {
-        parameters: {
-            query?: never;
             header?: never;
             path: {
                 id: number;
@@ -2536,31 +4372,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["EnvelopeUserDetail"];
-                };
-            };
-        };
-    };
-    list_1: {
-        parameters: {
-            query?: {
-                page?: number;
-                page_size?: number;
-                status?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopePageViewTicketView"];
+                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
                 };
             };
         };

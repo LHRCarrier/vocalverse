@@ -21,29 +21,58 @@
 
 ---
 
-## 2. 测试环境准备（一次，5 分钟）
+## 2. 测试环境准备（手机形态 = 打包进壳，2026-09-10 起）
+
+> 2026-09-10 起手机壳改为**打包形态**（方案 B，详见 `apps/mobile/README.md`）：页面由 Capacitor 以
+> **`https://localhost`** 提供（安全上下文 → 录音 getUserMedia 可用，无需装 CA），
+> API 用**构建期基址**打进包（`VITE_PYTHON_BASE`/`VITE_JAVA_BASE`），经后端 CORS + 混合内容放行直连本机。
 
 ```powershell
-# ① 全栈（必须 healthy）
-docker compose up -d
-docker compose ps            # 5 个服务 Up(healthy)：postgres/redis/python/java/web
-Invoke-WebRequest http://localhost:8088/readyz   # code=0, data.status=ready
-
-# ② 局域网 IP（DHCP 可能变；手机与电脑同一 WiFi）
-(Get-NetIPConfiguration | ? { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up'
-  -and $_.NetAdapter.InterfaceDescription -notmatch 'vEthernet|VMware|Virtual|Hyper-V|WSL' }
-  | % { $_.IPv4Address.IPAddress })
-#   若 IP 变化：改 apps/mobile/capacitor.config.json 的 server.url → npx cap sync android
-#   → cd android → .\gradlew.bat assembleDebug（build 缓存命中约 30s）
-
-# ③ 装 APK（真机）或模拟器
+# ① 后端（dev 栈：postgres/redis 容器 + python:8000 + java:8080 本地；python 绑 0.0.0.0 供手机可达）
+pwsh -File scripts/dev-up.ps1 start        # status / stop 同款
+# ② 防火墙放行手机（端口级；需管理员 PowerShell，幂等）
+pwsh -File scripts/firewall-phone.ps1
+# ③ 重打手机包（每次改完 web 执行；IP 变了也必须重建——API 基址构建期写死）
+pwsh -File scripts/build-phone.ps1                  # 局域网直连（默认 IP 192.168.0.104）
+pwsh -File scripts/build-phone.ps1 -Ip localhost    # adb 隧道（手机被客户端隔离时，见下）
+# ④ 装包
 adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-# 模拟器（带窗口）：& "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" -avd vocalverse
 ```
 
 演示账号：`demoadult` / `demoteen` / `demosenior`，密码 `demo123456`（M2 seed）。
 
-> ⚠️ 模拟器注意：NAT 对宿主 LAN IP 偶发不可达 → 用 Chrome 开 `http://10.0.2.2:8088`（宿主机别名）验证同一份产物；真机走 WiFi 直连不受限。
+> ⚠️ **手机「Failed to fetch」排查顺序（2026-09-10 三连坑沉淀）**：
+> ① 先看后端有没有手机 IP——`services/java/logs/access_log.*.log`（java，已开 Tomcat accesslog）+
+> `local/dev-logs/python-8000.out.log`（python）：
+> - **没有** = 网络/防火墙：先 `firewall-phone.ps1`；再查本机 IP 是否变了（变了 `build-phone.ps1 -Ip 新IP`）；
+>   手机→网关通、手机→本机不通、本机→手机通 = 路由器/热点**客户端隔离** → `adb reverse` 隧道绕行：
+>   `adb reverse tcp:8080 tcp:8080; adb reverse tcp:8000 tcp:8000` + `build-phone.ps1 -Ip localhost`；
+> - **有但 405/拦** = CORS（后端已配；改白名单源再重启）；
+> - **有且 401 / 「bad credentials」** = 账号密码/参数（如账号 demoadult、密码 demo123456）。
+> ② 手机 WebView 网络诊断：`adb forward tcp:9223 localabstract:webview_devtools_remote_<pid>` →
+> 桌面 Chrome `chrome://inspect`（或 CDP），看 Network 失败原因（比 logcat 可靠：App 捕获错误不打 console）。
+> ③ 后端日志文件：python `local/dev-logs/python-8000*.log`；java `services/java/logs/access_log.*.log`。
+> ④ 排查脚本：`scripts/phone-reconnect.ps1`（无线调试端口轮换/`offline` 残留/息屏打盹三坑一键重连 + 补 `adb reverse` + 隧道自检；**端口会随息屏/重开变化，别手抄旧端口**）。
+
+> ⚠️ **「手机上看不到最新改动 / 还是演示数据」排查顺序（2026-09-10 实测返工沉淀）**：
+> **第一原则：方案 B 打包壳内嵌的是「打包那一刻的 web 产物快照」**（`apps/mobile/android/app/src/main/assets/public/`），
+> dev server 的 HMR **对壳内 bundle 完全无效**——改完 `apps/web` 必须重建 + 重装，否则手机上永远是旧界面。
+>
+> 1. **现象判定**：界面内容/文案与源码不符（如私信 tab 仍显示 `data/messages-demo` 的 Kai/Momo/Teacher Lee/BBC —— 该文件已随私信真实化删除）。
+> 2. **先验 bundle 而不是猜代码**（10 秒定位）：
+>    ```powershell
+>    $b = "apps/mobile/android/app/src/main/assets/public"
+>    Get-ChildItem "$b/assets" -Filter "*.js" | Select-Object Name, LastWriteTime   # 时间戳=上次打包时刻
+>    Select-String -Path "$b/assets/*.js" -Pattern "Kai|messages-demo" -List        # 命中=旧包含已删演示数据
+>    Select-String -Path "$b/assets/index-*.js" -Pattern "<本机局域网IP>" -List      # 确认壳内 API 基址
+>    ```
+>    **有命中 = 旧包，不是代码问题**，直接重建（第 3 步）；**无命中仍不符** = WebView 缓存 → `adb shell am force-stop com.vocalverse.app` 重开，仍不行再 `gradlew clean` 重建。
+> 3. **重建 + 重装**：`pwsh -File scripts/build-phone.ps1 -Ip <本机当前局域网IP>` → `adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`。
+> 4. **换网络/换环境必带 `-Ip`**：脚本默认 `192.168.0.104` 是历史网络；本机 IP 变了（`Get-NetIPAddress -AddressFamily IPv4` 看 WLAN 那条）而没带 `-Ip`，
+>    壳内 API 基址会指向**不可达旧地址**——现象是「接口全失败，且后端 access log 看不到任何请求」（与①「没有请求」同族，但根因在 APK 不在网络）。
+> 5. **顺手核对链路的完整性**：`scripts/dev-up.ps1 status`（三端 True）→ 防火墙含 `VocalVerse port 8000/8080` → `adb devices` 有设备（无则 `phone-reconnect.ps1`）→ App 起来后后端 access log 出现手机请求。
+>
+> 推论（写进日常习惯）：**任何 `apps/web` 改动要上手机验证，都必须「重建壳 + 重装」两步**，不是刷新页面；反之若只想快速看交互，走 §4 桌面浏览器（`http://<IP>:5173/m/...` 或 8088 容器）。
 
 ---
 
@@ -86,13 +115,15 @@ pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
 
 | # | 用例 | 步骤 | 期望 |
 |---|---|---|---|
-| A1 | APK 构建 | `cd apps/mobile/android; .\gradlew.bat assembleDebug` | BUILD SUCCESSFUL；产物 ≈4MB |
-| A2 | 配置烘焙 | `Get-Content apps/mobile/android/app/src/main/assets/capacitor.config.json` | `server.url` = 当前局域网 IP + `cleartext:true` |
-| A3 | 安装启动 | `adb install -r …; am start -n com.vocalverse.app/.MainActivity` | WebView 加载首页，无 `ERR_*` |
-| A4 | 明文访问 | 同上（HTTP 局域网） | Android 9+ 能加载（Manifest `usesCleartextTraffic=true` 生效） |
+| A1 | APK 构建 | `pwsh -File scripts/build-phone.ps1` | BUILD SUCCESSFUL；产物 ≈4.6MB（含 web 产物） |
+| A2 | 配置烘焙 | `Get-Content apps/mobile/android/app/src/main/assets/capacitor.config.json` | `webDir=../web/dist` + `androidScheme=https` + `allowMixedContent=true`（打包壳**无** `server.url`） |
+| A3 | 安装启动 | `adb install -r …/*.apk; am start -n com.vocalverse.app/.MainActivity` | WebView 加载首页（`https://localhost`），无 `ERR_*` |
+| A4 | 明文化/混合内容 | 打包壳页面 `https://localhost` 调 `http://<IP>:8000` | 能加载（`allowMixedContent` + `network_security_config` cleartext 生效；生产应改 HTTPS 同源） |
 | A5 | 权限 | 首次点录音 | 弹麦克风授权；拒绝后中文引导（八约束 #6） |
 | A6 | 卸载重装 | `adb uninstall` + 重装 | 正常；旧会话/缓存清理 |
-| A7 | 版本更新 | 改 server.url → sync → 重打 | 新配置生效（无需应用商店发版） |
+| A7 | 版本更新 | `pwsh -File scripts/build-phone.ps1`（IP 变了 `-Ip 新IP`；隔离走 `-Ip localhost`+adb reverse） | 新配置生效（API 基址构建期写死，换网必须重建，否则 App 打旧地址） |
+| A8 | **改完 web 是否真的上机**（2026-09-10 新增） | ① 重建 + `adb install -r`；② 核验壳内 bundle：`Select-String -Path "apps/mobile/android/app/src/main/assets/public/assets/*.js" -Pattern "<刚删除的演示文件名/旧文案>" -List` | **零命中**（旧资产/旧文案已被新构建覆盖）；命中即「看的是旧包」，回 §2 排查顺序第 2~3 步 |
+| A9 | 缓存兜底 | `adb shell am force-stop com.vocalverse.app` 后重开（必要时 `gradlew clean` 重建） | 界面与当前源码一致；不再出现已删除的演示数据 |
 
 ## 6. L3/L4 · 真机与体验（手工 · 按 docs/27 §8 实测表）
 

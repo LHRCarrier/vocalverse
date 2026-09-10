@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 
 import MobileAccountDrawer from '@/components/mobile/MobileAccountDrawer.vue'
 import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
+import { useNativeBack } from '@/composables/useNativeBack'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { themeOverrides } from '@/styles/theme'
@@ -11,6 +12,13 @@ import { themeOverrides } from '@/styles/theme'
 const router = useRouter()
 const auth = useAuthStore()
 const ui = useUiStore()
+
+/** Android 返回手势/按键：抽屉开着就先关抽屉（阅读器弹层由各页自己注册，见 useNativeBack） */
+useNativeBack(() => {
+  if (!ui.drawerOpen) return false
+  ui.closeDrawer()
+  return true
+})
 
 /** 全局抽屉导航（任意页面头像 → 抽屉 → 菜单项） */
 function onDrawerNavigate(path: string) {

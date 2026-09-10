@@ -43,6 +43,14 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Gate — JPQL 不得出现 PG 无类型参数（真 PG 实测缺陷族，H2 测不出）
+        # 2026-09-10：`(:p is null or …)`（时间戳）与 `concat('%', :q, '%')` 里的裸参数
+        # 会让 PostgreSQL 在 Parse 阶段拒绝整条 SQL（could not determine data type of parameter /
+        # function lower(bytea) does not exist），而 H2 全绿 —— 实测 publish-events / audit-logs / users
+        # 三个端点清空筛选即 500。此门禁把这一类钉死在提交前。
+        working-directory: .
+        run: python3 scripts/check_pg_typed_params.py
+
       - name: Verify (spotless:check + tests)
         # J-07（2026-09-08）：@Tag("integration")（真 PG Testcontainers）由 surefire
         # excludedGroups 默认排除——本 job 即 CI 单测档；本地必跑集成：

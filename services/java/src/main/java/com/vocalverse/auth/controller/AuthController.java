@@ -17,6 +17,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -51,7 +52,17 @@ public class AuthController {
   public record TokenResponse(
       String accessToken, String refreshToken, long expiresIn, long userId) {}
 
-  public record MeView(Long userId, String username, String nickname, String level) {}
+  /**
+   * 当前用户视图。{@code avatarUrl}/{@code handle} 为 2026-09-09 新增（社区 S3 · docs/47 §4.2）：
+   * 前端账户抽屉/资料页要显示真实头像；写入走 {@code PATCH /api/v1/users/me}（不新增重复 GET）。
+   */
+  public record MeView(
+      Long userId,
+      String username,
+      String nickname,
+      String level,
+      String handle,
+      String avatarUrl) {}
 
   private static final long REFRESH_TTL_SECONDS = 30L * 24 * 3600;
 
@@ -195,13 +206,22 @@ public class AuthController {
             .findById(userId)
             .orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no such user"));
-    String level = profiles.findByUserId(userId).map(UserProfileEntity::getCefrLevel).orElse("L1");
-    return Envelope.ok(new MeView(user.getId(), user.getUsername(), user.getNickname(), level));
+    UserProfileEntity profile = profiles.findByUserId(userId).orElse(null);
+    String level = profile == null ? "L1" : profile.getCefrLevel();
+    return Envelope.ok(
+        new MeView(
+            user.getId(),
+            user.getUsername(),
+            user.getNickname(),
+            level,
+            profile == null ? null : profile.getHandle(),
+            profile == null ? null : profile.getAvatarUrl()));
   }
 
   private TokenResponse issue(Long userId, String role, HttpServletRequest request) {
     String access = jwt.generateAccessToken(userId, role);
-    String refresh = jwt.generateAccessToken(userId, role) + "-" + System.currentTimeMillis();
+    String refresh =
+        buildRefreshToken(jwt.generateAccessToken(userId, role), System.currentTimeMillis());
     RefreshTokenEntity entity = new RefreshTokenEntity();
     entity.setUserId(userId);
     entity.setTokenHash(sha256(refresh));
@@ -210,6 +230,18 @@ public class AuthController {
     entity.setIp(request.getRemoteAddr());
     refreshTokens.save(entity);
     return new TokenResponse(access, refresh, 3600, userId);
+  }
+
+  /**
+   * refresh token 构造（2026-09-10 热修复 · 手机实测复现 40904「数据冲突」）：
+   *
+   * <p>根因：`jwt.generateAccessToken` 仅含 {sub, role, iat, exp}（秒级精度、无随机字段），同一秒内 两次调用产出相同令牌；旧实现
+   * refresh = token + "-" + 毫秒 —— 同毫秒双登录/双刷新（WebView 双请求、双击登录）即产出相同字符串 → SHA-256 相同 → 撞
+   * `uq_refresh_tokens_token_hash` 唯一键 → DataIntegrityViolation → 40904。新增 UUID 随机因子保证唯一（refresh
+   * 为不透明串， 仅存哈希，格式变更零兼容影响）；抽为 package-private 纯静态便于确定性回归测试。
+   */
+  static String buildRefreshToken(String jwtToken, long nowMillis) {
+    return jwtToken + "-" + nowMillis + "-" + UUID.randomUUID();
   }
 
   static String sha256(String raw) {

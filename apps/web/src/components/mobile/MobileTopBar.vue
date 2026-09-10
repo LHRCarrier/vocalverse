@@ -6,9 +6,9 @@
  * 左 = 全局头像（点击开账户抽屉，App.vue 全局挂载）；
  * 中 = 页面标题（X 式居中）；右侧 = actions 插槽（按页面功能放按钮）+ 离开钮（可选）。
  */
-import { computed } from 'vue'
 import IconLogout from '~icons/tabler/logout'
 
+import MobileAvatar from '@/components/mobile/MobileAvatar.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 
@@ -26,16 +26,21 @@ const emit = defineEmits<{
 
 const auth = useAuthStore()
 const ui = useUiStore()
-
-const avatarLetter = computed(() => (auth.me?.nickname ?? auth.me?.username ?? '同').slice(0, 1).toUpperCase())
 </script>
 
 <template>
   <header class="u-topbar">
     <div class="u-topbar__left">
-      <!-- 头像固定最左侧（组长定规：左侧不可有其他图标） -->
+      <!-- 头像固定最左侧（组长定规：左侧不可有其他图标）。
+           2026-09-09：换 MobileAvatar —— 此前这里写死首字母，用户设了真实头像后
+           只有侧边抽屉显示新头像、顶栏仍是字母（组长手机实测 bug）。 -->
       <button class="u-topbar__ava" type="button" title="账户菜单" aria-label="账户菜单" @click="ui.openDrawer()">
-        {{ avatarLetter }}
+        <MobileAvatar
+          :src="auth.me?.avatarUrl"
+          :name="auth.me?.nickname ?? auth.me?.username"
+          :tint="auth.me?.tint"
+          size="sm"
+        />
       </button>
     </div>
     <h1 class="u-topbar__title">{{ props.title }}</h1>

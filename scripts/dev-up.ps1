@@ -11,6 +11,15 @@
 #   pwsh -File scripts/dev-up.ps1 status   # 查看监听与健康
 #   pwsh -File scripts/dev-up.ps1 stop     # 按端口杀三端
 #
+# 管理端控制台（docs/50 · apps/admin）**默认不启动**，需要时显式加开关：
+#   pwsh -File scripts/dev-up.ps1 start -WithConsole     # 三端 + 控制台 :5174
+#   pwsh -File scripts/dev-up.ps1 status -WithConsole    # 连带列出 5174
+#   pwsh -File scripts/dev-up.ps1 stop  -WithConsole     # 连带杀 5174
+# 为什么做成开关而不是并进默认：控制台是独立 pnpm 项目，首次要 `pnpm install`（几十秒）、
+# 还要有自己的管理员账号，把它塞进默认动作会拖慢所有组员的日常三端启动。
+# 控制台需要 **Java 与 Python 都在**（它有两个上游代理：/manage→8080、/api/v1→8000），
+# 所以它只能跟三端一起起，不能单独起。
+#
 # 数据库/缓存：start 里自动拉起——5432/6379 未监听时执行
 # `docker compose up -d postgres redis` 并等待 healthy（2026-09-05，
 # 修「电脑睡眠/重启后容器被引擎杀掉 → Java 起不来」的坑）；
@@ -18,13 +27,43 @@
 # ============================================================
 param(
     [ValidateSet("start", "stop", "status")]
-    [string]$Action = "start"
+    [string]$Action = "start",
+    # 是否连带管理端控制台（:5174）。见上方用法说明。
+    [switch]$WithConsole
 )
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 $LogDir = Join-Path $Root "local\dev-logs"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+
+# 受管端口（status / stop 都遍历它）。三端恒定；控制台按 -WithConsole 追加 ——
+# **这里是一处真源**：此前三处各写一遍 `8000, 8080, 5173`，加第四端必然漏掉其中一处
+# （漏 status 就"看不到它在跑"，漏 stop 就"杀了三端还剩一个占着端口"）。
+$Ports = @(8000, 8080, 5173)
+if ($WithConsole) { $Ports += 5174 }
+
+# 控制台密钥自检（仅 -WithConsole 时）：见根 `.env.example` 的长注释 ——
+# Java 读 VOICEVERSE_CONSOLE_JWT_SECRET、Python 读 APP_CONSOLE_JWT_SECRET，两者必须同值；
+# 只配一个的后果是 Python 侧控制台端点**静默全量 401**（Java 会回退用 JWT_SECRET 签）。
+# 这里只**警告**不中止：回退期（Java 侧留空）本身是设计允许的中间状态。
+function Test-ConsoleSecret {
+    $java = $env:VOICEVERSE_CONSOLE_JWT_SECRET
+    $py = $env:APP_CONSOLE_JWT_SECRET
+    if ($py -and -not $java) {
+        Write-Host "  [console] ⚠️ APP_CONSOLE_JWT_SECRET 已配但 VOICEVERSE_CONSOLE_JWT_SECRET 为空："
+        Write-Host "      Java 会回退用 JWT_SECRET 签控制台令牌，而 Python 用 APP_CONSOLE_JWT_SECRET 验签"
+        Write-Host "      → 运维 / LLM trace / 书籍 / 媒体等 Python 侧控制台端点会全量 401（且不提示原因）。"
+        Write-Host "      处置：在根 .env 里把两个键配成同一个值（≥32 字节）。"
+    } elseif ($java -and $py -and $java -ne $py) {
+        Write-Host "  [console] ⚠️ 两个控制台密钥**不一致**：Java 签发 / Python 验签必然 401。"
+    } elseif ($java -and -not $py) {
+        Write-Host "  [console] ⚠️ VOICEVERSE_CONSOLE_JWT_SECRET 已配但 APP_CONSOLE_JWT_SECRET 为空："
+        Write-Host "      Python 侧是 **fail-closed**（console_jwt_secret 为空 → 控制台端点一律 46001，"
+        Write-Host "      app/console/api/deps.py）：表现为能登录进控制台，但运维 / LLM trace / 书籍 /"
+        Write-Host "      媒体页面全报错，报错里不提密钥。处置：两个键配成同一个值（≥32 字节）。"
+    }
+}
 
 # HF 缓存约定（docs/06 §8 · 方式 B 本地，2026-09-04 修复；与容器 hf-cache 卷约定为两套口径，
 # 容器侧由 compose/镜像承载——当前未注入属 K03 未闭合项，另立整改）：
@@ -154,7 +193,7 @@ function Wait-DockerBase {
 
 switch ($Action) {
     "status" {
-        foreach ($p in 8000, 8080, 5173) {
+        foreach ($p in $Ports) {
             $pids = Get-PortPid $p
             $ok = $pids.Count -gt 0
             Write-Host ("  {0,5}: {1}" -f $p, ($(if ($ok) { "LISTENING (pid {0})" -f ($pids -join ',') } else { "down" })))
@@ -163,10 +202,13 @@ switch ($Action) {
         Write-Host "  health: java="(Test-Health java "http://127.0.0.1:8080/api/v1/ping")""
         # vite 默认绑 localhost（::1），127.0.0.1 会 refused（2026-09-04 踩坑）
         Write-Host "  health: vite="(Test-Health vite "http://localhost:5173" "web")""
+        if ($WithConsole) {
+            Write-Host "  health: console="(Test-Health console "http://localhost:5174" "web")""
+        }
         break
     }
     "stop" {
-        foreach ($p in 8000, 8080, 5173) {
+        foreach ($p in $Ports) {
             foreach ($procId in (Get-PortPid $p)) {
                 Write-Host "  killing $procId (port $p)..."
                 taskkill /PID $procId /T /F | Out-Null
@@ -181,7 +223,9 @@ switch ($Action) {
 
         Write-Host "== 启动 Python :8000（uvicorn --reload）=="
         if ((Get-PortPid 8000).Count -eq 0) {
-            Start-Detached "python-8000" "Set-Location '$Root\services\python'; uv run uvicorn app.main:app --reload --port 8000" "$Root\services\python"
+            # --host 0.0.0.0（2026-09-10）：方案 B 打包壳里 Web 直接调 http://<局域网IP>:8000，
+            # 只绑 127.0.0.1 时手机连不到（本地 health 检查仍走 127.0.0.1，不受影响）
+            Start-Detached "python-8000" "Set-Location '$Root\services\python'; uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000" "$Root\services\python"
         } else { Write-Host "  已在运行，跳过。" }
 
         Write-Host "== 启动 Java :8080（mvn spring-boot:run）=="
@@ -194,17 +238,41 @@ switch ($Action) {
             Start-Detached "vite-5173" "Set-Location '$Root\apps\web'; pnpm dev" "$Root\apps\web"
         } else { Write-Host "  已在运行，跳过。" }
 
+        if ($WithConsole) {
+            Write-Host "== 启动管理端控制台 :5174（pnpm dev）=="
+            Test-ConsoleSecret
+            $AdminDir = Join-Path $Root "apps\admin"
+            # 独立 pnpm 项目（本仓**没有**根 workspace），首次必须先 install，否则 vite 起不来
+            if (-not (Test-Path (Join-Path $AdminDir "node_modules"))) {
+                Write-Host "  [console] 未安装依赖，先 pnpm install（首次约 30~60s）..."
+                Push-Location $AdminDir
+                try {
+                    & pnpm install
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Host "  [console] ⚠️ pnpm install 失败（exit=$LASTEXITCODE），跳过控制台启动。"
+                    }
+                }
+                finally { Pop-Location }
+            }
+            if ((Get-PortPid 5174).Count -eq 0 -and (Test-Path (Join-Path $AdminDir "node_modules"))) {
+                Start-Detached "console-5174" "Set-Location '$AdminDir'; pnpm dev" $AdminDir
+                Write-Host "      入口 http://localhost:5174（需已 bootstrap 管理员账号，见 services/java/.env.example）"
+            } elseif ((Get-PortPid 5174).Count -gt 0) { Write-Host "  已在运行，跳过。" }
+        }
+
         Write-Host "== 健康等待（python≈8s / vite≈10s / java≈30-60s）=="
         $deadline = (Get-Date).AddSeconds(120)
-        $py = $false; $vt = $false; $jv = $false
-        while ((Get-Date) -lt $deadline -and -not ($py -and $vt -and $jv)) {
+        $py = $false; $vt = $false; $jv = $false; $cs = -not $WithConsole
+        while ((Get-Date) -lt $deadline -and -not ($py -and $vt -and $jv -and $cs)) {
             if (-not $py) { $py = Test-Health py "http://127.0.0.1:8000/readyz" }
             if (-not $vt) { $vt = Test-Health vite "http://localhost:5173" "web" }
             if (-not $jv) { $jv = Test-Health java "http://127.0.0.1:8080/api/v1/ping" }
-            if (-not ($py -and $vt -and $jv)) { Start-Sleep -Seconds 3 }
+            if (-not $cs) { $cs = Test-Health console "http://localhost:5174" "web" }
+            if (-not ($py -and $vt -and $jv -and $cs)) { Start-Sleep -Seconds 3 }
         }
         Write-Host ("  python(8000): {0}  vite(5173): {1}  java(8080): {2}" -f $py, $vt, $jv)
-        if (-not ($py -and $vt -and $jv)) {
+        if ($WithConsole) { Write-Host ("  console(5174): {0}" -f $cs) }
+        if (-not ($py -and $vt -and $jv -and $cs)) {
             Write-Host "  ⚠️ 有服务未就绪，看日志：local/dev-logs/*.err.log（数据库容器看上方 [docker] 提示 / docker compose ps）"
         }
         Write-Host "  完成。服务与终端已解耦：关终端不再提示 Terminate batch job。"

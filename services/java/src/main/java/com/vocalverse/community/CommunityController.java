@@ -34,7 +34,9 @@ public class CommunityController {
       @Size(max = 200) String title,
       @NotBlank @Size(max = 8000) String body,
       @NotBlank @Size(max = 16) String kind,
-      @NotBlank @Size(max = 16) String domain) {}
+      @NotBlank @Size(max = 16) String domain,
+      /** 媒体引用（docs/47 §4.3）；纯文本帖为 null */
+      com.fasterxml.jackson.databind.JsonNode media) {}
 
   public record AddCommentRequest(@NotBlank @Size(max = 500) String body) {}
 
@@ -49,15 +51,18 @@ public class CommunityController {
       @RequestAttribute("userId") Long userId,
       @RequestParam(required = false) String domain,
       @RequestParam(required = false) String cursor,
-      @RequestParam(defaultValue = "10") int limit) {
-    return Envelope.ok(service.feed(userId, domain, cursor, limit));
+      @RequestParam(defaultValue = "10") int limit,
+      /** mine=true → 只看本人发帖（「我的发帖」，docs/47 §5.1） */
+      @RequestParam(defaultValue = "false") boolean mine) {
+    return Envelope.ok(service.feed(userId, domain, cursor, limit, mine));
   }
 
   @PostMapping
   public Envelope<CommunityPostView> create(
       @RequestAttribute("userId") Long userId, @Valid @RequestBody CreatePostRequest body) {
     return Envelope.ok(
-        service.create(userId, body.title(), body.body(), body.kind(), body.domain()));
+        service.create(
+            userId, body.title(), body.body(), body.kind(), body.domain(), body.media()));
   }
 
   @GetMapping("/{id}")

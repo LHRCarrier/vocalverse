@@ -5,7 +5,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { request, setAuthRefresher, setAuthToken } from '@/api/client'
+import { JAVA_BASE, request, setAuthRefresher, setAuthToken } from '@/api/client'
 
 interface TokenResponse {
   accessToken: string
@@ -19,6 +19,12 @@ export interface MeView {
   username: string
   nickname: string
   level: string
+  /** 社区展示名（社区 S3 · docs/47 §4.2；GET /auth/me 扩展字段） */
+  handle?: string | null
+  /** 头像色板（无 avatarUrl 时的兜底底色） */
+  tint?: string | null
+  /** 真实头像（相对路径，渲染前过 mediaUrl） */
+  avatarUrl?: string | null
 }
 
 const TOKEN_KEY = 'vv_token'
@@ -64,7 +70,7 @@ export const useAuthStore = defineStore('auth', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       },
-      '/manage',
+      JAVA_BASE,
     )
     persist(resp.data, remember)
     await fetchMe()
@@ -78,7 +84,7 @@ export const useAuthStore = defineStore('auth', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       },
-      '/manage',
+      JAVA_BASE,
     )
     persist(resp.data, remember)
     await fetchMe()
@@ -93,7 +99,7 @@ export const useAuthStore = defineStore('auth', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username }),
       },
-      '/manage',
+      JAVA_BASE,
     )
     return resp.data ?? '已收到申请，管理员将尽快处理'
   }
@@ -101,7 +107,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchMe() {
     if (!token.value) return
     try {
-      const resp = await request<MeView>('/auth/me', undefined, '/manage')
+      const resp = await request<MeView>('/auth/me', undefined, JAVA_BASE)
       me.value = resp.data
     } catch {
       me.value = null
@@ -118,7 +124,7 @@ export const useAuthStore = defineStore('auth', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken: refreshToken.value }),
         },
-        '/manage',
+        JAVA_BASE,
       )
       persist(resp.data, remembered.value)
       return true
@@ -132,7 +138,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout() {
     if (token.value) {
       try {
-        await request('/auth/logout', { method: 'POST' }, '/manage')
+        await request('/auth/logout', { method: 'POST' }, JAVA_BASE)
       } catch (err) {
         // 吊销失败（网络/令牌已失效）不阻塞本地登出——但必须可观测（2026-09-07 评审：此前静默吞掉，
         // 网络失败时服务端 token 未吊销、用户毫不知情）

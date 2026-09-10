@@ -17,17 +17,19 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
     Date,
+    DateTime,
     ForeignKey,
     Index,
     String,
     Text,
     UniqueConstraint,
+    func,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -167,4 +169,62 @@ class Follow(CreatedAtMixin, Base):
         CheckConstraint("follower_id <> followee_id", name="no_self_follow"),
         UniqueConstraint("follower_id", "followee_id", name="uq_follows_follower_followee"),
         Index("ix_follows_followee", "followee_id"),
+    )
+
+
+class DirectMessage(CreatedAtMixin, Base):
+    """一对一私信消息（Java 写；docs/49 §1.1，迁移 0012）。
+
+    只记 created_at（不可变行，无 updated_at）；会话= (sender, recipient) 对，不建会话表。
+    ``status`` 为治理预留（本轮恒 'visible'，无删除入口）；迁移 0013 起 CHECK 另含
+    ``'hidden'``（审核隐藏，docs/50 §5.4）。
+    """
+
+    __tablename__ = "direct_messages"
+
+    id: Mapped[int] = bigint_pk()
+    sender_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    recipient_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    body: Mapped[str] = mapped_column(String(1000), nullable=False)  # 上限由应用层校验（42203）
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("'visible'")
+    )
+
+    __table_args__ = (
+        CheckConstraint("sender_id <> recipient_id", name="no_self_message"),
+        # 审核隐藏（迁移 0013 · docs/50 §5.4）：本期只读列表不提供处置，约束先就位
+        CheckConstraint("status IN ('visible', 'hidden', 'deleted')", name="status"),
+        Index("ix_dm_pair_time", "sender_id", "recipient_id", "created_at", "id"),
+        Index("ix_dm_recipient_time", "recipient_id", "created_at", "id"),
+        Index("ix_dm_sender_time", "sender_id", "created_at", "id"),
+    )
+
+
+class DmReadState(Base):
+    """私信已读水位（Java 写；docs/49 §1.2，迁移 0012）。
+
+    **水位是 ``last_read_id`` 而非时间戳**：时间戳水位在并发提交下会跨过尚未渲染的消息，
+    造成永久漏未读；消息 id 单调，取 ``max(现有, upTo)`` 无此问题（docs/49 §4.3 B2）。
+    未读定义 = 对端 visible 消息中 ``id > last_read_id`` 的条数（缺行视作 0）。
+    """
+
+    __tablename__ = "dm_read_state"
+
+    id: Mapped[int] = bigint_pk()
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    peer_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    last_read_id: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default=text("0"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        CheckConstraint("user_id <> peer_id", name="no_self_peer"),
+        # 代理主键 + 业务唯一键（本仓 Java/JPA 侧全实体统一 `@Id Long id` 形态；
+        # 业务唯一语义由本约束保证，`(user_id, peer_id)` 仍是「一会话一行」的真键）
+        UniqueConstraint("user_id", "peer_id", name="uq_dm_read_state_user_peer"),
+        Index("ix_dm_read_state_user", "user_id"),
     )

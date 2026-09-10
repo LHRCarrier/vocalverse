@@ -9,7 +9,13 @@ public final class CommunityView {
 
   private CommunityView() {}
 
-  public record AuthorView(Long id, String nickname, String handle, String tint, String level) {}
+  /**
+   * 作者视图。{@code avatarUrl} 为 2026-09-09 新增（社区 S3 · docs/47 §4.2）：取自 {@code
+   * user_profiles.avatar_url}，随 feed/详情/评论/关注一次带回，前端零额外请求。 通知（{@link NotificationItem}）**不含**
+   * AuthorView —— 通知行仍是图标块，登记 S4。
+   */
+  public record AuthorView(
+      Long id, String nickname, String handle, String tint, String level, String avatarUrl) {}
 
   public record CommunityPostView(
       Long id,

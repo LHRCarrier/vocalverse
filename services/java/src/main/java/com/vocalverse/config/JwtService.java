@@ -1,6 +1,8 @@
 package com.vocalverse.config;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
@@ -41,13 +43,23 @@ public class JwtService {
         .claim("role", role)
         .issuedAt(Date.from(now))
         .expiration(Date.from(now.plusSeconds(accessTtlSeconds)))
-        .signWith(key)
+        // ⚠️ 显式钉 HS256，不能只写 `.signWith(key)`（2026-09-10 实测缺陷，与控制台侧同一个坑）：
+        // `Keys.hmacShaKeyFor(bytes)` 按**密钥长度**自动选算法（≥64B→HS512、≥48B→HS384、≥32B→HS256），
+        // 而 `.signWith(key)` 用的就是 key 自带的那个；Python 侧却是手写 HMAC-SHA256 验签。
+        // 于是密钥一旦 ≥48 字节，Java 签出的**所有令牌**（含 App 学习者令牌）Python 全验不过。
+        .signWith(key, Jwts.SIG.HS256)
         .compact();
   }
 
   /** 解析并验签；失败抛 io.jsonwebtoken.JwtException（由过滤器转 401）。 */
   public Claims parse(String token) {
-    return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+    Jws<Claims> jws = Jwts.parser().verifyWith(key).build().parseSignedClaims(token);
+    // 只接受 HS256（与 Python 侧实现一致）：否则会出现"Java 认、Python 不认"的令牌
+    String alg = jws.getHeader().getAlgorithm();
+    if (!Jwts.SIG.HS256.getId().equals(alg)) {
+      throw new JwtException("令牌算法必须为 HS256（收到 " + alg + "）");
+    }
+    return jws.getPayload();
   }
 
   public Long parseUserId(String token) {

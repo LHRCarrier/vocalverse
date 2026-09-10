@@ -6,9 +6,10 @@ Starlette 对 >1MB 的 multipart part 落盘且无总量上限 → **匿名**大
 
 **修复前必失败证据**：`test_oversized_content_length_rejected_before_app`（无中间件时
 内层 app 会被调用且不会产生 413）与 `test_oversized_body_end_to_end_413`
-（实测 21MB body 打到普通端点：修复前是 422/200，修复后 413 + envelope 41301）。
+（实测超上限 body 打到普通端点：修复前是 422/200，修复后 413 + envelope 41301）。
 
-依据：docs/06 §8（≤20MB）、docs/api/error-codes.md:22（41301）、docs/api/envelope.md。
+依据：docs/06 §8（音频 ≤20MB / 视频 ≤64MB）、docs/api/error-codes.md（41301）、
+docs/api/envelope.md。
 """
 
 from __future__ import annotations
@@ -125,8 +126,16 @@ async def test_websocket_scope_passthrough():
 # 端到端：真实应用 + 真实请求（不依赖鉴权端点，走 /api/v1/events）
 # ---------------------------------------------------------------------------
 def test_oversized_body_end_to_end_413(client):
-    """21MB body（超 20MB+1MB 上限）→ 413 + envelope 41301，且**早于**鉴权/校验。"""
-    payload = b"x" * (22 * 1024 * 1024)
+    """超上限 body → 413 + envelope 41301，且**早于**鉴权/校验。
+
+    上限口径（2026-09-10 合并 main 后）：`max(音频 20MB, 视频 64MB) + 1MB` —— 社区 S3 允许
+    64MB 视频上传，护栏必须放行全部合法请求（见 app/main.py 的中间件注册注释）。
+    """
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    limit = max(settings.max_upload_bytes, settings.media_max_video_bytes) + 1024 * 1024
+    payload = b"x" * (limit + 1024 * 1024)  # 超上限 1MB
     resp = client.post(
         "/api/v1/events",
         content=payload,

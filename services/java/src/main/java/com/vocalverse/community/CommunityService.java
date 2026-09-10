@@ -21,13 +21,11 @@ import com.vocalverse.user.UserRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,8 +41,17 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 社区内容服务（Java 写方唯一实现 · docs/37 §5）。
  *
- * <p>沿用口径：统一可见谓词 status='visible'；互动与计数增减同事务；like/coin/share 幂等 （唯一键兜底 + 重复请求返回当前态）；checkin
- * 卡仅开放点赞（评论/投币/分享 40302）； media/checkin_snapshot 为 JSON 文本列 → ObjectMapper 转换。
+ * <p>沿用口径：统一可见谓词；互动与计数增减同事务；like/coin/share 幂等 （唯一键兜底 + 重复请求返回当前态）；checkin 卡仅开放点赞（评论/投币/分享 40302）；
+ * media/checkin_snapshot 为 JSON 文本列 → ObjectMapper 转换。
+ *
+ * <h2>统一可见谓词（2026-09-10 管理端隐藏）</h2>
+ *
+ * <p>{@code visible} 是**写入值**，不再直接当查询条件用；读路径一律问 {@link #isContentVisible(String)}（{@code NOT IN
+ * ('hidden','deleted')}）， 与 {@code PostRepository} / {@code PostCommentRepository} / {@code
+ * PostInteractionRepository} 的 SQL 谓词保持一致（docs/50 §6.2 联动硬点 1）。
+ *
+ * <p>{@link #detail} 对作者也不再放行 {@code hidden}（docs/50 §6.2 联动硬点 3「hidden 对作者也隐藏」）， 与 feed「我的发帖」一致 ——
+ * 否则作者点开链接仍能读到被处置的内容，隐藏等于没做。
  */
 @Service
 public class CommunityService {
@@ -55,11 +62,31 @@ public class CommunityService {
   public static final String ACTION_LIKE = "like";
   public static final String ACTION_COIN = "coin";
   public static final String ACTION_SHARE = "share";
+
+  /** 新内容的初始状态（写入值）。 */
   public static final String STATUS_VISIBLE = "visible";
+
+  /** 管理端隐藏（docs/50 §6.2；CHECK 已含该值，零迁移）。 */
+  public static final String STATUS_HIDDEN = "hidden";
+
+  /** 软删除（作者自删或管理端删除）。 */
+  public static final String STATUS_DELETED = "deleted";
+
   private static final int MAX_LIMIT = 20;
+
+  /** 统一可见谓词（docs/50 §6.2）：唯一读侧判定入口，避免各处自己写字符串比较。 */
+  public static boolean isContentVisible(String status) {
+    return status != null && !STATUS_HIDDEN.equals(status) && !STATUS_DELETED.equals(status);
+  }
 
   /** keyset 游标（base64url(epochMillis|id)）；null = 首页。 */
   private record Cursor(Instant ts, Long id) {}
+
+  /**
+   * 通知分页「首页」哨兵时间：不用 NULL（PG 推断不出 IS NULL 分支下游标参数类型），也不用 {@link Instant#MAX} （驱动渲染为公元前年份，PG 报
+   * `timestamp out of range`）——9999-12-31 足够大且两方言可绑定。
+   */
+  private static final Instant NOTI_CURSOR_MAX_TS = Instant.parse("9999-12-31T23:59:59Z");
 
   private final PostRepository posts;
   private final PostCommentRepository comments;
@@ -69,6 +96,7 @@ public class CommunityService {
   private final UserRepository users;
   private final UserProfileRepository profiles;
   private final ObjectMapper mapper;
+  private final MediaRefValidator mediaValidator;
   private final boolean postEnabled;
 
   public CommunityService(
@@ -80,6 +108,7 @@ public class CommunityService {
       UserRepository users,
       UserProfileRepository profiles,
       ObjectMapper mapper,
+      MediaRefValidator mediaValidator,
       @Value("${vocalverse.community.post-enabled:false}") boolean postEnabled) {
     this.posts = posts;
     this.comments = comments;
@@ -89,20 +118,23 @@ public class CommunityService {
     this.users = users;
     this.profiles = profiles;
     this.mapper = mapper;
+    this.mediaValidator = mediaValidator;
     this.postEnabled = postEnabled;
   }
 
   // ------------------------------------------------------------------ feed
 
   @Transactional(readOnly = true)
-  public FeedPage feed(Long actorId, String domain, String cursor, int limit) {
+  public FeedPage feed(Long actorId, String domain, String cursor, int limit, boolean mine) {
     String normalized = normalizeDomain(domain);
     Cursor c = decodeCursor(cursor);
     int pageSize = clampLimit(limit);
+    // mine=true → 只看本人发帖（「我的发帖」页，docs/47 §5.1 · 2026-09-09 补）
+    Long authorFilter = mine ? actorId : null;
     // 多取一条判 hasMore（docs/37 §5 keyset 约定）；DESC 排序由 Pageable 携带（Criteria 执行）
     PageRequest pageable =
         PageRequest.of(0, pageSize + 1, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
-    List<PostEntity> rows = posts.feed(normalized, c.ts(), c.id(), pageable);
+    List<PostEntity> rows = posts.feed(normalized, authorFilter, c.ts(), c.id(), pageable);
     boolean hasMore = rows.size() > pageSize;
     List<PostEntity> page = hasMore ? rows.subList(0, pageSize) : rows;
     List<CommunityPostView> views = buildViews(page, actorId);
@@ -114,7 +146,7 @@ public class CommunityService {
 
   @Transactional
   public CommunityPostView create(
-      Long userId, String title, String body, String kind, String domain) {
+      Long userId, String title, String body, String kind, String domain, JsonNode media) {
     if (!postEnabled) {
       throw new CommunityException(40302, "社区发帖功能未开放", HttpStatus.FORBIDDEN);
     }
@@ -128,12 +160,21 @@ public class CommunityService {
     if (body == null || body.isBlank()) {
       throw new CommunityException(42203, "帖子正文不能为空", HttpStatus.BAD_REQUEST);
     }
+    // media 契约校验（docs/47 §4.3）：形状/条数/URL 前缀白名单；违规 42203
+    JsonNode validatedMedia = mediaValidator.validate(media);
     PostEntity e = new PostEntity();
     e.setAuthorId(userId);
     e.setKind(kind);
     e.setDomain(normalized);
     e.setTitle(title);
     e.setBody(body);
+    if (validatedMedia != null) {
+      try {
+        e.setMedia(mapper.writeValueAsString(validatedMedia));
+      } catch (Exception ex) {
+        throw new CommunityException(42203, "media 序列化失败", HttpStatus.BAD_REQUEST);
+      }
+    }
     e.setStatus(STATUS_VISIBLE);
     Instant now = Instant.now();
     e.setCreatedAt(now);
@@ -145,8 +186,8 @@ public class CommunityService {
   @Transactional(readOnly = true)
   public CommunityPostView detail(Long userId, Long postId) {
     PostEntity post = posts.findById(postId).orElseThrow(() -> notFound("内容不存在或已删除"));
-    boolean isAuthor = post.getAuthorId().equals(userId);
-    if (!STATUS_VISIBLE.equals(post.getStatus()) && !isAuthor) {
+    // docs/50 §6.2 联动硬点 3：hidden 对作者也隐藏（作者从「我的帖子」的状态位看处置结果，不是继续读到正文）
+    if (!isContentVisible(post.getStatus())) {
       throw notFound("内容不存在或已删除");
     }
     return buildViews(List.of(post), userId).get(0);
@@ -158,7 +199,7 @@ public class CommunityService {
     if (!post.getAuthorId().equals(userId)) {
       throw new CommunityException(40302, "只能删除自己的内容", HttpStatus.FORBIDDEN);
     }
-    if (!STATUS_VISIBLE.equals(post.getStatus())) {
+    if (!isContentVisible(post.getStatus())) {
       throw notFound("内容不存在或已删除"); // 幂等：已删除视为不存在
     }
     post.setStatus("deleted");
@@ -453,115 +494,119 @@ public class CommunityService {
 
   // ------------------------------------------------------------------ S2 · 通知（派生 · mergeKey 聚合）
 
-  private record NotiGroup(
-      String key, Long postId, String action, int count, Instant latest, Long latestActorId) {}
-
-  private static final int NOTIFICATION_WINDOW = 50;
-
   /**
-   * 互动通知（docs/38 §5 mergeKey 模板 · 演示窗口 = 近 50 条互动/评论，内存聚合）： like/coin/share 按 (post, action, 当日
-   * UTC) 聚合为「actor 等 N 人…」；comment 逐条带内容； 仅本人可见帖、排除自身动作（自赞/自评不通知）；cursor = base64(ts|itemId) 阈值分页。
+   * 互动通知（docs/38 §5 mergeKey 模板 · **J-03 起 DB 层分页 + SQL 聚合**）： like/coin/share 按 (post, action, 当日
+   * UTC) 聚合为「actor 等 N 人…」；comment 逐条带内容； 仅本人可见帖、排除自身动作（自赞/自评不通知）；cursor = base64(ts|mergeKey)
+   * 阈值分页。
+   *
+   * <p>J-03（2026-09-10 实施，替代「近 50 条内存窗口 + 窗口内重筛」）：第 51 条及更早的互动/评论此前**永不可见**
+   * （翻页是窗口内反复重筛，与「游标分页可翻页」契约不符），且每页 O(窗口) 重算。现在互动组与评论都在 DB 层按 {@code (created_at/id, mergeKey)}
+   * keyset 分页、互动在 SQL 层 GROUP BY 聚合——每页 SQL 往返恒定（4 次）、内存 O(limit)。
    */
   @Transactional(readOnly = true)
   public NotificationsPage notifications(Long me, String cursor, int limit) {
     int pageSize = clampLimit(limit);
-    List<PostInteractionEntity> inters =
-        interactions.findMine(me, PageRequest.of(0, NOTIFICATION_WINDOW));
-    List<PostCommentEntity> cmts = comments.findMine(me, PageRequest.of(0, NOTIFICATION_WINDOW));
-    inters.removeIf(i -> i.getActorId().equals(me));
-    cmts.removeIf(c -> c.getAuthorId().equals(me));
+    CursorThreshold threshold = decodeNotiCursor(cursor);
+    // 各源取 pageSize+1：归并后判定 hasMore（keyset 阈值语义与旧实现一致——同刻按 mergeKey 升序）
+    int fetch = pageSize + 1;
+    // 首页游标用哨兵值（比任何真实行都「新」/都「小」），**不用 NULL**：PG 推断不出 IS NULL 分支下游标参数
+    // 的数据类型（`could not determine data type of parameter $4`，2026-09-10 真 PG 联调实测；H2 放过）。
+    // 哨兵不能取 Instant.MAX——驱动会渲染成 "-12-11 19:08:16+00 BC" 撞 PG 的 timestamp 范围
+    // （`timestamp out of range`，同一轮实测）；取 9999-12-31 足够覆盖演示与生产数据。
+    Instant cursorTs = threshold.ts() == null ? NOTI_CURSOR_MAX_TS : threshold.ts();
+    String cursorKey = threshold.key() == null ? "" : threshold.key();
+    Long commentCursor = commentCursorId(threshold.key());
 
+    List<NotificationItem> candidates = new ArrayList<>();
     Set<Long> postIds = new HashSet<>();
-    inters.forEach(i -> postIds.add(i.getPostId()));
-    cmts.forEach(c -> postIds.add(c.getPostId()));
-    Map<Long, PostEntity> postMap =
-        posts.findAllById(postIds).stream()
-            .collect(Collectors.toMap(PostEntity::getId, Function.identity()));
     Set<Long> actorIds = new HashSet<>();
-    inters.forEach(i -> actorIds.add(i.getActorId()));
-    cmts.forEach(c -> actorIds.add(c.getAuthorId()));
-    Map<Long, AuthorView> actorMap = loadAuthors(new ArrayList<>(actorIds));
+    Map<String, Long> groupActors = new HashMap<>();
+    Map<String, Long> itemActors = new HashMap<>();
 
-    // 聚合 like/coin/share：mergeKey = postId|action|当日UTC
-    Map<String, NotiGroup> groups = new LinkedHashMap<>();
-    for (PostInteractionEntity i : inters) {
-      String key =
-          i.getPostId()
-              + "|"
-              + i.getAction()
-              + "|"
-              + i.getCreatedAt().atZone(ZoneOffset.UTC).toLocalDate();
-      NotiGroup prev = groups.get(key);
-      if (prev == null) {
-        groups.put(
-            key,
-            new NotiGroup(key, i.getPostId(), i.getAction(), 1, i.getCreatedAt(), i.getActorId()));
-      } else {
-        groups.put(
-            key,
-            new NotiGroup(
-                key,
-                prev.postId(),
-                prev.action(),
-                prev.count() + 1,
-                prev.latest().isAfter(i.getCreatedAt()) ? prev.latest() : i.getCreatedAt(),
-                prev.latest().isAfter(i.getCreatedAt()) ? prev.latestActorId() : i.getActorId()));
+    for (String action : List.of(ACTION_LIKE, ACTION_COIN, ACTION_SHARE)) {
+      List<PostInteractionRepository.NotificationGroupRow> groups =
+          interactions.notificationGroups(me, action, cursorTs, cursorKey, fetch);
+      if (groups.isEmpty()) continue;
+      List<Long> postIdsOfGroups =
+          groups.stream()
+              .map(PostInteractionRepository.NotificationGroupRow::getPostId)
+              .distinct()
+              .toList();
+      for (Object[] row : interactions.latestActorPerGroup(action, me, postIdsOfGroups)) {
+        groupActors.put((String) row[0], ((Number) row[1]).longValue());
+      }
+      for (PostInteractionRepository.NotificationGroupRow g : groups) {
+        String id = "n|" + g.getMergeKey();
+        candidates.add(
+            new NotificationItem(
+                id,
+                action,
+                g.getPostId(),
+                null,
+                null,
+                g.getItemCount(),
+                null,
+                NativeProjections.toInstant(g.getLatestAt())));
+        postIds.add(g.getPostId());
+        Long actor = groupActors.getOrDefault(g.getMergeKey(), me);
+        itemActors.put(id, actor);
+        actorIds.add(actor);
       }
     }
 
-    List<NotificationItem> items = new ArrayList<>();
-    for (NotiGroup g : groups.values()) {
-      items.add(
+    List<PostInteractionRepository.NotificationCommentRow> cmts =
+        interactions.notificationComments(
+            me, cursorTs, commentCursor == null ? Long.MAX_VALUE : commentCursor, fetch);
+    for (PostInteractionRepository.NotificationCommentRow c : cmts) {
+      String id = "c|" + c.getId();
+      candidates.add(
           new NotificationItem(
-              "n|" + g.key(),
-              g.action(),
-              g.postId(),
-              titleOf(postMap.get(g.postId())),
-              nicknameOf(actorMap, g.latestActorId()),
-              g.count(),
-              null,
-              g.latest()));
-    }
-    for (PostCommentEntity c : cmts) {
-      items.add(
-          new NotificationItem(
-              "c|" + c.getId(),
+              id,
               "comment",
               c.getPostId(),
-              titleOf(postMap.get(c.getPostId())),
-              nicknameOf(actorMap, c.getAuthorId()),
+              null,
+              null,
               1,
               c.getBody(),
-              c.getCreatedAt()));
+              NativeProjections.toInstant(c.getCreatedAt())));
+      postIds.add(c.getPostId());
+      itemActors.put(id, c.getAuthorId());
+      actorIds.add(c.getAuthorId());
     }
 
-    // 排序：时间倒序，同刻按 itemId 升序（配合阈值游标）
-    items.sort(
+    candidates.sort(
         Comparator.comparing(NotificationItem::createdAt)
             .reversed()
             .thenComparing(NotificationItem::id));
+    boolean hasMore = candidates.size() > pageSize;
+    List<NotificationItem> page = hasMore ? candidates.subList(0, pageSize) : candidates;
 
-    // 阈值游标
-    CursorThreshold threshold = decodeNotiCursor(cursor);
-    List<NotificationItem> filtered = new ArrayList<>();
-    for (NotificationItem it : items) {
-      if (threshold.ts() == null) {
-        filtered.add(it);
-        continue;
-      }
-      int tsCmp = it.createdAt().compareTo(threshold.ts());
-      if (tsCmp < 0 || (tsCmp == 0 && it.id().compareTo(threshold.id()) > 0)) {
-        filtered.add(it);
-      }
+    Map<Long, PostEntity> postMap =
+        posts.findAllById(postIds).stream()
+            .collect(Collectors.toMap(PostEntity::getId, Function.identity()));
+    Map<Long, AuthorView> actorMap = loadAuthors(new ArrayList<>(actorIds));
+
+    List<NotificationItem> items = new ArrayList<>();
+    for (NotificationItem it : page) {
+      items.add(
+          new NotificationItem(
+              it.id(),
+              it.type(),
+              it.postId(),
+              titleOf(postMap, it.postId()),
+              nicknameOf(actorMap, itemActors.get(it.id())),
+              it.actorCount(),
+              it.commentBody(),
+              it.createdAt()));
     }
-    boolean hasMore = filtered.size() > pageSize;
-    List<NotificationItem> page = hasMore ? filtered.subList(0, pageSize) : filtered;
-    NotificationItem last = page.isEmpty() ? null : page.get(page.size() - 1);
+
+    NotificationItem last = items.isEmpty() ? null : items.get(items.size() - 1);
     String next = hasMore && last != null ? encodeNotiCursor(last.createdAt(), last.id()) : null;
-    return new NotificationsPage(page, next, hasMore);
+    return new NotificationsPage(items, next, hasMore);
   }
 
-  private static String titleOf(PostEntity p) {
+  private static String titleOf(Map<Long, PostEntity> posts, Long postId) {
+    PostEntity p = posts.get(postId);
     if (p == null) return "内容";
     return KIND_CHECKIN.equals(p.getKind())
         ? "今日打卡"
@@ -569,11 +614,14 @@ public class CommunityService {
   }
 
   private static String nicknameOf(Map<Long, AuthorView> actors, Long id) {
-    AuthorView a = actors.get(id);
+    AuthorView a = id == null ? null : actors.get(id);
     return a == null ? "有同修" : a.nickname();
   }
 
-  private record CursorThreshold(Instant ts, String id) {}
+  /**
+   * 通知阈值游标：{@code ts} + {@code key}（互动组=mergeKey {@code post|action|day}；评论={@code comment|id}）。
+   */
+  private record CursorThreshold(Instant ts, String key) {}
 
   private static CursorThreshold decodeNotiCursor(String cursor) {
     if (cursor == null || cursor.isBlank()) {
@@ -581,15 +629,28 @@ public class CommunityService {
     }
     try {
       String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
-      String[] parts = raw.split("\\|");
-      return new CursorThreshold(Instant.parse(parts[0]), parts[1]);
+      // mergeKey 自身含 "|"（post|action|day）→ 只按第一个分隔符切分
+      int sep = raw.indexOf('|');
+      return new CursorThreshold(Instant.parse(raw.substring(0, sep)), raw.substring(sep + 1));
     } catch (Exception e) {
       throw new CommunityException(42203, "分页游标非法", HttpStatus.BAD_REQUEST);
     }
   }
 
-  private static String encodeNotiCursor(Instant ts, String id) {
-    String raw = micro(ts).toString() + "|" + id;
+  /** 评论流游标 id：通知 itemId 形如 {@code c|<id>}；非评论游标（互动组）返回 null（该源从头取）。 */
+  private static Long commentCursorId(String mergeKey) {
+    if (mergeKey == null || !mergeKey.startsWith("c|")) {
+      return null;
+    }
+    try {
+      return Long.parseLong(mergeKey.substring(2));
+    } catch (NumberFormatException e) {
+      throw new CommunityException(42203, "分页游标非法", HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  private static String encodeNotiCursor(Instant ts, String itemId) {
+    String raw = micro(ts).toString() + "|" + itemId;
     return Base64.getUrlEncoder()
         .withoutPadding()
         .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
@@ -657,7 +718,13 @@ public class CommunityService {
         .toList();
   }
 
-  private Map<Long, AuthorView> loadAuthors(List<Long> authorIds) {
+  /**
+   * 批量作者视图（昵称/handle/tint/LV/头像）：一次 users + 一次 profiles（防 N+1）。
+   *
+   * <p>包级可见（2026-09-10）：私信服务 {@link DirectMessagingService} 复用本方法组装对端 {@code
+   * AuthorView}，避免第二份同构实现漂移。
+   */
+  Map<Long, AuthorView> loadAuthors(List<Long> authorIds) {
     Map<Long, UserEntity> userMap =
         users.findAllById(authorIds).stream()
             .collect(Collectors.toMap(UserEntity::getId, Function.identity()));
@@ -676,13 +743,14 @@ public class CommunityService {
               u == null ? "未知用户" : u.getNickname(),
               p == null ? null : p.getHandle(),
               p == null ? null : p.getTint(),
-              p == null ? "L1" : p.getCefrLevel()));
+              p == null ? "L1" : p.getCefrLevel(),
+              p == null ? null : p.getAvatarUrl()));
     }
     return out;
   }
 
   private AuthorView emptyAuthor(Long id) {
-    return new AuthorView(id, "未知用户", null, null, "L1");
+    return new AuthorView(id, "未知用户", null, null, "L1", null);
   }
 
   private CommunityPostView toPostView(

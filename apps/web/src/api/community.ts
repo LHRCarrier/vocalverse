@@ -7,28 +7,37 @@
  * - 时间/时长格式化（createdAt ISO → 「x 分钟前」；duration_s → m:ss）。
  * 请求/响应类型来自生成契约（gen:api）→ 边界强转为严格视图类型（服务端保证全量返回）。
  */
-import { JAVA_BASE, request } from './client'
+import { JAVA_BASE, authHeaders, request } from './client'
 
 import type {
   CoinState,
   CommentPage,
   CommentView,
   CommunityPostView,
+  ConversationView,
+  DirectMessageView,
   FeedPage,
   FollowRecommend,
   FollowSummary,
   LikeState,
+  MessagePage,
+  MessageStreamPayload,
   NotificationItem,
   NotificationsPage,
+  ReadState,
   ShareState,
 } from '@/types/community'
 import type {
   RawCommentPage,
   RawCommentView,
+  RawConversationView,
+  RawDirectMessageView,
   RawFeedPage,
   RawFollowRecommend,
   RawFollowSummary,
+  RawMessagePage,
   RawNotificationsPage,
+  RawReadState,
   RawCommunityPostView,
 } from '@/types/community'
 
@@ -74,10 +83,21 @@ const asCommentPage = (raw: RawCommentPage): CommentPage => ({
   hasMore: raw.hasMore ?? false,
 })
 
-/** feed（keyset 游标；domain 空 = 全量混排；后端返回 current user liked/coined 态） */
-export async function fetchFeed(domain: string | null, cursor: string | null, limit = 10, signal?: AbortSignal) {
+/** feed（keyset 游标；domain 空 = 全量混排；mine=true = 只看本人发帖；后端回带 liked/coined 态） */
+export async function fetchFeed(
+  domain: string | null,
+  cursor: string | null,
+  limit = 10,
+  signal?: AbortSignal,
+  mine = false,
+) {
   const res = await request<RawFeedPage>(
-    `/api/v1/community/posts${qs({ domain: domain ?? '', cursor: cursor ?? '', limit })}`,
+    `/api/v1/community/posts${qs({
+      domain: domain ?? '',
+      cursor: cursor ?? '',
+      limit,
+      mine: mine ? 'true' : '',
+    })}`,
     signal ? { signal } : undefined,
     JAVA_BASE,
   )
@@ -89,7 +109,31 @@ export async function fetchPost(id: number) {
   return asPost(res.data)
 }
 
-export async function createPost(body: { title?: string; body: string; kind: 'article' | 'video'; domain: string }) {
+export interface CreatePostInput {
+  title?: string
+  body: string
+  kind: 'article' | 'video'
+  domain: string
+  /** 媒体引用（社区 S3 · docs/47 §4.3）；纯文本帖不传 */
+  media?: PostMediaInput | null
+}
+
+/** 发帖 media 载荷（与后端 MediaRefValidator 同形状） */
+export interface PostMediaInput {
+  type: 'image' | 'video'
+  items: Array<{
+    id?: string
+    url: string
+    width?: number | null
+    height?: number | null
+    size?: number | null
+    mimeType?: string | null
+  }>
+  coverUrl?: string | null
+  durationS?: number | null
+}
+
+export async function createPost(body: CreatePostInput) {
   const res = await request<RawCommunityPostView>(
     '/api/v1/community/posts',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
@@ -173,6 +217,151 @@ export async function fetchNotifications(cursor: string | null, limit = 10): Pro
     nextCursor: res.data.nextCursor ?? null,
     hasMore: res.data.hasMore ?? false,
   }
+}
+
+/* ---------------- 私信 IM（docs/49 §2 · 2026-09-10） ---------------- */
+
+/** 会话列表（对端 + 最后一条 + 我未读）。 */
+export async function fetchConversations(limit = 50): Promise<ConversationView[]> {
+  const res = await request<RawConversationView[]>(
+    `/api/v1/community/messages/conversations${qs({ limit })}`,
+    undefined,
+    JAVA_BASE,
+  )
+  return (res.data ?? []).map((r) => r as unknown as ConversationView)
+}
+
+/** 未读合计（会话列表页脚 / SSE 校正口径）。 */
+export async function fetchUnreadTotal(): Promise<number> {
+  const res = await request<number>(`/api/v1/community/messages/unread`, undefined, JAVA_BASE)
+  return res.data ?? 0
+}
+
+/** 会话消息（keyset 倒序；cursor = 上一页最后一条 id）。 */
+export async function fetchThread(
+  peerId: number,
+  cursor: number | null,
+  limit = 20,
+  signal?: AbortSignal,
+): Promise<MessagePage> {
+  const res = await request<RawMessagePage>(
+    `/api/v1/community/messages/${peerId}${qs({ cursor: cursor ?? '', limit })}`,
+    signal ? { signal } : undefined,
+    JAVA_BASE,
+  )
+  const raw = res.data
+  return {
+    items: (raw.items ?? []) as unknown as DirectMessageView[],
+    nextCursor: raw.nextCursor ?? null,
+    hasMore: raw.hasMore ?? false,
+  }
+}
+
+/** 发送私信（服务端返回权威视图，前端以它替换乐观占位）。 */
+export async function sendMessage(peerId: number, body: string): Promise<DirectMessageView> {
+  const res = await request<RawDirectMessageView>(
+    `/api/v1/community/messages/${peerId}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body }) },
+    JAVA_BASE,
+  )
+  return res.data as unknown as DirectMessageView
+}
+
+/**
+ * 已读上报：`upTo` = 本次已渲染的最后一条**对端**消息 id（docs/49 §4.1）。
+ *
+ * <p>不用请求时刻——时间戳水位会跨过并发提交中尚未渲染的消息，造成永久漏未读（§4.3 B2）。
+ */
+export async function markThreadRead(peerId: number, upTo: number): Promise<ReadState> {
+  const res = await request<RawReadState>(
+    `/api/v1/community/messages/${peerId}/read`,
+    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ upTo }) },
+    JAVA_BASE,
+  )
+  return res.data as unknown as ReadState
+}
+
+/**
+ * 私信 SSE 长连（docs/49 §3.1）——**Java 侧首条流式端点**，与 `audio/sse.ts` 的 Python 音频流不是同一条通道：
+ *
+ * - `sse.ts` 的 `openSseFetch` 硬绑 `PYTHON_BASE`、只支持 POST+FormData、且丢弃 `id:` 行 → 本函数独立实现
+ *   GET + Bearer + `JAVA_BASE`，续传用 `since` 游标（服务端按 `since` 回放断线期间的来信）；
+ * - SSE 帧格式：`event:<name>` + `data:<json>`（服务端 `SseEmitter.event()` 默认输出，`data` 后无空格）；
+ * - 401 不自动续期（`request()` 才有 authRefresher）：交由调用方降级轮询，重连由上层退避驱动；
+ * - 单用户 ≤3 流、全局 ≤500：超限服务端回 `429 + event:error(data:stream-limit)` → `onFail('limit')`。
+ */
+export interface MessageStreamHandlers {
+  /** `event:message`（新消息或断线回放）。 */
+  onMessage?: (payload: MessageStreamPayload) => void
+  /** `event:open`（建流成功）。 */
+  onOpen?: () => void
+  /** `event:read`（本账号其他端的已读回执）。 */
+  onRead?: (payload: { peerId: number; lastReadId: number }) => void
+  /** 流结束/失败：`limit` = 超限（应转轮询）；`error` = 网络/认证失败。 */
+  onFail?: (reason: 'limit' | 'error', err?: unknown) => void
+}
+
+/** SSE 空闲超时（服务端心跳 25s，取 3× 兜底，同 `SSE_IDLE_TIMEOUT_MS` 口径）。 */
+export const MESSAGE_STREAM_IDLE_TIMEOUT_MS = 75_000
+
+export function openMessageStream(
+  since: number | null,
+  handlers: MessageStreamHandlers,
+  signal: AbortSignal,
+): void {
+  const url = `${JAVA_BASE}/api/v1/community/messages/stream${qs({ since: since ?? '' })}`
+  const headers: HeadersInit = {
+    Accept: 'text/event-stream',
+    ...(authHeaders() as Record<string, string>),
+  }
+  let failed = false
+  const fail = (reason: 'limit' | 'error', err?: unknown) => {
+    if (failed) return
+    failed = true
+    handlers.onFail?.(reason, err)
+  }
+
+  fetch(url, { method: 'GET', headers, signal })
+    .then(async (resp) => {
+      if (!resp.ok || !resp.body) {
+        // 超限：429 + event:error(data:stream-limit)（同步响应体）
+        const text = await resp.text().catch(() => '')
+        fail(resp.status === 429 || text.includes('stream-limit') ? 'limit' : 'error')
+        return
+      }
+      const reader = resp.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      for (;;) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        let idx: number
+        while ((idx = buffer.indexOf('\n\n')) >= 0) {
+          const block = buffer.slice(0, idx)
+          buffer = buffer.slice(idx + 2)
+          let eventName = 'message'
+          const dataLines: string[] = []
+          for (const line of block.split('\n')) {
+            if (line.startsWith('event:')) eventName = line.slice(6).trim()
+            else if (line.startsWith('data:')) dataLines.push(line.slice(5).trimStart())
+          }
+          if (!dataLines.length) continue // 注释帧（`:ping`）
+          let payload: unknown
+          try {
+            payload = JSON.parse(dataLines.join('\n'))
+          } catch {
+            continue // 坏块容错
+          }
+          if (eventName === 'open') handlers.onOpen?.()
+          else if (eventName === 'message') handlers.onMessage?.(payload as MessageStreamPayload)
+          else if (eventName === 'read') handlers.onRead?.(payload as { peerId: number; lastReadId: number })
+          else if (eventName === 'error') fail('limit')
+        }
+      }
+      fail('error') // 流被服务端/网络关闭：交由上层重连或降级
+    })
+    .catch((err) => fail('error', err))
 }
 
 /* ---------------- 展示语义工具 ---------------- */

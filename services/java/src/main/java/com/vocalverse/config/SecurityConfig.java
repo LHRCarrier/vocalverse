@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -21,6 +22,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
  * 安全策略（docs/18 §3-J1）：公开白名单仅 login/register/refresh/forgot（原 /auth/** 全开放， 2026-09-07
@@ -61,6 +65,7 @@ public class SecurityConfig {
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http.csrf(csrf -> csrf.disable())
+        .cors(Customizer.withDefaults()) // CORS（2026-09-10 打包壳跨域直连本机后端）
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
@@ -76,9 +81,15 @@ public class SecurityConfig {
                         "/actuator/health",
                         "/error")
                     .permitAll()
-                    // 管理端（docs/06 §9.6）：admin 角色专用；用户侧工单接口走 anyRequest().authenticated()
-                    .requestMatchers("/api/v1/admin/**")
-                    .hasRole("ADMIN")
+                    // 2026-09-10 旧管理端退役：原 `/api/v1/admin/**` → hasRole("ADMIN") 匹配已删除。
+                    // 那次退役把管理面整体搬到独立控制台（`/api/v1/console/**`，独立身份 admin_users，
+                    // 由 ConsoleSecurityConfig 的 @Order(1) 链守门），`/api/v1/admin/**` 已无任何控制器。
+                    //
+                    // ROLE_ADMIN 现状（如实说明）：**全仓已无任何匹配器/注解消费它**。
+                    // JwtAuthFilter 仍会为 role=admin 的 App 用户生成 ROLE_ADMIN authority，
+                    // 但没有任何规则读它 —— 即「有 authority、无授权作用」。
+                    // users.role 的 CHECK 与语义**未改动**（那是用户域迁移，不在本次范围），
+                    // 所以这里是「规则消失、数据保留」，不是「角色被删」。
                     .requestMatchers("/internal/**")
                     .hasRole("SERVICE")
                     .anyRequest()
@@ -87,6 +98,28 @@ public class SecurityConfig {
             new JwtAuthFilter(jwt, users, mapper), UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(new ServiceTokenFilter(serviceToken), JwtAuthFilter.class);
     return http.build();
+  }
+
+  /** 跨域配置（2026-09-10 打包壳方案 B：页面源 https://localhost，API 打到本机 http://<IP>:8080）。 */
+  @Bean
+  public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration cfg = new CorsConfiguration();
+    cfg.setAllowedOrigins(
+        List.of(
+            "https://localhost",
+            "http://localhost",
+            "http://127.0.0.1",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://192.168.0.104:5173",
+            "http://192.168.0.104:8088",
+            "http://localhost:8088"));
+    cfg.setAllowedMethods(List.of("*"));
+    cfg.setAllowedHeaders(List.of("*"));
+    cfg.setAllowCredentials(true);
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", cfg);
+    return source;
   }
 
   /** service-token 校验（仅匹配 /manage/internal/**；其余路径放行交给安全链）。 */
