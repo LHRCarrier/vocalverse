@@ -3,6 +3,57 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 管理端后台（真启动）：Java 起不来 → 迁移缺失；修好后又暴露两个跨服务 P0（I-15/I-16）
+
+- **起因**：需求方报"java 端启动失败，查看日志"。日志末尾是
+  `org.postgresql.util.PSQLException: ERROR: relation "admin_permissions" does not exist`
+  → `BUILD FAILURE`。
+
+- **根因 1（环境，非代码）**：**本地 PG 停在迁移 0012，没有 0013 的 15 张控制台表**。
+  Java 是 `ddl-auto: none`（Alembic 是 schema 唯一真源），而 `RbacBootstrap` 启动期就要查
+  `admin_permissions` → 直接起不来。处置：先 `pg_dump` 备份（5.4 MB → `local/db-backup/`），
+  再 `uv run alembic upgrade head`（0012 → 0013），真库复查 **15/15 表到位**、
+  `alembic_version=0013`；重启后 `RbacBootstrap` 写入权限码 37 行、`ConsoleAdminBootstrap` 建出账号 `admin`。
+
+- **根因 2（代码，P0）· I-15：JJWT 按密钥长度自动换算法，Python 固定 HS256**。
+  登录成功了（Java 侧 200），但**同一枚令牌打 Python 侧控制台端点全部 46001 `bad signature`**。
+  逐步取证：Java 日志无回退告警 → 令牌 claims 全对 → 用项目自己的验签实现验不过 →
+  **按 HMAC 反推候选密钥，一个都不匹配** → 打印令牌 header 得 **`alg: HS384`**。
+  机制：`Keys.hmacShaKeyFor(bytes)` 按密钥长度选算法（≥64B→HS512、≥48B→HS384、≥32B→HS256），
+  而 `.signWith(key)`（不带参数）用的就是它；Python `app/core/auth.py` 是**手写验签**、只算 HMAC-SHA256。
+  我生成的密钥是 **48 个 hex 字符 = 48 字节**，正好落进 384 位档 —— 而 `.env` 模板写的是
+  "≥32 字节"，**最自然的选法「64 个 hex 字符」更是直接落进 512 位档**，也就是"照着模板配就会踩"。
+  影响面不止控制台：App 学习者令牌走同一条 Python 验签路径。
+  修：Java 两处签发**显式钉 `Jwts.SIG.HS256`** + 解析侧拒绝非 HS256（避免"Java 认、Python 不认"的半可用令牌）；
+  Python `decode_jwt` 增加**显式 alg 检查并报出实际算法**（把"算法不一致"从"bad signature"里拆出来）。
+
+- **根因 3（代码，P0）· I-16：`aud` 形态两端不一致**。alg 修好后报错变成
+  `bad audience: ['vocalverse-console']` —— Java 用 JJWT `.audience().add(x).and()` 签发，产出的是**数组**
+  （RFC 7519 允许），Python 却拿它跟裸字符串比。Python 自己的单测全用 `create_jwt` 产出的**字符串** aud，
+  所以一直绿。修：Python 增加 `_audience_matches()`，字符串/数组两种形态都认（放行的是**形态**，
+  不是放宽校验：数组里没有控制台 aud 仍拒），`is_console_token` 同步。
+
+- **本轮最该记住的一条**：**「Java 签发、Python 验签」这句话在此之前从未被真正执行过一次。**
+  两侧单测各测各的（Java 用 JJWT 自签自验、Python 自签字符串 aud），
+  没有一条测试跨越进程边界，于是两个 100% 复现的缺陷同时藏了一整轮 —— 文档写"已就位"、实际"从未接通"。
+  触发它的只是一次**本地真启动**。已登记缺口 **G-18**：缺"跨服务一跳"的冒烟门禁
+  （Java CI / Python CI / admin-ci 结构上都不可能发现它）。
+
+- **验证（实跑）**：
+  - **修复前先红**：把两处 `.signWith(key, Jwts.SIG.HS256)` 临时改回 `.signWith(key)` 跑新测试 →
+    **2/4 失败**（正是那两条"算法必须 HS256"的断言）；改回后 4/4 绿。
+  - **Java**：`mvn -B clean verify` → **166 tests / 0 failures / 0 errors / BUILD SUCCESS**（162 → 166），spotless `153 files clean`。
+  - **Python**：`ruff check` 通过、`format --check` 203 files、`pytest -m "not gpu"` → **491 passed / 0 skipped**
+    （上一轮是 483 passed + 4 skipped：Docker 恢复后真 PG ×2、真 Redis ×2 **这次真的跑了**）。
+  - **端到端（首次真跑通）**：Java 登录 → 同一令牌打 Python 侧
+    `/ops/overview`、`/ops/metrics/catalog`、`/ops/traces`、`/ops/traces/stats`、`/ops/alerts/rules`、`/library/books`
+    **全部 HTTP 200 / code=0**；App 侧 `POST /auth/login` → Python `/api/v1/reading/books` **200**
+    （确认改签发算法没伤到学习者链路）。
+  - `dev-up.ps1 start -WithConsole` 全流程也**首次真跑通**（四端健康检查全绿），
+    上一轮"未跑全流程"的标注据此解除。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 管理端后台（配置）：本地 .env 补齐控制台密钥 + 修正上一轮的机制描述错误
 
 - **背景**：需求方要求"帮我填一下 .env 里密钥"。范围按"让控制台真能跑起来"来定，**不动**任何第三方密钥。
