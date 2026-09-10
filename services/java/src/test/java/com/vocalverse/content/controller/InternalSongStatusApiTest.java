@@ -7,8 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.vocalverse.support.AbstractAdminApiTest;
+import com.vocalverse.support.AbstractConsoleApiTest;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -17,40 +16,42 @@ import org.springframework.test.web.servlet.MvcResult;
 /**
  * /internal/song/{id}/pitch-status 契约测试（docs/21 §4 第三条 · 2026-09-09 唱歌 P0 D2）。
  *
- * <p>覆盖 service-token 鉴权、camelCase 键名（P0-6 教训的契约级回归）、状态枚举校验、 幂等语义（同值重复无害——Python 扫描补偿可放心重发）、404 分支。
+ * <p>覆盖 service-token 鉴权、camelCase 键名（P0-6 教训的契约级回归）、状态枚举校验、幂等语义（同值重复无害——Python 扫描补偿可放心重发）、404 分支。
+ *
+ * <p>2026-09-10 合并 main：旧管理端 HTTP 面（{@code /api/v1/admin/**}）已退役，造数据改走控制台 内容写接口 {@code
+ * /api/v1/console/content/songs}（权限码 CONTENT_SONG_WRITE/READ，super 角色全量）；`json(...)` 用基类提供的那份。
  */
-class InternalSongStatusApiTest extends AbstractAdminApiTest {
+class InternalSongStatusApiTest extends AbstractConsoleApiTest {
 
   private static final String SERVICE_TOKEN = "change-me-internal-service-token";
 
-  private JsonNode json(MvcResult result) throws Exception {
-    return objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
-  }
-
-  private long createSongToken(String admin) throws Exception {
-    String created =
+  /** 造一首已发布歌曲（控制台写接口）；返回 songId。 */
+  private long createSong(String consoleToken) throws Exception {
+    MvcResult created =
         mockMvc
             .perform(
-                post("/api/v1/admin/songs")
-                    .header("Authorization", "Bearer " + admin)
+                post("/api/v1/console/content/songs")
+                    .header("Authorization", bearer(consoleToken))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        ("{\"title\":\"Old Mac\",\"level\":1,\"audioUrl\":\"/data/audio/oldmac.wav\","
+                        ("{\"title\":\"Old Mac\",\"level\":1,"
+                                + "\"audioUrl\":\"/data/audio/oldmac.wav\","
                                 + "\"source\":\"public_domain\",\"status\":\"published\"}")
                             .getBytes(StandardCharsets.UTF_8)))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-    return objectMapper.readTree(created).path("data").path("id").asLong();
+            .andExpect(status().isOk())
+            .andReturn();
+    return json(created).path("data").path("id").asLong();
   }
 
   @Test
   void pitchStatus_flips_gate_and_is_idempotent() throws Exception {
-    String admin = seedAdminAndLogin();
-    long songId = createSongToken(admin);
-    // 新歌恒 missing（SongUpsert 已移除客户端直写，D-G4）
+    String console = seedAdminAndLogin(uniqueName("isa"), superRoleCode());
+    long songId = createSong(console);
+    // 新歌恒 missing（客户端直写参考旋律状态在旧面已移除，D-G4；控制台新建默认 missing）
     mockMvc
-        .perform(get("/api/v1/admin/songs/{id}", songId).header("Authorization", "Bearer " + admin))
+        .perform(
+            get("/api/v1/console/content/songs/{id}", songId)
+                .header("Authorization", bearer(console)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.pitchRefStatus").value("missing"));
 
@@ -72,7 +73,9 @@ class InternalSongStatusApiTest extends AbstractAdminApiTest {
       assertEquals(songId, json(r).path("data").asLong());
     }
     mockMvc
-        .perform(get("/api/v1/admin/songs/{id}", songId).header("Authorization", "Bearer " + admin))
+        .perform(
+            get("/api/v1/console/content/songs/{id}", songId)
+                .header("Authorization", bearer(console)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.pitchRefStatus").value("ready"));
   }
