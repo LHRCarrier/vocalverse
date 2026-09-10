@@ -10,15 +10,17 @@
  * 没有 `meta` 之类的前端自造字段。
  */
 import { computed, onMounted, ref } from 'vue'
-import { NDataTable, NPagination, NSelect } from 'naive-ui'
+import { NButton, NDataTable, NPagination, NSelect } from 'naive-ui'
 
 import { consoleApi } from '@/api'
 import type { MaterialRow } from '@/api'
 import AsyncBlock from '@/components/common/AsyncBlock.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import PermissionGate from '@/components/common/PermissionGate.vue'
 import { usePagedList } from '@/composables/usePagedList'
 import { fmtInt } from '@/utils/format'
 import ConsumerGapNote from './ConsumerGapNote.vue'
+import MaterialFormModal from './authoring/MaterialFormModal.vue'
 import { materialColumns } from './listeningColumns'
 
 type Filters = {
@@ -52,8 +54,20 @@ const columns = computed(() =>
     publishPermission: 'content:listening:publish',
     consumerNote: CONSUMER_GAP,
     onChanged: () => void load(),
+    onEdit: (row) => openForm(row),
   }),
 )
+
+// ── 内容维护（新建 / 编辑） ───────────────────────────────────────────────
+// 列表行只有 `hasTranscript` 布尔位（服务端不把转写原文放进列表），
+// 所以弹窗内部**必须**重新回读单条 —— 拿列表行回填会把已有转写清成空串。
+const formTarget = ref<MaterialRow | null>(null)
+const showForm = ref(false)
+
+function openForm(row: MaterialRow | null): void {
+  formTarget.value = row
+  showForm.value = true
+}
 
 onMounted(() => void load())
 </script>
@@ -79,6 +93,11 @@ onMounted(() => void load())
         />
         <span class="c-weak text-12px">共 {{ fmtInt(total) }} 条</span>
         <span class="c-weak text-12px">服务端该接口只支持按状态筛选与分页，没有关键词搜索。</span>
+        <PermissionGate code="content:listening:write">
+          <n-button class="ml-auto" size="small" type="primary" @click="openForm(null)">
+            新建听力素材
+          </n-button>
+        </PermissionGate>
       </div>
 
       <AsyncBlock
@@ -104,5 +123,7 @@ onMounted(() => void load())
         <n-pagination :page="page" :page-count="pageCount" :page-slot="7" @update:page="goPage" />
       </div>
     </div>
+
+    <MaterialFormModal v-model:show="showForm" :target="formTarget" @saved="() => void load()" />
   </div>
 </template>

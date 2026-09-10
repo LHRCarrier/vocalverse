@@ -11,14 +11,16 @@
  * 因此这里不编造一份类型清单（编了就会与库里实际存在的类型不一致）。
  */
 import { computed, onMounted, ref } from 'vue'
-import { NDataTable, NPagination, NSelect } from 'naive-ui'
+import { NButton, NDataTable, NPagination, NSelect } from 'naive-ui'
 
 import { consoleApi } from '@/api'
 import type { ScenarioRow } from '@/api'
 import AsyncBlock from '@/components/common/AsyncBlock.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import PermissionGate from '@/components/common/PermissionGate.vue'
 import { usePagedList } from '@/composables/usePagedList'
 import { fmtInt } from '@/utils/format'
+import ScenarioFormModal from './authoring/ScenarioFormModal.vue'
 import { scenarioColumns } from './scenarioColumns'
 
 type Filters = {
@@ -67,8 +69,19 @@ const columns = computed(() =>
     domain: 'scenario',
     publishPermission: 'content:scenario:publish',
     onChanged: () => void load(),
+    onEdit: (row) => openForm(row),
   }),
 )
+
+// ── 内容维护（新建 / 编辑） ───────────────────────────────────────────────
+// 与歌曲库同构：列表行只投影 4 个字段，弹窗内部一律重新回读单条再回填。
+const formTarget = ref<ScenarioRow | null>(null)
+const showForm = ref(false)
+
+function openForm(row: ScenarioRow | null): void {
+  formTarget.value = row
+  showForm.value = true
+}
 
 onMounted(() => void load())
 </script>
@@ -101,6 +114,11 @@ onMounted(() => void load())
         />
         <span class="c-weak text-12px">共 {{ fmtInt(total) }} 条</span>
         <span class="c-weak text-12px">场景类型选项来自当前已加载的行（服务端没有类型目录接口）。</span>
+        <PermissionGate code="content:scenario:write">
+          <n-button class="ml-auto" size="small" type="primary" @click="openForm(null)">
+            新建场景
+          </n-button>
+        </PermissionGate>
       </div>
 
       <AsyncBlock
@@ -126,5 +144,7 @@ onMounted(() => void load())
         <n-pagination :page="page" :page-count="pageCount" :page-slot="7" @update:page="goPage" />
       </div>
     </div>
+
+    <ScenarioFormModal v-model:show="showForm" :target="formTarget" @saved="() => void load()" />
   </div>
 </template>

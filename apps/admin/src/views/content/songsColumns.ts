@@ -5,13 +5,11 @@
  * status, pitchRefStatus, updatedAt)` —— 注意字段是**扁平**的，v1 那个 `meta` 字符串不存在。
  */
 import { h } from 'vue'
-import { NButton } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
-import type { TableBaseColumn } from 'naive-ui/es/data-table/src/interface'
 
 import type { SongRow } from '@/api'
-import PermissionGate from '@/components/common/PermissionGate.vue'
 import { fmtInt } from '@/utils/format'
+import { authoringColumn } from './authoringColumn'
 import {
   publishActionColumn,
   publishStatusColumn,
@@ -37,34 +35,6 @@ export interface SongColumnsOptions extends PublishColumnsOptions {
   onEdit: (row: SongRow | null) => void
   /** 打开歌词编辑器 */
   onEditLrc: (row: SongRow) => void
-}
-
-/**
- * 内容维护列：编辑歌曲 / 编辑歌词。
- *
- * 为什么与「操作」列分开而不是塞进 `publishActionColumn`：两列是**不同的权限与不同的风险**——
- * 上下架是 `content:song:publish`（状态机动作，必填原因、留审计），编辑是 `content:song:write`
- * （改内容字段）。合成一列会让"这个按钮要不要填原因"变成看着按钮猜。
- */
-function authoringColumn(opts: SongColumnsOptions): TableBaseColumn<SongRow> {
-  return {
-    title: '内容维护',
-    key: 'authoring',
-    width: 140,
-    render: (row) =>
-      h(PermissionGate, { code: 'content:song:write' }, () => [
-        h(
-          NButton,
-          { size: 'small', quaternary: true, onClick: () => opts.onEdit(row) },
-          () => '编辑',
-        ),
-        h(
-          NButton,
-          { size: 'small', quaternary: true, onClick: () => opts.onEditLrc(row) },
-          () => '歌词',
-        ),
-      ]),
-  }
 }
 
 export function songColumns(opts: SongColumnsOptions): DataTableColumns<SongRow> {
@@ -102,7 +72,11 @@ export function songColumns(opts: SongColumnsOptions): DataTableColumns<SongRow>
     },
     publishStatusColumn<SongRow>(),
     publishUpdatedAtColumn<SongRow>(),
-    authoringColumn(opts),
+    // 内容维护列放在上下架列**之前**：写内容（改字段）比改状态更常用，且它与上下架是不同权限
+    authoringColumn<SongRow>('content:song:write', [
+      { label: '编辑', onClick: (row) => opts.onEdit(row) },
+      { label: '歌词', onClick: (row) => opts.onEditLrc(row) },
+    ]),
     publishActionColumn<SongRow>(opts, (row) => row.title),
   ]
 }

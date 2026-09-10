@@ -21,6 +21,7 @@ import IconHistory from '~icons/tabler/history'
 import IconInbox from '~icons/tabler/inbox'
 import IconKey from '~icons/tabler/key'
 import IconLayoutDashboard from '~icons/tabler/layout-dashboard'
+import IconListCheck from '~icons/tabler/list-check'
 import IconMessages from '~icons/tabler/messages'
 import IconMusic from '~icons/tabler/music'
 import IconPhoto from '~icons/tabler/photo'
@@ -43,6 +44,7 @@ const ICONS: Record<string, unknown> = {
   inbox: IconInbox,
   key: IconKey,
   'layout-dashboard': IconLayoutDashboard,
+  'list-check': IconListCheck,
   messages: IconMessages,
   music: IconMusic,
   photo: IconPhoto,

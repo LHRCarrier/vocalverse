@@ -11,6 +11,7 @@ import type { DataTableColumns } from 'naive-ui'
 
 import type { ScenarioRow } from '@/api'
 import { fmtInt } from '@/utils/format'
+import { authoringColumn } from './authoringColumn'
 import {
   publishActionColumn,
   publishStatusColumn,
@@ -21,7 +22,12 @@ import {
 /** 上架门槛（`PublishService.validateScenario`：目标语料 ≥3 条） */
 const MIN_CORPUS_ITEMS = 3
 
-export function scenarioColumns(opts: PublishColumnsOptions): DataTableColumns<ScenarioRow> {
+export interface ScenarioColumnsOptions extends PublishColumnsOptions {
+  /** 打开编辑弹窗（`row = null` 表示新建） */
+  onEdit: (row: ScenarioRow | null) => void
+}
+
+export function scenarioColumns(opts: ScenarioColumnsOptions): DataTableColumns<ScenarioRow> {
   return [
     { title: '场景标题', key: 'title', minWidth: 220, ellipsis: { tooltip: true } },
     {
@@ -54,6 +60,9 @@ export function scenarioColumns(opts: PublishColumnsOptions): DataTableColumns<S
     },
     publishStatusColumn<ScenarioRow>(),
     publishUpdatedAtColumn<ScenarioRow>(),
+    authoringColumn<ScenarioRow>('content:scenario:write', [
+      { label: '编辑', onClick: (row) => opts.onEdit(row) },
+    ]),
     publishActionColumn<ScenarioRow>(opts, (row) => row.title),
   ]
 }

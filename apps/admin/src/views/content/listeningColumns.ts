@@ -11,6 +11,7 @@ import type { DataTableColumns } from 'naive-ui'
 
 import type { MaterialRow } from '@/api'
 import { fmtInt } from '@/utils/format'
+import { authoringColumn } from './authoringColumn'
 import {
   publishActionColumn,
   publishStatusColumn,
@@ -18,7 +19,12 @@ import {
   type PublishColumnsOptions,
 } from './publishColumns'
 
-export function materialColumns(opts: PublishColumnsOptions): DataTableColumns<MaterialRow> {
+export interface MaterialColumnsOptions extends PublishColumnsOptions {
+  /** 打开编辑弹窗（`row = null` 表示新建） */
+  onEdit: (row: MaterialRow | null) => void
+}
+
+export function materialColumns(opts: MaterialColumnsOptions): DataTableColumns<MaterialRow> {
   return [
     { title: '标题', key: 'title', minWidth: 240, ellipsis: { tooltip: true } },
     {
@@ -40,6 +46,9 @@ export function materialColumns(opts: PublishColumnsOptions): DataTableColumns<M
     },
     publishStatusColumn<MaterialRow>(),
     publishUpdatedAtColumn<MaterialRow>(),
+    authoringColumn<MaterialRow>('content:listening:write', [
+      { label: '编辑', onClick: (row) => opts.onEdit(row) },
+    ]),
     publishActionColumn<MaterialRow>(opts, (row) => row.title),
   ]
 }
