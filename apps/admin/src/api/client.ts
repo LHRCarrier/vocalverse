@@ -17,8 +17,19 @@ import type { Envelope } from './types'
 const ACCESS_KEY = 'vv_console_token'
 const REFRESH_KEY = 'vv_console_refresh'
 
-export const consoleBase = import.meta.env.VITE_CONSOLE_BASE || '/manage'
-export const opsBase = import.meta.env.VITE_OPS_BASE || '/api/v1'
+/**
+ * 两个上游的基址。
+ *
+ * **默认值写在代码里，不依赖 `.env` 文件**——仓库约定 `.env` 不入库（只提交 `.env.example`，
+ * 同 apps/web）。若把基址只放在 `.env.development` / `.env.production`，新克隆的仓库
+ * 构建出来会打到错误的路径。这里按 `import.meta.env.PROD` 给出正确默认，
+ * `.env` 仅用于**覆盖**（见 `apps/admin/.env.example`）。
+ */
+const DEFAULT_CONSOLE_BASE = import.meta.env.PROD ? '/console/manage' : '/manage'
+const DEFAULT_OPS_BASE = import.meta.env.PROD ? '/console/api/v1' : '/api/v1'
+
+export const consoleBase = import.meta.env.VITE_CONSOLE_BASE || DEFAULT_CONSOLE_BASE
+export const opsBase = import.meta.env.VITE_OPS_BASE || DEFAULT_OPS_BASE
 
 export function getAccessToken(): string | null {
   return localStorage.getItem(ACCESS_KEY)
