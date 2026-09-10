@@ -2,14 +2,17 @@
 /**
  * 唱歌评分 · 联调测试页（M3 唱歌 P0 全链路；test-only，可整体删除）。
  *
- * 流程：选歌（列表/详情 + 40905 就绪门禁）→ 整首录音（≤180s）→ 上传 →
+ * 流程：选歌（列表/详情 + 40905 就绪门禁 + **收藏切换**）→ 整首录音（≤180s）→ 上传 →
  * 轮询任务态（queued→processing→done|failed）→ 逐句评分 + D3 对齐图 + 报告。
  * 依赖：Python 服务（app.sing 管线）+ Java 服务（歌曲/LRC 管理 + 提取状态委托），
  * 无独立开关（接口为正式 C 端契约，非 test-only——与本页配套的删除清单仅含前端三行）。
  *
+ * 收藏（2026-09-10）：PUT/DELETE `/api/v1/songs/{id}/favorite`（幂等）+ 列表/详情 `favorited`
+ * 字段；本页按钮用于验证「点一下收藏、再点取消」与 `favorites` 派生列表。
+ *
  * 删除清单：
  * 1. 删本文件；`views/preview/registry.ts` 删除该行；`router/preview.ts` 删除该路由；
- * 2. 后端唱歌端点/管线为正式功能（docs/21 §2.1 op 20~24），不回滚；
+ * 2. 后端唱歌端点/管线为正式功能（docs/21 §2.1 op 22~28：选歌 2 + 跟唱 3 + 收藏 2），不回滚；
  * 3. 收尾：pnpm lint / typecheck / test:run / build 全绿。
  */
 import { nextTick, onMounted, ref } from 'vue'
@@ -25,23 +28,33 @@ import {
 } from 'naive-ui'
 
 import { useSingPlay } from '@/composables/sing'
+import LivePitchChart from '@/components/LivePitchChart.vue'
 import { renderSingChart } from '@/lib/sing-chart'
 
 const play = useSingPlay()
 
 const selectedId = ref<number | null>(null)
 const chartEl = ref<HTMLElement | null>(null)
-const scoreColor = (v: number | null) => (v == null ? '#888' : v >= 85 ? '#18a058' : v >= 60 ? '#f2a43a' : '#d03050')
+const favMsg = ref('')
+const scoreColor = (v: number | null | undefined) =>
+  v == null ? '#888' : v >= 85 ? '#18a058' : v >= 60 ? '#f2a43a' : '#d03050'
 
 const songOptions = () =>
   play.songs.value.map((s) => ({
-    label: `${s.title} · 就绪${s.pitch_ref_status === 'ready' ? '✓' : '✗'} · ${s.expected_lines} 句`,
+    label: `${s.title} · 就绪${s.pitch_ref_status === 'ready' ? '✓' : '✗'} · ${s.expected_lines} 句${s.favorited ? ' · ★已收藏' : ''}`,
     value: s.id,
   }))
 
 async function onSelect(songId: number) {
   selectedId.value = songId
   await play.openSong(songId)
+}
+
+/** 收藏/取消收藏（同一按钮切换；幂等契约——重复点不会 5xx，状态以后端返回为准） */
+async function toggleFavorite() {
+  if (selectedId.value == null) return
+  const r = await play.toggleFavorite(selectedId.value)
+  favMsg.value = r === null ? '收藏请求失败（检查后端/登录态）' : r ? '已收藏' : '已取消收藏'
 }
 
 async function renderChart() {
@@ -88,7 +101,18 @@ defineExpose({ renderChart })
           </NTag>
           <NTag>预计 {{ play.detail.value.expected_lines }} 句</NTag>
           <NTag v-if="play.detail.value.bpm">BPM {{ play.detail.value.bpm }}</NTag>
+          <NTag :type="play.detail.value.favorited ? 'success' : 'default'">
+            {{ play.detail.value.favorited ? '已收藏' : '未收藏' }}
+          </NTag>
+          <NButton size="small" @click="toggleFavorite">
+            {{ play.detail.value.favorited ? '取消收藏' : '收藏' }}
+          </NButton>
+          <NText depth="3">{{ favMsg }}</NText>
         </NSpace>
+        <NText depth="3" style="display: block; margin-top: 6px">
+          收藏 tab 数据源（favorites 派生）：
+          {{ play.favorites.value.length ? play.favorites.value.map((s) => s.title).join('、') : '（空）' }}
+        </NText>
       </div>
     </NCard>
 
@@ -112,6 +136,14 @@ defineExpose({ renderChart })
         </NButton>
         <NText depth="3">移动端注意：授权后 AudioContext resume；保持前台（iOS 锁屏断录）。</NText>
       </NSpace>
+      <!-- 实时音准线（docs/06 §9.4 注记：练习辅助；preview 与生产共用同一组件） -->
+      <LivePitchChart
+        v-if="play.detail.value && play.phase.value === 'recording'"
+        :detail="play.detail.value"
+        :stream="play.getLiveStream()"
+        :active="true"
+        style="margin-top: 10px"
+      />
       <template v-if="play.phase.value === 'processing'">
         <NProgress
           :percentage="play.progressPct.value"

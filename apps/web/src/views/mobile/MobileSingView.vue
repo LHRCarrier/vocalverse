@@ -7,19 +7,23 @@
  * GET /sing/attempts/{id}(/status)（api/sing.ts；错误码映射见 singErrorMessage）。
  * 视觉：沿用重制版基线（深青精选卡/56px 分段/点线时间轴歌单）；交互逻辑接真。
  */
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import IconShare from '~icons/tabler/share'
 
 import { shareDemoLink } from '@/composables/share'
 import { useSingPlay } from '@/composables/sing'
+import { useReferenceAudio } from '@/composables/useReferenceAudio'
 import { useUiStore } from '@/stores/ui'
-import { loadAudioBlob } from '@/api/client'
+
+import type { SongSummary } from '@/api/sing'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
+import MobileSongRow from '@/components/mobile/MobileSongRow.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import LivePitchChart from '@/components/LivePitchChart.vue'
 import { renderSingChart } from '@/lib/sing-chart'
 import '@/styles/mobile-uic.css'
 import '@/styles/mobile-sing.css'
@@ -32,6 +36,9 @@ const play = useSingPlay()
 /** 跟唱面板（同页全屏 sheet）：null=关闭 */
 const sheetOpen = ref(false)
 
+/** 报告图容器（P1-8：模板 ref 取代 document.getElementById） */
+const chartEl = ref<HTMLElement | null>(null)
+
 type Tab = 'all' | 'hot' | 'fav'
 
 const tab = ref<Tab>('all')
@@ -42,14 +49,13 @@ const tabs: { key: Tab; label: string; icon: 'chart' | 'note' | 'heart' }[] = [
   { key: 'fav', label: '收藏', icon: 'heart' },
 ]
 
-/* 分类规则（数据驱动的轻量口径）：hot=短歌（句数少），fav=低难度（level 1~2） */
-const visibleSongs = computed(() =>
-  tab.value === 'all'
-    ? play.songs.value
-    : play.songs.value.filter((s) =>
-        tab.value === 'hot' ? s.expected_lines <= 8 : s.level <= 2,
-      ),
-)
+/* 分类规则：hot=短歌（句数少）；fav=**用户自主收藏**（服务端 favorited 为准，2026-09-10） */
+const visibleSongs = computed(() => {
+  if (tab.value === 'fav') return play.favorites.value
+  return tab.value === 'hot'
+    ? play.songs.value.filter((s) => s.expected_lines <= 8)
+    : play.songs.value
+})
 
 const featured = computed(() => play.songs.value[0] ?? null)
 const sheetDetail = computed(() => play.detail.value)
@@ -57,100 +63,98 @@ const recording = computed(() => play.phase.value === 'recording')
 const processing = computed(
   () => play.phase.value === 'processing' || play.phase.value === 'uploading',
 )
-const scoreColor = (v: number | null) =>
+/** 分数→颜色（P1-14：契约生成类型里逐句分项是可选字段，签名同时接 null/undefined） */
+const scoreColor = (v: number | null | undefined) =>
   v == null ? '#999' : v >= 85 ? '#18a058' : v >= 60 ? '#f2a43a' : '#d03050'
 
-/** 覆盖率（v2 口径）：有效句 < 50% → 「样本不足」提示（分数仍给，标注仅供参考） */
+/** 有效句计数（覆盖率提示文案由后端 `alignment.coverage_note` 下发，v4 口径） */
 const evaluatedCount = computed(
   () => play.result.value?.lines.filter((x) => !x.skipped).length ?? 0,
 )
 const expectedCount = computed(() => play.result.value?.expected_lines ?? 0)
-const lowCoverage = computed(
-  () => expectedCount.value > 0 && evaluatedCount.value < expectedCount.value * 0.5,
-)
 
-/** 参考旋律回放（2026-09-09 真机反馈：先听一遍再跟唱，避免凭记忆清唱音准普遍偏低） */
-const refPlaying = ref(false)
-let refAudio: HTMLAudioElement | null = null
-
+/** 参考旋律回放（2026-09-09 真机反馈：先听一遍再跟唱，避免凭记忆清唱音准普遍偏低）。
+ *  播放/回收/重入守卫抽到 `useReferenceAudio`（P1-7；视图受 max-lines 门禁约束）。 */
 const refAudioPath = computed(() => {
   const url = sheetDetail.value?.audio_url
   return url ? `/api/v1/audio/${url.split('/').pop()}` : null
 })
+const reference = useReferenceAudio(
+  () => refAudioPath.value,
+  (msg) => ui.showToast(msg),
+)
+const refPlaying = reference.playing
 
-async function toggleReference() {
-  if (refPlaying.value) {
-    stopReference()
-    return
-  }
-  const path = refAudioPath.value
-  if (!path) {
-    ui.showToast('该曲目暂无参考旋律音频')
-    return
-  }
-  try {
-    const blob = await loadAudioBlob(path)
-    refAudio = new Audio(URL.createObjectURL(blob))
-    refAudio.onended = () => {
-      refPlaying.value = false
-      refAudio = null
-    }
-    await refAudio.play()
-    refPlaying.value = true
-  } catch {
-    ui.showToast('参考旋律播放失败，请重试')
-    refPlaying.value = false
-  }
-}
-
-function stopReference() {
-  refAudio?.pause()
-  refAudio = null
-  refPlaying.value = false
-}
-
-function statusBadge(s: string): { text: string; variant: 'success' | 'star' | 'neutral' } {
-  switch (s) {
-    case 'ready':
-      return { text: '就绪', variant: 'success' }
-    case 'building':
-      return { text: '提取中', variant: 'neutral' }
-    case 'invalid':
-      return { text: '提取失败', variant: 'neutral' }
-    default:
-      return { text: '未就绪', variant: 'neutral' }
-  }
+/**
+ * 开始跟唱（P1-5，2026-09-10）：**先停参考旋律再开录**。
+ * 修复前录音按钮直接 `play.startRecording()`：外放先听后唱时原唱被麦克风一起录进去
+ * （实时线显示的是参考音），而「停止参考旋律」按钮此刻又被 `:disabled` 锁死 → 用户停不掉。
+ * 依据：docs/31（跟唱为练习辅助，输入须为用户本人）、拷问报告 A-F3/D-F3。
+ */
+function startSinging() {
+  reference.stop()
+  play.startRecording()
 }
 
 async function openSong(songId: number) {
+  reference.stop() // 换歌即停播（原实现会继续播上一首的参考旋律）
   const ok = await play.openSong(songId)
   if (ok) sheetOpen.value = true
   else ui.showToast(play.error.value ?? '该歌暂时不能跟唱')
 }
 
+/** 收藏按钮：点一下收藏，再点一次取消（乐观更新 + 失败回滚，见 useSingPlay.toggleFavorite） */
+async function toggleFav(song: SongSummary) {
+  const r = await play.toggleFavorite(song.id)
+  if (r === null) ui.showToast(play.favoriteError.value ?? '收藏操作失败，请重试')
+  else ui.showToast(r ? '已收藏，可在「收藏」里找到' : '已取消收藏')
+}
+
 async function startOver() {
-  stopReference()
+  reference.stop()
   play.reset()
   sheetOpen.value = false
 }
 
+/**
+ * 面板背景滚动锁（2026-09-10 P0-4 配套）：
+ * sheet 改为**视口锚定**后，若背景仍可滚，移动端会出现"面板下方露出歌单/背景橡皮筋"；
+ * 打开锁 `body` 溢出、关闭与卸载都要还原（防"锁死整页"）。
+ * 依据：docs/35（App 端 UI 迭代 SOP：浮层与视口关系）+ 拷问报告 A-F1/D-F1 处置建议。
+ */
+watch(sheetOpen, (open) => {
+  document.body.style.overflow = open ? 'hidden' : ''
+})
+
 onUnmounted(() => {
-  stopReference()
+  reference.stop()
+  document.body.style.overflow = '' // 卸载兜底：面板开着直接离开页面时不得把整页锁死
 })
 
 onMounted(play.loadSongs)
 
-/** 结果就绪 → 渲染 D3 对齐图（参考 + 用户曲线） */
+/** 列表加载失败（P1-6）：`phase='failed'` 且列表为空 → 页面级错误态（原实现只在 sheet 内显示错误） */
+const loadFailed = computed(() => play.phase.value === 'failed' && play.songs.value.length === 0)
+
+/** 结果就绪 → 渲染 D3 对齐图（参考 + 用户曲线）。
+ *
+ * P1-8（2026-09-10）：原实现用 `document.getElementById` + 一次性 60ms 延时——若结果在
+ * **面板关闭时**落地（如评分中关面板），元素不存在 → 静默跳过，且再打开时不会重画 →
+ * 报告页图表区永久空盒（实测 `#m-sing-chart` innerHTML 长度 0）。现改为**模板 ref** +
+ * 监听 `[result, sheetOpen]`：面板打开且结果就绪时才画，两种情况都能出图。
+ * 依据：docs/35（状态覆盖：交互后/重新进入）、拷问报告 A-F4/D-F28。
+ */
 watch(
-  () => play.result.value,
-  async (v) => {
-    if (!v) return
+  [() => play.result.value, sheetOpen],
+  async ([v, open]) => {
+    if (!v || !open) return
+    await nextTick()
     await new Promise((r) => setTimeout(r, 60))
-    const el = document.getElementById('m-sing-chart')
-    if (el && sheetDetail.value) {
-      renderSingChart(el, sheetDetail.value, v)
+    if (chartEl.value && sheetDetail.value) {
+      renderSingChart(chartEl.value, sheetDetail.value, v)
     }
   },
+  { flush: 'post' },
 )
 
 /** 顶栏 · 分享歌曲（演示：系统面板 / 复制链接）——架构级功能，保留演示入口 */
@@ -210,6 +214,19 @@ async function shareSong() {
           <MobileIcon name="mic" :size="16" /> 去跟唱
         </button>
       </section>
+      <!-- 加载失败态（P1-6）：原实现在 v-else 里一律显示「加载中…」，且错误只写进 sheet 内的
+           play.error → 断网/500/401 时页面永久「加载中…」+ 列表空态「这个分类还没有歌」两句
+           自相矛盾的话，且没有重试入口。这里把三者拆开：loading / error（含重试）/ empty。
+           依据：docs/35（状态覆盖：空态/错误态）、拷问报告 A-F5/D-F4。 -->
+      <section v-else-if="loadFailed" class="u-dark-card u-dark-card--teal">
+        <div class="u-dark-card__art" aria-hidden="true"><MobileArt name="note" :size="104" /></div>
+        <span class="u-chip u-chip--teal">加载失败</span>
+        <h2 class="u-dark-card__title">歌曲库加载失败</h2>
+        <p class="u-dark-card__desc">{{ play.error.value ?? '网络异常，请重试' }}</p>
+        <button class="u-btn u-btn--ghost" type="button" style="margin-top: 16px" @click="play.loadSongs()">
+          <MobileIcon name="refresh" :size="16" /> 重试
+        </button>
+      </section>
       <section v-else class="u-dark-card u-dark-card--teal">
         <div class="u-dark-card__art" aria-hidden="true"><MobileArt name="note" :size="104" /></div>
         <span class="u-chip u-chip--teal">歌曲库</span>
@@ -231,44 +248,26 @@ async function shareSong() {
         </button>
       </div>
 
-      <!-- 歌单（点线时间轴 · 真实数据） -->
+      <!-- 歌单（点线时间轴 · 真实数据 + 每首歌收藏按钮） -->
       <div class="u-section-title">歌曲库</div>
       <template v-for="(s, i) in visibleSongs" :key="s.id">
-        <button class="u-item" type="button" style="width: 100%; text-align: left" @click="openSong(s.id)">
-          <span class="u-icon-block" :style="{ background: s.level <= 2 ? '#1E2B26' : '#16303A' }">
-            <MobileIcon :name="s.level <= 2 ? 'headphone' : 'note'" :size="22" />
-          </span>
-          <span class="u-item__main">
-            <span class="u-item__title">{{ s.title }}</span>
-            <span class="u-item__sub">
-              {{ s.artist ?? '歌单' }} · {{ s.expected_lines }} 句 · 难度 L{{ s.level }}
-            </span>
-          </span>
-          <span class="u-item__right">
-            <span class="u-item__value" :class="{ 'u-item__value--ink': s.pitch_ref_status !== 'ready' }">
-              {{
-                s.pitch_ref_status === 'ready'
-                  ? '可跟唱'
-                  : s.pitch_ref_status === 'building'
-                    ? '提取中'
-                    : s.pitch_ref_status === 'invalid'
-                      ? '提取失败'
-                      : '未就绪'
-              }}
-            </span>
-            <span class="u-badge" :class="`u-badge--${statusBadge(s.pitch_ref_status).variant}`">
-              {{ statusBadge(s.pitch_ref_status).text }}
-            </span>
-          </span>
-        </button>
+        <MobileSongRow :song="s" @open="openSong" @favorite="toggleFav" />
         <div v-if="i < visibleSongs.length - 1" class="u-dotline" aria-hidden="true">
           <span class="dot" /><span class="line" />
         </div>
       </template>
       <div v-if="!visibleSongs.length" class="u-empty">
         <div class="u-empty__art"><MobileArt name="note" :size="96" /></div>
-        <div class="u-empty__title">这个分类还没有歌</div>
-        <div class="u-empty__sub">参考旋律离线提取完成后即可跟唱。</div>
+        <div class="u-empty__title">
+          {{ tab === 'fav' ? '还没有收藏的歌曲' : '这个分类还没有歌' }}
+        </div>
+        <div class="u-empty__sub">
+          {{
+            tab === 'fav'
+              ? '点歌曲右侧的心形按钮收藏，再点一次取消。'
+              : '参考旋律离线提取完成后即可跟唱。'
+          }}
+        </div>
       </div>
 
       <p class="u-note" style="margin-top: 24px">
@@ -305,7 +304,7 @@ async function shareSong() {
             type="button"
             style="width: 100%; margin-top: 12px"
             :disabled="recording"
-            @click="toggleReference"
+            @click="reference.toggle()"
           >
             <MobileIcon name="play" :size="16" />
             {{ refPlaying ? '停止参考旋律' : '听参考旋律（建议先听一遍再跟唱）' }}
@@ -315,7 +314,7 @@ async function shareSong() {
             type="button"
             style="width: 100%; margin-top: 8px"
             :disabled="recording || processing"
-            @click="play.startRecording()"
+            @click="startSinging"
           >
             <MobileIcon name="mic" :size="16" />
             {{ recording ? '录音中…' : processing ? '上传/评分中…' : '开始跟唱（≤3 分钟）' }}
@@ -328,6 +327,14 @@ async function shareSong() {
               停止并评分
             </button>
           </div>
+          <!-- 实时音准线（docs/06 §9.4 注记：练习辅助，同流分析，评分以离线为准） -->
+          <LivePitchChart
+            v-if="sheetDetail"
+            class="m-sing-live"
+            :detail="sheetDetail"
+            :stream="play.getLiveStream()"
+            :active="recording"
+          />
           <div v-if="processing" class="m-sing-sheet__progress">
             <div class="m-sing-sheet__bar">
               <div class="m-sing-sheet__bar-inner" :style="{ width: `${play.progressPct.value}%` }" />
@@ -351,7 +358,7 @@ async function shareSong() {
               <span>节奏 {{ play.result.value.rhythm?.toFixed(1) ?? '—' }}</span>
               <span>发音 {{ play.result.value.pron?.toFixed(1) ?? '—' }}</span>
             </div>
-            <div id="m-sing-chart" class="m-sing-chart" />
+            <div ref="chartEl" class="m-sing-chart" />
             <div class="m-sing-report__lines">
               <div v-for="(l, i) in play.result.value.lines" :key="l.seq" class="m-sing-line">
                 <span class="m-sing-line__text">
@@ -368,14 +375,17 @@ async function shareSong() {
                 </span>
               </div>
             </div>
+            <!-- 有效句 + v3/v4 提示（音域/在调音符/覆盖率置信度；docs/06 §9.4） -->
             <div class="m-sing-sheet__hint" style="margin: 8px 0">
               有效句 {{ evaluatedCount }}/{{ expectedCount }}
               <template v-if="evaluatedCount < expectedCount">
                 · 未评测 {{ expectedCount - evaluatedCount }} 句（无音高/参考缺失/有效帧不足），综合按有效句均分（docs/06 §9.4 D5）
               </template>
+              <template v-if="play.result.value.alignment?.range_hint"> · {{ play.result.value.alignment.range_hint }}</template>
+              <template v-if="play.result.value.alignment?.note_hit_rate != null"> · 在调音符 {{ Math.round((play.result.value.alignment.note_hit_rate ?? 0) * 100) }}%（未唱到的音符按比例扣减音准分）</template>
             </div>
-            <div v-if="lowCoverage" class="m-sing-sheet__hint" style="color: #c0392b; margin: 8px 0">
-              样本不足（仅 {{ evaluatedCount }}/{{ expectedCount }} 句有效），分数仅供参考——建议完整唱一遍再评。
+            <div v-if="play.result.value.alignment?.coverage_note" class="m-sing-sheet__hint" style="color: #c0392b; margin: 8px 0">
+              {{ play.result.value.alignment.coverage_note }}
             </div>
             <button class="u-btn u-btn--ghost" type="button" style="width: 100%; margin-top: 10px" @click="startOver">
               返回歌单

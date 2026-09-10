@@ -1,19 +1,92 @@
-/* 移动端 · 唱吧（跟唱面板 & 报告）样式 —— MobileSingView.vue 专用（类名加 m-sing 前缀防污染） */
+/* 移动端 · 唱吧（歌单收藏行 & 跟唱面板 & 报告）样式 —— MobileSingView.vue 专用（类名加 m-sing 前缀防污染） */
 
-/* 跟唱面板（全屏 sheet，移动端真形态） */
+/* 歌单行：主点击区 + 收藏按钮（两颗独立 button，避免 button 嵌套的无效 HTML） */
+.m-sing-row {
+  padding-right: 8px;
+  gap: 4px;
+}
+.m-sing-row__hit {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.m-sing-row__hit:focus-visible {
+  outline: 2px solid var(--u-accent, #2f6bff);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+/* 收藏按钮：未收藏=弱灰线稿；已收藏=星黄实心（--u-star 收藏语义色，未新增色板） */
+.m-sing-fav {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--u-weak, #a6a6a0);
+  cursor: pointer;
+  transition:
+    color 150ms ease-out,
+    transform 60ms ease-out;
+}
+.m-sing-fav:active {
+  transform: scale(0.92);
+}
+.m-sing-fav.is-on {
+  color: var(--u-star, #ffc83d);
+}
+.m-sing-fav.is-on svg {
+  fill: currentColor;
+}
+.m-sing-fav:focus-visible {
+  outline: 2px solid var(--u-accent, #2f6bff);
+  outline-offset: 2px;
+}
+
+/* 跟唱面板（全屏 sheet，移动端真形态）
+ *
+ * 2026-09-10 P0 修复（拷问报告 A-F1 / D-F1）：原实现 `position:absolute; inset:0` 挂在
+ * `.u-phone`（`position:relative; min-height:100vh`，**随内容长高**）上 → 面板以"整页高度"为
+ * 参照：页面滚动后打开面板，面板顶部（含关闭钮/开始跟唱）落在视口**上方**，实测 head
+ * `bottom=-1102`、开始跟唱 `top=-822` → 用户看到纯灰空白页（除右上角关闭外无控件可点）。
+ * 修法：改为**视口锚定**（照抄仓内 `.u-tabbar` 的写法 `mobile-uic.css:2070-2079`），
+ * 宽度与 `.u-phone` 同源（`width:100%; max-width:480px; left:50%; translateX(-50%)`），
+ * 面板高度由视口上界决定（`top:0; bottom:0`）→ 内部 `__body{flex:1; overflow-y:auto}` 才真正滚动。
+ * 依据：docs/35（App 端 UI 迭代 SOP：容器 bottom ≤ 视口高、"页面总高超视口"为典型陷阱）、
+ * docs/31:36（硬规则 4：safe-area 底部留白）、`worklog/BUG实测/跟唱面板滚动后白屏.md`。
+ */
 .m-sing-sheet {
-  position: absolute;
-  inset: 0;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 480px;
   background: var(--u-bg, #f4f7f8);
   display: flex;
   flex-direction: column;
   z-index: 30;
 }
 .m-sing-sheet__head {
+  flex: none; /* 头部不参与压缩：body 才可滚动（否则长歌词会把关闭钮挤走） */
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 14px 16px;
+  /* 顶部安全区（与 .u-drawer 同款约定，mobile-uic.css:2774）：刘海屏不被状态栏遮挡 */
+  padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 .m-sing-sheet__sub {
@@ -129,3 +202,8 @@
   font-style: normal;
   color: #8a9aa2;
 }
+
+.m-sing-live {
+  margin: 8px 0;
+}
+
