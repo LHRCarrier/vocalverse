@@ -36,6 +36,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/community/messages/{peerId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["markRead"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/community/follows/{userId}": {
         parameters: {
             query?: never;
@@ -308,6 +324,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/community/messages/{peerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["thread"];
+        put?: never;
+        post: operations["send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/songs": {
         parameters: {
             query?: never;
@@ -516,6 +548,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/community/messages/unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["unread"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/community/messages/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["conversations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/community/follows": {
         parameters: {
             query?: never;
@@ -637,6 +701,22 @@ export interface components {
             code?: number;
             message?: string;
             data?: components["schemas"]["CoinState"];
+        };
+        ReadRequest: {
+            /** Format: int64 */
+            upTo?: number;
+        };
+        EnvelopeReadState: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["ReadState"];
+        };
+        ReadState: {
+            /** Format: int64 */
+            peerId?: number;
+            /** Format: int64 */
+            lastReadId?: number;
         };
         EnvelopeVoid: {
             /** Format: int32 */
@@ -1016,6 +1096,25 @@ export interface components {
             message?: string;
             data?: components["schemas"]["CommentView"];
         };
+        SendRequest: {
+            body?: string;
+        };
+        DirectMessageView: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: int64 */
+            peerId?: number;
+            body?: string;
+            mine?: boolean;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        EnvelopeDirectMessageView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["DirectMessageView"];
+        };
         QuestionUpsert: {
             /** Format: int32 */
             examRevision: number;
@@ -1174,6 +1273,35 @@ export interface components {
             items?: components["schemas"]["NotificationItem"][];
             nextCursor?: string;
             hasMore?: boolean;
+        };
+        EnvelopeMessagePage: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["MessagePage"];
+        };
+        MessagePage: {
+            items?: components["schemas"]["DirectMessageView"][];
+            /** Format: int64 */
+            nextCursor?: number;
+            hasMore?: boolean;
+        };
+        ConversationView: {
+            peer?: components["schemas"]["AuthorView"];
+            /** Format: int64 */
+            lastMessageId?: number;
+            lastBody?: string;
+            lastMine?: boolean;
+            /** Format: date-time */
+            lastCreatedAt?: string;
+            /** Format: int64 */
+            unreadCount?: number;
+        };
+        EnvelopeListConversationView: {
+            /** Format: int32 */
+            code?: number;
+            message?: string;
+            data?: components["schemas"]["ConversationView"][];
         };
         EnvelopeListFollowSummary: {
             /** Format: int32 */
@@ -1348,6 +1476,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["EnvelopeCoinState"];
+                };
+            };
+        };
+    };
+    markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                peerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReadRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeReadState"];
                 };
             };
         };
@@ -2012,6 +2166,57 @@ export interface operations {
             };
         };
     };
+    thread: {
+        parameters: {
+            query?: {
+                cursor?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                peerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeMessagePage"];
+                };
+            };
+        };
+    };
+    send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                peerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeDirectMessageView"];
+                };
+            };
+        };
+    };
     listSongs: {
         parameters: {
             query?: {
@@ -2428,6 +2633,48 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["EnvelopeNotificationsPage"];
+                };
+            };
+        };
+    };
+    unread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeLong"];
+                };
+            };
+        };
+    };
+    conversations: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeListConversationView"];
                 };
             };
         };

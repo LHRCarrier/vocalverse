@@ -84,6 +84,42 @@
         }
       }
     },
+    "/api/v1/community/messages/{peerId}/read" : {
+      "put" : {
+        "tags" : [ "direct-message-controller" ],
+        "operationId" : "markRead",
+        "parameters" : [ {
+          "name" : "peerId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReadRequest"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeReadState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/community/follows/{userId}" : {
       "put" : {
         "tags" : [ "community-social-controller" ],
@@ -916,6 +952,85 @@
         }
       }
     },
+    "/api/v1/community/messages/{peerId}" : {
+      "get" : {
+        "tags" : [ "direct-message-controller" ],
+        "operationId" : "thread",
+        "parameters" : [ {
+          "name" : "peerId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMessagePage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "direct-message-controller" ],
+        "operationId" : "send",
+        "parameters" : [ {
+          "name" : "peerId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SendRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeDirectMessageView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/songs" : {
       "get" : {
         "tags" : [ "content-admin-controller" ],
@@ -1479,6 +1594,52 @@
         }
       }
     },
+    "/api/v1/community/messages/unread" : {
+      "get" : {
+        "tags" : [ "direct-message-controller" ],
+        "operationId" : "unread",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeLong"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/messages/conversations" : {
+      "get" : {
+        "tags" : [ "direct-message-controller" ],
+        "operationId" : "conversations",
+        "parameters" : [ {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 50
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeListConversationView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/community/follows" : {
       "get" : {
         "tags" : [ "community-social-controller" ],
@@ -1746,6 +1907,43 @@
           },
           "data" : {
             "$ref" : "#/components/schemas/CoinState"
+          }
+        }
+      },
+      "ReadRequest" : {
+        "type" : "object",
+        "properties" : {
+          "upTo" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "EnvelopeReadState" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/ReadState"
+          }
+        }
+      },
+      "ReadState" : {
+        "type" : "object",
+        "properties" : {
+          "peerId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "lastReadId" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },
@@ -2776,6 +2974,54 @@
           }
         }
       },
+      "SendRequest" : {
+        "type" : "object",
+        "properties" : {
+          "body" : {
+            "maxLength" : 1000,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "DirectMessageView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "peerId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "body" : {
+            "type" : "string"
+          },
+          "mine" : {
+            "type" : "boolean"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "EnvelopeDirectMessageView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/DirectMessageView"
+          }
+        }
+      },
       "QuestionUpsert" : {
         "required" : [ "examRevision", "itemIndex", "kind", "prompt" ],
         "type" : "object",
@@ -3225,6 +3471,83 @@
           },
           "hasMore" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "EnvelopeMessagePage" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/MessagePage"
+          }
+        }
+      },
+      "MessagePage" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/DirectMessageView"
+            }
+          },
+          "nextCursor" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "hasMore" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "ConversationView" : {
+        "type" : "object",
+        "properties" : {
+          "peer" : {
+            "$ref" : "#/components/schemas/AuthorView"
+          },
+          "lastMessageId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "lastBody" : {
+            "type" : "string"
+          },
+          "lastMine" : {
+            "type" : "boolean"
+          },
+          "lastCreatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "unreadCount" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "EnvelopeListConversationView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ConversationView"
+            }
           }
         }
       },
