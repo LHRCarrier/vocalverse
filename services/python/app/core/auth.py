@@ -55,11 +55,25 @@ def create_jwt(payload: dict[str, Any], secret: str, ttl_s: int = 3600) -> str:
 
 
 def decode_jwt(token: str, secret: str) -> dict[str, Any]:
-    """验签 + 过期检查；失败抛 ValueError。"""
+    """验签 + 过期检查；失败抛 ValueError。
+
+    **只支持 HS256**（本函数只算 HMAC-SHA256）。Header 里的 ``alg`` 必须显式检查并报出实际值 ——
+    只报 "bad signature" 会把"算法不一致"伪装成"密钥不对"，让人往密钥方向排查（2026-09-10 实测：
+    Java 侧 ``Keys.hmacShaKeyFor`` 会按**密钥长度**自动选 HS256/384/512，48 字节的密钥签出的是
+    HS384，而这里按 HS256 验 → 所有控制台端点 46001，报错完全不提算法）。
+    Java 侧已显式钉死 HS256，这里是第二道闸：**收到非 HS256 就明确说出来**。
+    """
     parts = token.split(".")
     if len(parts) != 3:
         raise ValueError("bad token")
     h, p, sig = parts
+    try:
+        header = json.loads(_b64url_decode(h))
+    except Exception as exc:  # noqa: BLE001 - 头部解不开就是坏令牌
+        raise ValueError("bad token header") from exc
+    alg = header.get("alg")
+    if alg != "HS256":
+        raise ValueError(f"unsupported alg: {alg!r}（本服务只支持 HS256）")
     expected = hmac.new(secret.encode(), f"{h}.{p}".encode(), hashlib.sha256).digest()
     actual = _b64url_decode(sig)
     if not hmac.compare_digest(expected, actual):
@@ -68,6 +82,22 @@ def decode_jwt(token: str, secret: str) -> dict[str, Any]:
     if payload.get("exp", 0) < int(time.time()):
         raise ValueError("token expired")
     return payload
+
+
+def _audience_matches(actual: Any, expected: str) -> bool:
+    """``aud`` 是否命中期望值 —— **字符串与字符串数组都要认**。
+
+    RFC 7519 允许 ``aud`` 是单个字符串**或**字符串数组；两端产出的形态恰好不同：
+    Java 侧 JJWT 用 ``.audience().add(x).and()`` 签发，**产出数组** ``["vocalverse-console"]``；
+    Python 侧 ``create_jwt`` 产出字符串。2026-09-10 实测缺陷：这里原先直接 ``aud != audience``，
+    于是 **Java 签的每一枚控制台令牌在 Python 侧都是 46001 bad audience** —— 而 Python 自己的
+    单测全用字符串 aud，所以一直是绿的（跨服务那一跳从未被真正验证过）。
+    """
+    if isinstance(actual, str):
+        return actual == expected
+    if isinstance(actual, (list, tuple)):
+        return expected in actual
+    return False
 
 
 def decode_console_jwt(
@@ -85,7 +115,7 @@ def decode_console_jwt(
     """
     payload = decode_jwt(token, secret)
     aud = payload.get("aud")
-    if aud != audience:
+    if not _audience_matches(aud, audience):
         raise ValueError(f"bad audience: {aud!r}")
     iss = payload.get("iss")
     if iss != issuer:
@@ -99,7 +129,7 @@ def decode_console_jwt(
 def is_console_token(payload: dict[str, Any]) -> bool:
     """是否为控制台令牌（按 ``aud``/``typ`` 判定，不看密钥 —— 双密钥是第二道闸）。"""
     typ = payload.get("typ") or payload.get("type")
-    return payload.get("aud") == CONSOLE_AUDIENCE or typ == CONSOLE_TOKEN_TYPE
+    return _audience_matches(payload.get("aud"), CONSOLE_AUDIENCE) or typ == CONSOLE_TOKEN_TYPE
 
 
 async def get_current_user_id(
