@@ -39,6 +39,9 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+  private static final org.slf4j.Logger log =
+      org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
   /** HTTP 状态 → 错误码映射（docs/api/error-codes.md，先登记后用）。 */
   private static final Map<Integer, Integer> STATUS_CODE =
       Map.of(
@@ -108,6 +111,10 @@ public class GlobalExceptionHandler {
     if (ex instanceof jakarta.validation.ConstraintViolationException) {
       return ResponseEntity.badRequest().body(Envelope.error(40001, "参数校验失败"));
     }
+    // 2026-09-10 补日志：此前这里**不记任何日志**，客户端只看到 {"code":50002}，
+    // 服务端也一片安静 —— 排障时只能靠猜（本轮就因此在若干个 50002 上反复试错）。
+    // 500 是「不该发生」的类别，必须留下完整堆栈；4xx 兜底路径不记（那是预期内的业务拒绝）。
+    log.error("未处理异常 → 50002（{}）：{}", ex.getClass().getName(), ex.getMessage(), ex);
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
         .body(Envelope.error(50002, "服务内部错误"));
   }

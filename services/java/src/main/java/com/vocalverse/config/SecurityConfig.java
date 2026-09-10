@@ -81,9 +81,15 @@ public class SecurityConfig {
                         "/actuator/health",
                         "/error")
                     .permitAll()
-                    // 管理端（docs/06 §9.6）：admin 角色专用；用户侧工单接口走 anyRequest().authenticated()
-                    .requestMatchers("/api/v1/admin/**")
-                    .hasRole("ADMIN")
+                    // 2026-09-10 旧管理端退役：原 `/api/v1/admin/**` → hasRole("ADMIN") 匹配已删除。
+                    // 那次退役把管理面整体搬到独立控制台（`/api/v1/console/**`，独立身份 admin_users，
+                    // 由 ConsoleSecurityConfig 的 @Order(1) 链守门），`/api/v1/admin/**` 已无任何控制器。
+                    //
+                    // ROLE_ADMIN 现状（如实说明）：**全仓已无任何匹配器/注解消费它**。
+                    // JwtAuthFilter 仍会为 role=admin 的 App 用户生成 ROLE_ADMIN authority，
+                    // 但没有任何规则读它 —— 即「有 authority、无授权作用」。
+                    // users.role 的 CHECK 与语义**未改动**（那是用户域迁移，不在本次范围），
+                    // 所以这里是「规则消失、数据保留」，不是「角色被删」。
                     .requestMatchers("/internal/**")
                     .hasRole("SERVICE")
                     .anyRequest()
