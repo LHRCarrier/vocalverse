@@ -10,13 +10,13 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -66,15 +66,21 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * <h2>4. CORS：控制台源可配置，既有源原样保留</h2>
  *
  * <p>既有 {@code corsConfigurationSource} 硬编码了 8 个源。按设计（§10.2 网关 {@code /manage/...}、独立 SPA 5174
- * 端口）控制台需要加入口，但**不该**在配置类里再加一个硬编码字面量。本类提供 {@link #consoleCorsConfigurationSource}（{@code @Primary}
- * 的首选源），它 <b>复用同一份既有源清单</b>，再追加 {@code vocalverse.console.cors-origins}（环境变量 {@code
+ * 端口）控制台需要加入口。本类提供 {@link #consoleCorsConfigurationSource}：<b>复用同一份既有源清单</b>（并补上控制台 dev 端口 5174，见
+ * {@link #EXISTING_ORIGINS} 的说明），再追加 {@code vocalverse.console.cors-origins}（环境变量 {@code
  * VOICEVERSE_CONSOLE_CORS_ORIGINS}，逗号分隔）。 既有源一个不少、一个不改 —— 既有的 App 打包壳（{@code
  * https://localhost}）继续可用。
  *
  * <p><b>Bean 名为什么不能叫 {@code corsConfigurationSource}</b>：Spring Boot 2.1 起默认 {@code
  * allow-bean-definition-overriding=false}，第二个同名 Bean 会直接抛 {@code BeanDefinitionOverrideException}
- * 让**整个应用起不来**（实测踩到过：既有 App 的所有测试 一起变红，且报错信息指向 Bean 定义而不是本模块）。所以用一个独立名字 + {@code @Primary}
- * 来「成为首选」而不是「覆盖定义」。
+ * 让**整个应用起不来**（实测踩到过：既有 App 的所有测试 一起变红，且报错信息指向 Bean 定义而不是本模块）。所以用一个独立名字。
+ *
+ * <p><b>⚠️ 但「独立名字 + {@code @Primary}」不足以保证被用上（2026-09-10 实测缺陷）</b>： {@code @Primary}
+ * 只对"按类型注入"的语义生效，而 Spring Security 的 {@code CorsConfigurer} 在 {@code
+ * .cors(Customizer.withDefaults())} 下是**遍历容器里 {@code CorsConfigurationSource} 的 bean 名、取第一个**， 不看
+ * {@code @Primary}。于是控制台链长期用着 {@code SecurityConfig} 那份源：既没有 5174（浏览器登录 403「Invalid CORS
+ * request」），本模块的 {@code VOICEVERSE_CONSOLE_CORS_ORIGINS} 覆盖**也完全失效**。 修法见 {@link
+ * #consoleFilterChain}：**显式按 bean 名注入**本类的源。
  */
 @Configuration
 public class ConsoleSecurityConfig {
@@ -89,7 +95,20 @@ public class ConsoleSecurityConfig {
     CONSOLE_PREFIX + "/auth/login", CONSOLE_PREFIX + "/auth/refresh"
   };
 
-  /** 既有源清单（与 {@code SecurityConfig.corsConfigurationSource} 保持一致；此处只读不改那份代码）。 */
+  /**
+   * 既有源清单（与 {@code SecurityConfig.corsConfigurationSource} 保持一致；此处只读不改那份代码）。
+   *
+   * <p><b>5174 是控制台 SPA 的 dev 端口，必须在这里</b>（2026-09-10 实测缺陷）：原来只列了 {@code apps/web} 的 5173，靠 {@code
+   * VOICEVERSE_CONSOLE_CORS_ORIGINS} 追加 —— 而那个变量只写在 {@code services/java/.env.example}，方式 B
+   * 下**没有任何东西加载它**（Spring Boot 不读 .env）， 于是浏览器里登录必然 403「Invalid CORS request」。
+   *
+   * <p>为什么浏览器会触发 CORS 校验：控制台 dev server 走 Vite 代理，浏览器发的是**同源**请求 （5174 → 5174），但代理把 Host 改写成
+   * 8080（{@code changeOrigin: true}）后**原样转发 {@code Origin: http://localhost:5174}** —— 到了 Java
+   * 这一侧，请求 URL 是 8080 而 Origin 是 5174， Spring 就按**跨源**处理并查白名单。所以"代理能绕开 CORS"是错觉：POST 一定会带 Origin。
+   *
+   * <p>生产不需要它：控制台与 API 同源（nginx 的 {@code /console/} server 块），CORS 不参与。 把 dev 端口与既有的 {@code
+   * localhost:5173} 并列，是同一类"本地开发端口"的处理方式。
+   */
   private static final List<String> EXISTING_ORIGINS =
       List.of(
           "https://localhost",
@@ -97,6 +116,8 @@ public class ConsoleSecurityConfig {
           "http://127.0.0.1",
           "http://localhost:5173",
           "http://127.0.0.1:5173",
+          "http://localhost:5174",
+          "http://127.0.0.1:5174",
           "http://192.168.0.104:5173",
           "http://192.168.0.104:8088",
           "http://localhost:8088");
@@ -127,11 +148,14 @@ public class ConsoleSecurityConfig {
    */
   @Bean
   @Order(1)
-  public SecurityFilterChain consoleFilterChain(HttpSecurity http) throws Exception {
+  public SecurityFilterChain consoleFilterChain(
+      HttpSecurity http,
+      @Qualifier("consoleCorsConfigurationSource") CorsConfigurationSource consoleCors)
+      throws Exception {
     if (!consoleEnabled) {
       http.securityMatcher(CONSOLE_PREFIX + "/**")
           .csrf(csrf -> csrf.disable())
-          .cors(Customizer.withDefaults())
+          .cors(cors -> cors.configurationSource(consoleCors))
           .authorizeHttpRequests(auth -> auth.anyRequest().denyAll())
           .exceptionHandling(
               ex ->
@@ -155,7 +179,13 @@ public class ConsoleSecurityConfig {
     }
     http.securityMatcher(CONSOLE_PREFIX + "/**")
         .csrf(csrf -> csrf.disable())
-        .cors(Customizer.withDefaults())
+        // ⚠️ 必须**显式**指定本模块的 CORS 源，不能写 `.cors(Customizer.withDefaults())`（2026-09-10 实测）：
+        // `withDefaults()` 会让 Spring Security 的 `CorsConfigurer` 自己去容器里找 `CorsConfigurationSource`
+        // —— 它是**按 bean 名遍历取第一个**，**不看 `@Primary`**，于是拿到的是 `SecurityConfig` 那份
+        // （8 个源、不含控制台的 5174）。症状正是浏览器登录 403「Invalid CORS request」，
+        // 而本模块自己的 `VOICEVERSE_CONSOLE_CORS_ORIGINS` 覆盖也随之**完全失效**（它挂在没人用的那个 bean 上）。
+        // 显式注入（按 bean 名）之后，默认清单与覆盖项才真正作用在控制台链上。
+        .cors(cors -> cors.configurationSource(consoleCors))
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
