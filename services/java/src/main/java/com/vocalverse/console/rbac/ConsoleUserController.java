@@ -35,23 +35,20 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <h2>为什么控制台要管 App 用户（这不在 docs/50 §10.2 的原始列表里）</h2>
  *
- * <p>旧管理端的 {@code AdminUserController}（{@code /api/v1/admin/users/**}）随退役整体删除。
- * 逐条核对能力矩阵后发现：它管的是 **App 侧 {@code users} 表**（列表 / 详情 / 停用启用 / 改学习档案），
- * 而控制台的 {@code /admins/**} 管的是**控制台身份 {@code admin_users}**
- * —— 两者是两张表、两套身份（docs/50 §4.1）。删掉 {@code AdminUserController} 就等于
- * **全仓再没有任何接口能停用一个 App 用户**（封禁能力消失）。
+ * <p>旧管理端的 {@code AdminUserController}（{@code /api/v1/admin/users/**}）随退役整体删除。 逐条核对能力矩阵后发现：它管的是
+ * **App 侧 {@code users} 表**（列表 / 详情 / 停用启用 / 改学习档案）， 而控制台的 {@code /admins/**} 管的是**控制台身份 {@code
+ * admin_users}** —— 两者是两张表、两套身份（docs/50 §4.1）。删掉 {@code AdminUserController} 就等于 **全仓再没有任何接口能停用一个
+ * App 用户**（封禁能力消失）。
  *
- * <p>所以按「退役 = 入口消失 + 权限词汇统一，而不是产品能力消失」的口径，
- * 把它搬到控制台：{@code console:admin:write}（既有的「管理员账号维护」码，
+ * <p>所以按「退役 = 入口消失 + 权限词汇统一，而不是产品能力消失」的口径， 把它搬到控制台：{@code console:admin:write}（既有的「管理员账号维护」码，
  * 语义就是「管账号」，App 用户停用同属账号治理），每次写落审计。
  *
- * <p><b>与 docs/50 §5.4 的关系</b>：那一行写「{@code users}/{@code user_profiles} … **只读**（不提供用户禁用
- * —— 那是既有 {@code /api/v1/admin/users} 的职责）」。该设计的**前提**是那个既有端点还在；
- * 全仓退役后前提消失，若继续只读则「封禁用户」没有任何实现方。这是需要上报的偏差，
+ * <p><b>与 docs/50 §5.4 的关系</b>：那一行写「{@code users}/{@code user_profiles} … **只读**（不提供用户禁用 —— 那是既有
+ * {@code /api/v1/admin/users} 的职责）」。该设计的**前提**是那个既有端点还在； 全仓退役后前提消失，若继续只读则「封禁用户」没有任何实现方。这是需要上报的偏差，
  * 本类的注释即为记录。
  *
- * <p><b>不改 {@code users.role}</b>：role 的 CHECK 与语义属用户域迁移，不在本次范围
- * （docs/50 §4.1 明确管理端角色不复用 {@code users.role}）。本类只读写 {@code status} 与档案字段。
+ * <p><b>不改 {@code users.role}</b>：role 的 CHECK 与语义属用户域迁移，不在本次范围 （docs/50 §4.1 明确管理端角色不复用 {@code
+ * users.role}）。本类只读写 {@code status} 与档案字段。
  */
 @RestController
 @RequestMapping("/api/v1/console/users")
@@ -133,9 +130,8 @@ public class ConsoleUserController {
   /**
    * 停用 / 启用 App 用户（封禁能力的唯一实现）。
    *
-   * <p>停用后**下一个请求即 401**：{@code JwtAuthFilter} 每请求回读 {@code users.status}
-   * （J-02，2026-09-08），所以无需等 access token 过期。这一点由
-   * {@code DisabledUserAccessTest} 端到端验证。
+   * <p>停用后**下一个请求即 401**：{@code JwtAuthFilter} 每请求回读 {@code users.status} （J-02，2026-09-08），所以无需等
+   * access token 过期。这一点由 {@code DisabledUserAccessTest} 端到端验证。
    */
   @PatchMapping("/{id}/status")
   @RequireConsolePermission(PermissionCatalog.CONSOLE_USER_WRITE)
@@ -178,7 +174,9 @@ public class ConsoleUserController {
       @Valid @RequestBody ProfileUpdate body) {
     UserEntity u = requireUser(id);
     UserProfileEntity p =
-        profiles.findByUserId(id).orElseThrow(() -> ConsoleException.of(ConsoleErrorCodes.TARGET_NOT_FOUND, "学习档案不存在"));
+        profiles
+            .findByUserId(id)
+            .orElseThrow(() -> ConsoleException.of(ConsoleErrorCodes.TARGET_NOT_FOUND, "学习档案不存在"));
     Map<String, Object> before = new LinkedHashMap<>();
     before.put("ageGroup", p.getAgeGroup());
     before.put("cefrLevel", p.getCefrLevel());

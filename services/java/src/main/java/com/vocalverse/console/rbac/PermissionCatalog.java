@@ -67,8 +67,10 @@ public final class PermissionCatalog {
   public static final String CONSOLE_ROLE_READ = "console:role:read";
   public static final String CONSOLE_ROLE_WRITE = "console:role:write";
   public static final String CONSOLE_AUDIT_READ = "console:audit:read";
+
   /** App 用户（{@code users} 表）查看 —— 与控制台账号（{@code console:admin:*}）**分开成码**，见类注释。 */
   public static final String CONSOLE_USER_READ = "console:user:read";
+
   /** App 用户停用/启用 + 学习档案维护（封禁能力的唯一实现）。 */
   public static final String CONSOLE_USER_WRITE = "console:user:write";
 
@@ -140,9 +142,7 @@ public final class PermissionCatalog {
             new Object[] {MODULE_CONSOLE, CONSOLE_ROLE_READ, "角色与权限查看", "查看角色、权限码目录与分配"},
             new Object[] {MODULE_CONSOLE, CONSOLE_ROLE_WRITE, "角色与权限编辑", "角色 CRUD + 权限分配"},
             new Object[] {MODULE_CONSOLE, CONSOLE_AUDIT_READ, "审计日志查看", "查看管理员操作审计（只读）"},
-            new Object[] {
-              MODULE_CONSOLE, CONSOLE_USER_READ, "App 用户查看", "App 用户（users 表）列表与档案详情"
-            },
+            new Object[] {MODULE_CONSOLE, CONSOLE_USER_READ, "App 用户查看", "App 用户（users 表）列表与档案详情"},
             new Object[] {
               MODULE_CONSOLE, CONSOLE_USER_WRITE, "App 用户停用/编辑", "停用启用 App 用户 + 学习档案维护"
             },

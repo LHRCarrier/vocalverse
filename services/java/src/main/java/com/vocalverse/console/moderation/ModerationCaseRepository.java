@@ -55,24 +55,22 @@ public interface ModerationCaseRepository extends JpaRepository<ModerationCaseEn
    * escalated}（+priority=1），保持队列中」—— 升级后仍要能被处置， 所以 {@code escalated} 必须可决定。写死 {@code ='pending'}
    * 会让升级过的单永久卡死（终态除外）。
    *
-   * <p><b>为什么没有「目标状态 CAS」条件（2026-09-10 移除，实测事故）</b>：原先有一条
-   * {@code and (:currentStatus is null or :currentStatus <> coalesce(:targetStatus, :currentStatus))}，
-   * 目的是「目标若已被别人改过则整笔 46010」。它有两个致命问题：
+   * <p><b>为什么没有「目标状态 CAS」条件（2026-09-10 移除，实测事故）</b>：原先有一条 {@code and (:currentStatus is null or
+   * :currentStatus <> coalesce(:targetStatus, :currentStatus))}， 目的是「目标若已被别人改过则整笔 46010」。它有两个致命问题：
    *
    * <ol>
-   *   <li><b>它在语义上不成立</b>：本 UPDATE 只动 {@code moderation_cases}，两个参数都是**查询期已知的常量**，
-   *       比较结果对同一次调用是恒定的 —— 它既读不到目标表，也就不可能检测到"别人改了目标"。当目标未被改动时
-   *       （approve/reject/escalate，占多数）该条件恒为 false → 0 行 → **所有决定都误报 46010**；
-   *   <li><b>它在 Hibernate 上直接报错</b>：{@code coalesce} 的两个参数都可为 null 时无法做类型推断，
-   *       抛出 {@code JpaSystemException: Unknown data type: "?"} → 决定路径一律 50002
-   *       （{@code ModerationHiddenContentTest} 5 例、{@code ModerationConcurrencyTest} 2 例因此全红）。
+   *   <li><b>它在语义上不成立</b>：本 UPDATE 只动 {@code moderation_cases}，两个参数都是**查询期已知的常量**， 比较结果对同一次调用是恒定的
+   *       —— 它既读不到目标表，也就不可能检测到"别人改了目标"。当目标未被改动时 （approve/reject/escalate，占多数）该条件恒为 false → 0 行 →
+   *       **所有决定都误报 46010**；
+   *   <li><b>它在 Hibernate 上直接报错</b>：{@code coalesce} 的两个参数都可为 null 时无法做类型推断， 抛出 {@code
+   *       JpaSystemException: Unknown data type: "?"} → 决定路径一律 50002 （{@code
+   *       ModerationHiddenContentTest} 5 例、{@code ModerationConcurrencyTest} 2 例因此全红）。
    * </ol>
    *
-   * <p><b>真正的并发保护在哪</b>：① 审单层面由本方法的 {@code not in (终态)} 条件 UPDATE 提供（0 行 → 46010，
-   * 这是 DB 侧 CAS）；② 目标层面由 {@link ModerationService} 在**写目标之前**于同一事务内读取目标状态、
-   * 并在「目标已是 hidden/deleted 却要 hide/delete」时显式拒绝（防 hide/delete 互相复活）。
-   * 若要更进一步做目标级 CAS，正确做法是让**目标表的 UPDATE 自身**带上
-   * {@code where status = :expectedStatus} 并检查行数 —— 而不是在审单的 UPDATE 里比较两个参数。
+   * <p><b>真正的并发保护在哪</b>：① 审单层面由本方法的 {@code not in (终态)} 条件 UPDATE 提供（0 行 → 46010， 这是 DB 侧 CAS）；②
+   * 目标层面由 {@link ModerationService} 在**写目标之前**于同一事务内读取目标状态、 并在「目标已是 hidden/deleted 却要
+   * hide/delete」时显式拒绝（防 hide/delete 互相复活）。 若要更进一步做目标级 CAS，正确做法是让**目标表的 UPDATE 自身**带上 {@code where
+   * status = :expectedStatus} 并检查行数 —— 而不是在审单的 UPDATE 里比较两个参数。
    */
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
