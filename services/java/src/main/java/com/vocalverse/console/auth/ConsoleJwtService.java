@@ -1,6 +1,7 @@
 package com.vocalverse.console.auth;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -121,7 +122,15 @@ public class ConsoleJwtService {
         .claim("uname", username)
         .issuedAt(Date.from(now))
         .expiration(Date.from(now.plusSeconds(ACCESS_TTL_SECONDS)))
-        .signWith(key)
+        // ⚠️ 必须**显式钉死 HS256**，不能只写 `.signWith(key)`（2026-09-10 实测缺陷）：
+        // JJWT 的 `Keys.hmacShaKeyFor(bytes)` 会**按密钥长度**决定 key 的算法 ——
+        // ≥64 字节 → HmacSHA512、≥48 字节 → HmacSHA384、≥32 字节 → HmacSHA256；
+        // 而 `.signWith(key)` 用的是 key 自带的算法。Python 侧 `app/core/auth.py` 是**手写验签**，
+        // 只算 HMAC-SHA256，且它不看 header 的 alg。于是「密钥 ≥48 字节」时两端算法不一致：
+        // Java 签 HS384、Python 按 HS256 验 → **所有 Python 侧控制台端点 46001 bad signature**，
+        // 报错完全不提算法（本轮就是这么踩的：48 hex 字符的密钥恰好落进 384 位档）。
+        // 而 .env 模板写的是"≥32 字节"，64 个 hex 字符（=最自然的选法）更是直接落进 512 位档。
+        .signWith(key, Jwts.SIG.HS256)
         .compact();
   }
 
@@ -134,13 +143,16 @@ public class ConsoleJwtService {
    * @throws IllegalArgumentException typ 不符或 sub 非数字
    */
   public Claims parse(String token) {
-    Claims claims =
-        Jwts.parser()
-            .verifyWith(key)
-            .requireAudience(AUDIENCE)
-            .build()
-            .parseSignedClaims(token)
-            .getPayload();
+    Jws<Claims> jws =
+        Jwts.parser().verifyWith(key).requireAudience(AUDIENCE).build().parseSignedClaims(token);
+    // 只接受 HS256（与 Python 侧"只会算 HMAC-SHA256"的实现保持一致，见签发处的长注释）。
+    // 不校验的话，用同一密钥签出的 HS384/HS512 令牌会被本服务接受、却被 Python 全量拒绝 ——
+    // 那种"一半能过一半不能过"的令牌比直接拒掉更难排查。
+    String alg = jws.getHeader().getAlgorithm();
+    if (!Jwts.SIG.HS256.getId().equals(alg)) {
+      throw new IllegalArgumentException("控制台令牌算法必须为 HS256（收到 " + alg + "）");
+    }
+    Claims claims = jws.getPayload();
     if (!TYP_ACCESS.equals(claims.get("typ", String.class))) {
       throw new IllegalArgumentException("非控制台令牌（typ 不符），拒绝");
     }
