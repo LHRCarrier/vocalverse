@@ -3,6 +3,42 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 管理端后台（浏览器登录 403）：CORS 用错源清单 + 覆盖项从未生效（I-17）
+
+- **起因**：需求方截图 —— 控制台登录页报「**服务返回非标准响应（HTTP 403）**」，请求载荷正常
+  （`{username:"admin", password:"…"}`）。403 + 非 Envelope ⇒ **过滤器层**拒的，不是业务层。
+
+- **定位过程（记下来，因为第一直觉是错的）**：
+  1. 直连 8080 不带 `Origin` → **200**；带上 `Origin: http://localhost:5174` → **403**。
+     ⇒ 是 CORS。**注意**：控制台 dev 走 Vite 代理，直觉"同源、不涉及 CORS"是错的 ——
+     代理 `changeOrigin: true` 把 Host 改写成 8080 后**原样转发 `Origin`**，Java 侧按跨源处理。
+  2. 于是把 `http://localhost:5174` 加进 `ConsoleSecurityConfig.EXISTING_ORIGINS` → **仍然 403**
+     （响应体解码后是 `Invalid CORS request`；此前看到代理响应里的 `Access-Control-Allow-Origin`
+     是 **Vite 自己加的**，不是 Java）。
+  3. 真因：两条控制台链都写 `.cors(Customizer.withDefaults())`，而 Spring Security 的 `CorsConfigurer`
+     **按 bean 名遍历容器取第一个** `CorsConfigurationSource`，**不看 `@Primary`** ——
+     所以控制台链用的是 `SecurityConfig` 那份（8 个源、不含 5174）。
+  4. **连带发现**：本模块的 `VOICEVERSE_CONSOLE_CORS_ORIGINS` 挂在**没人用的那个 bean** 上，
+     **从来没有生效过**（文档却把它当作"控制台源可配置"的能力）。
+
+- **修法**：`consoleFilterChain` 显式按 bean 名注入 —— 
+  `@Qualifier("consoleCorsConfigurationSource") CorsConfigurationSource` +
+  `.cors(cors -> cors.configurationSource(consoleCors))`（两条链都改）；
+  5174 / 127.0.0.1:5174 进默认清单（与既有 `apps/web` 的 5173 并列）；
+  类注释里那句"用 `@Primary` 让它成为首选"是**错误认知**，已改写并说明原因
+  （`@Primary` 只对按类型注入生效，而这里是按 bean 名遍历）。
+
+- **验证（实跑）**：
+  - 新增 `ConsoleCorsOriginTest`（3 例）。**先红后绿**：临时把 5174 从清单拿掉 → **2/3 失败**；恢复 → 3/3 绿。
+  - **浏览器真实路径**（`POST http://localhost:5174/manage/api/v1/console/auth/login` + `Origin`）→ **HTTP 200 / code=0 / role=super**，
+    且令牌 header = `{"alg":"HS256"}`（I-15 的修复同时在线）；同一令牌打 Python 侧 `/ops/overview`、`/ops/traces/stats` → **200**。
+  - **覆盖项行为级验证**：带 `VOICEVERSE_CONSOLE_CORS_ORIGINS=http://10.9.9.9:5174` 重启 →
+    启动日志的允许源清单里出现它，且该源 **200**、`evil.example.com` **403**、`localhost:5174` **200**
+     —— 证明覆盖链路真的通了（修复前它是死的）。
+  - Java `mvn -B clean verify` → **169 tests / 0 failures / 0 errors / BUILD SUCCESS**，spotless `154 files clean`。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 管理端后台（真启动）：Java 起不来 → 迁移缺失；修好后又暴露两个跨服务 P0（I-15/I-16）
 
 - **起因**：需求方报"java 端启动失败，查看日志"。日志末尾是
