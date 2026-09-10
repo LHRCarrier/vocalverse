@@ -3,6 +3,48 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 管理端后台（"工作台没数据"）：真 PG 的可空参数类型推断 —— 同类第四次（I-18）
+
+- **起因**：需求方反馈"点击工作台里面没数据，其他几个页面也是"，网络面板里有一条红色请求返回
+  `{"code":50002,"message":"服务内部错误"}`。
+
+- **先排除"是不是真没数据"**：
+  - `uvicorn` 访问日志显示浏览器的 ops 请求**全是 200**（`overview`、`services`、`traces/stats` 都 200），
+    后端返回的载荷里依赖探测**有 2 项**（database/redis 均 ok）、uptime 有值、self-monitoring 齐全；
+  - `ops_metric_samples` 真库里有 **570 行**（15:43→16:14，每分钟一条）→ 采集器**是好的**
+    （err 日志里的 `ops_metric_samples does not exist` 是**迁移前**的旧行，时间戳早于 15:42）；
+  - 性能指标页 UI 自己写着"本次扫描 67 行样本"，只是 30 分钟数据 + step=1800s ⇒ 每个序列只有 1 个桶
+    → "暂无足够数据点"。**这是诚实行为，不是 bug**。
+  - ⇒ 真正坏的是 **Java 三个端点**（`publish-events` / `audit-logs` / `users`）。
+
+- **根因（I-18）**：JPQL 里 `(:p is null or col = :p)` 与 `concat('%', :q, '%')` 两类写法，
+  在 **PostgreSQL** 上让参数**没有类型线索** —— PG 在 **Parse 阶段**就要求确定每个 `$n` 的类型，
+  而参数为 NULL 时 JDBC 驱动也不补类型 OID（非 NULL 会补）。于是出现极具误导性的表现：
+  **带筛选正常、清空筛选必炸**。三个端点的真实报错：
+  - `publish-events` → `could not determine data type of parameter $3`（$3 是 `from` 的空值判断）；
+  - `audit-logs` → 同款 + `operator does not exist: character varying ~~ bytea`（`like (?||'%')`）；
+  - `users` → `function lower(bytea) does not exist`（`'%'||?||'%'` 被 PG 解析成 bytea 版本）。
+
+- **为什么测试一直绿**：Java 测试跑在 **H2**，对这两类写法一概接受 ——
+  **H2 与 PG 的差异不在 SQL 方言，而在参数类型推断**。本仓同类已第四次（审核单 CAS 的 `coalesce`、
+  审计 `from/to`、`users` 的 concat、以及本次全仓普查）。
+
+- **修法**：全仓 **9 个文件 / 19 处**统一给"空值判断"与"拼接"里的参数加显式 cast
+  （`cast(:p as string|long|short|timestamp)`），比较那一侧仍由列提供类型，**语义逐字不变**；
+  并把 `TicketRepository` 里"该写法 PG 也能推断"的**错误注释**改成实测结论。
+  `mvn -B clean verify` → **169 tests / 0 failures / 0 errors**，spotless `154 files clean`。
+
+- **新增静态门禁 `scripts/check_pg_typed_params.py`**（这一类缺陷 H2 测不出，只能用门禁钉住）：
+  扫描 `services/java/src/main` 的 117 个文件，命中裸空值判断或拼接裸参数即失败并给出修法。
+  **正向 ok（exit 0）；反向**把 `SongRepository` 一处 cast 改回旧写法 → 精确报出
+  `SongRepository.java:13` 且 **exit 1**。已接入 `java-ci.yml`（按 AGENTS 要求本地 `yaml.safe_load` 通过）。
+
+- **真栈复验（修复后）**：清空筛选 10 条 + 带筛选 4 条端点**全部 HTTP 200**
+  （`publish-events` / `audit-logs` / `users` / `songs` / `scenarios` / `listening-materials` /
+  `questions` / `tickets` / `moderation/cases` / `moderation/reports`）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 管理端后台（浏览器登录 403）：CORS 用错源清单 + 覆盖项从未生效（I-17）
 
 - **起因**：需求方截图 —— 控制台登录页报「**服务返回非标准响应（HTTP 403）**」，请求载荷正常
