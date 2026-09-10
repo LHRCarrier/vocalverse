@@ -3,6 +3,101 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 管理端后台（收尾）：三处安全控制静默失效 + 参考旋律静默损坏 + 两道门禁自身的漏洞（Java 全绿）
+
+- **这一段的价值不在"又写了一堆代码"，而在"把已经写完、且读起来完全正确的代码跑起来"**。三个 P0 全部满足同一个特征：**代码逐行看都对，只有跑起来才暴露**；而它们又都是**既有测试**抓到的（`ConsoleAuthApiTest` 三条 + 新增回归），说明"把设计里的承诺写成断言"是有回报的。
+
+- **缺陷 1（P0）· 认证风控三处控制全是空的**：`ConsoleAuthApiTest` 此前 3 例红（5 次锁号、同 IP 20 次/5 分限流、refresh 重放吊销全族），表象像"功能没实现"，**实际代码里三条逻辑都写着**。根因一条：`ConsoleAuthService.login/refresh` 是 `@Transactional`，而它们**写完安全状态之后必然要抛 `ConsoleException`**（RuntimeException → Spring 回滚整个事务），把刚写的尝试流水、刚累加的失败计数、刚盖的锁定时间、刚吊销的会话**一起丢掉**。后果逐条：① 失败计数不落库 → **口令爆破不受任何限制**；② 尝试流水不落库 → **撞库不受限**；③ 会话族吊销被回滚 → 重放旧 refresh 虽回 46001，但轮换出的**新 refresh 照样可用**（"检测到泄漏就全族下线"= 空话），更糟的是旁边那行走独立事务的审计**如实写着"已吊销 N 条会话"，而实际一条都没吊销** —— 日志与事实相反。修：新增 `ConsoleAuthIndependentWriter`，把这三类"**已经发生的事实**"放进 `REQUIRES_NEW` 独立事务（与既有 `IndependentAuditWriter` 同源、同理由）；单独一个类而不是同类私有方法，因为 Spring 事务代理不拦自调用。判据写进类注释：**这个写入是"事实"还是"业务结果的一部分"？是事实就必须独立提交。**
+
+- **缺陷 2（P0）· 改歌会静默损坏参考旋律**：`applySong` 把 `songs.pitch_ref_status` 按"缺省 = 回落默认值"写成 `b.pitchRefStatus() == null ? "missing" : …`，而该列**不是人填的**（由离线音高提取任务驱动，控制台四个内容弹窗里没有输入框），同时又是**上架前置条件**（`validateSong` 要求 `ready`）与逐句跟唱评分的参考旋律来源。于是**任何一次运营改歌（哪怕只改歌手名）都会把它打回 `missing`**：接口 200、无任何报错线索，但这首歌从此上不了架 —— 现象（上架被拦）与原因（某次无关编辑）离得极远。修：只在显式传值时覆盖，新建的初值移到 `createSong` 显式写入。**取证**：新增 `SongPitchRefPreservationTest`（3 例），把 `applySong` 临时改回旧写法后跑 → 用例 1 红在 `assertEquals("ready", …getPitchRefStatus())`；改回修复实现 → 3/3 绿。**先红后绿，不是我事后补的测试。**
+
+- **缺陷 3（P0）· 控制台的 42201 被自己的兜底吃掉**：`ConsoleExceptionHandler` 是 `@Order(HIGHEST_PRECEDENCE)` + `basePackages=console`，却带一个兜底 `@ExceptionHandler(Exception.class)`。Spring 选 advice **只按 advice order 找第一个"有匹配方法"者，不比较异常类型精确度** —— 于是控制台路径上所有 `@Valid @RequestBody` 失败（运营域 4 个写入端点的入参校验**正是**靠 Bean Validation）由「400 + 42201 + 字段名」变成 **500 + 50002**；`HttpMessageNotReadable` 同理由 40001 变 50002。后果：前端 `serverFieldErrors` 里"把 42201 的字段名浮回输入框"那套映射**在生产上永远走不到**，运营只看到「服务内部错误」。修：删掉兜底 —— 当初加它的理由（"保证 500 有堆栈"）已不成立，因为 `GlobalExceptionHandler.handleFallback` 自 2026-09-10 起同样打完整堆栈。
+
+- **缺陷 4（P0）· 两道门禁自身的漏洞**（这类最难发现，因为它让缺陷长期不可见）：
+  1. **`apps/admin/src/env.d.ts` 的 `declare module '*.vue'` 通配声明**使"导入一个**不存在**的 .vue 文件"也能过类型检查（解析成 `DefineComponent<Record<string, unknown>, …>`）。实测：`SongFormModal.vue` 导入的 `LrcEditorModal.vue` **根本不存在**，而 `pnpm typecheck` 绿、`pnpm build` 也绿 —— 因为该弹窗当时没有任何页面引用它，**Rollup 根本不去解析这个 import**。两处门禁同时失效，只有真正接线的那一刻才炸。修：删掉通配声明（vue-tsc/Volar 自己就能解析 `.vue`），立刻报出 `TS2307` 且无其它误报 → 补齐 `LrcEditorModal.vue` 并把 authoring 模块真正接进歌曲库。
+  2. **Java 的 `spotless:check` 绑在 `verify` 阶段、排在 `test` 之后** → Java 测试红了整整一轮期间，**格式门禁从未执行过**（构建在 test 阶段就停了）。等测试全绿它第一次跑起来，报出 **15 个文件**不合规。教训：**门禁的"阶段顺序"决定它是不是真门禁**。
+
+- **顺带补上的活儿**：① 工单状态机 `TicketWorkflowService` 上一轮 commit 被 `git add` 漏掉、一直躺在工作区（本轮补提）；② `apps/admin` 的 lint 从 6 warning + 4 error 收到 **0/0**（补 prop 默认值、属性引号内层改 `&quot;`、把 665 行的 payload 单文件按**改动原因**拆成 `contentFormTypes/Model/Payload` 三个文件 —— 原单文件触发 ESLint `max-lines`）；③ `apps/admin` 上游基址改为按 `import.meta.env.PROD` 在代码里给默认值（原先只写在 gitignore 的 `.env.*` 里，新克隆的仓库构建出来会打到错误路径）。
+
+- **验证（全部实跑；未跑的一律标注）**：
+  - **Java**：`mvn -B clean verify` → **BUILD SUCCESS：162 tests / 0 failures / 0 errors**（同一命令内 `spotless:check` = **152 files clean, 0 needs changes**）。定向复跑：`ConsoleAuthApiTest` **11/11 绿**（此前 3 红）、`SongPitchRefPreservationTest` **3/3 绿**（修复前 1 红）。
+  - **Python**：`ruff check` All checks passed / `ruff format --check` **203 files** / `pytest -m "not gpu" -q` **483 passed + 4 skipped** / `alembic heads` **0013 (head) 单头**。⚠️ **4 个 skip 的口径**：Docker 当前不可用 → `test_pg_integration.py` ×2（真 PG）与 `test_redis_state_store.py` ×2（真 Redis）跳过（`pytest -rs` 逐条打印原因）。**取证时点**：Docker 在本会话中途一度可用（`ServerVersion 29.4.0`），真 PG 迁移取证与 testcontainers 用例是在**那个窗口内**跑出来的；收尾复跑时 Docker 又不可用，故这 4 例**当前不可复现** —— 它们不是"已通过"，也不是"被忽略"。
+  - **`apps/admin`**：`lint` **0 error / 0 warning**、`typecheck` **0 error**（**去掉通配声明之后仍然绿，这个绿才有意义**）、`test:run` **44 passed / 4 files**、`build` 成功。产物取证：`正在读取歌曲详情`/`整首保存`/`至少 1 行歌词` 三个串出现在 `dist/SongsView-*.js` → authoring 模块**真的被打进构建**（此前它零引用、Rollup 不解析）。
+  - **`apps/web`**：`lint` 0 error、`test:run` **223 passed（40 files）**、`build` 成功、`node scripts/check-bundle.mjs` **exit 0**（四条断言：preview 树零体积 / manualChunks 专块齐 / 入口块无 p5 / echarts 零残留）。
+  - **记录更正**：`docs/51 §7` 原先写 `pnpm check-bundle`，而该门禁**不是** package.json script，必须用 `node scripts/check-bundle.mjs` 调（照抄会得到 `Command "check-bundle" not found`）。**失实之处在命令写法，不在脚本缺失** —— 已在文档里改对并写明这一点。
+
+- **仍未闭合（不得当成已完成）**：① **G-17 内容创作 UI 只接了歌曲域**（听力素材 / 场景 / 题库三个域的表单弹窗未做；值类型、预检、payload 映射在 `authoring/` 层已就绪，缺弹窗与列接线）——**在补齐前不得宣称"运营管理已闭环"**；② ADR 修订申请（`docs/06 §2.1-4` / `§9.6` / `§9.7` 受控例外 + 6 处同步性修订）**仍待组长签核**，批准前不改 `docs/06` 正文（本轮只把 `§17` 开关表里一处**悬空引用**（"见 §9.7 受控例外"指向尚不存在的例外）改为指向 `docs/50 §2.3 修订 3` 并标注"待签核"）；③ `apps/web` 的 `pnpm typecheck` **仍是空跑**（solution-style 根 tsconfig → 零文件受检，另立工单）；④ `-Pintegration` 真 PG Java 集成测试未跑；⑤ 控制台浏览器端冒烟未跑（无浏览器自动化）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 管理端后台（独立控制台）：三角色 RBAC + LLM trace + 四路拷问闭环
+
+- **需求（用户口径）**：做**独立 web 端**管理端后台，参考万玄阁 `apps/admin` 的设计模式，**模块化隔离、不与既有业务代码耦合**；要有权限控制台，分**运维（服务器运行/预警/性能 + LLM trace 供调优）／运营（音乐/书籍/音频上下架）／审核（社区帖子/评论/视频）**三角色；要求自己跑闭环——分析→设计→**子代理拷问**（怎么做/如何做/该做什么、并发性能、日志记录、数据模型、业务逻辑联动、模块设计、前端 UI/UX 与布局统一）；图表参考 lieflat-charts skill。
+
+- **交付物**：设计 `docs/50-管理端后台设计.md` + 拷问 `docs/51-管理端后台拷问报告.md`；前端 `apps/admin`（独立 SPA，独立 pnpm 项目/端口 5174/产物/nginx/Dockerfile，零 import `apps/web` 源码）；Java `com.vocalverse.console`（独立包，终端模块）；Python `app/console/**`（运维采集 + trace + 书籍/媒体）+ 迁移 `0013`（15 张表）；CI `admin-ci.yml`；compose `admin-console`（`console` profile）；联调桥接页 `apps/web/src/views/preview/AdminConsolePreview.vue`（含删除清单）。
+
+- **关键设计裁决**：
+  1. **独立身份** `admin_users`，**不复用 `users.role`**（既有 CHECK 只允许 `user/admin`，扩词表会把改动外溢到 App 登录/种子/16 个 Java 测试类）；控制台账号与 App 账号**互不能登**。
+  2. **按数据归属方分服务**而非按界面：Java 管身份/RBAC/审计/审核/内容（`/manage/api/v1/console/**`），Python 管运维/trace/书籍/媒体（`/api/v1/console/**`，**子路径不重叠**，复用既有 nginx 路由 → 用户端 nginx 零改动）。避免 Java 读写 Python 的表（破坏 `docs/06 §10` 写方矩阵）。
+  3. **单一审计流**：不建 `moderation_actions`，审核决定的前后状态写进 `admin_audit_logs.detail`；`@Audited` 必须显式 `@Order` 与业务写**同事务**（`@EnableTransactionManagement.order` 默认 `LOWEST_PRECEDENCE`，不显式设就有一半概率回滚后仍留痕）。
+  4. **LLM trace 移植 DSH GenAI span 树**（`loongsuite/dsh-plugin`，Apache-2.0）：`ENTRY→AGENT→STEP→{LLM,TOOL}`，一次 turn 一个 trace、每次真实 LLM 尝试一个 span（重试可见）、异常路径也关 span；**结构元数据与内容分表**（`llm_span_contents` 独立表 + 独立 72h TTL + 独立权限码 + 读取写审计），**默认关**，并**硬排除 `kind='defense'`**（答辩论文文本）。
+  5. **前端独立设计语言**：色彩**继承产品 `u-*` 纸墨**（`ink #1c1c1a` 与 lieflat Mono 的 `INK #1C1C1A` **完全相同**），圆角降级到控制台尺度（控件 8 / UI 卡 16），图表卡按 Mono 契约走**纸底 24px**；图标 Tabler only；naive-ui 单注入点，主色用现行 `#2f6bff`（**不用已退役的绿 `#16A34A`**）。
+  6. **图表锁 Mono 单一色彩系统**，17 张图逐图审计（体系/编号/gallery 卡内标题/淘汰理由），1 张库外图（trace 瀑布）走 SKILL §6 翻译流程；含 **Mono 偏离清单**（5 条）。
+
+- **四路拷问（子代理对抗，报告在 `local/`，不入库）**：并发性能+日志 / 数据模型+业务联动 / 架构模块+范围取舍 / 前端 UI-UX+图表，共报 **33 条 P0**，合流去重后 **30 项逐条裁决**（采纳 / 部分采纳 / 驳回附理由）。**8 条可当场复现的硬缺陷**，其中由拷问直接暴露、随后修复并取证的：
+  1. **迁移 `0013` 在真 PG 上装不上**：`DROP CONSTRAINT ck_media_assets_status` 名不存在——`0011`/`0012` 用裸全名建约束，而 `base.py` 的 `ck` 约定含 `%(constraint_name)s` → 二次套用成 `ck_media_assets_ck_media_assets_status`。**离线渲染与 SQLite `create_all` 都抓不到**；真 PG 实测 0012 时点正好 6 条错名。修：4 条 `RENAME` + 2 条双名 `DROP IF EXISTS` + 按正确名 `NOT VALID`+`VALIDATE` 重建。
+  2. **`aud` 跨令牌闸门根本不存在**：实现注释声称"App 侧会拒绝控制台令牌"，而 `JwtService`/`JwtAuthFilter` **既不签发也不校验 `aud`**，控制台又默认回退共享密钥 → **控制台令牌可被当成真实 App 用户身份**。修：App 侧**只拒绝携带外来 `aud`** 的令牌（既有无 `aud` 令牌零影响）；**严禁**给 App 令牌补 `aud`（`AuthController:224` 复用 access 作 refresh，补了会**全体在线用户强制登出**）；Python 侧补 `aud/typ/iss` 三闸 + `get_current_user_id` 拒控制台令牌。
+  3. **隐藏生效清单是 18 处不是 8 处**，漏的含**通知中心**（`PostInteractionRepository` 3 处 native SQL + `DirectMessageRepository` 6 处）→ 只改 `PostRepository` 时 hidden 帖仍经通知露出标题/评论正文，而 v1 用例不覆盖通知 → **自测会通过**。
+  4. **指标分位数无处可存**：DDL 只有 `avg/max/min` 却要 p50/p95/p99；跨桶取平均得到的是"平均的分位数"，v1 自己的验收用例必红。修：加 `buckets jsonb` 直方图，跨桶**求和后插值**；可加型/分布型分列且不得混用。
+  5. **内容捕获推翻已写红线**（`docs/06 §9.7`「只存评分/转写/元数据」「不 log 论文/转写/请求体」）→ 补 §9.7 受控例外 ADR 申请 + 答辩域硬排除。
+  6. **依赖方向规则与埋点位置自相矛盾**（§3.1 断言"领域模块不得 import console"vs §7.3 把埋点放进领域模块）→ 规则精确化 + 白名单 `app.console.trace`。
+  7. **`TraceWaterfall` 脚注在说谎**（脚注"未截断"，代码有 `MIN_BAR=1.5px`）→ 保留下限但**在界面写明当前比例尺与最小宽度对应毫秒数**（SKILL §7 第 ③ 条"撕柱不撕轴"）。
+  8. **仓库 `pnpm typecheck` 从未检查过任何代码**：`apps/web` 根 `tsconfig.json` 是 solution-style（`files: []`），`vue-tsc --noEmit` 零文件可查。**实测：故意写入类型错误，退出码 0**。→ `apps/admin` 改为显式 `-p tsconfig.app.json` 并用探针验证会报错；**`apps/web` 的同类修正另立工单**（会一次性暴露大量历史类型错误）。
+  - 其他采纳项：`ops_alert_events.rule_id` CASCADE→**RESTRICT**（原写法删规则会删光预警历史）、举报建单并发 `ON CONFLICT DO NOTHING` + `46015`、Java `Semaphore(4)` **删掉**（限不住连接，连接由事务持有到 commit）、sink 跨线程提交改 `call_soon_threadsafe`、nginx 每个 location 单独写 `X-Request-Id`（漏写会让浏览器/Java 审计/Python 日志是三个 uuid）、Tomcat access log **不认 MDC**（`%{x}r` 是 RequestAttributeElement）→ 改 `request.setAttribute` + `%{adminUserId}r`、对比度实测修正（焦点环 `#e8edff` 在白底 **1.17:1 等于隐形**）。
+  - **驳回项（附理由）**：砍运维整域（与需求冲突，改为限定覆盖范围并登记 Java 进程指标缺口）、砍 trace 内容捕获（需求要"调优参考"，改为默认关 + 多层隐私闸）、砍 `admin_login_attempts`（状态与事件流语义不同，风控排查要后者）、砍 13 张图（图表是三角色的实际决策依据，改为每页 ≤6 张 + 只做被消费的图）。
+
+- **ADR 修订申请（待组长拍板，批准前不改 `docs/06` 正文）**：① `§2.1-4` 管理端 UI 改为独立 SPA（**维持**不建根 workspace/共享包、不新增网关容器）；② `§9.6` Java 管理端权限由"简单 admin/user 角色"改为四角色 RBAC + 全量审计；③ **`§9.7` 新增 LLM trace 内容捕获的受控例外**；④ 同步修订 `docs/12`/`docs/04`/`docs/13`/`docs/20`/`docs/21`/`docs/06 §2+§14`；⑤ 15 张表按 §18/§19 体例**新开 §20 登记**（非修订）。
+
+- **登记**：`docs/50`、`docs/51`（README 文档索引已登记）；`docs/api/error-codes.md` 新增 **`46xxx` 管理端段 15 码**；`docs/api/envelope.md` 新增「错误 data 的结构化例外」（46002/46003/46008/46011/46015 的 data 形状）+ 控制台端点前缀 + **控制台鉴权专节**；`docs/06 §17` 登记 5 个新开关（`APP_LLM_TRACE_ENABLED` / `APP_LLM_TRACE_CONTENT_CAPTURE` / `APP_OPS_TELEMETRY_ENABLED` / `VOICEVERSE_CONSOLE_ENABLED` / `VOICEVERSE_CONSOLE_LLM_CONTENT_CAPTURE`）；`VOICEVERSE_CONSOLE_JWT_SECRET` 是**密钥**不入功能位表并标注"只配一处会让 Python 侧控制台端点全量 401"的生产脚枪。
+
+- **验证（真跑过的，未跑的一律标注）**：
+  - **迁移**：`alembic heads` → `0013 (head)` 单头；离线 `upgrade 0012:head --sql` 18,204 字节，逐条核对 4 处 P0（约束名/RESTRICT/部分索引 WHERE/`buckets`）；**真 PG16 取证**（Docker 会话中途转为可用）：0012 时点实测 6 条双前缀错名 → 0013 后全部正名、`alembic check` **零 diff**、**19 张表模型↔真库零漂移**、行为探针（CHECK 拒 `bogus` 收 `hidden`、部分唯一索引幂等、RESTRICT 拦下删规则、既有章节读 `published`）、有 `hidden` 行时 downgrade **按设计失败**、归一化后回退→重放零 diff；SQLite `create_all` 56 张表 + `sqlite_master` 原文含 `WHERE` 谓词；`check_single_writer.py` → 25 张表受守护无越权。
+  - **Python**：`pytest -m "not gpu" -q` → **392 passed**（含 2 个真 PG testcontainers 用例，非 skip）。
+  - **前端 `apps/admin`**：`lint` **0 error**（6 条 `vue/require-default-prop` warning，均在共享组件）；`typecheck` **0 error**（显式 `-p tsconfig.app.json`，非空跑）；`test:run` **28 passed**（`mono.test.ts` 15 例 + 12 张图渲染烟测 13 例）；`build` **成功**（入口 46.8 kB / `vendor-naive` 787.9 kB，按路由分包）。
+  - **前端 `apps/web`（含新增的 preview 桥接页）**：`lint` 0 error、`test:run` **223 passed**、`build` 成功、`node scripts/check-bundle.mjs` **exit 0**（桥接页被生产构建整枝剔除，证明零体积零路由）。⚠️ `pnpm typecheck` 仍是**空跑**（见上 §8 条）。
+  - **图表接线自查（一个不好看但必须写的数字）**：14 个图型组件里**只有 6 个被页面消费**（`docs/50 §12.7` 逐个交代）。4 个建议删除（F3 与 F2 冗余 / F11 选型已被拷问证伪 / L4 消费者已在审计中合并掉 / L17 要一整年数据而保留期只有 30 天），3 个缺聚合端点（F9 净变化 / F15 五数概括 / F10 星期×小时），1 个与"不做实时推送"冲突（G17）。**得到的教训**：组件完成 ≠ 能力交付；凡"做了一组组件"的交付必须附"谁在消费"的清单，否则交付的是库不是功能。
+  - **集成期反向发现的 4 处契约不一致**（前端按 `docs/50 §10.2` 实装后与 Java 实装对账出来的，已回派实现方）：①②`/moderation/reports/{id}/handle` 字段名（`decision` vs `@NotNull action`）与 `CaseAssign.assigneeId` 不可空 → **举报处理必然 400、取消认领服务端失败**；③`/moderation/stats` 缺 `approvedToday/rejectedToday/trend/decisions` → **审核工作台首屏空白**（界面如实降级显示 `—`，不编造数字）；④`/moderation/cases/{id}` 与列表不同形。**这类问题只有真正接线才暴露**——正是闭环要求的价值。
+  - **安全闸门代码级复核（我独立看的，不是听报告）**：`JwtAuthFilter` 已实现「**任何携带外来 `aud` 的令牌一律拒绝**」并明确论证**不给 App 令牌补 `aud`** 的理由（`AuthController:224` 复用 access 作 refresh，补了会让**全体在线用户强制登出**）；`ConsoleSecurityConfig` 用 `@Order(1)` + `securityMatcher("/api/v1/console/**")`，并给出**两条独立证据**说明既有 `JwtAuthFilter` 不会跑在控制台路径上（它不是 `@Component`，而是 `new` 出来只加进既有链 → 既不在匹配到的链里，也不在 Servlet 容器注册表里）；`ConsoleCrossTokenTest` 用 `@SpringBootTest` 真实上下文断言双向拒绝。
+  - **YAML 门禁（AGENTS 硬要求）**：6 份 workflow + `docker-compose.yml` 全部 `yaml.safe_load` 通过（`admin-ci.yml` jobs=`['admin']`；compose services 含 `admin-console`，profiles=`['console']`）。
+
+- **未做 / 已登记缺口**：① 保留期清理（trace 30d / 内容 72h / 指标 7d / 审计 365d / 登录尝试 90d）**只有索引、无调度器**（本仓确实没有后台清理先例，24h 音频是"读时惰性删"）；② Java 进程级指标（JVM/线程池/Hikari）未采集，本期只覆盖 Python 进程 + Java `/actuator/health` 探活；③ `shadow_materials` 无管理端点；④ 作者可见性/审核原因下发通道需扩 C 端 DTO + `docs/21` + 契约快照，本期不做半成品；⑤ 图表候选审计深度仍有 8 行不达标（已如实标注，未假装审完）；⑥ `apps/web` 的 `typecheck` 空跑修正另立工单；⑦ 媒体存储占用/孤儿清理只读视图；⑧ ~~双轨管理面（既有 `/api/v1/admin/**` 与新的控制台）需评估既有面下线~~ → **已决议：旧管理端整体退役**（见下）。
+
+- **需求方澄清与随之的范围变更（2026-09-10 追加）**：澄清"**之前写的旧管理端是废弃的，不需要重复用**"。据此把原"旧壳保留为兼容壳、后端双轨共存"的保守处置**升级为旧管理端整体退役**：
+  - **前端（已完成并复跑门禁）**：删除 `apps/web` 的 `/admin` 路由子树（`AdminLayout` + 5 个 `PlaceholderView` 子路由，从未实现过）、`layouts/AdminLayout.vue`、`views/preview/AdminDashboardPreview.vue`、`views/preview/AdminUsersPreview.vue`，并把预览画廊的布局枚举由 `'user'|'admin'|'gallery'` 收窄为 `'user'|'gallery'`（独立控制台不共享用户端布局，无可模拟）。复跑：`lint` 0 error、`test:run` **223 passed**、`build` 成功、`check-bundle` **exit 0**。保留 `/preview/admin-console` 桥接页（新控制台的联调入口）与 `LieflatPreview` 资产（图表风格参考，服务的不是旧管理端）。
+  - **后端（已回派，随本 PR 执行）**：删 `AdminUserController`/`ContentAdminController`/`QuestionAdminController`/`AdminTicketController`（27 op）+ 只测它们的测试 + `SecurityConfig` 的 `hasRole("ADMIN")` matcher + 契约快照重生成；**保留**其 Repository/Service（`com.vocalverse.console` 复用的是数据层，只删 HTTP 面）；**不动** `users.role` 的 CHECK（用户域资产，改它属另一件事，仅记录 `ROLE_ADMIN` 失去消费者）。
+  - **退役后必须复核**：① 没有控制台功能因此回退（尤其工单——控制台 `/content/tickets/**` 成为唯一工单面）；② 没有别的调用方指向 `/api/v1/admin/**`（Python 内部调用走 `/internal/**`，应不受影响，但要**验证而非假设**）；③ `/admin` 旧书签若需平滑，应在**网关层** 302 到 `/console/`（不写进 `apps/web` 路由表）。
+  - **这次澄清简化了设计**：少一套权限语义（`ROLE_ADMIN` vs 控制台权限码）、少一处"同一份数据两个改法"的双写面，`docs/50 §15.2` 的 G-1/G-10 两条缺口**闭合**；代价是本 PR 删除面变大，故删除清单（`docs/50 §15.5`）明确区分"删 HTTP 面"与"留数据层"。
+
+- **退役复核期发现并修复的真缺陷（2026-09-10 追加二）** —— 这一段是"闭环"真正起作用的地方，逐条都值得记：
+  1. **工单零 UI（我自查抓到）**：控制台只有工单 **API**（`listTickets`/`setTicketStatus`）**却没有工单页面**；旧 `AdminTicketController` 一删，用户在 App 提交的反馈/报错/纠误就**没人能处理**。已补 `views/content/TicketsView.vue` + `content/ticketFlow.ts`（状态机可达性 + 处置弹窗含**回复用户**）+ 导航项 + 路由；并把 `TicketRow` 从**臆造字段**（后端根本没有 `subject`）改为与 Java `TicketView` 逐字对齐，接口从 `POST /{id}/status` 改为 `PATCH /{id}` + `adminReply`。
+  2. **内容域连 API 都没有（实现方发现，比我那条更严重）**：控制台内容面只有"读 + 上下架"，**没有增删改**。照 v1 的 §10.2 退役旧 `ContentAdminController`/`QuestionAdminController`，会让**全系统没有任何 HTTP 面能新建/编辑歌曲·LRC·场景·听力素材·题目**——运营失去写入路径，`PublishService` 也成半个废功能。**裁决：不删能力，迁到 `/api/v1/console/content/**`**（控制台权限码 + 审计），再删 `/api/v1/admin/**` 原版。**退役原则修正为一句话：「删的是入口与第二套权限，不是产品的写入能力」**（`docs/51 §1.7`）。
+  3. **实现方自查抓到 4 个"整条功能静默失效"级缺陷**（`docs/51 §1.6`）：`AuditFieldAllowlist` 的 `Set.of` 重复元素 → `ExceptionInInitializerError` → **每一次审计写入都失败**（而所有不碰审计的测试照样全绿）；`super` 的 `*` 通配在 `admin_permissions` 里无对应行 → **引导出来的超管权限为零**；控制台 CORS bean 名与 `SecurityConfig` 冲突 → `BeanDefinitionOverrideException` → **整个应用起不来**；独立审计路径 `REQUIRES_NEW`/`MANDATORY` 互斥。要求每个都补**在旧代码上会失败**的回归测试。
+  4. **前端 DTO 系统性失真（我自查抓到）**：控制台 DTO 是**照设计文档写、在实现之前写的**，于是大面积与真实接口不符——`OpsOverview` 用 camelCase 而 Python 返回 snake_case（运维页运行时全是空值）；`CaseView` 的认领人/决定人是**标量 id** 而 DTO 写成 `{id,displayName}` 对象；`ContentRow` 用**一个形状套四个内容域**而真实是四套不同字段（导致"元数据"列恒空）。已派两路对齐（Python 侧 / Java 侧），并**清理掉 `as unknown as` 兜底**——那种写法是掩盖不是修复。
+  5. **权限码数量三处互相打脸**：文档先写 35、又写 36，而 §4.2 表格逐条数是 36、删掉无端点的 `moderation:word:*` 后是 **34**。处置：**数字不在散文里写死，由 `PermissionCatalog` 常量表 + 单测钉死**（`docs/50 §4.2` 已改）。
+
+- **本轮教训（值得写进 SOP）**：① **"设计通过评审"≠"能跑"**——4 个 P0 全是实现期才暴露的；② **凡"退役/删除"清单，每一行都必须配一列"能力迁到哪"**，没有这一列就不算清单（我在 `docs/50 §15.5` 亲手写下"必须复核无功能回退"，然后在同一份文档里**自己违反了它**）；③ **凡能被代码推导的事实，不要在文档里重复声明**（权限码数量是最好的例子）；④ **DTO 必须在实现之后对着源码核一遍**，照文档写的 DTO 会"看起来合理、运行时全空"。
+
+- **DTO 系统性失真：两路对齐完成（2026-09-10 追加三）** —— 这是本轮最贵也最有价值的一段。
+  - **根因**：控制台的 DTO 是**照 `docs/50` 写、在实现之前写**的。于是成批出现"看着合理、后端没有"的字段，以及**根本不存在的端点**。危害形态是**静默空白**而不是报错——比崩溃更难发现。
+  - **发现量**（两路对齐各自独立发现，完整清单见 `docs/51 §7.3`）：**不存在的端点 3 个**（`PATCH /auth/me`、`POST /auth/password`、`GET /admins/{id}/sessions`）；**请求体字段名错 1 个**（`{newPassword}` vs `{password}` → 恒 46007）；**形状/字段不符 12 处**（`ContentRow` 一个形状套四个内容域且 `meta` 不存在 → 元数据列恒空；`OpsOverview` 全 camelCase 而 Python 全 snake_case；`Violation` 写 `reason` 实际是 `message` → 渲染成 `· lrc：undefined`；`MediaKind` 写了后端 CHECK 根本没有的 `audio`；上架流水是 `operator` 不是 `adminUsername`，`publishedAt` 不存在；会话的 `current` 标记不存在……）。
+  - **结构性修复（比逐个改更重要）**：新增 **16 例契约测试**（`api/__tests__/console.contract.test.ts` 8 + `ops.contract.test.ts` 8）。它们**桩掉 `fetch`、捕获真实的 URL/method/body 再断言**（如「metrics 用重复 `metric` + `labels_key` 而不是 `labelsKey`」「`ack` 不带请求体」「overview 键原样 snake_case」），**修复前必红**。审计从 28 → **44 passed**。**纪律在这个问题上已被证明无效**（同类错误连续出现四次都没被拦住），只有会红的测试能拦住第五次。
+  - **写进设计文档的契约纪律**（`docs/50 §10.1.1`）：① 端点清单**只承诺路径/方法/权限码，字段形状以实现为准**；② 每个域必须由契约测试钉住；③ 后端不提供的字段**不许在前端编**——要么删显示项并写明"后端未提供"，要么**回头扩后端**。
+  - **一个我拒绝的处置**：对齐过程中，控制台的两张运维图（调用量/错误率趋势、按模型调用量）因 `/ops/traces/stats` 不返回 `trend`/`by_model` 而被**删除**，改成"后端未提供"说明卡。技术上诚实，但需求里运维的本职就是"看运行情况/性能 + trace 用于调优参考"，没有趋势、没有按模型拆分的 trace 页答不了"这几天在恶化吗""哪个模型扛的活最多"。**已回派 Python 侧扩接口**（dense 按天分桶 + 按模型聚合 + 直方图重算 p95，禁止平均分位数）。**原则写进文档：「删掉一个功能」与「加一个后端聚合」是两种完全不同的处置——前者要登记为缺口，后者才叫闭环。**
+
+- **顺带修掉一个 CI 阻断（验证时发现）**：Java 契约快照重新生成后，`apps/web/src/api/generated/java-api.d.ts` **没有跟着重新生成** → `frontend-ci.yml:47` 的 `pnpm gen:api && git diff --exit-code -- src/api/generated/` **必红**。已重新生成并验证**幂等**（二次运行文件 hash 不变）。教训：**快照与生成物是一对，改一个必须跑另一个**。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 社区 S2 收口（一）：J-03 通知分页改 DB 层 keyset + SQL 聚合（去 50 条内存窗口）
 
 - **背景**：J-03（docs/41 §1 登记「未实施」）——通知原为「近 50 条互动/评论 → 内存聚合 → 窗口内按游标重筛」：第 51 条及更早**永不可见**（翻页是窗口内反复重筛，与「游标分页可翻页」契约不符）+ 每页 O(窗口) 重算；
