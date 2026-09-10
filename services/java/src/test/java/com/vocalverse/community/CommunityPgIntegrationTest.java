@@ -8,9 +8,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
@@ -75,7 +78,8 @@ class CommunityPgIntegrationTest {
   void cleanTables() throws Exception {
     try (Statement st = conn.createStatement()) {
       st.execute(
-          "TRUNCATE TABLE post_likes, post_interactions, post_comments, follows, posts, user_profiles, users CASCADE");
+          "TRUNCATE TABLE post_likes, post_interactions, post_comments, follows, posts, user_profiles, users,"
+              + " direct_messages, dm_read_state CASCADE");
     }
   }
 
@@ -260,8 +264,149 @@ class CommunityPgIntegrationTest {
     exec("SET enable_seqscan = on");
   }
 
-  // ------------------------------------------------------------------ 工具
+  /**
+   * 2026-09-10 联调教训：**H2 放过的写法 PG 会拒**，单测全绿但真机 500。本用例在真 PG 上以 PreparedStatement 复刻服务层实发
+   * SQL（含首页哨兵游标），锁住两处修复：
+   *
+   * <ol>
+   *   <li>首页游标 **不能用 NULL 参数**——`(:cursorTs IS NULL OR … :cursorKey)` 在 IS NULL 分支下 PG 报 `could not
+   *       determine data type of parameter $4`；服务层改传哨兵值（9999-12-31 + 空串）；
+   *   <li>哨兵 **不能用 {@link Instant#MAX}**——驱动渲染为 `169104627-12-11 … BC`，PG 报 `timestamp out of
+   *       range`。
+   * </ol>
+   *
+   * <p>SQL 与 {@code PostInteractionRepository} / {@code DirectMessageRepository} 的字符串常量同步维护 （Java
+   * 无共享常量机制；改动仓库查询时同步本用例，否则本用例退化为「假绿」）。
+   */
+  @Test
+  void notifications_paging_queries_on_real_pg() throws Exception {
+    Instant cursorMax = Instant.parse("9999-12-31T23:59:59Z");
+    long author = insertUser("j03_dialect_a");
+    long actor = insertUser("j03_dialect_b");
+    long actor2 = insertUser("j03_dialect_c");
+    long post = insertPost(author, "article", "news", null);
+    exec(
+        "INSERT INTO post_interactions (actor_id, post_id, action, created_at) VALUES ("
+            + actor
+            + ", "
+            + post
+            + ", 'like', now())");
+    exec(
+        "INSERT INTO post_interactions (actor_id, post_id, action, created_at) VALUES ("
+            + actor2
+            + ", "
+            + post
+            + ", 'like', now())");
+    exec(
+        "INSERT INTO post_comments (post_id, author_id, body, status, created_at, updated_at) VALUES ("
+            + post
+            + ", "
+            + actor
+            + ", 'c1', 'visible', now(), now())");
 
+    String sqlGroups =
+        "SELECT merge_key AS \"mergeKey\", post_id AS \"postId\", action AS \"action\", "
+            + "item_count AS \"itemCount\", latest_at AS \"latestAt\", latest_id AS \"latestId\" FROM ("
+            + " SELECT g.merge_key AS merge_key, g.post_id AS post_id, g.action AS action,"
+            + " COUNT(*) AS item_count, MAX(g.created_at) AS latest_at, MAX(g.id) AS latest_id FROM ("
+            + "  SELECT p.post_id || '|' || p.action || '|' || CAST(p.created_at AS date) AS merge_key,"
+            + "  p.post_id AS post_id, p.action AS action, p.created_at AS created_at, p.id AS id"
+            + "  FROM post_interactions p WHERE p.action = ? AND p.actor_id <> ?"
+            + "  AND p.post_id IN (SELECT po.id FROM posts po WHERE po.author_id = ? AND po.status = 'visible')"
+            + " ) g GROUP BY g.merge_key, g.post_id, g.action"
+            + ") a WHERE (a.latest_at < ? OR (a.latest_at = ? AND a.merge_key > ?))"
+            + " ORDER BY a.latest_at DESC, a.merge_key ASC LIMIT ?";
+    try (PreparedStatement ps = conn.prepareStatement(sqlGroups)) {
+      ps.setString(1, "like");
+      ps.setLong(2, author);
+      ps.setLong(3, author);
+      ps.setTimestamp(4, Timestamp.from(cursorMax));
+      ps.setTimestamp(5, Timestamp.from(cursorMax));
+      ps.setString(6, "");
+      ps.setInt(7, 11);
+      try (ResultSet rs = ps.executeQuery()) {
+        assertTrue(rs.next(), "首页（哨兵游标）应返回互动组");
+        assertEquals(2, rs.getInt("itemCount"), "同帖同动作当日应聚合为 1 组 count=2");
+      }
+    }
+    // 带真实游标（早于该组）→ 不返回
+    try (PreparedStatement ps = conn.prepareStatement(sqlGroups)) {
+      Instant earlier = Instant.now().minusSeconds(3600);
+      ps.setString(1, "like");
+      ps.setLong(2, author);
+      ps.setLong(3, author);
+      ps.setTimestamp(4, Timestamp.from(earlier));
+      ps.setTimestamp(5, Timestamp.from(earlier));
+      ps.setString(6, "");
+      ps.setInt(7, 11);
+      try (ResultSet rs = ps.executeQuery()) {
+        assertTrue(!rs.next(), "游标早于该组 → 不应返回");
+      }
+    }
+
+    String sqlComments =
+        "SELECT c.id AS id, c.post_id AS \"postId\", c.author_id AS \"authorId\", c.body AS body,"
+            + " c.created_at AS \"createdAt\" FROM post_comments c WHERE c.status = 'visible'"
+            + " AND c.post_id IN (SELECT po.id FROM posts po WHERE po.author_id = ? AND po.status = 'visible')"
+            + " AND c.author_id <> ? AND (c.created_at < ? OR (c.created_at = ? AND c.id < ?))"
+            + " ORDER BY c.created_at DESC, c.id DESC LIMIT ?";
+    try (PreparedStatement ps = conn.prepareStatement(sqlComments)) {
+      ps.setLong(1, author);
+      ps.setLong(2, author);
+      ps.setTimestamp(3, Timestamp.from(cursorMax));
+      ps.setTimestamp(4, Timestamp.from(cursorMax));
+      ps.setLong(5, Long.MAX_VALUE);
+      ps.setInt(6, 11);
+      try (ResultSet rs = ps.executeQuery()) {
+        assertTrue(rs.next(), "评论首页应返回 1 条");
+        assertEquals("c1", rs.getString("body"));
+      }
+    }
+
+    long peer = insertUser("j03_dialect_peer");
+    exec(
+        "INSERT INTO direct_messages (sender_id, recipient_id, body, status, created_at) VALUES ("
+            + author
+            + ", "
+            + peer
+            + ", 'm1', 'visible', now() - interval '2 hour')");
+    exec(
+        "INSERT INTO direct_messages (sender_id, recipient_id, body, status, created_at) VALUES ("
+            + peer
+            + ", "
+            + author
+            + ", 'm2', 'visible', now())");
+    String sqlConversations =
+        "SELECT a.peer_id AS \"peerId\", a.last_message_id AS \"lastMessageId\","
+            + " (SELECT m2.body FROM direct_messages m2 WHERE m2.id = a.last_message_id) AS \"lastBody\","
+            + " (SELECT m3.sender_id FROM direct_messages m3 WHERE m3.id = a.last_message_id) AS \"lastSenderId\","
+            + " (SELECT m4.created_at FROM direct_messages m4 WHERE m4.id = a.last_message_id) AS \"lastCreatedAt\","
+            + " (SELECT COUNT(*) FROM direct_messages m5 WHERE m5.sender_id = a.peer_id AND m5.recipient_id = ?"
+            + "   AND m5.status = 'visible' AND m5.id > COALESCE((SELECT r.last_read_id FROM dm_read_state r"
+            + "     WHERE r.user_id = ? AND r.peer_id = a.peer_id), 0)) AS \"unreadCount\" FROM ("
+            + "  SELECT x.peer_id AS peer_id, MAX(x.id) AS last_message_id FROM ("
+            + "   SELECT CASE WHEN m.sender_id = ? THEN m.recipient_id ELSE m.sender_id END AS peer_id, m.id AS id"
+            + "   FROM direct_messages m WHERE m.status = 'visible' AND (m.sender_id = ? OR m.recipient_id = ?)"
+            + "  ) x GROUP BY x.peer_id"
+            + ") a ORDER BY a.last_message_id DESC LIMIT ?";
+    try (PreparedStatement ps = conn.prepareStatement(sqlConversations)) {
+      ps.setLong(1, author);
+      ps.setLong(2, author);
+      ps.setLong(3, author);
+      ps.setLong(4, author);
+      ps.setLong(5, author);
+      ps.setInt(6, 50);
+      try (ResultSet rs = ps.executeQuery()) {
+        assertTrue(rs.next(), "应返回 1 个会话");
+        assertEquals(peer, rs.getLong("peerId"));
+        assertEquals("m2", rs.getString("lastBody"), "最后一条应是对方刚发的 m2（防跨会话串话）");
+        assertEquals(peer, rs.getLong("lastSenderId"));
+        assertEquals(1, rs.getInt("unreadCount"), "对端 1 条未读（水位缺行视作 0）");
+      }
+    }
+  }
+
+  // ------------------------------------------------------------------ 工具
   /** schema 真源（Alembic）迁移到 head：env APP_DATABASE_URL 指向容器（迁移 env.py 同款约定）。 */
   private static void runAlembicUpgrade(PostgreSQLContainer<?> pg) throws Exception {
     Path repoPython =
