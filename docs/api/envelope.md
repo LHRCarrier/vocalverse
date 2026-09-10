@@ -16,6 +16,7 @@
 - 时间字段一律 UTC ISO-8601
 - 分页（offset 型）：`data = { items: [], total, page, page_size }`
 - 分页（**keyset 游标例外 · 社区流专用**，2026-09-06 登记）：`data = { items: [], next_cursor, has_more }`——无 `total/page/page_size`（无限长流分页无法也不必要总数）；请求参数 `cursor`（`base64(created_at_iso|id)`）+ `limit ≤ 20`，服务端取 `limit+1` 判 `has_more`；`next_cursor` 为 null 表示到尾
+- **流式例外（SSE，2026-09-10 补登记）**：响应为 `text/event-stream` 事件帧、**不是 envelope**——Python 侧 `POST /api/v1/sessions/{id}/turns`、`POST /api/v1/reading/chapters/{id}/tts/prepare`；**Java 侧 `GET /api/v1/community/messages/stream`**（私信 IM · docs/49 §3，`@Hidden` 不进 OpenAPI 契约）。统一事件名与 `since` 续传语义见 docs/21 §1.1 例外 ⑤
 
 ## 端点分组
 
