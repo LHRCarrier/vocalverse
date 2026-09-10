@@ -12,7 +12,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -28,6 +28,7 @@ from app.api.routes import (
     recommendations,
     singing,
 )
+from app.core.body_limit import BodySizeLimitMiddleware
 from app.core.config import get_settings
 from app.core.response import BizError
 from app.core.trace import RequestIdLogFilter, RequestIdMiddleware
@@ -131,6 +132,47 @@ async def validation_error_handler(_: Request, exc: RequestValidationError) -> J
     )
 
 
+# HTTP 层异常（HTTPException）→ 统一 envelope（2026-09-10 · P0-5 修复）
+#
+# 背景：鉴权（core/auth.py）、限流（core/ratelimit.py）等 24 处走 `raise HTTPException(...)`，
+# 而 FastAPI 默认 handler 返回 `{"detail": ...}`（非 envelope）→ **已登记的 40101/42901 永不出现**，
+# 前端 `client.ts` 只能拿到 `body.code === undefined` → 抛 `ApiError(-1, 'HTTP 429')`，
+# `api/sing.ts` 里「每小时 5 次」的 42901 分支成为死代码（拷问报告 §1 Top 5，
+# 见 `local/唱歌模块全链路拷问报告-2026-09-10.md`）。
+#
+# 映射目标**全部取自已登记码表**（docs/api/error-codes.md，本 handler 不新增任何码）；
+# 未登记的 4xx 兜底 40001、5xx 兜底 50002（安全网，实际抛出的状态码集合见下表注释）。
+# `headers` 必须透传：42901 的契约要求携带 `Retry-After`（docs/api/error-codes.md:28）。
+# 依据：docs/api/envelope.md（所有端点统一 envelope）、docs/21 §1.1 例外登记与 §6 码集对账。
+_HTTP_STATUS_TO_CODE: dict[int, int] = {
+    400: 40001,  # 参数错误
+    401: 40101,  # 未登录 / token 失效（auth.py 三处）
+    403: 40301,  # 无权限 / 非本资源归属
+    404: 40401,  # 资源不存在（defense/placement/service 共 9 处）
+    405: 40501,  # 方法不允许（Starlette 路由层）
+    409: 40902,  # 会话状态不允许（站点语义更细者应改抛 BizError）
+    410: 41001,  # 音频过期
+    413: 41301,  # 音频超过 20MB（唱歌 41302 由 service 层 BizError 给出）
+    422: 42201,  # 请求体校验（audio/placement：text required / no scored attempts 等）
+    429: 42901,  # 限流（ratelimit.py；必须回 Retry-After）
+    502: 50301,  # 上游（TTS/ASR）失败
+    503: 50301,  # ASR/TTS 服务不可用
+}
+
+
+@app.exception_handler(HTTPException)
+async def http_error_handler(_: Request, exc: HTTPException) -> JSONResponse:
+    """HTTPException → envelope（保留 Retry-After 等响应头）。"""
+    code = _HTTP_STATUS_TO_CODE.get(exc.status_code)
+    if code is None:
+        code = 50002 if exc.status_code >= 500 else 40001
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"code": code, "message": str(exc.detail), "data": None},
+        headers=getattr(exc, "headers", None),
+    )
+
+
 app.include_router(health.router)
 app.include_router(audio.router)
 app.include_router(practice.router)
@@ -160,3 +202,12 @@ if get_settings().shadow_preview_enabled:
 
     app.include_router(shadow_preview.router)
 app.add_middleware(RequestIdMiddleware)  # X-Request-Id 透传（docs/06 §11）
+
+# 请求体大小护栏（2026-09-10 · P0-6）：**必须在路由/依赖之前拦截**——FastAPI 解析 body
+# （`request.form()`）早于鉴权依赖，Starlette 会把 >1MB 的 part spool 到临时盘且无总量上限，
+# 匿名大 body 可打爆容器（细节与依据见 app/core/body_limit.py 模块说明）。
+# 上限 = 音频上限 + 1MB：`max_upload_bytes`(20MB) 约束的是**音频文件本身**，multipart 封装
+# （boundary/头部/其它字段）天然多出若干字节，留 1MB 余量避免"合规上传被边界拒绝"。
+# 与 nginx `client_max_body_size 21m`（apps/web/nginx.conf）构成纵深防御：nginx 挡边缘、
+# 本中间件挡直连（vite dev / 容器内网 / 其它入口）。
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=get_settings().max_upload_bytes + 1024 * 1024)

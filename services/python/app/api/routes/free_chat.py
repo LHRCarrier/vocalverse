@@ -29,7 +29,7 @@ from app.audio.base import get_asr_client, get_llm_client
 from app.audio.upload import validate_audio_bytes
 from app.core.auth import get_current_user_id
 from app.core.config import get_settings
-from app.core.ratelimit import bucket_limits, consume
+from app.core.ratelimit import bucket_limits, consume_all
 from app.core.response import BizError
 from app.practice import events as ev
 
@@ -92,10 +92,12 @@ async def free_chat_turn(
 
     # 分桶限流：预检（history/kind/音频校验）通过后再扣——审计 R-06「先扣后校验」修复；
     # ASR 桶仅实际转写时扣（docs/19 P1-5：按实际消耗计，打字轮不耗 ASR）。
+    # P1-13：本请求涉及的桶**一起扣**（LLM 超限时不得白扣 ASR）
     limits = bucket_limits()
+    buckets = [("llm", limits["llm"])]
     if kind == "audio":
-        await consume("asr", limits["asr"], user_id)
-    await consume("llm", limits["llm"], user_id)
+        buckets.insert(0, ("asr", limits["asr"]))
+    await consume_all(buckets, user_id)
 
     async def event_stream():
         try:
