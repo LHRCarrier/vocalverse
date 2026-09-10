@@ -12,6 +12,17 @@ spring:
       hibernate:
         # J-05 读路径回归：需 Hibernate Statistics 断言评论页 SQL 往返数恒定（防 N+1 回潮）
         generate_statistics: true
+        # 2026-09-10 临时：观察 CAS 条件 UPDATE 的实际 SQL（定位「一个成功一个 46010」用例）
+        show_sql: true
+        format_sql: false
+
+# 2026-09-10：被 @ExceptionHandler(Exception.class) 兜底的 50002 会**丢掉原始异常链**，
+# 排障时只能看到「服务内部错误」。测试档打开这两条日志，让根因（SQL 错误/代理调用失败等）
+# 直接打印在 surefire 输出里 —— 只影响测试档，生产日志级别不变。
+logging:
+  level:
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: DEBUG
+    org.springframework.transaction.interceptor: DEBUG
 
 vocalverse:
   jwt:
