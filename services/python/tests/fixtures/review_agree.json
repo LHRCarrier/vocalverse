@@ -1,0 +1,25 @@
+{
+  "songs": [
+    {
+      "title": "Twinkle Twinkle Little Star（演示 · 高一致场景）",
+      "lines": [
+        {"seq": 1, "algo": 95.0, "r1_lo": 90, "r1_hi": 96, "r2_lo": 92, "r2_hi": 97},
+        {"seq": 2, "algo": 90.0, "r1_lo": 84, "r1_hi": 92, "r2_lo": 85, "r2_hi": 93},
+        {"seq": 3, "algo": 86.0, "r1_lo": 82, "r1_hi": 90, "r2_lo": 80, "r2_hi": 88},
+        {"seq": 4, "algo": 92.0, "r1_lo": 88, "r1_hi": 95, "r2_lo": 89, "r2_hi": 94},
+        {"seq": 5, "algo": 84.0, "r1_lo": 80, "r1_hi": 88, "r2_lo": 79, "r2_hi": 87},
+        {"seq": 6, "algo": 88.0, "r1_lo": 83, "r1_hi": 91, "r2_lo": 84, "r2_hi": 90}
+      ]
+    },
+    {
+      "title": "Ode to Joy（演示 · 高一致场景）",
+      "lines": [
+        {"seq": 1, "algo": 91.0, "r1_lo": 86, "r1_hi": 93, "r2_lo": 87, "r2_hi": 94},
+        {"seq": 2, "algo": 87.0, "r1_lo": 82, "r1_hi": 89, "r2_lo": 81, "r2_hi": 88},
+        {"seq": 3, "algo": 93.0, "r1_lo": 90, "r1_hi": 96, "r2_lo": 91, "r2_hi": 95},
+        {"seq": 4, "algo": 85.0, "r1_lo": 80, "r1_hi": 87, "r2_lo": 79, "r2_hi": 86},
+        {"seq": 5, "algo": 89.0, "r1_lo": 84, "r1_hi": 92, "r2_lo": 85, "r2_hi": 91}
+      ]
+    }
+  ]
+}

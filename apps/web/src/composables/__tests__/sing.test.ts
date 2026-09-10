@@ -1,93 +1,176 @@
 /**
- * 唱吧 API/组合式状态机测试（M3 唱歌 P0）：
- * - singErrorMessage 错误码文案映射（40905/41302/40002/42901）；
+ * 唱吧组合式状态机测试（M3 唱歌 P0）：
  * - useSingPlay 状态机：openSong 门禁（40905 → false + error）、
- *   submitAudio → processing → （假时钟轮询后）done + result、轮询 failed、reset。
+ *   submitAudio → processing → （假时钟轮询后）done + result、轮询 failed、reset；
+ * - 录音状态机（放弃重录复位 / 关闭面板取消录音）、轮询世代号（P1-2）、收藏切换。
+ *
+ * 2026-09-10 拆分（eslint `max-lines 350`，新代码不豁免）：
+ * - 纯映射函数用例 → `api/__tests__/sing-messages.test.ts`（API 层）；
+ * - 共享脚手架（录音器伪实现 + API 替换 + 夹具）→ `./singTestUtils.ts`。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiError } from '@/api/client'
-import { singErrorMessage } from '@/api/sing'
-import type { SingAttemptResult, SongDetail } from '@/api/sing'
 
-describe('singErrorMessage（docs/api/error-codes.md 文案映射）', () => {
-  it('40905 参考旋律未就绪', () => {
-    expect(singErrorMessage(new ApiError(40905, 'x', 409))).toContain('参考旋律')
+import { detail, installMock, rec } from './singTestUtils'
+
+describe('useSingPlay 录音状态机（2026-09-10「放弃重录」卡死 BUG 回归）', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
   })
-  it('41302 时长超限', () => {
-    expect(singErrorMessage(new ApiError(41302, 'x', 413))).toContain('3 分钟')
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.doUnmock('@/api/sing')
+    vi.doUnmock('@/audio/recorder')
   })
-  it('40002 音频过短', () => {
-    expect(singErrorMessage(new ApiError(40002, 'x', 400))).toContain('重录')
+
+  it('放弃重录：recorder 发 idle → phase 必须复位（修复前停在 recording，整页按钮失效）', async () => {
+    const { useSingPlay } = await installMock()
+    const play = useSingPlay()
+
+    play.startRecording()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(play.phase.value).toBe('recording')
+    expect(play.getLiveStream()).not.toBeNull()
+
+    play.cancelRecording() // 「放弃重录」
+    await vi.advanceTimersByTimeAsync(0)
+    expect(play.phase.value).toBe('idle') // ← 修复前为 'recording'（主按钮永久禁用 + 停止条空操作）
+    expect(play.getLiveStream()).toBeNull()
+    expect(rec.instance?.state).toBe('idle')
   })
-  it('42901 限流提示', () => {
-    expect(singErrorMessage(new ApiError(42901, 'x', 429))).toContain('5 次')
+
+  it('放弃后可以重新开始录音（不残留录音态）', async () => {
+    const { useSingPlay } = await installMock()
+    const play = useSingPlay()
+    play.startRecording()
+    await vi.advanceTimersByTimeAsync(0)
+    play.cancelRecording()
+    await vi.advanceTimersByTimeAsync(0)
+
+    play.startRecording() // 再点「开始跟唱」
+    await vi.advanceTimersByTimeAsync(0)
+    expect(play.phase.value).toBe('recording')
   })
-  it('未知错误回退 message', () => {
-    expect(singErrorMessage(new ApiError(50001, '上游超时', 500))).toBe('上游超时')
+
+  it('正常停止不受复位影响：stopped → 立刻 uploading（不闪回 idle、不重复上传）', async () => {
+    const create = vi.fn(async () => ({ id: 5, kind: 'sing', song_id: 1, assigned_turns: 2 }))
+    const { useSingPlay } = await installMock({ createSingSession: create })
+    const play = useSingPlay()
+    await play.loadSongs()
+    await play.openSong(1)
+    play.startRecording()
+    await vi.advanceTimersByTimeAsync(0)
+
+    play.stopRecording() // onStateChange('stopped') → onStop → submitAudio
+    expect(play.phase.value).toBe('uploading')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(create).toHaveBeenCalledTimes(1)
+  })
+
+  it('录音启动失败（error 态）仍进 failed（保留原语义）', async () => {
+    const { useSingPlay } = await installMock()
+    const play = useSingPlay()
+    play.startRecording()
+    await vi.advanceTimersByTimeAsync(0)
+    rec.instance?.onStateChange?.('error')
+    expect(play.phase.value).toBe('failed')
+  })
+
+  it('关闭面板（reset）必须取消在录的录音；之后能正常重新开始（修复前必失败）', async () => {
+    const { useSingPlay } = await installMock()
+    const play = useSingPlay()
+    play.startRecording()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(play.phase.value).toBe('recording')
+
+    play.reset() // 面板顶部 chevron 关闭 → startOver() → reset()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(rec.instance?.state).toBe('idle') // 修复前仍是 'recording'（录音被遗弃、麦克风未释放）
+    expect(play.getLiveStream()).toBeNull()
+
+    await play.loadSongs()
+    await play.openSong(1)
+    play.startRecording() // 修复前：start() 同态守卫静默早退 → phase 停在 idle，界面毫无反应
+    await vi.advanceTimersByTimeAsync(0)
+    expect(play.phase.value).toBe('recording')
+  })
+
+  it('retry() 同样收尾在录的录音（错误态复位不留活录音）', async () => {
+    const { useSingPlay } = await installMock()
+    const play = useSingPlay()
+    play.startRecording()
+    await vi.advanceTimersByTimeAsync(0)
+
+    play.retry()
+    expect(rec.instance?.state).toBe('idle')
+    expect(play.phase.value).toBe('idle')
+  })
+
+  it('P1-2：重置后**在飞**轮询落地不得写状态（换歌串台的根因）', async () => {
+    // 用 holder 对象持有 resolve（直接 `let x: fn | null` 会被 TS 收窄成 never，调用报 TS2349）
+    const pending: { land?: (v: unknown) => void } = {}
+    const { useSingPlay } = await installMock({
+      fetchSingStatus: vi.fn(
+        () =>
+          new Promise((resolve) => {
+            pending.land = resolve
+          }),
+      ),
+    })
+    const play = useSingPlay()
+    await play.loadSongs()
+    await play.openSong(1)
+    const p = play.submitAudio(new Blob(['x']))
+    await vi.advanceTimersByTimeAsync(0)
+    await p
+    expect(play.phase.value).toBe('processing')
+
+    await vi.advanceTimersByTimeAsync(1600) // 首轮 status 已发出并挂起
+    play.reset() // 关面板/换歌 → 世代失效
+    pending.land?.({ attempt_id: 9, status: 'done', progress: { done_lines: 2, total: 2 } })
+    await vi.advanceTimersByTimeAsync(50)
+
+    expect(play.result.value).toBeNull() // 修复前：迟到结果把 result 写回来
+    expect(play.phase.value).toBe('idle')
+  })
+
+  it('P1-2：reset 会 abort 在飞请求（不只清定时器）', async () => {
+    const signals: (AbortSignal | undefined)[] = []
+    const { useSingPlay } = await installMock({
+      fetchSingStatus: vi.fn((_id: number, signal?: AbortSignal) => {
+        signals.push(signal)
+        return new Promise(() => {})
+      }),
+    })
+    const play = useSingPlay()
+    await play.loadSongs()
+    await play.openSong(1)
+    const p = play.submitAudio(new Blob(['x']))
+    await vi.advanceTimersByTimeAsync(0)
+    await p
+    await vi.advanceTimersByTimeAsync(1600)
+
+    expect(signals.length).toBe(1)
+    expect(signals[0]?.aborted).toBe(false)
+    play.reset()
+    expect(signals[0]?.aborted).toBe(true) // 修复前：无 AbortController，请求继续跑
+  })
+
+  it('P1-2：openSong 换歌会作废旧轮询并取消在录录音', async () => {
+    const { useSingPlay } = await installMock()
+    const play = useSingPlay()
+    await play.loadSongs()
+    await play.openSong(1)
+    play.startRecording()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(play.phase.value).toBe('recording')
+
+    await play.openSong(1) // 换歌（同 id 也走同一条清理路径）
+    expect(rec.instance?.state).toBe('idle') // 录音被取消（修复前仍在录）
+    expect(play.phase.value).toBe('idle')
   })
 })
-
-const detail = (status: string): SongDetail => ({
-  id: 1,
-  title: 'Twinkle',
-  level: 1,
-  pitch_ref_status: status as SongDetail['pitch_ref_status'],
-  expected_lines: 2,
-  lines: [],
-})
-
-const fullResult: SingAttemptResult = {
-  id: 9,
-  song_id: 1,
-  duration_s: 10,
-  overall: 91.1,
-  pitch: 95,
-  rhythm: 95,
-  pron: 82,
-  is_complete: true,
-  expected_lines: 2,
-  scoring_version: 'v1',
-  ref_version: 'pyin-v1',
-  lines: [],
-  alignment: { offset_ms: 0, method: 'dtw-sakoe-chiba-v1' },
-}
-
-interface ApiMock {
-  fetchSongDetail?: ReturnType<typeof vi.fn>
-  fetchSongs?: ReturnType<typeof vi.fn>
-  createSingSession?: ReturnType<typeof vi.fn>
-  uploadSingAudio?: ReturnType<typeof vi.fn>
-  fetchSingStatus?: ReturnType<typeof vi.fn>
-  fetchSingResult?: ReturnType<typeof vi.fn>
-}
-
-async function installMock(overrides: ApiMock = {}) {
-  vi.resetModules()
-  const { ApiError: ClientApiError } = await import('@/api/client')
-  vi.doMock('@/api/sing', () => ({
-    fetchSongDetail: overrides.fetchSongDetail ?? vi.fn(async () => detail('ready')),
-    fetchSongs: overrides.fetchSongs ?? vi.fn(async () => [
-      { id: 1, title: 'T', level: 1, pitch_ref_status: 'ready', expected_lines: 2 },
-    ]),
-    createSingSession: overrides.createSingSession ?? vi.fn(async () => ({ id: 5, kind: 'sing', song_id: 1, assigned_turns: 2 })),
-    uploadSingAudio: overrides.uploadSingAudio ?? vi.fn(async () => ({
-      attempt_id: 9,
-      status: 'queued',
-      progress: { done_lines: 0, total: 2 },
-    })),
-    fetchSingStatus: overrides.fetchSingStatus ?? vi.fn(async () => ({
-      attempt_id: 9,
-      status: 'done',
-      progress: { done_lines: 2, total: 2 },
-    })),
-    fetchSingResult: overrides.fetchSingResult ?? vi.fn(async () => fullResult),
-    ApiError: ClientApiError,
-  }))
-  const { useSingPlay } = await import('@/composables/sing')
-  return { useSingPlay }
-}
-
 describe('useSingPlay 状态机', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -160,6 +243,65 @@ describe('useSingPlay 状态机', () => {
     expect(play.detail.value).toBeNull()
     expect(play.result.value).toBeNull()
     expect(play.phase.value).toBe('idle')
+  })
+})
+
+describe('useSingPlay 收藏（2026-09-10）', () => {
+  afterEach(() => {
+    vi.doUnmock('@/api/sing')
+  })
+
+  it('toggleFavorite：收藏 → favorited=true 且 favorites 收录；再点 → 取消', async () => {
+    const fav = vi.fn(async (songId: number, favorited: boolean) => ({ song_id: songId, favorited }))
+    const { useSingPlay } = await installMock({ setSongFavorite: fav })
+    const play = useSingPlay()
+    await play.loadSongs()
+    expect(play.favorites.value).toHaveLength(0)
+
+    expect(await play.toggleFavorite(1)).toBe(true)
+    expect(fav).toHaveBeenCalledWith(1, true)
+    expect(play.songs.value[0].favorited).toBe(true)
+    expect(play.favorites.value.map((s) => s.id)).toEqual([1])
+
+    expect(await play.toggleFavorite(1)).toBe(false)
+    expect(fav).toHaveBeenLastCalledWith(1, false)
+    expect(play.songs.value[0].favorited).toBe(false)
+    expect(play.favorites.value).toHaveLength(0)
+  })
+
+  it('toggleFavorite：详情已加载时同步 detail.favorited', async () => {
+    const { useSingPlay } = await installMock()
+    const play = useSingPlay()
+    await play.loadSongs()
+    await play.openSong(1)
+    await play.toggleFavorite(1)
+    expect(play.detail.value?.favorited).toBe(true)
+  })
+
+  it('toggleFavorite：请求失败 → 回滚为原状态并返回 null（不静默、不留假状态）', async () => {
+    const { useSingPlay } = await installMock({
+      setSongFavorite: vi.fn(async () => {
+        throw new Error('boom')
+      }),
+    })
+    const play = useSingPlay()
+    await play.loadSongs()
+    expect(await play.toggleFavorite(1)).toBeNull()
+    expect(play.songs.value[0].favorited).toBe(false)
+    expect(play.favorites.value).toHaveLength(0)
+    expect(play.favoriteError.value).toBe('收藏操作失败，请重试')
+  })
+
+  // 404/401/5xx 的「可诊断文案」由 favoriteErrorMessage 的纯函数用例 + MobileSingView 集成用例覆盖
+  // （此处不重复：本文件的 doMock 模块图与真实映射函数的 ApiError 不是同一个类实例，instanceof 会回落通用文案）
+
+  it('toggleFavorite：未知歌曲 id → null（不发请求）', async () => {
+    const fav = vi.fn()
+    const { useSingPlay } = await installMock({ setSongFavorite: fav })
+    const play = useSingPlay()
+    await play.loadSongs()
+    expect(await play.toggleFavorite(999)).toBeNull()
+    expect(fav).not.toHaveBeenCalled()
   })
 })
 

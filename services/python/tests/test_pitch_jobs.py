@@ -1,7 +1,8 @@
 """参考旋律提取任务编排测试（唱歌 P0 D2/D6 · pitch_extract_jobs 事实源）。
 
-覆盖：扫描建任务（published 门禁/已有 refs 跳过/进行中任务去重/LRC 重写重建）/
-工作器状态机（queued→running→done|failed）/ 委托 camelCase 键名（P0-6 类回归）/
+覆盖：扫描建任务（published 门禁/已有 refs 跳过/进行中任务去重/LRC 重写重建/
+**提取器世代升级自动重建（pyin-v1 refs → 建任务）**）/ 工作器状态机
+（queued→running→done|failed）/ 委托 camelCase 键名（P0-6 类回归）/
 委托失败补偿（refs 齐全但门禁未 ready → 幂等重发）/ 失败重试达上限不再自动重建。
 CI 零模型：Fake 提取器注入 + ffmpeg 转换打桩（测试音频由 soundfile 合成）。
 """
@@ -11,6 +12,7 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+from app.audio.pitch import EXTRACTOR_VERSION
 from app.models import Lrc, PitchExtractJob, Song, SongPitchRef
 from app.models.base import PitchJobStatus
 from sqlalchemy import delete, select, update
@@ -160,7 +162,7 @@ def test_scan_skips_draft_and_skips_when_refs_ready():
                     start_ms=0,
                     end_ms=3000,
                     pitch_ref={"f0s": [440.0], "notes": ["A4"]},
-                    version="pyin-v1",
+                    version=EXTRACTOR_VERSION,
                 )
             )
         db.execute(update(Song).where(Song.id == ready_id).values(pitch_ref_status="ready"))
@@ -226,13 +228,15 @@ def test_run_job_writes_refs_and_delegates_camelcase(monkeypatch, tmp_path):
         assert job.attempts == 0
         refs = db.execute(select(SongPitchRef)).scalars().all()
         assert len(refs) == 2
-        assert all(r.version == "pyin-v1" for r in refs)
+        assert all(r.version == EXTRACTOR_VERSION for r in refs)
         assert refs[0].pitch_ref["f0s"] != []
+        # pyin-v2：pitch_ref 必含参考音符级 onset（item7 参考侧数据源；BUG-1 修复的落库契约）
+        assert "onsets_ms" in refs[0].pitch_ref
         # 委托契约：camelCase 键名 + 路径参数 + Bearer + 3s（P0-6 类回归）
         assert len(captured["calls"]) == 1
         call = captured["calls"][0]
         assert call["url"].endswith(f"/internal/song/{song_id}/pitch-status")
-        assert call["json"] == {"songId": song_id, "status": "ready", "version": "pyin-v1"}
+        assert call["json"] == {"songId": song_id, "status": "ready", "version": EXTRACTOR_VERSION}
         assert "songId" in call["json"] and "song_id" not in call["json"]
         assert call["headers"]["Authorization"].startswith("Bearer ")
         assert call["timeout"] == 3.0
@@ -290,8 +294,41 @@ def test_run_job_delegation_failure_keeps_done_and_compensates(monkeypatch, tmp_
     assert captured["calls"][1]["json"] == {
         "songId": song_id,
         "status": "ready",
-        "version": "pyin-v1",
+        "version": EXTRACTOR_VERSION,
     }
+
+
+def test_scan_rebuilds_refs_when_extractor_generation_is_old(monkeypatch, tmp_path):
+    """**提取器世代升级自动重建（BUG-1/A2 的新行为）**：refs 齐全但 version=pyin-v1
+    （旧世代，无 onsets_ms）→ `_refs_ready` 判定"世代旧" → 扫描建任务重建。
+
+    这是 pyin-v2 上线后 3 首 demo 自动重提取的机制（不触碰 Java 独占写的 songs 表；
+    门禁状态仍由内部 REST 委托翻转）。
+    """
+    from app.sing.jobs import scan_due_jobs
+
+    _install_fake_post(monkeypatch)
+    audio = _wav_audio(tmp_path)
+    db = _new_db()
+    try:
+        song_id = _seed_song(db)
+        db.execute(update(Song).where(Song.id == song_id).values(audio_url=audio))
+        lrc_ids = db.execute(select(Lrc.id).where(Lrc.song_id == song_id)).scalars().all()
+        for lid in lrc_ids:
+            db.add(
+                SongPitchRef(
+                    lrc_id=int(lid),
+                    start_ms=0,
+                    end_ms=3000,
+                    pitch_ref={"f0s": [440.0], "notes": ["A4"]},  # 旧世代无 onsets_ms
+                    version="pyin-v1",
+                )
+            )
+        db.commit()
+    finally:
+        db.close()
+
+    assert scan_due_jobs() == 1, "旧世代 refs 应触发重建任务"
 
 
 def test_run_job_extraction_failure_marks_failed_and_retries_to_cap(monkeypatch, tmp_path):
@@ -394,3 +431,188 @@ def test_lrc_rewrite_cascades_job_and_rebuilds(monkeypatch, tmp_path):
         assert job.revision.startswith("lrc-m")
     finally:
         db.close()
+
+
+# ---------------------------------------------------------------------------
+# P1-12：并发闸门 + 重试上限的世代复位（2026-09-10 修复回归）
+# ---------------------------------------------------------------------------
+def test_drain_queue_caps_concurrency_to_setting(monkeypatch):
+    """并发上限 = `pitch_extract_concurrency`（docs/06 §8③ 的 CPU 队列语义）。
+
+    修复前必失败：旧实现 `async with _sem(): await gather(*(to_thread(...)))` 只取 **1 个**许可
+    就并发跑满一批——实测并发 = 批大小（5），配置值 2 形同虚设（8 个任务同时 pyin = 8×CPU）。
+    """
+    import asyncio
+    import time
+
+    import app.sing.jobs as jobs
+    from app.core.config import get_settings
+
+    limit = get_settings().pitch_extract_concurrency
+    monkeypatch.setattr(jobs, "_extract_sem", None)  # 丢掉单例，按当前配置重建
+
+    batch = limit + 3
+    db = _new_db()
+    try:
+        song_id = _seed_song(db, with_lrc=batch)
+        lrc_ids = [
+            int(x) for x in db.execute(select(Lrc.id).where(Lrc.song_id == song_id)).scalars().all()
+        ]
+        # 进行中任务有 UNIQUE(lrc_id) 部分索引 → 每个任务引用不同 LRC 行（与真实扫描一致）
+        for lrc_id in lrc_ids:
+            db.add(
+                PitchExtractJob(
+                    song_id=song_id,
+                    lrc_id=lrc_id,
+                    revision="lrc-m1",
+                    status=PitchJobStatus.QUEUED,
+                    payload={},
+                )
+            )
+        db.commit()
+    finally:
+        db.close()
+
+    state = {"cur": 0, "max": 0}
+
+    def fake_run_sync(job_id: int, max_attempts: int = 3) -> None:
+        state["cur"] += 1
+        state["max"] = max(state["max"], state["cur"])
+        time.sleep(0.05)
+        state["cur"] -= 1
+
+    monkeypatch.setattr(jobs, "run_job_sync", fake_run_sync)
+    asyncio.run(jobs._drain_queue())
+
+    assert state["max"] == limit, f"并发应被信号量限到 {limit}，实测 {state['max']}"
+
+
+def test_scan_revives_capped_job_after_extractor_generation_change(monkeypatch):
+    """提取器换代后，撞了重试上限的失败任务必须重建（P1-12 修复）。
+
+    真实事故（BUG-2）：pyin-v1 的 upsert 缺陷让 3 首 demo 的提取任务 attempts=3 全 failed；
+    换代到 pyin-v2 并修好缺陷后，旧判据 `attempts >= max → 永久跳过` 让这些歌**再也不会被重建**
+    （refs 永远 missing，跟唱入口 40905），只能人工改库。
+    修复前必失败：`assert scan_due_jobs() == 1` 实测 0。
+    """
+    from app.sing.jobs import scan_due_jobs
+
+    _install_fake_post(monkeypatch)  # 即便走委托也不发真实请求
+    db = _new_db()
+    try:
+        song_id = _seed_song(db)
+        lrc_ids = [
+            int(x) for x in db.execute(select(Lrc.id).where(Lrc.song_id == song_id)).scalars().all()
+        ]
+        from app.sing.jobs import lrc_generation
+
+        revision = lrc_generation(db, song_id)[1]  # **当前**世代：排除 revision 分支干扰
+        db.add(
+            PitchExtractJob(
+                song_id=song_id,
+                lrc_id=lrc_ids[0],
+                revision=revision,
+                status=PitchJobStatus.FAILED,
+                attempts=3,
+                payload={
+                    "error": "UniqueViolation(uq_song_pitch_refs_lrc_id)",
+                    "extractor_version": "pyin-v1",  # ← 失败发生在旧提取器世代
+                },
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    assert scan_due_jobs() == 1, "换代后应重建（修复前 attempts=3 撞上限 → 永久跳过）"
+    db = _new_db()
+    try:
+        job = db.execute(select(PitchExtractJob)).scalar_one()
+        assert job.status == PitchJobStatus.QUEUED
+        assert job.attempts == 0, "新世代应拿到完整重试预算（旧世代的失败不消耗它）"
+    finally:
+        db.close()
+
+
+def test_scan_probes_legacy_capped_job_only_once(monkeypatch, tmp_path):
+    """历史失败行（payload 无提取器版本快照）→ 只放行**一次**探针，不重置预算。
+
+    本次修复前落库的失败行没有 `extractor_version`，无法判断是否换代；一律跳过会永久卡死，
+    一律重置则等于取消重试上限。取折中：放行一次、失败后（已记录当前版本）立即回到上限。
+    修复前必失败：`assert scan_due_jobs() == 1` 实测 0。
+    """
+    from app.sing.jobs import lrc_generation, scan_due_jobs
+
+    _install_fake_post(monkeypatch)
+    db = _new_db()
+    try:
+        song_id = _seed_song(db)
+        db.execute(update(Song).where(Song.id == song_id).values(audio_url="/data/audio/nope.wav"))
+        lrc_ids = [
+            int(x) for x in db.execute(select(Lrc.id).where(Lrc.song_id == song_id)).scalars().all()
+        ]
+        db.add(
+            PitchExtractJob(
+                song_id=song_id,
+                lrc_id=lrc_ids[0],
+                revision=lrc_generation(db, song_id)[1],
+                status=PitchJobStatus.FAILED,
+                attempts=3,
+                payload={"error": "音频文件不可达"},  # 无 extractor_version（历史行）
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    jobs = _install_jobs_stubs(monkeypatch, tmp_path, None)
+    assert scan_due_jobs() == 1, "世代不明的历史失败行应放行一次探针（修复前永久跳过）"
+    db = _new_db()
+    try:
+        job = db.execute(select(PitchExtractJob)).scalar_one()
+        assert job.attempts == 3, "探针不重置预算（只多给这一次）"
+        job_id = int(job.id)
+    finally:
+        db.close()
+
+    jobs.run_job_sync(job_id)  # 探针再失败 → attempts=4 且 payload 记下当前世代
+    db = _new_db()
+    try:
+        job = db.get(PitchExtractJob, job_id)
+        assert job.attempts == 4
+        assert job.payload["extractor_version"] == EXTRACTOR_VERSION
+    finally:
+        db.close()
+    assert scan_due_jobs() == 0, "记录版本后回到上限约束（不会无限探针）"
+
+
+def test_retry_decision_matrix():
+    """`retry_decision` 四态（P1-12）：
+
+    换代 reset / 撞上限 skip / 无版本 probe / 未达上限 requeue。
+    """
+    from app.sing.jobs import (
+        RETRY_PROBE,
+        RETRY_REQUEUE,
+        RETRY_RESET,
+        RETRY_SKIP,
+        retry_decision,
+    )
+
+    class _Row:
+        """轻量替身：只用 attempts / revision / payload 三个属性。"""
+
+        def __init__(self, attempts: int, revision: str, payload: dict):
+            self.attempts = attempts
+            self.revision = revision
+            self.payload = payload
+
+    cur = {"extractor_version": EXTRACTOR_VERSION}
+    assert retry_decision(None, "lrc-m1", 3) == RETRY_REQUEUE  # 无 failed 行 → 走新建分支
+    assert retry_decision(_Row(1, "lrc-m1", cur), "lrc-m1", 3) == RETRY_REQUEUE
+    assert retry_decision(_Row(3, "lrc-m1", cur), "lrc-m1", 3) == RETRY_SKIP
+    assert retry_decision(_Row(3, "lrc-m1", {"extractor_version": "pyin-v0"}), "lrc-m1", 3) == (
+        RETRY_RESET
+    )
+    assert retry_decision(_Row(3, "lrc-m-old", cur), "lrc-m1", 3) == RETRY_RESET
+    assert retry_decision(_Row(3, "lrc-m1", {"error": "boom"}), "lrc-m1", 3) == RETRY_PROBE

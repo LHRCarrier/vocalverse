@@ -15,7 +15,7 @@ from alembic import command as alembic_command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from app.models import Base, Event, User
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import UniqueConstraint, create_engine, inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -44,6 +44,7 @@ EXPECTED_TABLES = {
     "defense_profiles",
     "usage_log",
     "pitch_extract_jobs",  # 唱歌 P0 迁移 0010（2026-09-09）
+    "song_favorites",  # 跟唱收藏 迁移 0011（2026-09-10）
 }
 
 
@@ -218,6 +219,94 @@ def test_sing_attempts_scoring_version_default(sqlite_engine):
         session.commit()
         assert attempt.scoring_version == "v1"
         assert attempt.ref_version is None
+
+
+def _seed_sing_session(session, song_id: int) -> int:
+    """建一条 sing 会话（user_id=1 不建真实用户——SQLite 测试库默认不校验 FK，与其他用例同口径）。"""
+    from app import models as m
+
+    sess = m.Session(user_id=1, kind="sing", song_id=song_id, assigned_turns=3)
+    session.add(sess)
+    session.commit()
+    return int(sess.id)
+
+
+# ---------------------------------------------------------------------------
+# 跟唱幂等键（迁移 0012 · 2026-09-10 · P1-3）：sing_attempts UNIQUE(user_id, session_id)
+# ---------------------------------------------------------------------------
+def test_sing_attempt_unique_per_user_session(sqlite_engine):
+    """uq_sing_attempts_user_session：同一 (user, session) 只允许一行
+    （幂等重试的地基，docs/10 §4.3）。
+
+    修复前必失败：迁移 0012 之前无该唯一键——并发双击/弱网重传可落两行，
+    重复消耗 pyin/DTW CPU 且污染看板（拷问报告 P1-3 / B-F7 / C-#3 / G-#9）。
+
+    语义：`session_id` 可空（会话删除时 SET NULL）——SQL 唯一索引对 NULL 不冲突，
+    历史/脱离会话的行不受影响（末尾用例覆盖）。
+    """
+    from app import models as m
+
+    with Session(sqlite_engine) as session:
+        song_id, _ = _seed_song_with_lrc(session)
+        session_id = _seed_sing_session(session, song_id)
+        session.add(
+            m.SingAttempt(user_id=1, session_id=session_id, song_id=song_id, duration_s=3, lines=[])
+        )
+        session.commit()
+    with Session(sqlite_engine) as session, pytest.raises(IntegrityError):
+        session.add(
+            m.SingAttempt(user_id=1, session_id=session_id, song_id=song_id, duration_s=3, lines=[])
+        )
+        session.commit()
+    # 不同用户 / 不同会话互不冲突（幂等键只锁"同一人的同一会话"）
+    with Session(sqlite_engine) as session:
+        session.add(
+            m.SingAttempt(user_id=2, session_id=session_id, song_id=song_id, duration_s=3, lines=[])
+        )
+        session.add(
+            m.SingAttempt(user_id=1, session_id=None, song_id=song_id, duration_s=3, lines=[])
+        )
+        session.add(
+            m.SingAttempt(user_id=1, session_id=None, song_id=song_id, duration_s=3, lines=[])
+        )
+        session.commit()
+
+
+def test_sing_attempt_unique_key_present_in_metadata():
+    """模型元数据必须显式声明唯一键（不依赖迁移手写 SQL——`alembic check` 对账靠它）。"""
+    from app import models as m
+
+    names = {
+        c.name
+        for c in m.SingAttempt.__table__.constraints
+        if isinstance(c, UniqueConstraint)  # noqa: F821 —— 运行时导入见上
+    }
+    assert "uq_sing_attempts_user_session" in names, (
+        "SingAttempt 缺 UNIQUE(user_id, session_id)：迁移 0012 与模型元数据会漂移"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 跟唱收藏（迁移 0011 · 2026-09-10）：song_favorites 唯一键
+# ---------------------------------------------------------------------------
+def test_song_favorite_unique_per_user_song(sqlite_engine):
+    """uq_song_favorites_user_song：同一用户同一首歌只允许一行（幂等收藏的地基，docs/10）。
+
+    修复前必失败：该表/唯一键由迁移 0011 引入，此前不存在。
+    """
+    from app import models as m
+
+    with Session(sqlite_engine) as session:
+        song_id, _ = _seed_song_with_lrc(session)
+        session.add(m.SongFavorite(user_id=1, song_id=song_id))
+        session.commit()
+    with Session(sqlite_engine) as session, pytest.raises(IntegrityError):
+        session.add(m.SongFavorite(user_id=1, song_id=song_id))
+        session.commit()
+    # 不同用户互不冲突（收藏按用户隔离）
+    with Session(sqlite_engine) as session:
+        session.add(m.SongFavorite(user_id=2, song_id=song_id))
+        session.commit()
 
 
 def test_alembic_offline_pg_render(capsys, monkeypatch):
