@@ -49,6 +49,22 @@ import org.springframework.transaction.annotation.Transactional;
  *   <tr><td>同 IP 超限</td><td>46008</td><td>429</td><td>与账号无关，按 §10.4 语义即为「登录失败次数过多」</td></tr>
  * </table>
  *
+ * <h2>独立事务：本类最容易被写错的一处（2026-09-10 实测缺陷）</h2>
+ *
+ * <p>{@link #login} 与 {@link #refresh} 都是 {@code @Transactional}，而它们在**写完安全状态之后必然要抛 {@link
+ * ConsoleException} 表示拒绝**；{@code ConsoleException} 是 {@link RuntimeException}，Spring 因此回滚 整个事务 ——
+ * 连同刚写的尝试流水、刚累加的失败计数、刚盖上的锁定时间、刚吊销的会话。代码逐行读起来 每一处都对，但三处控制在生产上是**空的**：
+ *
+ * <ul>
+ *   <li>失败计数不落库 → 5 次锁号永不触发（口令爆破不受限）；
+ *   <li>尝试流水不落库 → 同 IP 20 次/5 分钟限流永不触发（撞库不受限）；
+ *   <li>会话族吊销不回滚地消失 → 「检测到 refresh 重放就全族下线」失效，且审计里那行 "已吊销 N 条会话"（走独立事务）与事实相反。
+ * </ul>
+ *
+ * <p>因此：**凡"必须活过这次拒绝"的写入，一律经 {@link ConsoleAuthIndependentWriter}（{@code
+ * REQUIRES_NEW}）落库**，不要在业务事务里直接写。 判断标准很简单 —— 这个写入是不是"已经发生的事实"（谁在什么时候尝试登录、被锁到什么时候）？
+ * 是事实就必须独立提交；是"业务结果的一部分"才留在业务事务里。
+ *
  * <p>另外两处反枚举细节：① 用户名不存在时也**跑一次 BCrypt 校验**（对固定假哈希），让响应时间与真实账号一致， 避免时序侧信道；② 失败计数对**不存在的用户名同样累加**（落在
  * {@code admin_login_attempts.reason=unknown_user}）， 所以「先爆破一堆用户名再挑真的」也要吃 5 次/15 分钟的限速。
  *
@@ -97,6 +113,7 @@ public class ConsoleAuthService {
   private final RbacService rbac;
   private final AuditService audit;
   private final IndependentAuditWriter auditWriter;
+  private final ConsoleAuthIndependentWriter authWriter;
 
   public ConsoleAuthService(
       AdminUserRepository adminUsers,
@@ -107,7 +124,8 @@ public class ConsoleAuthService {
       ConsoleJwtService jwt,
       RbacService rbac,
       AuditService audit,
-      IndependentAuditWriter auditWriter) {
+      IndependentAuditWriter auditWriter,
+      ConsoleAuthIndependentWriter authWriter) {
     this.adminUsers = adminUsers;
     this.roles = roles;
     this.sessions = sessions;
@@ -117,6 +135,7 @@ public class ConsoleAuthService {
     this.rbac = rbac;
     this.audit = audit;
     this.auditWriter = auditWriter;
+    this.authWriter = authWriter;
   }
 
   /** 登录结果（access + refresh + 有效期 + 主体摘要）。 */
@@ -146,7 +165,8 @@ public class ConsoleAuthService {
             earliest == null
                 ? IP_WINDOW.toSeconds()
                 : Math.max(1, IP_WINDOW.minus(Duration.between(earliest, now)).toSeconds());
-        record(username, null, ip, false, AdminLoginAttemptEntity.REASON_THROTTLED, now);
+        authWriter.recordAttempt(
+            username, null, ip, false, AdminLoginAttemptEntity.REASON_THROTTLED, now);
         throw ConsoleException.of(
             ConsoleErrorCodes.LOGIN_THROTTLED, "同 IP 登录尝试过于频繁", Map.of("retryAfter", retryAfter));
       }
@@ -157,13 +177,15 @@ public class ConsoleAuthService {
     if (user == null) {
       // 反枚举：跑一次 BCrypt 抹平时序差；按 username 记失败（同样受限速约束）
       passwordEncoder.matches(password == null ? "" : password, DUMMY_HASH);
-      record(username, null, ip, false, AdminLoginAttemptEntity.REASON_UNKNOWN_USER, now);
+      authWriter.recordAttempt(
+          username, null, ip, false, AdminLoginAttemptEntity.REASON_UNKNOWN_USER, now);
       throw ConsoleException.of(ConsoleErrorCodes.ADMIN_NOT_FOUND);
     }
 
     // ② 锁定检查（在验口令之前 —— 锁定期间不消耗 BCrypt，也不因口令对错表现不同）
     if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) {
-      record(username, user.getId(), ip, false, AdminLoginAttemptEntity.REASON_LOCKED, now);
+      authWriter.recordAttempt(
+          username, user.getId(), ip, false, AdminLoginAttemptEntity.REASON_LOCKED, now);
       throw ConsoleException.of(
           ConsoleErrorCodes.ACCOUNT_UNAVAILABLE,
           "管理端账号已锁定，请稍后再试",
@@ -173,21 +195,24 @@ public class ConsoleAuthService {
     // ③ 口令校验
     boolean ok = password != null && passwordEncoder.matches(password, user.getPasswordHash());
     if (!ok) {
-      int failed = user.getFailedAttempts() + 1;
-      user.setFailedAttempts((short) failed);
-      if (failed >= FAILURE_THRESHOLD) {
-        user.setLockedUntil(now.plus(LOCK_DURATION));
-        user.setFailedAttempts((short) 0); // 锁定期满重新计数，避免累加到永久锁定
+      // 计数/锁定/流水走独立事务：本方法随后就抛 46004，写在业务事务里会被这次回滚一起丢掉
+      // （那样"5 次锁号"与"IP 限流"两处控制全是空的，见 ConsoleAuthIndependentWriter 的类注释）
+      ConsoleAuthIndependentWriter.FailureOutcome outcome =
+          authWriter.recordPasswordFailure(username, user.getId(), ip, now);
+      if (outcome.locked()) {
+        log.warn(
+            "控制台账号因连续口令失败被锁定至 {}：adminUserId={} username={}",
+            outcome.lockedUntil(),
+            user.getId(),
+            user.getUsername());
       }
-      user.setUpdatedAt(now);
-      adminUsers.save(user);
-      record(username, user.getId(), ip, false, AdminLoginAttemptEntity.REASON_BAD_PASSWORD, now);
       throw ConsoleException.of(ConsoleErrorCodes.ADMIN_NOT_FOUND);
     }
 
     // ④ 停用检查（仅在口令正确后披露：调用方已是账号所有者，不构成信息泄漏）
     if (!AdminUserEntity.STATUS_ACTIVE.equals(user.getStatus())) {
-      record(username, user.getId(), ip, false, AdminLoginAttemptEntity.REASON_DISABLED, now);
+      authWriter.recordAttempt(
+          username, user.getId(), ip, false, AdminLoginAttemptEntity.REASON_DISABLED, now);
       throw ConsoleException.of(
           ConsoleErrorCodes.ACCOUNT_UNAVAILABLE, "管理端账号已停用", Map.of("status", user.getStatus()));
     }
@@ -201,7 +226,8 @@ public class ConsoleAuthService {
     adminUsers.save(user);
 
     AdminSessionEntity session = createSession(user.getId(), now, ip, userAgent);
-    record(username, user.getId(), ip, true, AdminLoginAttemptEntity.REASON_LOGIN, now);
+    authWriter.recordAttempt(
+        username, user.getId(), ip, true, AdminLoginAttemptEntity.REASON_LOGIN, now);
 
     AdminRoleEntity role = roles.findById(user.getRoleId()).orElse(null);
     String roleCode = role == null ? "" : role.getCode();
@@ -256,9 +282,13 @@ public class ConsoleAuthService {
     }
 
     if (session.isRevoked()) {
-      // 重放已轮换/已吊销的令牌 → 视为令牌泄漏，吊销该账号全部会话（见类注释）
+      // 重放已轮换/已吊销的令牌 → 视为令牌泄漏，吊销该账号全部会话（见类注释）。
+      //
+      // ⚠️ 必须走独立事务：本分支随后就抛 46001，写在业务事务里的吊销会被这次回滚清掉，
+      // 于是"检测到泄漏 → 全族下线"完全失效（实测：新 refresh 照样能用），
+      // 而下面那行走独立事务的审计却如实写着"已吊销 N 条会话" —— 日志与事实相反。
       int revoked =
-          sessions.revokeAllForUser(
+          authWriter.revokeAllSessions(
               session.getAdminUserId(), AdminSessionEntity.REASON_TOKEN_REUSE, now);
       // 安全事件独立落库：不能因为外层事务回滚（本方法随后就抛 46001）而丢掉这行归因
       auditWriter.bestEffort(
@@ -301,7 +331,8 @@ public class ConsoleAuthService {
     // 一次性轮换：吊销旧行（条件更新，0 行=已被并发轮换 → 按重放处理）
     int revoked = sessions.revoke(session.getId(), AdminSessionEntity.REASON_ROTATED, now);
     if (revoked == 0) {
-      sessions.revokeAllForUser(
+      // 并发轮换同样按重放处理：这里也抛 46001，所以吊销也必须走独立事务（同上）
+      authWriter.revokeAllSessions(
           session.getAdminUserId(), AdminSessionEntity.REASON_TOKEN_REUSE, now);
       throw ConsoleException.of(ConsoleErrorCodes.UNAUTHENTICATED, "刷新令牌已被并发使用，请重新登录");
     }
@@ -362,18 +393,6 @@ public class ConsoleAuthService {
     AdminSessionEntity saved = sessions.saveAndFlush(e);
     saved.setRefreshTokenPlain(plain);
     return saved;
-  }
-
-  private void record(
-      String username, Long adminUserId, String ip, boolean success, String reason, Instant now) {
-    AdminLoginAttemptEntity a = new AdminLoginAttemptEntity();
-    a.setUsername(truncate(username == null ? "" : username, 32));
-    a.setAdminUserId(adminUserId);
-    a.setIp(ip == null ? null : truncate(ip, 45));
-    a.setSuccess(success);
-    a.setReason(reason);
-    a.setCreatedAt(now);
-    attempts.save(a);
   }
 
   public static String sha256Hex(String value) {
