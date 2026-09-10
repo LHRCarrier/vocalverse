@@ -865,7 +865,7 @@
           "singing"
         ],
         "summary": "List Songs",
-        "description": "已发布歌曲列表（读侧；写侧归 Java 管理端，Python 只读——docs/10 §3）。",
+        "description": "已发布歌曲列表（读侧；写侧归 Java 管理端，Python 只读——docs/10 §3）。\n\n``favorited`` = 当前用户是否已收藏（收藏 tab 的唯一依据，2026-09-10）。",
         "operationId": "list_songs_api_v1_songs_get",
         "parameters": [
           {
@@ -900,7 +900,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_SongSummary__"
+                }
               }
             }
           },
@@ -967,7 +969,145 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_SongDetail_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/songs/{song_id}/favorite": {
+      "put": {
+        "tags": [
+          "singing"
+        ],
+        "summary": "Add Song Favorite",
+        "description": "收藏歌曲（幂等：重复收藏仍返回 favorited=true；歌曲不存在/未发布 → 40401）。",
+        "operationId": "add_song_favorite_api_v1_songs__song_id__favorite_put",
+        "parameters": [
+          {
+            "name": "song_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Song Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-test-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_FavoriteState_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "singing"
+        ],
+        "summary": "Remove Song Favorite",
+        "description": "取消收藏（幂等：未收藏时调用同样返回 favorited=false）。",
+        "operationId": "remove_song_favorite_api_v1_songs__song_id__favorite_delete",
+        "parameters": [
+          {
+            "name": "song_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Song Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-test-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_FavoriteState_"
+                }
               }
             }
           },
@@ -1044,7 +1184,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_SubmitAck_"
+                }
               }
             }
           },
@@ -1110,7 +1252,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_AttemptStatus_"
+                }
               }
             }
           },
@@ -1176,7 +1320,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_AttemptResult_"
+                }
               }
             }
           },
@@ -1932,6 +2078,185 @@
         ],
         "title": "ASRResult"
       },
+      "AttemptResult": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "song_id": {
+            "type": "integer",
+            "title": "Song Id"
+          },
+          "audio_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Url"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "overall": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall"
+          },
+          "pitch": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pitch"
+          },
+          "rhythm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rhythm"
+          },
+          "pron": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pron"
+          },
+          "is_complete": {
+            "type": "boolean",
+            "title": "Is Complete"
+          },
+          "expected_lines": {
+            "type": "integer",
+            "title": "Expected Lines"
+          },
+          "scoring_version": {
+            "type": "string",
+            "title": "Scoring Version"
+          },
+          "ref_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref Version"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ScoreLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "alignment": {
+            "$ref": "#/components/schemas/SingAlignment"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "song_id",
+          "is_complete",
+          "expected_lines",
+          "scoring_version",
+          "lines",
+          "alignment"
+        ],
+        "title": "AttemptResult",
+        "description": "跟唱评分结果（`GET /api/v1/sing/attempts/{id}`；done 后可取）。\n\n`overall` **允许为 null**：v4/v5 覆盖率 <40% 不给综合分（docs/06 §9.4 口径 v4 · R3）。"
+      },
+      "AttemptStatus": {
+        "properties": {
+          "attempt_id": {
+            "type": "integer",
+            "title": "Attempt Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/TaskProgress"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "attempt_id",
+          "status",
+          "progress"
+        ],
+        "title": "AttemptStatus",
+        "description": "任务状态（queued→processing→done|failed；轮询端点）。\n\n`code` 仅失败态回带（50003 算法失败 / 50002 任务态丢失，docs/api/error-codes.md）。"
+      },
       "Body_asr_api_v1_asr_post": {
         "properties": {
           "audio": {
@@ -2161,6 +2486,58 @@
         "type": "object",
         "title": "Envelope[Any]"
       },
+      "Envelope_AttemptResult_": {
+        "properties": {
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "default": 0
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "ok"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AttemptResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "Envelope[AttemptResult]"
+      },
+      "Envelope_AttemptStatus_": {
+        "properties": {
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "default": 0
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "ok"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AttemptStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "Envelope[AttemptStatus]"
+      },
       "Envelope_ChatResult_": {
         "properties": {
           "code": {
@@ -2186,6 +2563,32 @@
         },
         "type": "object",
         "title": "Envelope[ChatResult]"
+      },
+      "Envelope_FavoriteState_": {
+        "properties": {
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "default": 0
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "ok"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FavoriteState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "Envelope[FavoriteState]"
       },
       "Envelope_ScoreResult_": {
         "properties": {
@@ -2213,6 +2616,58 @@
         "type": "object",
         "title": "Envelope[ScoreResult]"
       },
+      "Envelope_SongDetail_": {
+        "properties": {
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "default": 0
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "ok"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SongDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "Envelope[SongDetail]"
+      },
+      "Envelope_SubmitAck_": {
+        "properties": {
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "default": 0
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "ok"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubmitAck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "Envelope[SubmitAck]"
+      },
       "Envelope_TTSResult_": {
         "properties": {
           "code": {
@@ -2238,6 +2693,36 @@
         },
         "type": "object",
         "title": "Envelope[TTSResult]"
+      },
+      "Envelope_list_SongSummary__": {
+        "properties": {
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "default": 0
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "ok"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SongSummary"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "title": "Envelope[list[SongSummary]]"
       },
       "EventIn": {
         "properties": {
@@ -2324,6 +2809,25 @@
         ],
         "title": "EventIn"
       },
+      "FavoriteState": {
+        "properties": {
+          "song_id": {
+            "type": "integer",
+            "title": "Song Id"
+          },
+          "favorited": {
+            "type": "boolean",
+            "title": "Favorited"
+          }
+        },
+        "type": "object",
+        "required": [
+          "song_id",
+          "favorited"
+        ],
+        "title": "FavoriteState",
+        "description": "收藏切换结果（PUT=收藏 / DELETE=取消，均幂等；docs/21 §3.6）。"
+      },
       "FinalizeIn": {
         "properties": {
           "attempts": {
@@ -2352,6 +2856,62 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "PitchRef": {
+        "properties": {
+          "f0s": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "F0S"
+          },
+          "notes": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "midi": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Midi"
+          },
+          "onsets_ms": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onsets Ms"
+          }
+        },
+        "type": "object",
+        "title": "PitchRef",
+        "description": "逐句参考旋律（song_pitch_refs.pitch_ref；docs/10 §4.3 · pyin-v2）。"
       },
       "ProfileIn": {
         "properties": {
@@ -2409,6 +2969,145 @@
           "highlights"
         ],
         "title": "ProfileIn"
+      },
+      "ScoreLine": {
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "title": "Seq"
+          },
+          "start_ms": {
+            "type": "integer",
+            "title": "Start Ms"
+          },
+          "end_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Ms"
+          },
+          "pitch_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pitch Score"
+          },
+          "rhythm_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rhythm Score"
+          },
+          "pron_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pron Score"
+          },
+          "synced": {
+            "type": "boolean",
+            "title": "Synced",
+            "default": true
+          },
+          "skipped": {
+            "type": "boolean",
+            "title": "Skipped",
+            "default": false
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "ref_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref Seq"
+          },
+          "no_ref": {
+            "type": "boolean",
+            "title": "No Ref",
+            "default": false
+          },
+          "onset_dev_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onset Dev Ms"
+          },
+          "note_hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note Hit Rate"
+          },
+          "user_f0": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "User F0"
+          },
+          "cent_dev": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Cent Dev"
+          }
+        },
+        "type": "object",
+        "required": [
+          "seq",
+          "start_ms"
+        ],
+        "title": "ScoreLine",
+        "description": "逐句评分（sing_attempts.lines[i]；结构契约 docs/10 §4.3）。"
       },
       "ScoreResult": {
         "properties": {
@@ -2542,6 +3241,544 @@
         ],
         "title": "SessionCreate"
       },
+      "SingAlignment": {
+        "properties": {
+          "bpm_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpm Ratio"
+          },
+          "bpm_user": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpm User"
+          },
+          "bpm_ref": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpm Ref"
+          },
+          "bpm_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "onset-f0",
+                  "onset-flux",
+                  "onset-arbitrated",
+                  "duration"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpm Source"
+          },
+          "offset_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset Ms"
+          },
+          "time_warp_stretch": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Warp Stretch"
+          },
+          "windows_ms": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Windows Ms"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "transpose_semitones": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transpose Semitones"
+          },
+          "range_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Range Hint"
+          },
+          "medfilt_kernel": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medfilt Kernel"
+          },
+          "ref_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref Coverage"
+          },
+          "pitch_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pitch Weight"
+          },
+          "pitch_reliability": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "reduced",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pitch Reliability"
+          },
+          "weight_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Note"
+          },
+          "note_hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note Hit Rate"
+          },
+          "user_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Coverage"
+          },
+          "coverage_conf": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Conf"
+          },
+          "coverage_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Note"
+          },
+          "breath_structure": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Breath Structure"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "SingAlignment",
+        "description": "整首对齐与口径留痕（docs/10 §4.3 alignment 扩展；口径 v3/v4/v5）。\n\n`extra=\"allow\"`：口径升级新增的诊断键**必须透传**——响应模型只做类型标注，不做过滤。"
+      },
+      "SongDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "artist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artist"
+          },
+          "level": {
+            "type": "integer",
+            "title": "Level"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "bpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpm"
+          },
+          "musical_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Musical Key"
+          },
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
+          },
+          "audio_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Url"
+          },
+          "pitch_ref_status": {
+            "type": "string",
+            "title": "Pitch Ref Status"
+          },
+          "expected_lines": {
+            "type": "integer",
+            "title": "Expected Lines"
+          },
+          "favorited": {
+            "type": "boolean",
+            "title": "Favorited"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/SongLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "level",
+          "pitch_ref_status",
+          "expected_lines",
+          "favorited",
+          "lines"
+        ],
+        "title": "SongDetail",
+        "description": "`GET /api/v1/songs/{id}`：列表字段 + 逐句数据。"
+      },
+      "SongLine": {
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "title": "Seq"
+          },
+          "start_ms": {
+            "type": "integer",
+            "title": "Start Ms"
+          },
+          "end_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Ms"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "pitch_ref": {
+            "$ref": "#/components/schemas/PitchRef"
+          }
+        },
+        "type": "object",
+        "required": [
+          "seq",
+          "start_ms",
+          "pitch_ref"
+        ],
+        "title": "SongLine",
+        "description": "歌曲详情的逐句 LRC + 参考旋律（D3 双序列图数据源）。"
+      },
+      "SongSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "artist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artist"
+          },
+          "level": {
+            "type": "integer",
+            "title": "Level"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "bpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpm"
+          },
+          "musical_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Musical Key"
+          },
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
+          },
+          "audio_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Url"
+          },
+          "pitch_ref_status": {
+            "type": "string",
+            "title": "Pitch Ref Status"
+          },
+          "expected_lines": {
+            "type": "integer",
+            "title": "Expected Lines"
+          },
+          "favorited": {
+            "type": "boolean",
+            "title": "Favorited"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "level",
+          "pitch_ref_status",
+          "expected_lines",
+          "favorited"
+        ],
+        "title": "SongSummary",
+        "description": "选歌列表条目（`GET /api/v1/songs`）。"
+      },
+      "SubmitAck": {
+        "properties": {
+          "attempt_id": {
+            "type": "integer",
+            "title": "Attempt Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "attempt_id",
+          "status"
+        ],
+        "title": "SubmitAck",
+        "description": "整首上传受理回执（`POST /api/v1/sessions/{id}/audio`）。"
+      },
       "TTSResult": {
         "properties": {
           "audio_bytes": {
@@ -2560,6 +3797,23 @@
         ],
         "title": "TTSResult",
         "description": "TTS 响应数据。M1 stub 为 hex 字符串；M2 真 TTS 改二进制/URL 时更新契约（docs/06 §8）。"
+      },
+      "TaskProgress": {
+        "properties": {
+          "done_lines": {
+            "type": "integer",
+            "title": "Done Lines",
+            "default": 0
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "TaskProgress",
+        "description": "任务进度（轮询展示用）。"
       },
       "ValidationError": {
         "properties": {

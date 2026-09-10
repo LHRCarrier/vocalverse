@@ -274,6 +274,8 @@ export interface paths {
         /**
          * List Songs
          * @description 已发布歌曲列表（读侧；写侧归 Java 管理端，Python 只读——docs/10 §3）。
+         *
+         *     ``favorited`` = 当前用户是否已收藏（收藏 tab 的唯一依据，2026-09-10）。
          */
         get: operations["list_songs_api_v1_songs_get"];
         put?: never;
@@ -299,6 +301,30 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/songs/{song_id}/favorite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Add Song Favorite
+         * @description 收藏歌曲（幂等：重复收藏仍返回 favorited=true；歌曲不存在/未发布 → 40401）。
+         */
+        put: operations["add_song_favorite_api_v1_songs__song_id__favorite_put"];
+        post?: never;
+        /**
+         * Remove Song Favorite
+         * @description 取消收藏（幂等：未收藏时调用同样返回 favorited=false）。
+         */
+        delete: operations["remove_song_favorite_api_v1_songs__song_id__favorite_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -566,6 +592,60 @@ export interface components {
              */
             no_speech: boolean;
         };
+        /**
+         * AttemptResult
+         * @description 跟唱评分结果（`GET /api/v1/sing/attempts/{id}`；done 后可取）。
+         *
+         *     `overall` **允许为 null**：v4/v5 覆盖率 <40% 不给综合分（docs/06 §9.4 口径 v4 · R3）。
+         */
+        AttemptResult: {
+            /** Id */
+            id: number;
+            /** Song Id */
+            song_id: number;
+            /** Audio Url */
+            audio_url?: string | null;
+            /** Duration S */
+            duration_s?: number | null;
+            /** Overall */
+            overall?: number | null;
+            /** Pitch */
+            pitch?: number | null;
+            /** Rhythm */
+            rhythm?: number | null;
+            /** Pron */
+            pron?: number | null;
+            /** Is Complete */
+            is_complete: boolean;
+            /** Expected Lines */
+            expected_lines: number;
+            /** Scoring Version */
+            scoring_version: string;
+            /** Ref Version */
+            ref_version?: string | null;
+            /** Lines */
+            lines: components["schemas"]["ScoreLine"][];
+            alignment: components["schemas"]["SingAlignment"];
+            /** Created At */
+            created_at?: string | null;
+        };
+        /**
+         * AttemptStatus
+         * @description 任务状态（queued→processing→done|failed；轮询端点）。
+         *
+         *     `code` 仅失败态回带（50003 算法失败 / 50002 任务态丢失，docs/api/error-codes.md）。
+         */
+        AttemptStatus: {
+            /** Attempt Id */
+            attempt_id: number;
+            /** Status */
+            status: string;
+            progress: components["schemas"]["TaskProgress"];
+            /** Error */
+            error?: string | null;
+            /** Code */
+            code?: number | null;
+        };
         /** Body_asr_api_v1_asr_post */
         Body_asr_api_v1_asr_post: {
             /** Audio */
@@ -674,6 +754,34 @@ export interface components {
             /** Data */
             data?: unknown;
         };
+        /** Envelope[AttemptResult] */
+        Envelope_AttemptResult_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["AttemptResult"] | null;
+        };
+        /** Envelope[AttemptStatus] */
+        Envelope_AttemptStatus_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["AttemptStatus"] | null;
+        };
         /** Envelope[ChatResult] */
         Envelope_ChatResult_: {
             /**
@@ -687,6 +795,20 @@ export interface components {
              */
             message: string;
             data?: components["schemas"]["ChatResult"] | null;
+        };
+        /** Envelope[FavoriteState] */
+        Envelope_FavoriteState_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["FavoriteState"] | null;
         };
         /** Envelope[ScoreResult] */
         Envelope_ScoreResult_: {
@@ -702,6 +824,34 @@ export interface components {
             message: string;
             data?: components["schemas"]["ScoreResult"] | null;
         };
+        /** Envelope[SongDetail] */
+        Envelope_SongDetail_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["SongDetail"] | null;
+        };
+        /** Envelope[SubmitAck] */
+        Envelope_SubmitAck_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["SubmitAck"] | null;
+        };
         /** Envelope[TTSResult] */
         Envelope_TTSResult_: {
             /**
@@ -715,6 +865,21 @@ export interface components {
              */
             message: string;
             data?: components["schemas"]["TTSResult"] | null;
+        };
+        /** Envelope[list[SongSummary]] */
+        Envelope_list_SongSummary__: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            /** Data */
+            data?: components["schemas"]["SongSummary"][] | null;
         };
         /** EventIn */
         EventIn: {
@@ -740,6 +905,16 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * FavoriteState
+         * @description 收藏切换结果（PUT=收藏 / DELETE=取消，均幂等；docs/21 §3.6）。
+         */
+        FavoriteState: {
+            /** Song Id */
+            song_id: number;
+            /** Favorited */
+            favorited: boolean;
+        };
         /** FinalizeIn */
         FinalizeIn: {
             /** Attempts */
@@ -749,6 +924,20 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * PitchRef
+         * @description 逐句参考旋律（song_pitch_refs.pitch_ref；docs/10 §4.3 · pyin-v2）。
+         */
+        PitchRef: {
+            /** F0S */
+            f0s?: number[];
+            /** Notes */
+            notes?: (string | null)[];
+            /** Midi */
+            midi?: (number | null)[];
+            /** Onsets Ms */
+            onsets_ms?: number[] | null;
         };
         /** ProfileIn */
         ProfileIn: {
@@ -772,6 +961,51 @@ export interface components {
              * @default balanced
              */
             emphasis: string;
+        };
+        /**
+         * ScoreLine
+         * @description 逐句评分（sing_attempts.lines[i]；结构契约 docs/10 §4.3）。
+         */
+        ScoreLine: {
+            /** Seq */
+            seq: number;
+            /** Start Ms */
+            start_ms: number;
+            /** End Ms */
+            end_ms?: number | null;
+            /** Pitch Score */
+            pitch_score?: number | null;
+            /** Rhythm Score */
+            rhythm_score?: number | null;
+            /** Pron Score */
+            pron_score?: number | null;
+            /**
+             * Synced
+             * @default true
+             */
+            synced: boolean;
+            /**
+             * Skipped
+             * @default false
+             */
+            skipped: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Ref Seq */
+            ref_seq?: number | null;
+            /**
+             * No Ref
+             * @default false
+             */
+            no_ref: boolean;
+            /** Onset Dev Ms */
+            onset_dev_ms?: number | null;
+            /** Note Hit Rate */
+            note_hit_rate?: number | null;
+            /** User F0 */
+            user_f0?: number[][];
+            /** Cent Dev */
+            cent_dev?: number[];
         };
         /** ScoreResult */
         ScoreResult: {
@@ -808,6 +1042,145 @@ export interface components {
             song_id?: number | null;
         };
         /**
+         * SingAlignment
+         * @description 整首对齐与口径留痕（docs/10 §4.3 alignment 扩展；口径 v3/v4/v5）。
+         *
+         *     `extra="allow"`：口径升级新增的诊断键**必须透传**——响应模型只做类型标注，不做过滤。
+         */
+        SingAlignment: {
+            /** Bpm Ratio */
+            bpm_ratio?: number | null;
+            /** Bpm User */
+            bpm_user?: number | null;
+            /** Bpm Ref */
+            bpm_ref?: number | null;
+            /** Bpm Source */
+            bpm_source?: ("onset-f0" | "onset-flux" | "onset-arbitrated" | "duration") | null;
+            /** Offset Ms */
+            offset_ms?: number | null;
+            /** Time Warp Stretch */
+            time_warp_stretch?: number | null;
+            /** Windows Ms */
+            windows_ms?: number[][] | null;
+            /** Method */
+            method?: string | null;
+            /** Version */
+            version?: string | null;
+            /** Transpose Semitones */
+            transpose_semitones?: number | null;
+            /** Range Hint */
+            range_hint?: string | null;
+            /** Medfilt Kernel */
+            medfilt_kernel?: number | null;
+            /** Ref Coverage */
+            ref_coverage?: number | null;
+            /** Pitch Weight */
+            pitch_weight?: number | null;
+            /** Pitch Reliability */
+            pitch_reliability?: ("full" | "reduced" | "low") | null;
+            /** Weight Note */
+            weight_note?: string | null;
+            /** Note Hit Rate */
+            note_hit_rate?: number | null;
+            /** User Coverage */
+            user_coverage?: number | null;
+            /** Coverage Conf */
+            coverage_conf?: number | null;
+            /** Coverage Note */
+            coverage_note?: string | null;
+            /** Breath Structure */
+            breath_structure?: boolean | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * SongDetail
+         * @description `GET /api/v1/songs/{id}`：列表字段 + 逐句数据。
+         */
+        SongDetail: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Artist */
+            artist?: string | null;
+            /** Level */
+            level: number;
+            /** Duration S */
+            duration_s?: number | null;
+            /** Bpm */
+            bpm?: number | null;
+            /** Musical Key */
+            musical_key?: string | null;
+            /** Cover Url */
+            cover_url?: string | null;
+            /** Audio Url */
+            audio_url?: string | null;
+            /** Pitch Ref Status */
+            pitch_ref_status: string;
+            /** Expected Lines */
+            expected_lines: number;
+            /** Favorited */
+            favorited: boolean;
+            /** Lines */
+            lines: components["schemas"]["SongLine"][];
+        };
+        /**
+         * SongLine
+         * @description 歌曲详情的逐句 LRC + 参考旋律（D3 双序列图数据源）。
+         */
+        SongLine: {
+            /** Seq */
+            seq: number;
+            /** Start Ms */
+            start_ms: number;
+            /** End Ms */
+            end_ms?: number | null;
+            /** Text */
+            text?: string | null;
+            pitch_ref: components["schemas"]["PitchRef"];
+        };
+        /**
+         * SongSummary
+         * @description 选歌列表条目（`GET /api/v1/songs`）。
+         */
+        SongSummary: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Artist */
+            artist?: string | null;
+            /** Level */
+            level: number;
+            /** Duration S */
+            duration_s?: number | null;
+            /** Bpm */
+            bpm?: number | null;
+            /** Musical Key */
+            musical_key?: string | null;
+            /** Cover Url */
+            cover_url?: string | null;
+            /** Audio Url */
+            audio_url?: string | null;
+            /** Pitch Ref Status */
+            pitch_ref_status: string;
+            /** Expected Lines */
+            expected_lines: number;
+            /** Favorited */
+            favorited: boolean;
+        };
+        /**
+         * SubmitAck
+         * @description 整首上传受理回执（`POST /api/v1/sessions/{id}/audio`）。
+         */
+        SubmitAck: {
+            /** Attempt Id */
+            attempt_id: number;
+            /** Status */
+            status: string;
+        };
+        /**
          * TTSResult
          * @description TTS 响应数据。M1 stub 为 hex 字符串；M2 真 TTS 改二进制/URL 时更新契约（docs/06 §8）。
          */
@@ -816,6 +1189,22 @@ export interface components {
             audio_bytes: string;
             /** Length */
             length: number;
+        };
+        /**
+         * TaskProgress
+         * @description 任务进度（轮询展示用）。
+         */
+        TaskProgress: {
+            /**
+             * Done Lines
+             * @default 0
+             */
+            done_lines: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -1319,7 +1708,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_list_SongSummary__"];
                 };
             };
             /** @description Validation Error */
@@ -1353,7 +1742,75 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_SongDetail_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_song_favorite_api_v1_songs__song_id__favorite_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                song_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_FavoriteState_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_song_favorite_api_v1_songs__song_id__favorite_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                song_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_FavoriteState_"];
                 };
             };
             /** @description Validation Error */
@@ -1391,7 +1848,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_SubmitAck_"];
                 };
             };
             /** @description Validation Error */
@@ -1425,7 +1882,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_AttemptStatus_"];
                 };
             };
             /** @description Validation Error */
@@ -1459,7 +1916,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_AttemptResult_"];
                 };
             };
             /** @description Validation Error */
