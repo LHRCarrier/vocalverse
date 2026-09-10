@@ -4,16 +4,17 @@
  * 结果源 = 社区演示帖 + 演示用户/教程；输入即过滤；空态展示历史/热门 chips。
  * M3 接真实搜索接口（帖子/用户/教程索引）；词汇速记「划词即查」预留挂点（docs/34 §3）。
  */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
+import { fetchFollowRecommendations } from '@/api/community'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
-import { createDemoConversations } from '@/data/messages-demo'
 import '@/styles/mobile-uic.css'
 
 /**
- * 搜索（S3 后置 · A-13）：真实帖子/用户/教程索引随 S3 上线；当前为静态演示样本
- * （community-demo.ts 已随 S1 删除，此处保留少量展示样例维持演示可看性）。
+ * 搜索（S3 后置 · A-13）：真实帖子索引随搜索接口上线；当前「帖子/教程」为静态演示样本，
+ * **「用户」改为真实用户源**（2026-09-10 · 私信 IM 落地的副产物：原演示会话数据已删除，
+ * 用户结果改取 `GET /community/follows/recommendations` 的真实作者，避免演示假名与品牌名入库）。
  */
 const SEARCH_SAMPLES = [
   { id: 1, author: 'VocalVerse News', handle: '@vocalverse', tint: '#37546e', domain: '新闻稿', title: "Inside China's English learning boom", desc: 'AI partners meet human teachers' },
@@ -32,7 +33,20 @@ const keyword = ref('')
 const HISTORY = ['phrasal verbs', 'BBC 6 minute', 'MIT dorm life']
 const HOT = ['#Shadowing', '#EnglishLearning', '#BonfireNight']
 
-const users = createDemoConversations().map((c) => ({ name: c.name, handle: c.handle, tint: c.tint }))
+/** 真实用户源（推荐关注候选 = 全库用户分页，排除自己） */
+const users = ref<{ name: string; handle: string; tint: string }[]>([])
+onMounted(async () => {
+  try {
+    const recs = await fetchFollowRecommendations()
+    users.value = recs.map((r) => ({
+      name: r.author.nickname,
+      handle: r.author.handle ? `@${r.author.handle}` : '—',
+      tint: r.author.tint ?? '#37546e',
+    }))
+  } catch {
+    users.value = [] // 拉取失败：用户 tab 走空态，不阻塞其余搜索分类
+  }
+})
 const tutorials = [
   { title: '影子跟读法入门 · 10 分钟中文教程', tag: '口语' },
   { title: '5 个让口语更自然的连接词组', tag: '词汇' },
@@ -46,7 +60,7 @@ const posts = computed(() =>
     : [],
 )
 const foundUsers = computed(() =>
-  kw.value ? users.filter((u) => `${u.name} ${u.handle}`.toLowerCase().includes(kw.value)).slice(0, 10) : [],
+  kw.value ? users.value.filter((u) => `${u.name} ${u.handle}`.toLowerCase().includes(kw.value)).slice(0, 10) : [],
 )
 const foundTutorials = computed(() =>
   kw.value ? tutorials.filter((t) => t.title.toLowerCase().includes(kw.value)).slice(0, 10) : [],

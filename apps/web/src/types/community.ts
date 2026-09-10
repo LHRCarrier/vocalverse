@@ -21,6 +21,11 @@ export type RawCommentPage = components['schemas']['CommentPage']
 export type RawFollowSummary = components['schemas']['FollowSummary']
 export type RawFollowRecommend = components['schemas']['FollowRecommend']
 export type RawNotificationsPage = components['schemas']['NotificationsPage']
+/* 私信 IM（docs/49 · 2026-09-10；契约见 java-api.d.ts 的 DirectMessageController 段） */
+export type RawDirectMessageView = components['schemas']['DirectMessageView']
+export type RawConversationView = components['schemas']['ConversationView']
+export type RawMessagePage = components['schemas']['MessagePage']
+export type RawReadState = components['schemas']['ReadState']
 
 /**
  * 媒体元数据（后端 media jsonb）。
@@ -197,4 +202,44 @@ export interface NotificationsPage {
   items: NotificationItem[]
   nextCursor: string | null
   hasMore: boolean
+}
+
+/* ---------------- 私信 IM（docs/49 · 2026-09-10） ---------------- */
+
+/** 单条私信（`mine` = 我发的；`peerId` = 对方 userId，收发两侧都是「对方」）。 */
+export interface DirectMessageView {
+  id: number
+  peerId: number
+  body: string
+  mine: boolean
+  createdAt: string
+}
+
+/** 会话列表行（对端 + 最后一条 + 我未读数）。 */
+export interface ConversationView {
+  peer: AuthorView
+  lastMessageId: number
+  lastBody: string
+  lastMine: boolean
+  lastCreatedAt: string
+  unreadCount: number
+}
+
+/** 会话消息页（keyset 倒序；`nextCursor` = 下一页 beforeId）。 */
+export interface MessagePage {
+  items: DirectMessageView[]
+  nextCursor: number | null
+  hasMore: boolean
+}
+
+/** 已读上报结果（服务端权威水位）。 */
+export interface ReadState {
+  peerId: number
+  lastReadId: number
+}
+
+/** SSE 新消息事件载荷（对端视角：message.peerId = 发送者）。 */
+export interface MessageStreamPayload {
+  message: DirectMessageView
+  unreadCount: number
 }
