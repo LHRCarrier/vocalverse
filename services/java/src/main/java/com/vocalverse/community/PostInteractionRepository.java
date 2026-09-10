@@ -8,7 +8,13 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** 互动时序单（Java 写方；like/coin/share 唯一 (actor, post, action) 幂等）。 */
+/**
+ * 互动时序单（Java 写方；like/coin/share 唯一 (actor, post, action) 幂等）。
+ *
+ * <p><b>2026-09-10 管理端隐藏 · 通知中心泄漏修复</b>：本类的两条原生 SQL 是隐藏内容最容易漏掉的读路径 —— 隐藏只改 PostRepository
+ * 的话，被隐藏帖子的**点赞者/评论者仍在通知中心可见**， 泄漏的是「谁互动了哪条内容」这层社交图信息，比正文更难察觉。所以这里的 {@code = 'visible'} 全部放宽为
+ * {@code NOT IN ('hidden','deleted')}（docs/50 §6.2 联动硬点 1）。
+ */
 public interface PostInteractionRepository extends JpaRepository<PostInteractionEntity, Long> {
 
   Optional<PostInteractionEntity> findByActorIdAndPostIdAndAction(
@@ -86,7 +92,7 @@ public interface PostInteractionRepository extends JpaRepository<PostInteraction
               + "    FROM post_interactions p "
               + "    WHERE p.action = :action AND p.actor_id <> :authorId "
               + "      AND p.post_id IN (SELECT po.id FROM posts po "
-              + "                        WHERE po.author_id = :authorId AND po.status = 'visible') "
+              + "                        WHERE po.author_id = :authorId AND po.status NOT IN ('hidden', 'deleted')) "
               + "  ) g "
               + "  GROUP BY g.merge_key, g.post_id, g.action "
               + ") a "
@@ -151,9 +157,9 @@ public interface PostInteractionRepository extends JpaRepository<PostInteraction
           "SELECT c.id AS id, c.post_id AS postId, c.author_id AS authorId, "
               + "       c.body AS body, c.created_at AS createdAt "
               + "FROM post_comments c "
-              + "WHERE c.status = 'visible' "
+              + "WHERE c.status NOT IN ('hidden', 'deleted') "
               + "  AND c.post_id IN (SELECT po.id FROM posts po "
-              + "                    WHERE po.author_id = :authorId AND po.status = 'visible') "
+              + "                    WHERE po.author_id = :authorId AND po.status NOT IN ('hidden', 'deleted')) "
               + "  AND c.author_id <> :authorId "
               + "  AND (c.created_at < :cursorTs "
               + "       OR (c.created_at = :cursorTs AND c.id < :cursorId)) "

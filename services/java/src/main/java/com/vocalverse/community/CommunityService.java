@@ -41,8 +41,17 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 社区内容服务（Java 写方唯一实现 · docs/37 §5）。
  *
- * <p>沿用口径：统一可见谓词 status='visible'；互动与计数增减同事务；like/coin/share 幂等 （唯一键兜底 + 重复请求返回当前态）；checkin
- * 卡仅开放点赞（评论/投币/分享 40302）； media/checkin_snapshot 为 JSON 文本列 → ObjectMapper 转换。
+ * <p>沿用口径：统一可见谓词；互动与计数增减同事务；like/coin/share 幂等 （唯一键兜底 + 重复请求返回当前态）；checkin 卡仅开放点赞（评论/投币/分享 40302）；
+ * media/checkin_snapshot 为 JSON 文本列 → ObjectMapper 转换。
+ *
+ * <h2>统一可见谓词（2026-09-10 管理端隐藏）</h2>
+ *
+ * <p>{@code visible} 是**写入值**，不再直接当查询条件用；读路径一律问 {@link #isContentVisible(String)}（{@code NOT IN
+ * ('hidden','deleted')}）， 与 {@code PostRepository} / {@code PostCommentRepository} / {@code
+ * PostInteractionRepository} 的 SQL 谓词保持一致（docs/50 §6.2 联动硬点 1）。
+ *
+ * <p>{@link #detail} 对作者也不再放行 {@code hidden}（docs/50 §6.2 联动硬点 3「hidden 对作者也隐藏」）， 与 feed「我的发帖」一致 ——
+ * 否则作者点开链接仍能读到被处置的内容，隐藏等于没做。
  */
 @Service
 public class CommunityService {
@@ -53,8 +62,22 @@ public class CommunityService {
   public static final String ACTION_LIKE = "like";
   public static final String ACTION_COIN = "coin";
   public static final String ACTION_SHARE = "share";
+
+  /** 新内容的初始状态（写入值）。 */
   public static final String STATUS_VISIBLE = "visible";
+
+  /** 管理端隐藏（docs/50 §6.2；CHECK 已含该值，零迁移）。 */
+  public static final String STATUS_HIDDEN = "hidden";
+
+  /** 软删除（作者自删或管理端删除）。 */
+  public static final String STATUS_DELETED = "deleted";
+
   private static final int MAX_LIMIT = 20;
+
+  /** 统一可见谓词（docs/50 §6.2）：唯一读侧判定入口，避免各处自己写字符串比较。 */
+  public static boolean isContentVisible(String status) {
+    return status != null && !STATUS_HIDDEN.equals(status) && !STATUS_DELETED.equals(status);
+  }
 
   /** keyset 游标（base64url(epochMillis|id)）；null = 首页。 */
   private record Cursor(Instant ts, Long id) {}
@@ -163,8 +186,8 @@ public class CommunityService {
   @Transactional(readOnly = true)
   public CommunityPostView detail(Long userId, Long postId) {
     PostEntity post = posts.findById(postId).orElseThrow(() -> notFound("内容不存在或已删除"));
-    boolean isAuthor = post.getAuthorId().equals(userId);
-    if (!STATUS_VISIBLE.equals(post.getStatus()) && !isAuthor) {
+    // docs/50 §6.2 联动硬点 3：hidden 对作者也隐藏（作者从「我的帖子」的状态位看处置结果，不是继续读到正文）
+    if (!isContentVisible(post.getStatus())) {
       throw notFound("内容不存在或已删除");
     }
     return buildViews(List.of(post), userId).get(0);
@@ -176,7 +199,7 @@ public class CommunityService {
     if (!post.getAuthorId().equals(userId)) {
       throw new CommunityException(40302, "只能删除自己的内容", HttpStatus.FORBIDDEN);
     }
-    if (!STATUS_VISIBLE.equals(post.getStatus())) {
+    if (!isContentVisible(post.getStatus())) {
       throw notFound("内容不存在或已删除"); // 幂等：已删除视为不存在
     }
     post.setStatus("deleted");
