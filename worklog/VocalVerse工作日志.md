@@ -3,6 +3,33 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 社区 S2 收口（一）：J-03 通知分页改 DB 层 keyset + SQL 聚合（去 50 条内存窗口）
+
+- **背景**：J-03（docs/41 §1 登记「未实施」）——通知原为「近 50 条互动/评论 → 内存聚合 → 窗口内按游标重筛」：第 51 条及更早**永不可见**（翻页是窗口内反复重筛，与「游标分页可翻页」契约不符）+ 每页 O(窗口) 重算；
+- **修复（code 独立提交 `439f5a0`）**：互动组在 SQL 层 `GROUP BY post_id|action|当日UTC` + keyset `(latest_at DESC, merge_key ASC)` + LIMIT 下推；「最新互动者」用 `ROW_NUMBER() OVER (PARTITION BY merge_key …)` 取组内第一行；评论流改原生 keyset `(created_at DESC, id DESC)`（保留 J-04 的 `c.status='visible'` 与排除自身动作）；游标语义不变（`base64(micro(ts)|mergeKey)`）→ **契约零变更**；删掉无调用方的两条旧窗口查询（`findMine`）；
+- **测试（`e130d97`）**：`CommunitySocialTest` 跨窗口 2 例（**改前必红**：60 组翻页 seen=10 / 评论 50 封顶）+ PG 集成 EXPLAIN 断言（命中 `ix_post_interactions_post_action` / `ix_post_comments_status_post`）；
+- **踩坑**：① H2 的 GROUP BY 校验不接受「SELECT 里 CAST 出来的 merge_key 不参与 GROUP BY」→ 改子查询先算 merge_key、外层按 merge_key 分组；② 接口投影 `Instant getLatestAt()` 在 H2 抛 `Cannot project OffsetDateTime to Instant`（方言差异，见下条统一修复）；
+- **门禁**：`mvn verify` 72→**79** 绿、`-Pintegration` PG 集成 7→**8** 绿；契约快照零 diff（`@Hidden` 不计）。
+
+## 2026-09-10 社区 S2 收口（二）：私信 IM 真实化（4 端点 + SSE 长连 + 移动端接真 + 演示种子）
+
+- **背景与拍板（组长 2026-09-10）**：翻 `docs/41`/`docs/02`/`docs/42` 三处「私信不做/演示帧」口径，**私信真实化**、要「和常用社交平台一样的 IM 体感」、只做移动端；联调测试页**不新增**（登记豁免）；模块组织**维持现行规范**（不引入新目录形态）。设计先行：`docs/49-私信（IM）实施设计.md`（定稿）+ 两路子代理拷问（实时通道 / 未读口径，报告在 `local/`，不入库）；
+- **设计裁决**：实时通道 = **A · Java SSE 长连（`SseEmitter`）+ 进程内广播 + 轮询兜底**（否决 Redis pub/sub、WebSocket、纯轮询——写方在 Java、写与推同进程零跨服务通道；依据：100 长连内存 <10MB、空闲 0 DB 查询，而轮询 1320 请求/小时/人）；未读 = **会话级水位（`last_read_id`，非时间戳**——时间戳水位在并发提交下会跨过未渲染消息造成永久漏未读）；可见面 = 会话列表未读数字 + 私信 tab 提示（**不碰全局底栏**；底栏红点登记下轮，前置=全局未读聚合 + 实时通道定稿 + bell 语义）；
+- **后端（Java 社区主服务）**：迁移 **0012**（`direct_messages` + `dm_read_state`，Python 侧只读映射）→ 4 端点（会话列表 / 未读合计 / 会话消息 keyset / 发送 / 已读，自聊 42203、对端不存在 40402、1~1000 字）+ **SSE** `GET /messages/stream?since`（`@Hidden` 不进契约；连接注册表单用户 ≤3 流、全局 ≤500，超限 429 + `event:error`；心跳 25s；`since` 游标回放断线来信；`@EnableScheduling` 首次启用）；演示种子 `DirectMessageSeeder`（demoadult ↔ demoteen/demosenior，按会话对幂等）；
+- **ADR 限定修订（阻断项）**：`docs/06 §1/§8`、`docs/20`、`docs/21 §1.1 例外⑤`、`docs/api/envelope.md` —— 「Java 严禁进 语音/SSE/LLM 热路径」按原意收窄为**语音/LLM 热路径（含其 SSE）；社区域单向 SSE 归 Java**；
+- **前端（移动端 only）**：`api/community.ts` 5 函数 + 独立 `openMessageStream`（`audio/sse.ts` 硬绑 PYTHON_BASE/丢弃 `id:` 行 → 本函数 GET+Bearer+`since`）；`stores/messages.ts`（服务端水位真源、乐观发送回滚、SSE 优先→失败降级轮询、双通道按 id 去重）；通知中心私信 tab 与 `/m/messages`、`/m/messages/:id` 接真；删 `data/messages-demo.ts`；搜索页「用户」改真实源；
+- **门禁**：Java **79** 绿（私信 7 例）+ PG 集成 **8** 绿；前端 lint/typecheck/**test 223**/build/check-bundle 全绿；pytest **392** 绿；`alembic check` 零漂移；契约快照 55→**60 op** + `gen:api`；
+- **三端实测（dev 真栈）**：私信冒烟全绿——会话列表/发送/**未读 +1 → 已读归零**/自聊 42203/对端 40402/空正文 42203/**SSE `event:open` + 实时 `event:message` 帧**；J-03 冒烟——通知 9 条无重复翻页 + `EXPLAIN` 命中两条索引（脚本留 `local/smoke_im.ps1` / `local/smoke_j03.ps1`，gitignored）；
+- **真 PG 才暴露的三处方言坑（已修复 + 补集成回归 `399a197`）**：
+  1. **未类型化 NULL 游标**：`(:cursorTs IS NULL OR … :cursorKey)` → PG `could not determine data type of parameter $4`（H2 放过）→ 首页改传**哨兵值**（9999-12-31 + 空串 / `Long.MAX_VALUE`）；
+  2. **哨兵不能用 `Instant.MAX`**：驱动渲染 `169104627-12-11 … BC` → PG `timestamp out of range`；
+  3. **原生投影的时间列类型随方言而变**：同一条查询 PG 给 `Instant`、H2 给 `OffsetDateTime`，写死任一端都抛 `Cannot project …`（本轮两端各撞一次）→ 新增 `NativeProjections.toInstant(Object)` 归一，投影列声明 `Object`；
+  - 教训：**H2 绿 ≠ 真机绿**；凡新增原生 SQL（含游标/NULL 参数/时间列投影）必须过 `-Pintegration` 真 PG。
+- **登记**：`docs/49`（新，README 索引）、`docs/21`（Java 60 op + 私信行 + 例外⑤）、`docs/10`（待补表清单 38→40 与写方矩阵行）、`docs/13 §8`（联调页豁免）、`README`（能测段/私信 IM）、UI 与交互记录见 `worklog/安卓开发日志.md`；
+- **未做/登记**：群聊、消息撤回编辑、图片/语音消息、已读回执给对方看、推送、底栏红点、多副本广播（单实例内存广播；升级走 Redis pub/sub）、消息级已读、发布开关（`VOICEVERSE_COMMUNITY_POST_ENABLED` 默认关，私信不受其影响）。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-09 联调发现并修复：读书进度「第二次保存起 500」（ORM 过期属性跨会话访问）
 
 - **怎么发现的**：S3 验收时翻 `local/dev-logs/python-8000.err.log`，看到一串 `DetachedInstanceError`；随后用 live PG 复现：PUT 进度第 1 次 200、第 2 次起 500。

@@ -52,7 +52,7 @@ VocalVerse 面向不同年龄段英语学习者，产品形态 = **「练」+「
 - ✅ **能测**：注册/登录（Java JWT，演示账号 `demoadult`/`demoteen`/`demosenior`，密码 `demo123456`）→ 移动端全流程：**社区首页（S1 真实流：三领域 Tab + 为你推荐混排（含每日打卡卡）+ 发帖/评论/点赞/支持/分享，Java 社区接口）** → **口语**（先选场景 → 播放开场白 → 录音 ≤15s → 三维评分 + 语言点覆盖 + 教练笔记 → 8 轮收尾 → 评分报告）→ **AI 自由说**（麦克风或打字 → DeepSeek 流式 + TTS 播报）→ **英文小说阅读**（学习页「书房」→ 书架 → 书详情 → 阅读器：点词查义/生词本/划词批注/听书句级高亮/字号主题设置，docs/45；种子：`uv run python -m app.db.seed_reading`）→ **我的**；自定义答辩导师（粘贴论文 → AI 评委英文提问 → 等级反馈）；埋点 15 类事件；SSE 流式（音频为时间轴权威、文本字幕）。
 - ⏳ 真实语音链路需 `.env` 密钥（DeepSeek/讯飞）+ ffmpeg + whisper 模型；缺省时全链路走 Fake（`APP_TESTING=true`），联调冒烟脚本：`python scripts/poc/demo_smoke.py`。
 - ⏳ **听书引擎**：默认 edge（联网即可）；本地 KittenTTS（Apache-2.0 · CPU 实时 · 8 英文音色）可选启用——`services/python` 下 `uv sync --extra local-tts` + `.env` 置 `APP_VOICE_MODELS_DIR=<VoiceStudio 模型目录>`（模型权重不入库，docs/45 §5.1）。
-- ⏳ 唱吧/推荐/报表仍按 M3 排期推进；社区 S1 真实流已上线（发帖开关 `VOICEVERSE_COMMUNITY_POST_ENABLED=true` 演示开启、生产默认关）；**S2 关注 + 互动通知已真实化**（通知中心「通知/关注」两 tab = 真实流；「私信」tab 仍演示）；搜索/嵌套楼/视频播放器（S3）后置。
+- ⏳ 唱吧/推荐/报表仍按 M3 排期推进；社区 S1 真实流已上线（发帖开关 `VOICEVERSE_COMMUNITY_POST_ENABLED=true` 演示开启、生产默认关）；**S2 关注 + 互动通知已真实化**（通知中心「通知/关注」两 tab = 真实流）；**私信 IM 已真实化**（会话列表/会话页/未读 + **SSE 长连实时推送**，弱网自动降级轮询；种子 `demoadult ↔ demoteen/demosenior`，docs/49）；搜索/嵌套楼/视频播放器（S3）后置。
 
 ### 1. 一次性准备（工具链）
 
