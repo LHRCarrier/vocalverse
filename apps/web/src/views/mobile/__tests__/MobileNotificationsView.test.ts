@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   fetchFollows: {} as ReturnType<typeof vi.fn>,
   fetchFollowRecommendations: {} as ReturnType<typeof vi.fn>,
   fetchFollowingFeed: {} as ReturnType<typeof vi.fn>,
+  fetchConversations: {} as ReturnType<typeof vi.fn>,
+  fetchUnreadTotal: {} as ReturnType<typeof vi.fn>,
+  openMessageStream: {} as ReturnType<typeof vi.fn>,
   followUser: {} as ReturnType<typeof vi.fn>,
   unfollowUser: {} as ReturnType<typeof vi.fn>,
 }))
@@ -47,12 +50,28 @@ vi.mock('@/api/community', async (importOriginal) => {
   })
   mocks.followUser = vi.fn().mockResolvedValue({ data: null })
   mocks.unfollowUser = vi.fn().mockResolvedValue({ data: null })
+  // 私信 tab = 真实会话列表（docs/49 §4：未读为服务端水位口径）
+  mocks.fetchConversations = vi.fn().mockResolvedValue([
+    {
+      peer: { id: 2, nickname: 'Teacher Amy', handle: 'amyteach', tint: '#37546e', level: 'L3', avatarUrl: null },
+      lastMessageId: 9,
+      lastBody: '先读十分钟',
+      lastMine: false,
+      lastCreatedAt: now,
+      unreadCount: 2,
+    },
+  ])
+  mocks.fetchUnreadTotal = vi.fn().mockResolvedValue(2)
+  mocks.openMessageStream = vi.fn()
   return {
     ...actual,
     fetchNotifications: mocks.fetchNotifications,
     fetchFollows: mocks.fetchFollows,
     fetchFollowRecommendations: mocks.fetchFollowRecommendations,
     fetchFollowingFeed: mocks.fetchFollowingFeed,
+    fetchConversations: mocks.fetchConversations,
+    fetchUnreadTotal: mocks.fetchUnreadTotal,
+    openMessageStream: mocks.openMessageStream,
     followUser: mocks.followUser,
     unfollowUser: mocks.unfollowUser,
   }
@@ -77,11 +96,26 @@ beforeEach(() => {
   for (const k of Object.keys(mocks)) mocks[k as keyof typeof mocks]?.mockClear?.()
 })
 
-describe('MobileNotificationsView（S2 真实化）', () => {
-  it('私信 tab（默认）：演示会话列表仍渲染', async () => {
+describe('MobileNotificationsView（S2 真实化 + 私信 IM）', () => {
+  it('私信 tab（默认）：真实会话列表渲染（对端/LV/最后一条/未读数字 + 建立长连）', async () => {
     const wrapper = mountView()
-    expect(wrapper.text()).toContain('Kai')
-    expect(wrapper.text()).toContain('Momo')
+    await flushPromises()
+    const text = wrapper.text()
+    expect(mocks.fetchConversations).toHaveBeenCalled()
+    expect(text).toContain('Teacher Amy')
+    expect(text).toContain('LV3')
+    expect(text).toContain('先读十分钟')
+    expect(wrapper.find('.u-msg__unread').text()).toBe('2')
+    expect(mocks.openMessageStream).toHaveBeenCalled() // SSE 优先，失败才降级轮询
+  })
+
+  it('离开私信 tab：收流（不再占用长连）', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button.u-notif-tab')[1].trigger('click') // 切到「通知」
+    await flushPromises()
+    // 切走后再无新的建流调用（stopStream 生效；SSE 单用户 ≤3 流约束，docs/49 §3.1）
+    expect(mocks.openMessageStream).toHaveBeenCalledTimes(1)
   })
 
   it('通知 tab：mergeKey 聚合文案（张三 等 2 人…）+ 评论逐条带内容', async () => {
