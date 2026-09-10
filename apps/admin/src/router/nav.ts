@@ -54,6 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       { label: '书籍', path: '/content/books', icon: 'book', permission: 'content:book:read' },
       { label: '场景库', path: '/content/scenarios', icon: 'messages', permission: 'content:scenario:read' },
+      { label: '题库', path: '/content/questions', icon: 'list-check', permission: 'content:question:read' },
       { label: '媒体库', path: '/content/media', icon: 'photo', permission: 'content:media:read' },
       { label: '工单', path: '/content/tickets', icon: 'ticket', permission: 'content:ticket:read' },
       {

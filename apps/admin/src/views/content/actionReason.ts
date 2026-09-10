@@ -93,6 +93,20 @@ export const ROLE_EDIT_REASONS: ReasonOption[] = [
   { label: '其他', value: 'other' },
 ]
 
+/**
+ * 题目归档（`DELETE /content/questions/{id}` → `status='archived'`）。
+ *
+ * 为什么题库没有"上架"原因集：题库**没有** `content:question:publish` 权限码，
+ * `QuestionUpsert.status` 的取值域也只有 `published|archived`（无 draft）——
+ * 题目是"启用 / 归档"两态，不是三态的上下架语义（那三态属于歌曲 / 场景 / 听力素材）。
+ */
+export const QUESTION_ARCHIVE_REASONS: ReasonOption[] = [
+  { label: '题目有误', value: 'item_error' },
+  { label: '版本迭代（换新卷）', value: 'revision_bump' },
+  { label: '难度不合适', value: 'difficulty_mismatch' },
+  { label: '重复题目', value: 'duplicate' },
+]
+
 /** 确认框里对「原因去哪了」的一句话说明，避免运营以为它没被记下来 */
 const REASON_HINT = '原因用于本次操作确认；状态变更由服务端自动写审计流水（docs/50 §9.3）。'
 
