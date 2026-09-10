@@ -30,6 +30,8 @@ from app.api.routes import (
     reading_tts,
     recommendations,
 )
+from app.console.api.deps import ConsoleBizError
+from app.console.ops.middleware import HttpMetricsMiddleware
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.core.response import BizError
@@ -100,8 +102,30 @@ async def lifespan(app: FastAPI):
             logger.info("听书预合成任务孤儿清扫完成：%s 个", swept)
     except Exception as exc:  # 数据库未就绪等：仅告警不阻塞启动
         logger.warning("听书任务孤儿清扫跳过（%s）", exc)
-    yield
-    logger.info("vocalverse python-api stopped")
+    # 控制台采集（docs/50 §8.3/§8.4）：trace sink 消费者 + 指标采集器
+    from app.console.ops.runtime import start_collector, stop_collector
+    from app.console.trace.sink import get_sink
+
+    await get_sink().start()
+    await start_collector()
+    try:
+        yield
+    finally:
+        # docs/50 §8.3 的排水必须在 finally：
+        # uvicorn 会先等完在途连接再跑 lifespan shutdown，且 --timeout-graceful-shutdown
+        # 默认无限 → 正常退出路径**也可能**根本不走到这里。故：
+        # ① 排水自带超时（有界，绝不挂住进程）；② 超时未写出的条数计入 trace_dropped_total
+        # （"丢了多少"必须在控制台可见，而不是静默消失）；③ 用 finally 保证异常退出也尝试。
+        await stop_collector()
+        try:
+            remaining = await get_sink().stop()
+            if remaining:
+                logger.warning(
+                    "trace sink 关闭超时，丢弃 %s 条（已计入 trace_dropped_total）", remaining
+                )
+        except Exception as exc:  # 采集关闭失败不得影响进程退出
+            logger.warning("trace sink 关闭异常：%s", exc)
+        logger.info("vocalverse python-api stopped")
 
 
 app = FastAPI(
@@ -117,6 +141,16 @@ async def biz_error_handler(_: Request, exc: BizError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.http_status,
         content={"code": exc.code, "message": exc.message, "data": None},
+    )
+
+
+@app.exception_handler(ConsoleBizError)
+async def console_error_handler(_: Request, exc: ConsoleBizError) -> JSONResponse:
+    """控制台错误：比通用 BizError 多一个 ``data``（如 46002 的 ``required``、
+    46007 的 ``suggestedStep``、46011 的 ``violations[]`` —— docs/50 §10.4 明确要求回传）。"""
+    return JSONResponse(
+        status_code=exc.http_status,
+        content={"code": exc.code, "message": exc.message, "data": exc.data},
     )
 
 
@@ -139,6 +173,14 @@ app.include_router(recommendations.router)
 app.include_router(reading.router)  # 读书域（docs/45：书架/查词/生词/批注/进度/音色）
 app.include_router(reading_tts.router)  # 听书（单句音频/预合成 SSE/任务）
 app.include_router(media.router)  # 媒体（社区 S3 · docs/47 §4.1：图片/视频/头像上传与读取）
+# 管理端控制台 · Python 侧端点（docs/50 §10.3）：运维/遥测 + 内容治理（library）。
+# 鉴权走独立的控制台令牌（get_console_admin），与学习者 JWT 双密钥双 audience；
+# 端点内部各自做功能位闸门（APP_OPS_TELEMETRY_ENABLED / APP_LLM_TRACE_ENABLED → 46014）。
+from app.console.api.routes import library as console_library  # noqa: E402
+from app.console.api.routes import ops as console_ops  # noqa: E402
+
+app.include_router(console_ops.router)
+app.include_router(console_library.router)
 # Agent Lab（test-only 测试台；默认关闭，开启才注册 → 404；删除无影响，见 agent_lab.py 删除清单）
 if get_settings().agent_lab_enabled:
     from app.api.routes import agent_lab
@@ -157,6 +199,8 @@ if get_settings().shadow_preview_enabled:
 
     app.include_router(shadow_preview.router)
 app.add_middleware(RequestIdMiddleware)  # X-Request-Id 透传（docs/06 §11）
+# HTTP 指标（docs/50 §8.4：http.request.* / http.inflight）——纯 ASGI，不缓冲 SSE 响应
+app.add_middleware(HttpMetricsMiddleware)
 # CORS（2026-09-10 打包壳方案 B：页面源 https://localhost、API 打到本机 http://<IP>:8000，
 # 跨域 → 需 CORS）。开发靠 Vite 代理同源、容器靠 nginx 同源，均不触发；仅打包壳直连后端需要。
 # allow_credentials=True ⇒ 禁止 allow_origins=["*"]，需精确列出后端地址（含 https://localhost）。

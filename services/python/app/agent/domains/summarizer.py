@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 
+from app.console.trace.recorder import span
 from app.db import get_session_factory
 from app.models import ScenarioMessage
 from app.models import Session as DbSession
@@ -130,13 +131,27 @@ class SummarizerService:
             db.close()
 
     async def _chat_with_usage(self, prompt_user: str) -> tuple[str | None, dict | None]:
-        """优先 chat_with_usage（真客户端带用量）；退化普通 chat（Fake）。失败重试一次。"""
+        """优先 chat_with_usage（真客户端带用量）；退化普通 chat（Fake）。失败重试一次。
+
+        docs/50 §7.2：**每次尝试一个 span**，``retry_index`` 让"第 0 次 429、第 1 次成功"
+        这种重试在瀑布图上直接可见（此前重试是黑盒）。
+        """
         last_err: Exception | None = None
         fn = getattr(self._llm, "chat_with_usage", None)
         for attempt in range(RETRY_MAX + 1):
             try:
-                if fn is not None:
-                    raw, usage = await fn(
+                with span("LLM", retry_index=attempt, purpose="summary"):
+                    if fn is not None:
+                        raw, usage = await fn(
+                            [
+                                {"role": "system", "content": _PROMPT_SYSTEM},
+                                {"role": "user", "content": prompt_user},
+                            ],
+                            temperature=0.3,
+                            max_tokens=SUMMARY_MAX_TOKENS,
+                        )
+                        return raw, usage
+                    raw = await self._llm.chat(
                         [
                             {"role": "system", "content": _PROMPT_SYSTEM},
                             {"role": "user", "content": prompt_user},
@@ -144,16 +159,7 @@ class SummarizerService:
                         temperature=0.3,
                         max_tokens=SUMMARY_MAX_TOKENS,
                     )
-                    return raw, usage
-                raw = await self._llm.chat(
-                    [
-                        {"role": "system", "content": _PROMPT_SYSTEM},
-                        {"role": "user", "content": prompt_user},
-                    ],
-                    temperature=0.3,
-                    max_tokens=SUMMARY_MAX_TOKENS,
-                )
-                return raw, None
+                    return raw, None
             except Exception as exc:  # noqa: PERF203
                 last_err = exc
                 if attempt < RETRY_MAX:

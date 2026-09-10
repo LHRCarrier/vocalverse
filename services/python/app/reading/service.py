@@ -113,14 +113,22 @@ def list_books(
 
 
 def get_book_detail(session: Session, user_id: int, book_id: int) -> dict[str, Any] | None:
-    """书详情 + 章节列表（已读标记 = 进度所在章）。"""
+    """书详情 + 章节列表（已读标记 = 进度所在章）。
+
+    **下架必须真的不可见**（docs/50 §6.1 运营上下架 + 迁移 0013）：
+    - ``books.status != 'published'`` → 等同于不存在（返回 None，路由给 45001）；
+      ``list_books``（书架）此前已过滤，但详情页没过滤 = 下架后仍可直连 URL 进入，
+      是"下架零效果"的第二个漏点；
+    - 章节列表只出 ``status='published'`` 的章（``book_chapters.status`` 是 0013 新列，
+      本 PR 之前阅读路径完全不看它）。
+    """
     book = session.get(Book, book_id)
-    if book is None:
+    if book is None or book.status != "published":
         return None
     chapters = list(
         session.execute(
             select(BookChapter)
-            .where(BookChapter.book_id == book_id)
+            .where(BookChapter.book_id == book_id, BookChapter.status == "published")
             .order_by(BookChapter.chapter_no)
         ).scalars()
     )
@@ -165,9 +173,14 @@ def get_book_detail(session: Session, user_id: int, book_id: int) -> dict[str, A
 
 
 def get_chapter_split(session: Session, chapter_id: int) -> tuple[BookChapter, ChapterSplit] | None:
-    """章节正文 + 服务端权威切分（段落/句子/章内 offset 坐标系）。"""
+    """章节正文 + 服务端权威切分（段落/句子/章内 offset 坐标系）。
+
+    **下架章节不可读**（docs/50 §6.1 + 迁移 0013 新增 ``book_chapters.status``）：
+    这是章节正文的**唯一**读取入口（章节详情 / 听书预合成 / 批注锚点校验 / 划词），
+    在这一处加谓词即可让"章节下架"在全部阅读路径生效。
+    """
     chapter = session.get(BookChapter, chapter_id)
-    if chapter is None:
+    if chapter is None or chapter.status != "published":
         return None
     return chapter, split_chapter(chapter.content)
 

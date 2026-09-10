@@ -16,6 +16,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # 测试档固定值（docs/19 P0-9：CI 零真实 Key，docs/06 §5/§6 纪律；仅 APP_TESTING=true 生效）
 TEST_JWT_SECRET = "vocalverse-test-jwt-secret-0123456789abcdef"
 TEST_SERVICE_TOKEN = "vocalverse-test-internal-service-token"
+# 控制台令牌测试值：与学习者令牌**不同**（docs/50 §4.1 双密钥），也是 audience 闸门的回归样本
+TEST_CONSOLE_JWT_SECRET = "vocalverse-test-console-jwt-secret-0123456789"
 
 
 class Settings(BaseSettings):
@@ -183,6 +185,36 @@ class Settings(BaseSettings):
     # ---- 影子跟读测试台（test-only 前端联调页，DoD ④；默认关闭，生产禁止开启） ----
     shadow_preview_enabled: bool = False  # 开启时注册 /api/v1/shadow-preview/*
 
+    # =========================================================================
+    # 管理端控制台 · 运维/遥测（docs/50 §13.2；开关登记见 docs/06 §17，由组长登记）
+    # 注意：env 前缀 APP_（APP_LLM_TRACE_ENABLED / APP_OPS_TELEMETRY_ENABLED 等）
+    # =========================================================================
+
+    # ---- 采集开关 ----
+    # 结构采集（span 树/耗时/token/错误）默认开：不落正文，隐私风险低，是调优的基本盘。
+    llm_trace_enabled: bool = True  # APP_LLM_TRACE_ENABLED
+    # 内容捕获（prompt/response 正文）默认**关**：prompt 里可能带用户原话，属隐私敏感面；
+    # 与 docs/06 §9.7「只存评分/转写/元数据」一致，开启属受控例外（另见 recorder 硬禁采清单）。
+    llm_trace_content_capture: bool = False  # APP_LLM_TRACE_CONTENT_CAPTURE
+    # 指标采集器（60s 桶）与预警评估；关掉后控制台 ops 端点返回 46014（前端可读降级）。
+    ops_telemetry_enabled: bool = True  # APP_OPS_TELEMETRY_ENABLED
+
+    # ---- 采集参数（阈值口径见 docs/50 §7.5 / §8.3，非开关、不进功能位登记表） ----
+    llm_trace_sample_rate: float = 1.0  # 采样率（1.0=全采；<1 时按 trace 维度随机丢）
+    llm_trace_content_max_chars: int = 128000  # 单条内容上限（对齐 DSH 默认），超出截断
+    ops_telemetry_interval_s: int = 60  # 采集桶宽（秒），对齐 docs/50 §8.4
+    llm_trace_retention_days: int = 30  # trace/span 保留期（docs/50 §9.3）
+    llm_span_content_retention_hours: int = 72  # 内容保留期（比结构短，独立清理）
+    ops_metric_retention_days: int = 7  # 指标样本保留期
+
+    # ---- 控制台令牌（Java 签发，与学习者令牌**双密钥 + 双 audience**） ----
+    # 空串 = 控制台端点一律 46001（fail-closed）：宁可控制台不可用，不可用学习者密钥冒充。
+    # 不在 production 强制必填：控制台是独立部署面，缺省只影响控制台自身（其余端点不受累）。
+    console_jwt_secret: str = ""  # APP_CONSOLE_JWT_SECRET（生产必须与 APP_JWT_SECRET 不同）
+    console_jwt_audience: str = "vocalverse-console"  # APP_CONSOLE_JWT_AUDIENCE
+    console_jwt_issuer: str = "vocalverse-java"  # APP_CONSOLE_JWT_ISSUER
+    console_rate_per_min: int = 300  # 控制台账号限流（docs/50 §8.5）
+
     @model_validator(mode="after")
     def _resolve_secrets(self) -> "Settings":
         """密钥三档（docs/19 P0-9）：testing 固定测试值 / development 缺值告警 / production 强制。
@@ -197,16 +229,29 @@ class Settings(BaseSettings):
                 object.__setattr__(self, "jwt_secret", TEST_JWT_SECRET)
             if not self.service_token:
                 object.__setattr__(self, "service_token", TEST_SERVICE_TOKEN)
+            if not self.console_jwt_secret:
+                object.__setattr__(self, "console_jwt_secret", TEST_CONSOLE_JWT_SECRET)
         elif self.app_env == "production":
             if not self.jwt_secret:
                 raise ValueError("APP_JWT_SECRET 必填：production 禁默认密钥（docs/19 P0-9）")
             if not self.service_token:
                 raise ValueError("APP_SERVICE_TOKEN 必填：production 禁默认密钥（docs/19 P0-9）")
+            if self.console_jwt_secret and self.console_jwt_secret == self.jwt_secret:
+                # docs/50 §4.1：控制台令牌与学习者令牌必须双密钥——同密钥时 audience 校验
+                # 就是唯一闸门，一旦缺席即可越权，故在启动期直接拒绝。
+                raise ValueError(
+                    "APP_CONSOLE_JWT_SECRET 不得与 APP_JWT_SECRET 相同（docs/50 §4.1）"
+                )
         else:  # development / 其余
             if not self.jwt_secret:
                 warn("APP_JWT_SECRET 未设置（development 档）：JWT 验签将失败", stacklevel=2)
             if not self.service_token:
                 warn("APP_SERVICE_TOKEN 未设置（development 档）：内部委托将被拒", stacklevel=2)
+            if not self.console_jwt_secret:
+                warn(
+                    "APP_CONSOLE_JWT_SECRET 未设置（development 档）：控制台端点将 46001",
+                    stacklevel=2,
+                )
         return self
 
 

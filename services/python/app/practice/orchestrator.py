@@ -25,6 +25,7 @@ from app.audio.fluency import compute_fluency_features
 from app.audio.textproc.normalize import normalize_for_tts
 from app.audio.textproc.sentence_splitter import StreamSentenceSplitter
 from app.audio.tts import mp3_duration_seconds, tts_synthesize_cached
+from app.console.trace.recorder import span, trace
 from app.core.config import get_settings
 from app.db import get_session_factory
 from app.models import (
@@ -231,18 +232,25 @@ async def run_turn(
     if nonce is None:
         raise OrchestratorError(status_code=409, detail="session busy (lock held)")
 
+    # docs/50 §7.2：一次 turn = 一个 trace；ENTRY 由 start_trace 隐式打开。
+    # kind 取会话类型（dialog/defense/shadow）→ 控制台可按 kind 分组看调用量。
     try:
-        if state.kind == SessionKinds.DEFENSE:
-            async for event in _defense_turn(
-                state, action, audio, audio_url, asr, scorer, llm, tts
-            ):
-                yield event
-        elif state.kind == SessionKinds.SHADOW:
-            async for event in _shadow_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
-                yield event
-        else:
-            async for event in _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
-                yield event
+        with trace(kind=state.kind or "turn", session_id=session_id, user_id=user_id):
+            if state.kind == SessionKinds.DEFENSE:
+                async for event in _defense_turn(
+                    state, action, audio, audio_url, asr, scorer, llm, tts
+                ):
+                    yield event
+            elif state.kind == SessionKinds.SHADOW:
+                async for event in _shadow_turn(
+                    state, action, audio, audio_url, asr, scorer, llm, tts
+                ):
+                    yield event
+            else:
+                async for event in _dialog_turn(
+                    state, action, audio, audio_url, asr, scorer, llm, tts
+                ):
+                    yield event
     finally:
         await store.release_lock(session_id, nonce)
 
@@ -390,17 +398,31 @@ async def _dialog_turn(state, action, audio, audio_url, asr, scorer, llm, tts):
             )
 
         try:
-            async for delta in runner.run(messages):
-                yield ev.TextDelta(text=delta)
-                for line in splitter.push(delta):
-                    _spawn(line)
-                # 非阻塞排空已完成的句子（乱序完成由 seq 归一，事件顺序恒为文本顺序）
-                while next_emit in pending_tts:
-                    url, duration = pending_tts.pop(next_emit)
-                    next_emit += 1
-                    if url:
-                        emitted_urls.append(url)
-                        yield ev.AudioChunk(url=url, duration=duration)
+            # docs/50 §7.2 的树：AGENT（本回合的角色扮演智能体）→ STEP（一次生成步）
+            # → LLM（TurnRunner 内的每次尝试）。span 只包住 LLM+流式产出这一段，
+            # 不改任何业务语义（异常/取消由 recorder 保证关闭并标 error/aborted）。
+            # attrs 只放**一定存在**的标量：scenario 没有 code 列，写错会让 span 构造抛错
+            # 并被 recorder 降级成"没有 span"（此前实测踩过）。
+            with (
+                span(
+                    "AGENT",
+                    scene_id=scenario.id,
+                    turn_index=turn_index,
+                    difficulty=scenario.difficulty,
+                ),
+                span("STEP", step_index=0),
+            ):
+                async for delta in runner.run(messages):
+                    yield ev.TextDelta(text=delta)
+                    for line in splitter.push(delta):
+                        _spawn(line)
+                    # 非阻塞排空已完成的句子（乱序完成由 seq 归一，事件顺序恒为文本顺序）
+                    while next_emit in pending_tts:
+                        url, duration = pending_tts.pop(next_emit)
+                        next_emit += 1
+                        if url:
+                            emitted_urls.append(url)
+                            yield ev.AudioChunk(url=url, duration=duration)
         except Exception as exc:
             caught = True
             logger.warning("llm failed: %s", exc)
@@ -1008,21 +1030,23 @@ async def _conclude_summary(
             "Summarize this short speaking practice in one friendly English sentence: "
             f"{' | '.join(digest[-4:])}"
         )
-        fn = getattr(llm, "chat_with_usage", None)
-        if fn is not None:
-            raw, usage = await fn(
-                [{"role": "user", "content": content}],
-                temperature=0.4,
-                max_tokens=80,
-            )
-            if usage:
-                log_usage("conclude", usage, meta={"session_id": session_id})
-        else:
-            raw = await llm.chat(
-                [{"role": "user", "content": content}],
-                temperature=0.4,
-                max_tokens=80,
-            )
+        # docs/50 §7.2：收尾摘要是一次独立 LLM 尝试（独立 span，重试可见性交给上层循环）
+        with span("LLM", retry_index=0, purpose="conclude"):
+            fn = getattr(llm, "chat_with_usage", None)
+            if fn is not None:
+                raw, usage = await fn(
+                    [{"role": "user", "content": content}],
+                    temperature=0.4,
+                    max_tokens=80,
+                )
+                if usage:
+                    log_usage("conclude", usage, meta={"session_id": session_id})
+            else:
+                raw = await llm.chat(
+                    [{"role": "user", "content": content}],
+                    temperature=0.4,
+                    max_tokens=80,
+                )
         return (raw or "")[:200]
     except Exception:
         return "Well done! Keep practicing."
