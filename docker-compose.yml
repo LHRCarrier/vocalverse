@@ -49,6 +49,11 @@ services:
       APP_SERVICE_TOKEN: ${APP_SERVICE_TOKEN:?required}
       # 模型使用镜像内预下载副本（docs/06 §8 / 审计 R-11：容器网络到 HF 不可达；本地裸跑仍走 'small' 联网下载）
       APP_ASR_MODEL: /app/models/whisper-small
+      # 内部 REST 委托地址（docs/21 §4：Python → Java 的参考旋律门禁翻转 / 档位回写 / 打卡卡物化）。
+      # 必须用**容器网络服务名**：`config.py` 默认 `http://localhost:8080` 只适用于裸跑（host 上的 Java），
+      # 在容器内指容器自己 → Connection refused（2026-09-10 复测实测：提取完成却翻不了 ready，
+      # 新环境/世代重建后歌曲永久 40905）。故此处显式钉死，不受 .env 影响。
+      APP_JAVA_BASE_URL: http://java-api:8080
     # docs/06 §8：whisper 信号量 2 下多 worker 收益为负（每进程 ≈500MB 模型）；内存 ≥2GB 显式护栏
     mem_limit: 2g
     ports:
