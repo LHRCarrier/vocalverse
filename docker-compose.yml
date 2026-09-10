@@ -131,5 +131,24 @@ services:
       java-api:
         condition: service_healthy
 
+  # 管理端控制台（独立 SPA · docs/50）。
+  # 挂在 profile 里：默认 `docker compose up` **不启动**它，
+  # 因此 README 的「五服务全 healthy」验收口径与部署流程零变化；
+  # 需要时显式拉起：
+  #   docker compose --profile console up -d --build admin-console
+  #   → http://localhost:8089/console/
+  admin-console:
+    profiles: ["console"]
+    build:
+      context: ./apps/admin
+    ports:
+      - "8089:80"
+    # 控制台只是静态产物 + 反代，健康不依赖上游起来（上游不可用时页面自己报错更好排查）
+    depends_on:
+      python-api:
+        condition: service_started
+      java-api:
+        condition: service_started
+
 volumes:
   pgdata:
