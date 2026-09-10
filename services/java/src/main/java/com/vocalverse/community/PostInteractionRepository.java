@@ -1,7 +1,6 @@
 package com.vocalverse.community;
 
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -56,11 +55,11 @@ public interface PostInteractionRepository extends JpaRepository<PostInteraction
     Integer getItemCount();
 
     /**
-     * H2/PG 原生查询的 timestamptz 列投影到接口时返回 {@link OffsetDateTime}（Spring Data 无 Instant 转换器，
-     * 2026-09-10 实测 {@code Cannot project java.time.OffsetDateTime to java.time.Instant}）；服务层统一
-     * {@code .toInstant()} 归一到既有 Instant 口径。
+     * 原生查询的 timestamptz 列投影为 {@link Object}：**PG 返回 {@code Instant}、H2 返回 {@code
+     * OffsetDateTime}**（两方言类型不同，Spring Data 无跨类型转换器，2026-09-10 真 PG 联调实测）——服务层用 {@code
+     * DirectMessagingService.toInstant(Object)} 归一。
      */
-    OffsetDateTime getLatestAt();
+    Object getLatestAt();
 
     Long getLatestId();
   }
@@ -68,9 +67,11 @@ public interface PostInteractionRepository extends JpaRepository<PostInteraction
   /**
    * 通知分页查询（J-03）：互动聚合组 UNION 评论单条 → keyset {@code (latestAt, mergeKey)} 过滤 → 排序 → LIMIT。
    *
-   * <p>与旧实现的差别：**数据不再被 50 行窗口截断**（第 51 条及更早同样可翻到），且聚合在 SQL 层完成 （每页 O(limit)，而非 O(窗口) 重算）。cursor
-   * 为空时不过滤（首页）。 {@code action} 为空 = 只要评论；非空 = 只要该 action 的互动组（三个 action + 评论共 4 次查询，页内归并后截断到
-   * limit+1）。
+   * <p>与旧实现的差别：**数据不再被 50 行窗口截断**（第 51 条及更早同样可翻到），且聚合在 SQL 层完成 （每页 O(limit)，而非 O(窗口) 重算）。
+   *
+   * <p><b>首页游标用哨兵值，不用 NULL</b>（2026-09-10 真 PG 实测）：`(:cursorTs IS NULL OR … merge_key &gt;
+   * :cursorKey)` 在 PG 报 `could not determine data type of parameter $4`——游标键参数在「IS NULL 分支」下类型未知（H2
+   * 放过， PG 拒绝）。首页传 {@code Instant.MAX} + 空串即恒真，语义等价且两方言一致（同 docs/37 §9「PG 未类型化 NULL」族）。
    */
   @Query(
       value =
@@ -89,7 +90,7 @@ public interface PostInteractionRepository extends JpaRepository<PostInteraction
               + "  ) g "
               + "  GROUP BY g.merge_key, g.post_id, g.action "
               + ") a "
-              + "WHERE (:cursorTs IS NULL OR a.latest_at < :cursorTs "
+              + "WHERE (a.latest_at < :cursorTs "
               + "       OR (a.latest_at = :cursorTs AND a.merge_key > :cursorKey)) "
               + "ORDER BY a.latest_at DESC, a.merge_key ASC "
               + "LIMIT :pageSize",
@@ -135,10 +136,16 @@ public interface PostInteractionRepository extends JpaRepository<PostInteraction
 
     String getBody();
 
-    /** 同 {@link NotificationGroupRow#getLatestAt()}：原生投影返回 OffsetDateTime。 */
-    OffsetDateTime getCreatedAt();
+    /** 同 {@link NotificationGroupRow#getLatestAt()}：原生投影的类型随方言不同，服务层归一到 Instant。 */
+    Object getCreatedAt();
   }
 
+  /**
+   * 评论流分页（J-03）：逐条通知的 DB 层 keyset（{@code (created_at,id)}），不再受 50 条窗口截断。
+   *
+   * <p>同 {@link #notificationGroups}：**首页游标用哨兵值**（{@code Instant.MAX} + {@code Long.MAX_VALUE}）——
+   * 不用 NULL 参数，避免 PG 的 `could not determine data type of parameter`（2026-09-10 真 PG 实测）。
+   */
   @Query(
       value =
           "SELECT c.id AS id, c.post_id AS postId, c.author_id AS authorId, "
@@ -148,7 +155,7 @@ public interface PostInteractionRepository extends JpaRepository<PostInteraction
               + "  AND c.post_id IN (SELECT po.id FROM posts po "
               + "                    WHERE po.author_id = :authorId AND po.status = 'visible') "
               + "  AND c.author_id <> :authorId "
-              + "  AND (:cursorTs IS NULL OR c.created_at < :cursorTs "
+              + "  AND (c.created_at < :cursorTs "
               + "       OR (c.created_at = :cursorTs AND c.id < :cursorId)) "
               + "ORDER BY c.created_at DESC, c.id DESC "
               + "LIMIT :pageSize",

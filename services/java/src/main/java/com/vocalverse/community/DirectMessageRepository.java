@@ -1,6 +1,5 @@
 package com.vocalverse.community;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -47,11 +46,12 @@ public interface DirectMessageRepository extends JpaRepository<DirectMessageEnti
     Long getLastSenderId();
 
     /**
-     * 原生查询的 timestamptz 列投影到接口返回 {@link OffsetDateTime}（Spring Data 无 Instant 转换器， 2026-09-10 实测
-     * `Cannot project java.time.OffsetDateTime to java.time.Instant`）；DTO 层直接沿用
-     * OffsetDateTime（Jackson 序列化为 ISO-8601，与 Instant 同形）。
+     * 原生查询的 timestamptz 列投影为 {@link Object}：**PG 返回 {@code Instant}、H2 返回 {@code
+     * OffsetDateTime}**（同一份接口投影在两种方言下类型不同，Spring Data 无跨类型转换器——2026-09-10 实跑， H2 测试绿、真 PG 联调
+     * 500：`Cannot project java.time.Instant to java.time.OffsetDateTime`）； 由 {@code
+     * DirectMessagingService.toInstant(Object)} 归一，两个方言都能跑。
      */
-    OffsetDateTime getLastCreatedAt();
+    Object getLastCreatedAt();
 
     Long getUnreadCount();
   }

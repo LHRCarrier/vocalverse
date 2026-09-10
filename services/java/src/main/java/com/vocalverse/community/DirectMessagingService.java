@@ -71,7 +71,7 @@ public class DirectMessagingService {
               r.getLastMessageId(),
               r.getLastBody(),
               me.equals(r.getLastSenderId()),
-              r.getLastCreatedAt(),
+              NativeProjections.toInstant(r.getLastCreatedAt()),
               r.getUnreadCount() == null ? 0L : r.getUnreadCount()));
     }
     return out;

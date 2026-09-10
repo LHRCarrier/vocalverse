@@ -19,7 +19,7 @@ public final class MessageView {
       Long lastMessageId,
       String lastBody,
       boolean lastMine,
-      java.time.OffsetDateTime lastCreatedAt,
+      Instant lastCreatedAt,
       long unreadCount) {}
 
   /** 会话消息页（keyset 倒序；{@code nextCursor} = 下一页 beforeId）。 */

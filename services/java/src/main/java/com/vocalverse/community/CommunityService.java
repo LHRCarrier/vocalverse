@@ -59,6 +59,12 @@ public class CommunityService {
   /** keyset 游标（base64url(epochMillis|id)）；null = 首页。 */
   private record Cursor(Instant ts, Long id) {}
 
+  /**
+   * 通知分页「首页」哨兵时间：不用 NULL（PG 推断不出 IS NULL 分支下游标参数类型），也不用 {@link Instant#MAX} （驱动渲染为公元前年份，PG 报
+   * `timestamp out of range`）——9999-12-31 足够大且两方言可绑定。
+   */
+  private static final Instant NOTI_CURSOR_MAX_TS = Instant.parse("9999-12-31T23:59:59Z");
+
   private final PostRepository posts;
   private final PostCommentRepository comments;
   private final PostLikeRepository likes;
@@ -480,6 +486,13 @@ public class CommunityService {
     CursorThreshold threshold = decodeNotiCursor(cursor);
     // 各源取 pageSize+1：归并后判定 hasMore（keyset 阈值语义与旧实现一致——同刻按 mergeKey 升序）
     int fetch = pageSize + 1;
+    // 首页游标用哨兵值（比任何真实行都「新」/都「小」），**不用 NULL**：PG 推断不出 IS NULL 分支下游标参数
+    // 的数据类型（`could not determine data type of parameter $4`，2026-09-10 真 PG 联调实测；H2 放过）。
+    // 哨兵不能取 Instant.MAX——驱动会渲染成 "-12-11 19:08:16+00 BC" 撞 PG 的 timestamp 范围
+    // （`timestamp out of range`，同一轮实测）；取 9999-12-31 足够覆盖演示与生产数据。
+    Instant cursorTs = threshold.ts() == null ? NOTI_CURSOR_MAX_TS : threshold.ts();
+    String cursorKey = threshold.key() == null ? "" : threshold.key();
+    Long commentCursor = commentCursorId(threshold.key());
 
     List<NotificationItem> candidates = new ArrayList<>();
     Set<Long> postIds = new HashSet<>();
@@ -489,7 +502,7 @@ public class CommunityService {
 
     for (String action : List.of(ACTION_LIKE, ACTION_COIN, ACTION_SHARE)) {
       List<PostInteractionRepository.NotificationGroupRow> groups =
-          interactions.notificationGroups(me, action, threshold.ts(), threshold.key(), fetch);
+          interactions.notificationGroups(me, action, cursorTs, cursorKey, fetch);
       if (groups.isEmpty()) continue;
       List<Long> postIdsOfGroups =
           groups.stream()
@@ -510,7 +523,7 @@ public class CommunityService {
                 null,
                 g.getItemCount(),
                 null,
-                g.getLatestAt().toInstant()));
+                NativeProjections.toInstant(g.getLatestAt())));
         postIds.add(g.getPostId());
         Long actor = groupActors.getOrDefault(g.getMergeKey(), me);
         itemActors.put(id, actor);
@@ -520,7 +533,7 @@ public class CommunityService {
 
     List<PostInteractionRepository.NotificationCommentRow> cmts =
         interactions.notificationComments(
-            me, threshold.ts(), commentCursorId(threshold.key()), fetch);
+            me, cursorTs, commentCursor == null ? Long.MAX_VALUE : commentCursor, fetch);
     for (PostInteractionRepository.NotificationCommentRow c : cmts) {
       String id = "c|" + c.getId();
       candidates.add(
@@ -532,7 +545,7 @@ public class CommunityService {
               null,
               1,
               c.getBody(),
-              c.getCreatedAt().toInstant()));
+              NativeProjections.toInstant(c.getCreatedAt())));
       postIds.add(c.getPostId());
       itemActors.put(id, c.getAuthorId());
       actorIds.add(c.getAuthorId());
