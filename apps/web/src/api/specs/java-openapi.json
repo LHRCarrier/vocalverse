@@ -5,6 +5,529 @@
     "version" : "v0"
   },
   "paths" : {
+    "/api/v1/console/roles/{id}/permissions" : {
+      "put" : {
+        "tags" : [ "console-rbac-controller" ],
+        "operationId" : "putPermissions",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeRoleView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/songs/{id}" : {
+      "get" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "getSong",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "updateSong",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SongUpsert"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "archiveSong",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/songs/{id}/lrc" : {
+      "get" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "getLrc",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeListMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "replaceLrc",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LrcUpsert"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeListMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/scenarios/{id}" : {
+      "get" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "getScenario",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "updateScenario",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ScenarioUpsert"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "archiveScenario",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/questions/{id}" : {
+      "get" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "getQuestion",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "updateQuestion",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/QuestionPatch"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "archiveQuestion",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/listening-materials/{id}" : {
+      "get" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "getMaterial",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "updateMaterial",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MaterialUpsert"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "archiveMaterial",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/community/posts/{id}/likes" : {
       "put" : {
         "tags" : [ "community-controller" ],
@@ -165,391 +688,6 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/EnvelopeVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/songs/{id}" : {
-      "get" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "getSong",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeSongView"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "updateSong",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/SongUpsert"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeSongView"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "archiveSong",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeSongView"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/songs/{id}/lrc" : {
-      "get" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "getLrc",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeListLrcView"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "replaceLrc",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/LrcUpsert"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeListLrcView"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/scenarios/{id}" : {
-      "get" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "getScenario",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeScenarioView"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "updateScenario",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/ScenarioUpsert"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeScenarioView"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "archiveScenario",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeScenarioView"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/placement-questions/{id}" : {
-      "put" : {
-        "tags" : [ "question-admin-controller" ],
-        "operationId" : "update",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/QuestionPatch"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeQuestionView"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete" : {
-        "tags" : [ "question-admin-controller" ],
-        "operationId" : "archive",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeQuestionView"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/listening-materials/{id}" : {
-      "get" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "getMaterial",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeMaterialView"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "updateMaterial",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MaterialUpsert"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeMaterialView"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "archiveMaterial",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeMaterialView"
                 }
               }
             }
@@ -764,6 +902,998 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/EnvelopeTicketView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/roles" : {
+      "get" : {
+        "tags" : [ "console-rbac-controller" ],
+        "operationId" : "listRoles",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeListRoleView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "console-rbac-controller" ],
+        "operationId" : "createRole",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RoleCreate"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeRoleView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/moderation/reports/{id}/handle" : {
+      "post" : {
+        "tags" : [ "moderation-controller" ],
+        "operationId" : "handleReport",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReportHandle"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeReportView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/moderation/cases" : {
+      "get" : {
+        "tags" : [ "moderation-controller" ],
+        "operationId" : "listCases",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "name" : "page_size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "pattern" : "pending|approved|rejected|escalated|withdrawn",
+            "type" : "string"
+          }
+        }, {
+          "name" : "targetType",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "pattern" : "post|comment|media|direct_message",
+            "type" : "string"
+          }
+        }, {
+          "name" : "priority",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 3,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "assigneeId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePageViewCaseView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "moderation-controller" ],
+        "operationId" : "createCase",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CaseCreate"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeCaseView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/moderation/cases/{id}/decision" : {
+      "post" : {
+        "tags" : [ "moderation-controller" ],
+        "operationId" : "decide",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CaseDecision"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeCaseView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/moderation/cases/{id}/assign" : {
+      "post" : {
+        "tags" : [ "moderation-controller" ],
+        "operationId" : "assign",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CaseAssign"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeCaseView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/songs" : {
+      "get" : {
+        "tags" : [ "console-content-controller" ],
+        "operationId" : "listSongs",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "name" : "page_size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "pattern" : "draft|published|archived",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePageViewSongRow"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "createSong",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SongUpsert"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/songs/{id}/publish" : {
+      "post" : {
+        "tags" : [ "console-content-controller" ],
+        "operationId" : "publishSong",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PublishRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePublishView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/scenarios" : {
+      "get" : {
+        "tags" : [ "console-content-controller" ],
+        "operationId" : "listScenarios",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "name" : "page_size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "pattern" : "draft|published|archived",
+            "type" : "string"
+          }
+        }, {
+          "name" : "sceneType",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePageViewScenarioRow"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "createScenario",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ScenarioUpsert"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/scenarios/{id}/publish" : {
+      "post" : {
+        "tags" : [ "console-content-controller" ],
+        "operationId" : "publishScenario",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PublishRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePublishView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/questions" : {
+      "get" : {
+        "tags" : [ "console-content-controller" ],
+        "operationId" : "listQuestions",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "name" : "page_size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "examRevision",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "pattern" : "published|archived",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePageViewQuestionRow"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "createQuestion",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/QuestionUpsert"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/listening-materials" : {
+      "get" : {
+        "tags" : [ "console-content-controller" ],
+        "operationId" : "listMaterials",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "name" : "page_size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "pattern" : "draft|published|archived",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePageViewMaterialRow"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "console-content-write-controller" ],
+        "operationId" : "createMaterial",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MaterialUpsert"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/listening-materials/{id}/publish" : {
+      "post" : {
+        "tags" : [ "console-content-controller" ],
+        "operationId" : "publishMaterial",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PublishRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePublishView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/auth/refresh" : {
+      "post" : {
+        "tags" : [ "console-auth-controller" ],
+        "operationId" : "refresh_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeSessionView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/auth/logout" : {
+      "post" : {
+        "tags" : [ "console-auth-controller" ],
+        "operationId" : "logout_1",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/auth/login" : {
+      "post" : {
+        "tags" : [ "console-auth-controller" ],
+        "operationId" : "login_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeSessionView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/admins" : {
+      "get" : {
+        "tags" : [ "console-rbac-controller" ],
+        "operationId" : "listAdmins",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "name" : "page_size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "q",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }, {
+          "name" : "roleId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "pattern" : "active|disabled",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePageViewAdminView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "console-rbac-controller" ],
+        "operationId" : "createAdmin",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AdminCreate"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeAdminView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/admins/{id}/password" : {
+      "post" : {
+        "tags" : [ "console-rbac-controller" ],
+        "operationId" : "resetPassword",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PasswordReset"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
                 }
               }
             }
@@ -1031,289 +2161,6 @@
         }
       }
     },
-    "/api/v1/admin/songs" : {
-      "get" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "listSongs",
-        "parameters" : [ {
-          "name" : "page",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32",
-            "default" : 1
-          }
-        }, {
-          "name" : "page_size",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "maximum" : 100,
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32",
-            "default" : 20
-          }
-        }, {
-          "name" : "status",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "pattern" : "draft|published|archived",
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopePageViewSongView"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "createSong",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/SongUpsert"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeSongView"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/scenarios" : {
-      "get" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "listScenarios",
-        "parameters" : [ {
-          "name" : "page",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32",
-            "default" : 1
-          }
-        }, {
-          "name" : "page_size",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "maximum" : 100,
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32",
-            "default" : 20
-          }
-        }, {
-          "name" : "status",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "pattern" : "draft|published|archived",
-            "type" : "string"
-          }
-        }, {
-          "name" : "sceneType",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopePageViewScenarioView"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "createScenario",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/ScenarioUpsert"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeScenarioView"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/placement-questions" : {
-      "get" : {
-        "tags" : [ "question-admin-controller" ],
-        "operationId" : "list_2",
-        "parameters" : [ {
-          "name" : "examRevision",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeListQuestionView"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post" : {
-        "tags" : [ "question-admin-controller" ],
-        "operationId" : "create_2",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/QuestionUpsert"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeQuestionView"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/listening-materials" : {
-      "get" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "listMaterials",
-        "parameters" : [ {
-          "name" : "page",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32",
-            "default" : 1
-          }
-        }, {
-          "name" : "page_size",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "maximum" : 100,
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32",
-            "default" : 20
-          }
-        }, {
-          "name" : "status",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "pattern" : "draft|published|archived",
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopePageViewMaterialView"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post" : {
-        "tags" : [ "content-admin-controller" ],
-        "operationId" : "createMaterial",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MaterialUpsert"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeMaterialView"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/users/me" : {
       "patch" : {
         "tags" : [ "user-controller" ],
@@ -1342,11 +2189,18 @@
         }
       }
     },
-    "/api/v1/admin/users/{id}/status" : {
+    "/api/v1/console/users/{id}/status" : {
       "patch" : {
-        "tags" : [ "admin-user-controller" ],
-        "operationId" : "updateStatus",
+        "tags" : [ "console-user-controller" ],
+        "operationId" : "setStatus",
         "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
           "name" : "id",
           "in" : "path",
           "required" : true,
@@ -1379,11 +2233,18 @@
         }
       }
     },
-    "/api/v1/admin/users/{id}/profile" : {
+    "/api/v1/console/users/{id}/profile" : {
       "patch" : {
-        "tags" : [ "admin-user-controller" ],
+        "tags" : [ "console-user-controller" ],
         "operationId" : "updateProfile",
         "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
           "name" : "id",
           "in" : "path",
           "required" : true,
@@ -1416,11 +2277,119 @@
         }
       }
     },
-    "/api/v1/admin/tickets/{id}" : {
-      "patch" : {
-        "tags" : [ "admin-ticket-controller" ],
-        "operationId" : "update_1",
+    "/api/v1/console/roles/{id}" : {
+      "delete" : {
+        "tags" : [ "console-rbac-controller" ],
+        "operationId" : "deleteRole",
         "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch" : {
+        "tags" : [ "console-rbac-controller" ],
+        "operationId" : "patchRole",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RolePatch"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeRoleView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/tickets/{id}" : {
+      "get" : {
+        "tags" : [ "console-content-controller" ],
+        "operationId" : "getTicket",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeTicketView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch" : {
+        "tags" : [ "console-content-controller" ],
+        "operationId" : "patchTicket",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
           "name" : "id",
           "in" : "path",
           "required" : true,
@@ -1446,6 +2415,50 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/EnvelopeTicketView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/admins/{id}" : {
+      "patch" : {
+        "tags" : [ "console-rbac-controller" ],
+        "operationId" : "patchAdmin",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AdminPatch"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeAdminView"
                 }
               }
             }
@@ -1507,10 +2520,502 @@
         }
       }
     },
+    "/api/v1/console/users" : {
+      "get" : {
+        "tags" : [ "console-user-controller" ],
+        "operationId" : "list",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "name" : "page_size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "q",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }, {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "pattern" : "active|disabled",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePageViewUserRow"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/users/{id}" : {
+      "get" : {
+        "tags" : [ "console-user-controller" ],
+        "operationId" : "detail",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeUserDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/permissions" : {
+      "get" : {
+        "tags" : [ "console-rbac-controller" ],
+        "operationId" : "listPermissions",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeListMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/moderation/stats" : {
+      "get" : {
+        "tags" : [ "moderation-controller" ],
+        "operationId" : "stats",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 90,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 30
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/moderation/reports" : {
+      "get" : {
+        "tags" : [ "moderation-controller" ],
+        "operationId" : "listReports",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "name" : "page_size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "pattern" : "pending|accepted|rejected|duplicate",
+            "type" : "string"
+          }
+        }, {
+          "name" : "targetType",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "pattern" : "post|comment|media|direct_message",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePageViewReportView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/moderation/contract" : {
+      "get" : {
+        "tags" : [ "moderation-controller" ],
+        "operationId" : "contract",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/moderation/cases/{id}" : {
+      "get" : {
+        "tags" : [ "moderation-controller" ],
+        "operationId" : "getCase",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/tickets" : {
+      "get" : {
+        "tags" : [ "console-content-controller" ],
+        "operationId" : "listTickets",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "name" : "page_size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "pattern" : "open|processing|resolved|closed",
+            "type" : "string"
+          }
+        }, {
+          "name" : "kind",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "pattern" : "feedback|bug|content_correction",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePageViewTicketView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/content/publish-events" : {
+      "get" : {
+        "tags" : [ "console-content-controller" ],
+        "operationId" : "publishEvents",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "name" : "page_size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "targetType",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "pattern" : "song|listening_material|scenario|book|chapter",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePageViewMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/auth/me" : {
+      "get" : {
+        "tags" : [ "console-auth-controller" ],
+        "operationId" : "me_1",
+        "parameters" : [ {
+          "name" : "me",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ConsolePrincipal"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeMeView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/audit-logs" : {
+      "get" : {
+        "tags" : [ "console-audit-controller" ],
+        "operationId" : "list_1",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "name" : "page_size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "action",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "actionPrefix",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "targetType",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "adminUserId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "result",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "from",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePageViewAuditLogView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/console/admins/sessions" : {
+      "get" : {
+        "tags" : [ "console-rbac-controller" ],
+        "operationId" : "listSessions",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "name" : "page_size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopePageViewSessionView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/community/posts/{id}" : {
       "get" : {
         "tags" : [ "community-controller" ],
-        "operationId" : "detail",
+        "operationId" : "detail_1",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
@@ -1721,68 +3226,18 @@
         }
       }
     },
-    "/api/v1/admin/users" : {
-      "get" : {
-        "tags" : [ "admin-user-controller" ],
-        "operationId" : "list",
+    "/api/v1/console/admins/{id}/sessions" : {
+      "delete" : {
+        "tags" : [ "console-rbac-controller" ],
+        "operationId" : "kickSessions",
         "parameters" : [ {
-          "name" : "page",
+          "name" : "me",
           "in" : "query",
-          "required" : false,
+          "required" : true,
           "schema" : {
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32",
-            "default" : 1
+            "$ref" : "#/components/schemas/ConsolePrincipal"
           }
         }, {
-          "name" : "pageSize",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "maximum" : 100,
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32",
-            "default" : 20
-          }
-        }, {
-          "name" : "status",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "pattern" : "active|disabled",
-            "type" : "string"
-          }
-        }, {
-          "name" : "search",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "maxLength" : 64,
-            "minLength" : 0,
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopePageViewUserRow"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/users/{id}" : {
-      "get" : {
-        "tags" : [ "admin-user-controller" ],
-        "operationId" : "detail_1",
-        "parameters" : [ {
           "name" : "id",
           "in" : "path",
           "required" : true,
@@ -1797,55 +3252,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopeUserDetail"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/tickets" : {
-      "get" : {
-        "tags" : [ "admin-ticket-controller" ],
-        "operationId" : "list_1",
-        "parameters" : [ {
-          "name" : "page",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32",
-            "default" : 1
-          }
-        }, {
-          "name" : "page_size",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "maximum" : 100,
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32",
-            "default" : 20
-          }
-        }, {
-          "name" : "status",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "pattern" : "open|processing|resolved|closed",
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/EnvelopePageViewTicketView"
+                  "$ref" : "#/components/schemas/EnvelopeMapStringObject"
                 }
               }
             }
@@ -1856,6 +3263,336 @@
   },
   "components" : {
     "schemas" : {
+      "ConsolePrincipal" : {
+        "type" : "object",
+        "properties" : {
+          "adminUserId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "username" : {
+            "type" : "string"
+          },
+          "roleCode" : {
+            "type" : "string"
+          },
+          "permissions" : {
+            "uniqueItems" : true,
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "sessionId" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "EnvelopeRoleView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/RoleView"
+          }
+        }
+      },
+      "RoleView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "builtin" : {
+            "type" : "boolean"
+          },
+          "rank" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "permissionCodes" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "memberCount" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "SongUpsert" : {
+        "required" : [ "audioUrl", "level", "title" ],
+        "type" : "object",
+        "properties" : {
+          "title" : {
+            "maxLength" : 128,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "artist" : {
+            "maxLength" : 128,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "level" : {
+            "maximum" : 4,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "durationS" : {
+            "minimum" : 0,
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "bpm" : {
+            "type" : "number"
+          },
+          "musicalKey" : {
+            "maxLength" : 8,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "audioUrl" : {
+            "maxLength" : 512,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "lrcUrl" : {
+            "maxLength" : 512,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "coverUrl" : {
+            "maxLength" : 512,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "interestTags" : {
+            "type" : "string"
+          },
+          "source" : {
+            "pattern" : "public_domain|original|demo_only",
+            "type" : "string"
+          },
+          "status" : {
+            "pattern" : "draft|published|archived",
+            "type" : "string"
+          },
+          "pitchRefStatus" : {
+            "pattern" : "missing|building|ready|invalid",
+            "type" : "string"
+          }
+        }
+      },
+      "EnvelopeMapStringObject" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "object"
+            }
+          }
+        }
+      },
+      "LrcLine" : {
+        "required" : [ "lineText", "offsetMs" ],
+        "type" : "object",
+        "properties" : {
+          "offsetMs" : {
+            "minimum" : 0,
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "endOffsetMs" : {
+            "minimum" : 0,
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "lineText" : {
+            "type" : "string"
+          }
+        }
+      },
+      "LrcUpsert" : {
+        "required" : [ "lines" ],
+        "type" : "object",
+        "properties" : {
+          "lines" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LrcLine"
+            }
+          }
+        }
+      },
+      "EnvelopeListMapStringObject" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : {
+                "type" : "object"
+              }
+            }
+          }
+        }
+      },
+      "ScenarioUpsert" : {
+        "required" : [ "difficulty", "openingLine", "sceneType", "systemPrompt", "title" ],
+        "type" : "object",
+        "properties" : {
+          "title" : {
+            "maxLength" : 128,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "sceneType" : {
+            "pattern" : "cafe|airport|interview|library|other",
+            "type" : "string"
+          },
+          "difficulty" : {
+            "maximum" : 4,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "description" : {
+            "maxLength" : 512,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "systemPrompt" : {
+            "type" : "string"
+          },
+          "openingLine" : {
+            "type" : "string"
+          },
+          "targetCorpus" : {
+            "type" : "string"
+          },
+          "interestTags" : {
+            "type" : "string"
+          },
+          "promptVersion" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "estimatedTurns" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "estimatedMinutes" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "status" : {
+            "pattern" : "draft|published|archived",
+            "type" : "string"
+          }
+        }
+      },
+      "QuestionPatch" : {
+        "required" : [ "prompt" ],
+        "type" : "object",
+        "properties" : {
+          "prompt" : {
+            "type" : "string"
+          },
+          "referenceAnswer" : {
+            "type" : "string"
+          },
+          "status" : {
+            "pattern" : "published|archived",
+            "type" : "string"
+          }
+        }
+      },
+      "MaterialUpsert" : {
+        "required" : [ "audioUrl", "level", "title" ],
+        "type" : "object",
+        "properties" : {
+          "title" : {
+            "maxLength" : 128,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "level" : {
+            "maximum" : 4,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "audioUrl" : {
+            "maxLength" : 512,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "durationS" : {
+            "minimum" : 0,
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "transcript" : {
+            "type" : "string"
+          },
+          "interestTags" : {
+            "type" : "string"
+          },
+          "source" : {
+            "pattern" : "public_domain|original|demo_only",
+            "type" : "string"
+          },
+          "license" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "status" : {
+            "pattern" : "draft|published|archived",
+            "type" : "string"
+          }
+        }
+      },
       "EnvelopeLikeState" : {
         "type" : "object",
         "properties" : {
@@ -1959,524 +3696,6 @@
           },
           "data" : {
             "type" : "object"
-          }
-        }
-      },
-      "SongUpsert" : {
-        "required" : [ "audioUrl", "level", "title" ],
-        "type" : "object",
-        "properties" : {
-          "title" : {
-            "maxLength" : 128,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "artist" : {
-            "maxLength" : 128,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "level" : {
-            "maximum" : 4,
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "durationS" : {
-            "minimum" : 0,
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "bpm" : {
-            "type" : "number"
-          },
-          "musicalKey" : {
-            "maxLength" : 8,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "audioUrl" : {
-            "maxLength" : 512,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "lrcUrl" : {
-            "maxLength" : 512,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "coverUrl" : {
-            "maxLength" : 512,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "interestTags" : {
-            "type" : "string"
-          },
-          "source" : {
-            "pattern" : "public_domain|original|demo_only",
-            "type" : "string"
-          },
-          "status" : {
-            "pattern" : "draft|published|archived",
-            "type" : "string"
-          },
-          "pitchRefStatus" : {
-            "pattern" : "missing|building|ready|invalid",
-            "type" : "string"
-          }
-        }
-      },
-      "EnvelopeSongView" : {
-        "type" : "object",
-        "properties" : {
-          "code" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/SongView"
-          }
-        }
-      },
-      "SongView" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "title" : {
-            "type" : "string"
-          },
-          "artist" : {
-            "type" : "string"
-          },
-          "level" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "durationS" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "bpm" : {
-            "type" : "number"
-          },
-          "musicalKey" : {
-            "type" : "string"
-          },
-          "audioUrl" : {
-            "type" : "string"
-          },
-          "lrcUrl" : {
-            "type" : "string"
-          },
-          "coverUrl" : {
-            "type" : "string"
-          },
-          "interestTags" : {
-            "type" : "string"
-          },
-          "source" : {
-            "type" : "string"
-          },
-          "status" : {
-            "type" : "string"
-          },
-          "pitchRefStatus" : {
-            "type" : "string"
-          },
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "updatedAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          }
-        }
-      },
-      "LrcLine" : {
-        "required" : [ "lineText", "offsetMs" ],
-        "type" : "object",
-        "properties" : {
-          "offsetMs" : {
-            "minimum" : 0,
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "endOffsetMs" : {
-            "minimum" : 0,
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "lineText" : {
-            "type" : "string"
-          }
-        }
-      },
-      "LrcUpsert" : {
-        "required" : [ "lines" ],
-        "type" : "object",
-        "properties" : {
-          "lines" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/LrcLine"
-            }
-          }
-        }
-      },
-      "EnvelopeListLrcView" : {
-        "type" : "object",
-        "properties" : {
-          "code" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "data" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/LrcView"
-            }
-          }
-        }
-      },
-      "LrcView" : {
-        "type" : "object",
-        "properties" : {
-          "seq" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "offsetMs" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "endOffsetMs" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "lineText" : {
-            "type" : "string"
-          },
-          "source" : {
-            "type" : "string"
-          }
-        }
-      },
-      "ScenarioUpsert" : {
-        "required" : [ "difficulty", "openingLine", "sceneType", "systemPrompt", "title" ],
-        "type" : "object",
-        "properties" : {
-          "title" : {
-            "maxLength" : 128,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "sceneType" : {
-            "pattern" : "cafe|airport|interview|library|other",
-            "type" : "string"
-          },
-          "difficulty" : {
-            "maximum" : 4,
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "description" : {
-            "maxLength" : 512,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "systemPrompt" : {
-            "type" : "string"
-          },
-          "openingLine" : {
-            "type" : "string"
-          },
-          "targetCorpus" : {
-            "type" : "string"
-          },
-          "interestTags" : {
-            "type" : "string"
-          },
-          "promptVersion" : {
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "estimatedTurns" : {
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "estimatedMinutes" : {
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "status" : {
-            "pattern" : "draft|published|archived",
-            "type" : "string"
-          }
-        }
-      },
-      "EnvelopeScenarioView" : {
-        "type" : "object",
-        "properties" : {
-          "code" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/ScenarioView"
-          }
-        }
-      },
-      "ScenarioView" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "title" : {
-            "type" : "string"
-          },
-          "sceneType" : {
-            "type" : "string"
-          },
-          "difficulty" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "description" : {
-            "type" : "string"
-          },
-          "systemPrompt" : {
-            "type" : "string"
-          },
-          "openingLine" : {
-            "type" : "string"
-          },
-          "targetCorpus" : {
-            "type" : "string"
-          },
-          "interestTags" : {
-            "type" : "string"
-          },
-          "promptVersion" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "estimatedTurns" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "estimatedMinutes" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "status" : {
-            "type" : "string"
-          },
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "updatedAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          }
-        }
-      },
-      "QuestionPatch" : {
-        "required" : [ "kind", "prompt", "status" ],
-        "type" : "object",
-        "properties" : {
-          "kind" : {
-            "pattern" : "read|qa",
-            "type" : "string"
-          },
-          "prompt" : {
-            "type" : "string"
-          },
-          "referenceAnswer" : {
-            "type" : "string"
-          },
-          "status" : {
-            "pattern" : "published|archived",
-            "type" : "string"
-          }
-        }
-      },
-      "EnvelopeQuestionView" : {
-        "type" : "object",
-        "properties" : {
-          "code" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/QuestionView"
-          }
-        }
-      },
-      "QuestionView" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "examRevision" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "itemIndex" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "kind" : {
-            "type" : "string"
-          },
-          "prompt" : {
-            "type" : "string"
-          },
-          "referenceAnswer" : {
-            "type" : "string"
-          },
-          "status" : {
-            "type" : "string"
-          },
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "updatedAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          }
-        }
-      },
-      "MaterialUpsert" : {
-        "required" : [ "audioUrl", "level", "title" ],
-        "type" : "object",
-        "properties" : {
-          "title" : {
-            "maxLength" : 128,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "level" : {
-            "maximum" : 4,
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "audioUrl" : {
-            "maxLength" : 512,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "durationS" : {
-            "minimum" : 0,
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "transcript" : {
-            "type" : "string"
-          },
-          "interestTags" : {
-            "type" : "string"
-          },
-          "source" : {
-            "pattern" : "public_domain|original|demo_only",
-            "type" : "string"
-          },
-          "license" : {
-            "maxLength" : 64,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "status" : {
-            "pattern" : "draft|published|archived",
-            "type" : "string"
-          }
-        }
-      },
-      "EnvelopeMaterialView" : {
-        "type" : "object",
-        "properties" : {
-          "code" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/MaterialView"
-          }
-        }
-      },
-      "MaterialView" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "title" : {
-            "type" : "string"
-          },
-          "level" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "audioUrl" : {
-            "type" : "string"
-          },
-          "durationS" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "transcript" : {
-            "type" : "string"
-          },
-          "interestTags" : {
-            "type" : "string"
-          },
-          "source" : {
-            "type" : "string"
-          },
-          "license" : {
-            "type" : "string"
-          },
-          "status" : {
-            "type" : "string"
-          },
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "updatedAt" : {
-            "type" : "string",
-            "format" : "date-time"
           }
         }
       },
@@ -2764,6 +3983,477 @@
           }
         }
       },
+      "RoleCreate" : {
+        "required" : [ "code", "name" ],
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "maxLength" : 32,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "name" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "description" : {
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "rank" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "permissionCodes" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "ReportHandle" : {
+        "type" : "object",
+        "properties" : {
+          "decision" : {
+            "pattern" : "accept|reject|duplicate",
+            "type" : "string"
+          },
+          "action" : {
+            "pattern" : "accept|reject|duplicate",
+            "type" : "string"
+          },
+          "caseId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "note" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "EnvelopeReportView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/ReportView"
+          }
+        }
+      },
+      "ReportView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "reporterUserId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "targetType" : {
+            "type" : "string"
+          },
+          "targetId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "reasonCode" : {
+            "type" : "string"
+          },
+          "detail" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "caseId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "handledBy" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "handledAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "CaseCreate" : {
+        "required" : [ "reasonCode", "targetId", "targetType" ],
+        "type" : "object",
+        "properties" : {
+          "targetType" : {
+            "pattern" : "post|comment|media|direct_message",
+            "type" : "string"
+          },
+          "targetId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "source" : {
+            "pattern" : "auto|report|manual",
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "type" : "string"
+          },
+          "priority" : {
+            "maximum" : 3,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "assigneeId" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "CaseView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "targetType" : {
+            "type" : "string"
+          },
+          "targetId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "source" : {
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "type" : "string"
+          },
+          "priority" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "snippet" : {
+            "type" : "string"
+          },
+          "snapshot" : {
+            "type" : "object"
+          },
+          "reporterUserId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "assigneeId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "decidedBy" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "decidedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "decisionNote" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "EnvelopeCaseView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/CaseView"
+          }
+        }
+      },
+      "CaseDecision" : {
+        "required" : [ "decision" ],
+        "type" : "object",
+        "properties" : {
+          "decision" : {
+            "pattern" : "approve|hide|delete|reject|escalate",
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "type" : "string"
+          },
+          "note" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "CaseAssign" : {
+        "type" : "object",
+        "properties" : {
+          "assigneeId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "note" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "PublishRequest" : {
+        "type" : "object",
+        "properties" : {
+          "status" : {
+            "pattern" : "draft|published|archived",
+            "type" : "string"
+          }
+        }
+      },
+      "EnvelopePublishView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PublishView"
+          }
+        }
+      },
+      "PublishView" : {
+        "type" : "object",
+        "properties" : {
+          "domain" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "prevStatus" : {
+            "type" : "string"
+          },
+          "nextStatus" : {
+            "type" : "string"
+          },
+          "publishedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "QuestionUpsert" : {
+        "required" : [ "examRevision", "itemIndex", "kind", "prompt" ],
+        "type" : "object",
+        "properties" : {
+          "examRevision" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "itemIndex" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "kind" : {
+            "pattern" : "read|qa",
+            "type" : "string"
+          },
+          "prompt" : {
+            "type" : "string"
+          },
+          "referenceAnswer" : {
+            "type" : "string"
+          },
+          "status" : {
+            "pattern" : "published|archived",
+            "type" : "string"
+          }
+        }
+      },
+      "EnvelopeSessionView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/SessionView"
+          }
+        }
+      },
+      "SessionView" : {
+        "type" : "object",
+        "properties" : {
+          "token" : {
+            "$ref" : "#/components/schemas/TokenResponse"
+          },
+          "adminUserId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "username" : {
+            "type" : "string"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "roleCode" : {
+            "type" : "string"
+          },
+          "permissions" : {
+            "uniqueItems" : true,
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "AdminCreate" : {
+        "required" : [ "displayName", "password", "roleId", "username" ],
+        "type" : "object",
+        "properties" : {
+          "username" : {
+            "maxLength" : 32,
+            "minLength" : 0,
+            "pattern" : "[A-Za-z0-9_.-]{3,32}",
+            "type" : "string"
+          },
+          "displayName" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "password" : {
+            "type" : "string"
+          },
+          "roleId" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "AdminView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "username" : {
+            "type" : "string"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "roleId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "roleCode" : {
+            "type" : "string"
+          },
+          "roleName" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "failedAttempts" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "lockedUntil" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "tokenEpoch" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "lastLoginAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "lastLoginIp" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "EnvelopeAdminView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminView"
+          }
+        }
+      },
+      "PasswordReset" : {
+        "required" : [ "password" ],
+        "type" : "object",
+        "properties" : {
+          "password" : {
+            "type" : "string"
+          }
+        }
+      },
       "CreatePostRequest" : {
         "required" : [ "body", "domain", "kind" ],
         "type" : "object",
@@ -3022,32 +4712,6 @@
           }
         }
       },
-      "QuestionUpsert" : {
-        "required" : [ "examRevision", "itemIndex", "kind", "prompt" ],
-        "type" : "object",
-        "properties" : {
-          "examRevision" : {
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "itemIndex" : {
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "kind" : {
-            "pattern" : "read|qa",
-            "type" : "string"
-          },
-          "prompt" : {
-            "type" : "string"
-          },
-          "referenceAnswer" : {
-            "type" : "string"
-          }
-        }
-      },
       "PatchMeRequest" : {
         "type" : "object",
         "properties" : {
@@ -3116,11 +4780,15 @@
         }
       },
       "StatusUpdate" : {
-        "required" : [ "status" ],
         "type" : "object",
         "properties" : {
           "status" : {
             "pattern" : "active|disabled",
+            "type" : "string"
+          },
+          "reason" : {
+            "maxLength" : 255,
+            "minLength" : 0,
             "type" : "string"
           }
         }
@@ -3150,9 +4818,6 @@
           "username" : {
             "type" : "string"
           },
-          "email" : {
-            "type" : "string"
-          },
           "nickname" : {
             "type" : "string"
           },
@@ -3162,7 +4827,14 @@
           "status" : {
             "type" : "string"
           },
+          "email" : {
+            "type" : "string"
+          },
           "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "updatedAt" : {
             "type" : "string",
             "format" : "date-time"
           }
@@ -3172,11 +4844,14 @@
         "type" : "object",
         "properties" : {
           "ageGroup" : {
-            "pattern" : "child|teen|adult|senior",
+            "maxLength" : 16,
+            "minLength" : 0,
+            "pattern" : "teen|adult",
             "type" : "string"
           },
           "cefrLevel" : {
-            "pattern" : "L[1-4]",
+            "maxLength" : 8,
+            "minLength" : 0,
             "type" : "string"
           },
           "learningGoal" : {
@@ -3184,23 +4859,10 @@
             "minLength" : 0,
             "type" : "string"
           },
-          "interestTags" : {
-            "type" : "string"
-          },
-          "voiceRate" : {
-            "pattern" : "slow|normal|fast",
-            "type" : "string"
-          },
-          "voiceType" : {
-            "maxLength" : 32,
+          "handle" : {
+            "maxLength" : 64,
             "minLength" : 0,
             "type" : "string"
-          },
-          "preferredDifficulty" : {
-            "maximum" : 4,
-            "minimum" : 1,
-            "type" : "integer",
-            "format" : "int32"
           },
           "avatarUrl" : {
             "maxLength" : 512,
@@ -3227,64 +4889,44 @@
       "UserDetail" : {
         "type" : "object",
         "properties" : {
-          "id" : {
-            "type" : "integer",
-            "format" : "int64"
+          "user" : {
+            "$ref" : "#/components/schemas/UserRow"
           },
-          "username" : {
+          "profile" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "object"
+            }
+          }
+        }
+      },
+      "RolePatch" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "maxLength" : 32,
+            "minLength" : 0,
             "type" : "string"
           },
-          "email" : {
+          "name" : {
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           },
-          "nickname" : {
+          "description" : {
+            "maxLength" : 255,
+            "minLength" : 0,
             "type" : "string"
           },
-          "role" : {
-            "type" : "string"
-          },
-          "status" : {
-            "type" : "string"
-          },
-          "ageGroup" : {
-            "type" : "string"
-          },
-          "cefrLevel" : {
-            "type" : "string"
-          },
-          "learningGoal" : {
-            "type" : "string"
-          },
-          "interestTags" : {
-            "type" : "string"
-          },
-          "voiceRate" : {
-            "type" : "string"
-          },
-          "voiceType" : {
-            "type" : "string"
-          },
-          "preferredDifficulty" : {
+          "rank" : {
             "type" : "integer",
             "format" : "int32"
           },
-          "avatarUrl" : {
-            "type" : "string"
-          },
-          "cefrLevelSource" : {
-            "type" : "string"
-          },
-          "cefrLevelAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "updatedAt" : {
-            "type" : "string",
-            "format" : "date-time"
+          "permissionCodes" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
           }
         }
       },
@@ -3298,6 +4940,24 @@
           "adminReply" : {
             "maxLength" : 2000,
             "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "AdminPatch" : {
+        "type" : "object",
+        "properties" : {
+          "displayName" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "roleId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "status" : {
+            "pattern" : "active|disabled",
             "type" : "string"
           }
         }
@@ -3343,6 +5003,652 @@
           },
           "service" : {
             "type" : "string"
+          }
+        }
+      },
+      "EnvelopePageViewUserRow" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PageViewUserRow"
+          }
+        }
+      },
+      "PageViewUserRow" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/UserRow"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "page_size" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "EnvelopeListRoleView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RoleView"
+            }
+          }
+        }
+      },
+      "EnvelopePageViewReportView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PageViewReportView"
+          }
+        }
+      },
+      "PageViewReportView" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ReportView"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "page_size" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "EnvelopePageViewCaseView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PageViewCaseView"
+          }
+        }
+      },
+      "PageViewCaseView" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CaseView"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "page_size" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "EnvelopePageViewTicketView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PageViewTicketView"
+          }
+        }
+      },
+      "PageViewTicketView" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/TicketView"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "page_size" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "EnvelopePageViewSongRow" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PageViewSongRow"
+          }
+        }
+      },
+      "PageViewSongRow" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SongRow"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "page_size" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "SongRow" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "artist" : {
+            "type" : "string"
+          },
+          "level" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "audioUrl" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "pitchRefStatus" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "EnvelopePageViewScenarioRow" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PageViewScenarioRow"
+          }
+        }
+      },
+      "PageViewScenarioRow" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ScenarioRow"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "page_size" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "ScenarioRow" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "sceneType" : {
+            "type" : "string"
+          },
+          "difficulty" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "corpusItemCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "EnvelopePageViewQuestionRow" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PageViewQuestionRow"
+          }
+        }
+      },
+      "PageViewQuestionRow" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/QuestionRow"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "page_size" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "QuestionRow" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "examRevision" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "itemIndex" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "prompt" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "EnvelopePageViewMapStringObject" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PageViewMapStringObject"
+          }
+        }
+      },
+      "PageViewMapStringObject" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : {
+                "type" : "object"
+              }
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "page_size" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "EnvelopePageViewMaterialRow" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PageViewMaterialRow"
+          }
+        }
+      },
+      "MaterialRow" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "level" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "audioUrl" : {
+            "type" : "string"
+          },
+          "hasTranscript" : {
+            "type" : "boolean"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "PageViewMaterialRow" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MaterialRow"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "page_size" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "AuditLogView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "adminUserId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "adminUsername" : {
+            "type" : "string"
+          },
+          "action" : {
+            "type" : "string"
+          },
+          "targetType" : {
+            "type" : "string"
+          },
+          "targetId" : {
+            "type" : "string"
+          },
+          "result" : {
+            "type" : "string"
+          },
+          "errorCode" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "summary" : {
+            "type" : "string"
+          },
+          "detail" : {
+            "type" : "object"
+          },
+          "requestId" : {
+            "type" : "string"
+          },
+          "ip" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "EnvelopePageViewAuditLogView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PageViewAuditLogView"
+          }
+        }
+      },
+      "PageViewAuditLogView" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AuditLogView"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "page_size" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "EnvelopePageViewAdminView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PageViewAdminView"
+          }
+        }
+      },
+      "PageViewAdminView" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AdminView"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "page_size" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "EnvelopePageViewSessionView" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PageViewSessionView"
+          }
+        }
+      },
+      "PageViewSessionView" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SessionView"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "page_size" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
@@ -3609,214 +5915,6 @@
           },
           "followed" : {
             "type" : "boolean"
-          }
-        }
-      },
-      "EnvelopePageViewUserRow" : {
-        "type" : "object",
-        "properties" : {
-          "code" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/PageViewUserRow"
-          }
-        }
-      },
-      "PageViewUserRow" : {
-        "type" : "object",
-        "properties" : {
-          "items" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/UserRow"
-            }
-          },
-          "total" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "page" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "page_size" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        }
-      },
-      "EnvelopePageViewTicketView" : {
-        "type" : "object",
-        "properties" : {
-          "code" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/PageViewTicketView"
-          }
-        }
-      },
-      "PageViewTicketView" : {
-        "type" : "object",
-        "properties" : {
-          "items" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/TicketView"
-            }
-          },
-          "total" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "page" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "page_size" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        }
-      },
-      "EnvelopePageViewSongView" : {
-        "type" : "object",
-        "properties" : {
-          "code" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/PageViewSongView"
-          }
-        }
-      },
-      "PageViewSongView" : {
-        "type" : "object",
-        "properties" : {
-          "items" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/SongView"
-            }
-          },
-          "total" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "page" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "page_size" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        }
-      },
-      "EnvelopePageViewScenarioView" : {
-        "type" : "object",
-        "properties" : {
-          "code" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/PageViewScenarioView"
-          }
-        }
-      },
-      "PageViewScenarioView" : {
-        "type" : "object",
-        "properties" : {
-          "items" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/ScenarioView"
-            }
-          },
-          "total" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "page" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "page_size" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        }
-      },
-      "EnvelopeListQuestionView" : {
-        "type" : "object",
-        "properties" : {
-          "code" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "data" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/QuestionView"
-            }
-          }
-        }
-      },
-      "EnvelopePageViewMaterialView" : {
-        "type" : "object",
-        "properties" : {
-          "code" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/PageViewMaterialView"
-          }
-        }
-      },
-      "PageViewMaterialView" : {
-        "type" : "object",
-        "properties" : {
-          "items" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/MaterialView"
-            }
-          },
-          "total" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "page" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "page_size" : {
-            "type" : "integer",
-            "format" : "int32"
           }
         }
       }
