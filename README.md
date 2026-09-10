@@ -135,6 +135,21 @@ mvn spring-boot:run
 >    所以两个键都要写在根 `.env` 里；只配一个会让 Python 侧控制台端点（运维 / trace / 书籍 / 媒体）
 >    **静默全量 401**。`start -WithConsole` 会对此做一次自检并告警。
 > 控制台**依赖 Java 与 Python 都在**（两个上游代理：`/manage`→8080、`/api/v1`→8000），不能单独起。
+>
+> 🔑 **控制台联调账号（组员直接用）**：入口 http://localhost:5174 ，用户名 **`admin`** / 口令 **`demo123456`**
+> （角色 `super`，36 个权限码全给）。这个口令与 App 演示账号 `demoadult/demo123456` **是同款公开演示口令**
+> ——它**不是密钥**，公开库里出现不违规（本仓 `.env.example` 里的 dev 默认值同理）；
+> 真正需要保护的是 `VOICEVERSE_CONSOLE_JWT_SECRET` 那类，**只放本机 `.env`，永不入库**。
+> 复现方式（根 `.env`，首次启动时自动建号）：
+> ```env
+> VOICEVERSE_CONSOLE_BOOTSTRAP_USERNAME=admin
+> VOICEVERSE_CONSOLE_BOOTSTRAP_PASSWORD=demo123456
+> ```
+> 说明与注意：
+> - bootstrap 是**一次性**的：仅当 `admin_users` 表为空时建号，之后改这两行**不会**覆盖已有口令；
+> - 想换口令：登录后走「权限控制台 → 账号管理 → 重置口令」，或删掉 `admin_users` 里的账号再重启；
+> - 口令长度下限 10 位，且拒绝 `password`/`password123` 一类弱口令（`ConsoleAdminBootstrap.WEAK_PASSWORDS`）；
+> - ⚠️ **生产环境必须改掉**：bootstrap 只用于一次性建号，建完即改密并清空 `..._PASSWORD`。
 
 ### 3.5 手机端（Android APK · 今日交付形态）
 
