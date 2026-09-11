@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UI Concept Design · App Report</title>
+<!--
+  Mobile App 示例 ③ 唱歌评分报告
+  组件：深紫评分卡（光晕 + chip + 音符插画 + 幽灵按钮）、四维统计行、逐句评分列表（点线时间轴）。
+  全部取值来自 ../tokens/design-tokens.md。
+-->
+<style>
+  :root {
+    --paper:#F5F4F1; --card:#FFFFFF; --ink:#1C1C1A; --ink-hover:#333330;
+    --sub:#6F6F6A; --weak:#A6A6A0; --track:#ECEAE5; --track-hover:#E2E0DA;
+    --accent:#2F6BFF; --star:#FFC83D; --pop-green:#A8E05F;
+    --dark-navy:#232044; --dark-purple:#3A2440;
+    --r-card:24px; --r-pill:999px; --r-chip:12px;
+    --shadow-card:0 8px 24px rgba(28,28,26,.06);
+    --shadow-float:0 2px 8px rgba(28,28,26,.08);
+    --font:'Segoe UI','Microsoft YaHei UI','Microsoft YaHei',sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { background:#EDECE8; }
+  body { font-family:var(--font); color:var(--ink); -webkit-font-smoothing:antialiased; }
+  .phone { width:390px; margin:0 auto; min-height:844px; background:var(--paper); position:relative; overflow:hidden; }
+  .content { padding:24px 20px 40px; }
+
+  .head { display:flex; align-items:center; gap:14px; margin-bottom:20px; }
+  .back { width:44px; height:44px; border-radius:var(--r-pill); background:var(--track);
+    border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--ink);
+    transition:background-color 150ms ease-out; }
+  .back:hover { background:var(--track-hover); }
+  .head h1 { font-size:22px; font-weight:700; }
+  .head .sub { font-size:13px; color:var(--weak); margin-top:3px; }
+
+  /* 深紫评分卡 */
+  .hero { position:relative; padding:28px; border-radius:var(--r-card); color:#fff; overflow:hidden;
+    background:radial-gradient(90% 140% at 10% 8%, rgba(185,168,255,.25) 0%, transparent 55%),
+               radial-gradient(130% 170% at 85% 10%, #4C3060 0%, transparent 60%), var(--dark-purple);
+    margin-bottom:20px; }
+  .hero .chip { display:inline-flex; align-items:center; height:24px; padding:0 12px;
+    border-radius:var(--r-chip); background:#4C3A6E; color:#B9A8FF; font-size:12px; font-weight:600; }
+  .hero .time { font-size:12px; color:rgba(255,255,255,.6); margin-left:10px; }
+  .hero h2 { font-size:24px; margin:16px 0 6px; }
+  .hero p { font-size:14px; color:rgba(255,255,255,.72); }
+  .hero .score { position:absolute; right:28px; bottom:24px; text-align:right; }
+  .hero .score .label { font-size:12px; color:rgba(255,255,255,.6); }
+  .hero .score .num { font-size:52px; font-weight:700; letter-spacing:-2px; line-height:1.05;
+    font-variant-numeric:tabular-nums; }
+  .hero .art { position:absolute; right:24px; top:20px; width:96px; opacity:.85; }
+  .hero .art svg { width:100%; height:auto; }
+  .hero .btn-ghost { display:inline-flex; align-items:center; gap:8px; height:40px; padding:0 20px;
+    border:1.5px solid rgba(255,255,255,.6); border-radius:var(--r-pill);
+    background:transparent; color:#fff; font:600 14px var(--font); cursor:pointer;
+    transition:border-color 150ms ease-out, background-color 150ms ease-out; margin-top:16px; }
+  .hero .btn-ghost:hover { border-color:#fff; background:rgba(255,255,255,.08); }
+
+  /* 四维统计行 */
+  .metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:20px;
+    background:var(--card); border-radius:var(--r-card); box-shadow:var(--shadow-card); margin-bottom:24px; }
+  .m { text-align:center; }
+  .m-label { font-size:12px; color:var(--weak); }
+  .m-value { font-size:22px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums; }
+  .m-value.accent { color:var(--accent); }
+
+  /* 逐句列表 */
+  .section-title { font-size:17px; font-weight:700; margin-bottom:14px; }
+  .line { display:flex; align-items:center; gap:14px; padding:14px 16px;
+    background:var(--card); border-radius:20px; box-shadow:var(--shadow-card); }
+  .icon-block { width:44px; height:44px; border-radius:14px; flex:none;
+    display:flex; align-items:center; justify-content:center; color:#fff; }
+  .line-main { flex:1; min-width:0; }
+  .line-lyric { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .line-comment { font-size:12px; color:var(--weak); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .line-score { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .line-score.accent { color:var(--accent); }
+  .dotline { display:flex; align-items:center; gap:8px; margin:8px 0 8px 30px; }
+  .dotline .dot { width:7px; height:7px; border-radius:50%; background:var(--accent); }
+  .dotline .line { flex:1; border-top:1.5px dashed #E0DED8; }
+  .badge { display:inline-flex; align-items:center; height:22px; padding:0 10px; border-radius:var(--r-pill);
+    font-size:11px; font-weight:600; }
+  .badge.good { background:#DCFCE7; color:#15803D; }
+  .badge.warn { background:#E8EDFF; color:var(--accent); }
+</style>
+
+<!-- ============================================================
+     展示用副本：内容与 ui-concept-design/examples/app/<同名文件> 一致，
+     仅追加下面这层「机身适配」，让它能正确塞进 433×882 的机身框：
+       · .phone 锁死 844 高度 —— 否则内容变高会把 absolute 的底部控件顶出屏幕；
+       · 顶部留 70px —— 灵动岛侵入屏幕区 47.75px，不留就会被盖住标题。
+     规则值取自 tokens/design-tokens.md 的 8px 网格。
+     ============================================================ -->
+<style>
+  html, body { height: 844px; overflow: hidden; }
+  .phone { height: 844px; min-height: 844px; overflow: hidden; }
+  .content { padding-top: 70px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="content">
+    <header class="head">
+      <button class="back" title="Back">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div>
+        <h1>Singing Report</h1>
+        <div class="sub">Perfect Night · LE SSERAFIM · 12-16 20:15</div>
+      </div>
+    </header>
+
+    <!-- 深紫评分卡 -->
+    <section class="hero">
+      <div class="art" aria-hidden="true">
+        <svg viewBox="0 0 320 340" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M196 28 L 196 184"/><path d="M196 28 C 196 28 232 40 252 60 C 262 70 264 92 250 102"/>
+          <ellipse cx="186" cy="196" rx="34" ry="26"/><ellipse cx="250" cy="118" rx="30" ry="24"/>
+          <path d="M110 96 L 88 128 M96 72 L 70 96" stroke-width="2"/>
+        </svg>
+      </div>
+      <span class="chip">New record</span><span class="time">107s · full song</span>
+      <h2>Perfect Night</h2>
+      <p>Beat 82% of learners. Keep it up.</p>
+      <button class="btn-ghost" onclick="toast('Sing again')">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 13a8 8 0 0 1 16 0"/><rect x="3.5" y="13" width="4" height="6" rx="2"/><rect x="16.5" y="13" width="4" height="6" rx="2"/></svg>
+        Sing again
+      </button>
+      <div class="score"><div class="label">Total</div><div class="num">92.4</div></div>
+    </section>
+
+    <!-- 四维统计 -->
+    <section class="metrics">
+      <div class="m"><div class="m-label">Pitch</div><div class="m-value accent">93</div></div>
+      <div class="m"><div class="m-label">Rhythm</div><div class="m-value">91</div></div>
+      <div class="m"><div class="m-label">Pronun</div><div class="m-value">88</div></div>
+      <div class="m"><div class="m-label">Full</div><div class="m-value">100%</div></div>
+    </section>
+
+    <!-- 逐句评分 -->
+    <div class="section-title">Line by line</div>
+    <div class="line">
+      <span class="icon-block" style="background:#1E2B26">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>
+      </span>
+      <div class="line-main">
+        <div class="line-lyric">You know I'm just a girl...</div>
+        <div class="line-comment">Pitch excellent, linking natural</div>
+      </div>
+      <span class="line-score accent">95</span>
+    </div>
+    <div class="dotline"><span class="dot"></span><span class="line"></span></div>
+    <div class="line">
+      <span class="icon-block" style="background:#232044">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>
+      </span>
+      <div class="line-main">
+        <div class="line-lyric">And I will always love you...</div>
+        <div class="line-comment">Breath before chorus - slight early</div>
+      </div>
+      <span class="line-score">88</span>
+    </div>
+    <div class="dotline"><span class="dot"></span><span class="line"></span></div>
+    <div class="line">
+      <span class="icon-block" style="background:#16303A">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>
+      </span>
+      <div class="line-main">
+        <div class="line-lyric">I'm yours, I'm yours...</div>
+        <div class="line-comment">Repeat section runs slightly ahead</div>
+      </div>
+      <span class="line-score">81</span>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" style="position:fixed;top:24px;left:50%;transform:translateX(-50%) translateY(-8px);display:flex;align-items:center;gap:10px;height:44px;padding:0 20px;border-radius:16px;background:var(--card);box-shadow:var(--shadow-card);font-size:14px;opacity:0;transition:opacity 200ms ease-out,transform 200ms ease-out;pointer-events:none;z-index:9;">
+    <span style="width:8px;height:8px;border-radius:50%;background:var(--accent)"></span><span id="toastText"></span>
+  </div>
+</div>
+
+<script>
+  let tt; function toast(msg){ const t=document.getElementById('toast');
+    document.getElementById('toastText').textContent=msg; t.style.opacity=1; t.style.transform='translateX(-50%) translateY(0)';
+    clearTimeout(tt); tt=setTimeout(()=>{ t.style.opacity=0; t.style.transform='translateX(-50%) translateY(-8px)'; },2500); }
+</script>
+</body>
+</html>

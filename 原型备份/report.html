@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VocalVerse — Learning Report Preview</title>
+  <meta name="description" content="Preview of the VocalVerse learning report: at-a-glance metrics, ability radar, fluency features, and ISE scoring." />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,100..900,0..100&family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/nav-reveal.css" />
+  <link rel="stylesheet" href="css/site-nav.css" />
+  <link rel="stylesheet" href="css/gooey-nav.css" />
+  <link rel="stylesheet" href="css/report.css" />
+  <link rel="stylesheet" href="css/footer.css" />
+  <link rel="stylesheet" href="css/aero-shards.css" />
+  <script>document.documentElement.classList.add((localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")));</script>
+</head>
+<body class="min-h-screen bg-background font-sans text-foreground antialiased">
+  <div class="site-frame site-frame--top" aria-hidden="true"></div>
+  <div class="site-frame site-frame--left" aria-hidden="true"></div>
+  <div class="site-frame site-frame--right" aria-hidden="true"></div>
+  <svg class="site-corner site-corner--top-left" width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M5.50871e-06 0C-0.00788227 37.3001 8.99616 50.0116 50 50H5.50871e-06V0Z" fill="currentColor"/>
+  </svg>
+  <svg class="site-corner site-corner--top-right" width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M5.50871e-06 0C-0.00788227 37.3001 8.99616 50.0116 50 50H5.50871e-06V0Z" fill="currentColor"/>
+  </svg>
+  <a href="#main-content" class="skip-to-content">Skip to main content</a>
+
+  <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-225 overflow-hidden">
+    <div class="absolute inset-0 opacity-50 md:opacity-100">
+      <div class="absolute inset-0 h-full w-full grayscale" data-shader data-flow-speed="0,0.1" data-iterations="10" data-brightness="3"></div>
+    </div>
+  </div>
+
+  <div class="nav-reveal-zone" data-nav-reveal-zone aria-hidden="true"></div>
+  <nav aria-label="Primary" class="site-nav fixed left-1/2 top-6 z-50 -translate-x-1/2">
+    <div class="site-nav__bar flex items-center gap-1 rounded-full bg-background p-1.5 shadow-sm border border-foreground/8">
+      <ul class="site-nav__list relative flex items-center gap-1" data-nav-list>
+        <span aria-hidden="true" class="nav-pill" data-nav-pill hidden></span>
+        <li class="relative">
+          <a href="index.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Home</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="practice.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Practice</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="sing.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Sing</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="recommend.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Recommend</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="stats.html" aria-current="page" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground">Stats</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="community.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Community</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="about.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">About</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="showcase.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Showcase</span>
+          </a>
+        </li>
+      </ul>
+      <button type="button" data-theme-toggle aria-label="Toggle theme" aria-pressed="false"
+        class="focus-ring relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-background ring-1 ring-foreground/8 transition-colors">
+        <span aria-hidden="true" class="relative h-4 w-4">
+          <svg class="theme-icon sun-icon absolute inset-0 h-4 w-4 text-foreground -rotate-90 scale-0 opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+          </svg>
+          <svg class="theme-icon moon-icon absolute inset-0 h-4 w-4 text-foreground rotate-90 scale-0 opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+          </svg>
+        </span>
+      </button>
+    </div>
+  </nav>
+
+  <main id="main-content" class="flex flex-1 flex-col">
+    <!-- 报头：返回 + 标题 -->
+    <section class="mx-auto w-full max-w-275 px-6 pt-40 pb-8 sm:px-10 sm:pt-44">
+      <div class="fade-in">
+        <a href="stats.html" class="report-back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+          Back to Stats
+        </a>
+      </div>
+      <div class="fade-in mt-8" style="transition-delay: 0.08s">
+        <div class="report-masthead">
+          <p class="report-kicker">VocalVerse / Learning Report</p>
+          <p class="report-masthead-meta">Data dashboard · Week 9 · Demo</p>
+        </div>
+        <div class="report-hero-grid">
+          <div>
+            <h1 data-split-text class="report-title">Every sentence you practice becomes progress you can see.</h1>
+            <p class="report-lead">Starting from your baseline 4 weeks ago, one dashboard shows pronunciation, fluency, grammar, and language points — and where to go next.</p>
+            <div class="report-chips">
+              <span>42 practice sessions</span>
+              <span>386 spoken sentences</span>
+            </div>
+          </div>
+          <div class="report-arc" aria-hidden="true">
+            <svg viewBox="0 0 460 200" role="img" aria-label="Learning loop: opening to scoring to feedback to progress">
+              <g fill="none" stroke="currentColor" stroke-width="1.6" style="color:var(--foreground)">
+                <path class="arc-path" d="M70 172 Q 128 92 192 172" opacity="0.3"/>
+                <path class="arc-path" d="M192 172 Q 250 44 310 172" opacity="0.45"/>
+                <path class="arc-path" d="M310 172 Q 368 92 424 172" opacity="0.3"/>
+                <path d="M70 178 H 424" opacity="0.16"/>
+              </g>
+              <g fill="currentColor" style="color:var(--foreground)">
+                <circle class="arc-node" cx="70" cy="178" r="4"/>
+                <circle class="arc-node" cx="192" cy="178" r="4"/>
+                <circle class="arc-node" cx="310" cy="178" r="4"/>
+                <circle class="arc-node" cx="424" cy="178" r="4.6"/>
+              </g>
+              <g font-family="Geist Mono, monospace" font-size="10" letter-spacing="1.2" fill="currentColor" style="color:var(--foreground)">
+                <text x="70" y="196" text-anchor="middle" opacity="0.55">OPENING</text>
+                <text x="192" y="196" text-anchor="middle" opacity="0.55">SCORING</text>
+                <text x="310" y="196" text-anchor="middle" opacity="0.55">FEEDBACK</text>
+                <text x="424" y="196" text-anchor="middle" opacity="0.7">PROGRESS</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AT A GLANCE + A STARTING POINT -->
+    <section class="mx-auto w-full max-w-275 px-6 pb-4 sm:px-10">
+      <div class="grid gap-8 lg:grid-cols-[1.75fr_1fr] lg:gap-7">
+        <div class="fade-in">
+          <header class="report-head">
+            <div>
+              <p class="report-kicker">At a glance</p>
+              <h2 class="report-subtitle">What the last four weeks shaped</h2>
+            </div>
+            <p class="report-head-side">Read the mirrors: practice frequency grew, while seven-tenths of speaking time went into dialogue &amp; singing.</p>
+          </header>
+
+          <div class="grid gap-6 sm:grid-cols-2">
+            <!-- 五维雷达 -->
+            <article class="report-card">
+              <h3 class="report-card__title">Five abilities, taking shape</h3>
+              <p class="report-card__desc">Radar · this last 4 weeks · daily baseline 85.</p>
+              <div class="report-chart report-anim">
+                <svg viewBox="0 0 320 238" role="img" aria-label="Five-dimension ability radar">
+                  <g fill="none" stroke="rgba(127,127,127,0.35)" stroke-width="1">
+                    <polygon points="160,95.5 208.6,116.6 189.7,167.9 130.3,167.9 111.4,116.6"/>
+                    <polygon points="160,61 238.9,98.9 207.5,180.5 112.5,180.5 81.1,98.9"/>
+                    <polygon points="160,40 250.4,82.4 211.6,191.1 108.4,191.1 69.6,82.4"/>
+                    <polygon points="160,26.5 266,72.5 219.7,194.3 100.3,194.3 54,72.5"/>
+                  </g>
+                  <g stroke="rgba(127,127,127,0.25)" stroke-width="1">
+                    <path d="M160 126V26.5"/><path d="M160 126 266 72.5"/><path d="M160 126 219.7 194.3"/><path d="M160 126 100.3 194.3"/><path d="M160 126 54 72.5"/>
+                  </g>
+                  <polygon class="draw-poly" points="160,52.4 227.8,88.5 215.2,176.6 122.1,179.8 92.4,98.8" fill="rgba(127,127,127,0.28)" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" style="color:var(--foreground)"/>
+                  <g fill="currentColor" style="color:var(--foreground)"><circle class="chart-dot" data-tip="Pronunciation 82" cx="160" cy="52.4" r="3.4"/><circle class="chart-dot" data-tip="Fluency 78" cx="227.8" cy="88.5" r="3.4"/><circle class="chart-dot" data-tip="Grammar 86" cx="215.2" cy="176.6" r="3.4"/><circle class="chart-dot" data-tip="Intonation 74" cx="122.1" cy="179.8" r="3.4"/><circle class="chart-dot" data-tip="Vocabulary 80" cx="92.4" cy="98.8" r="3.4"/></g>
+                  <g font-family="Geist Mono, monospace" font-size="10.5" fill="currentColor" style="color:var(--foreground)">
+                    <text x="160" y="16" text-anchor="middle">Pronunciation 82</text>
+                    <text x="294" y="70" text-anchor="middle">Fluency 78</text>
+                    <text x="252" y="214" text-anchor="middle">Grammar 86</text>
+                    <text x="68" y="214" text-anchor="middle">Intonation 74</text>
+                    <text x="20" y="70" text-anchor="middle">Vocabulary 80</text>
+                  </g>
+                </svg>
+              </div>
+              <div class="report-card__foot"><p class="report-card__meta">Radar · Pentagon · 5 dims · avg 80</p><span class="report-card__arrows" aria-hidden="true">↑↑</span></div>
+            </article>
+
+            <!-- 三十天曲线 -->
+            <article class="report-card">
+              <h3 class="report-card__title">Thirty days, trending up</h3>
+              <p class="report-card__desc">One dot · one day → trend index rises as days turn into weeks.</p>
+              <div class="report-chart report-anim">
+                <svg viewBox="0 0 320 148" role="img" aria-label="Thirty-day score trend rising upward">
+                  <g stroke="rgba(127,127,127,0.22)" stroke-width="1">
+                    <line x1="10" y1="34" x2="310" y2="34"/>
+                    <line x1="10" y1="74" x2="310" y2="74"/>
+                    <line x1="10" y1="114" x2="310" y2="114"/>
+                  </g>
+                  <path d="M10 118 20 112 31 120 41 106 52 114 62 100 72 110 83 94 93 106 103 88 114 102 124 82 134 98 145 76 155 94 165 70 176 90 186 64 196 86 207 58 217 82 227 52 237 78 248 46 258 74 268 40 279 66 289 36 299 64 310 30 L310 140 10 140 Z" fill="rgba(127,127,127,0.16)" stroke="none"/>
+                  <path class="draw-path" d="M10 118 20 112 31 120 41 106 52 114 62 100 72 110 83 94 93 106 103 88 114 102 124 82 134 98 145 76 155 94 165 70 176 90 186 64 196 86 207 58 217 82 227 52 237 78 248 46 258 74 268 40 279 66 289 36 299 64 310 30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="color:var(--foreground)"/>
+                  <g fill="currentColor" style="color:var(--foreground)">
+                    <circle class="chart-dot" data-tip="Day 1 · 61" cx="10" cy="118" r="2.4"/><circle class="chart-dot" data-tip="Day 9 · 69" cx="93" cy="106" r="2.4"/><circle class="chart-dot" data-tip="Day 16 · 78" cx="165" cy="70" r="2.4"/><circle class="chart-dot" data-tip="Day 24 · 86" cx="227" cy="52" r="2.4"/><circle class="chart-dot" data-tip="Day 30 · 92" cx="310" cy="30" r="3.4"/>
+                  </g>
+                </svg>
+              </div>
+              <div class="report-card__foot"><p class="report-card__meta">SVG baseline · sine curve · gos15 · rising</p><span class="report-card__arrows" aria-hidden="true">↑↑</span></div>
+            </article>
+
+            <!-- 七成时间环形 -->
+            <article class="report-card">
+              <h3 class="report-card__title">Seven-tenths in dialogue &amp; singing</h3>
+              <p class="report-card__desc">Use time · share of total speech time: dialogue, songs, drills.</p>
+              <div class="report-chart report-anim" style="max-width: 210px; margin-left: auto; margin-right: auto;">
+                <svg viewBox="0 0 200 200" role="img" aria-label="Donut showing 70 percent in dialogue and singing">
+                  <circle cx="100" cy="100" r="78" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="1.5 11" opacity="0.35" style="color:var(--foreground)"/>
+                  <circle cx="100" cy="100" r="54" fill="none" stroke="currentColor" stroke-width="13" opacity="0.12" style="color:var(--foreground)"/>
+                  <circle class="draw-arc" cx="100" cy="100" r="54" fill="none" stroke="currentColor" stroke-width="13" stroke-dasharray="237.5 339.3" stroke-linecap="butt" transform="rotate(-90 100 100)" style="color:var(--foreground)"/>
+                  <text x="100" y="102" text-anchor="middle" font-family="Geist, sans-serif" font-size="30" font-weight="500" fill="currentColor" style="color:var(--foreground)">70%</text>
+                  <text x="100" y="122" text-anchor="middle" font-family="Geist Mono, monospace" font-size="9" letter-spacing="1.5" fill="currentColor" opacity="0.5" style="color:var(--foreground)">DIALOGUE · SING</text>
+                </svg>
+              </div>
+              <div class="report-card__foot"><p class="report-card__meta">Donut ring · ticks ring · 70%</p><span class="report-card__arrows" aria-hidden="true">↑↑</span></div>
+            </article>
+
+            <!-- 六维口语成绩点阵 -->
+            <article class="report-card">
+              <h3 class="report-card__title">Six-dimension score field</h3>
+              <p class="report-card__desc">93 dots · each dot, one practice line: the darker, the closer to 90+.</p>
+              <div class="report-chart report-anim">
+                <svg class="report-dots" viewBox="0 0 320 168" role="img" aria-label="Six-dimension score dot grid" data-rows="6" data-cols="19" data-seed="7"></svg>
+              </div>
+              <div class="report-legend">
+                <span><i></i>90–100</span>
+                <span><i class="o65"></i>80–89</span>
+                <span><i class="o45"></i>70–79</span>
+                <span><i class="o25"></i>60–69</span>
+              </div>
+              <div class="report-card__foot"><p class="report-card__meta">Dot grid · opacity bands · 6 dims</p><span class="report-card__arrows" aria-hidden="true">↑↑</span></div>
+            </article>
+          </div>
+        </div>
+
+        <!-- A STARTING POINT -->
+        <aside class="fade-in" style="transition-delay: 0.1s">
+          <header class="report-head">
+            <div>
+              <p class="report-kicker">A starting point</p>
+              <h2 class="report-subtitle">Know where you stand</h2>
+            </div>
+            <p class="report-head-side">Four kinds of numbers hold the pattern: frequency, time, quality, and consistency.</p>
+          </header>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="stat-tile">
+              <div class="stat-tile__value-row">
+                <p class="stat-tile__value count-up" data-to="42">42</p>
+                <span class="stat-tile__arrow" aria-hidden="true">→</span>
+              </div>
+              <p class="stat-tile__label">Practice sessions</p>
+              <p class="stat-tile__delta">+12 this month</p>
+              <div class="stat-tile__track" aria-hidden="true"><i style="height:6px"></i><i style="height:10px"></i><i style="height:12px"></i><i style="height:8px"></i><i style="height:11px"></i></div>
+            </div>
+            <div class="stat-tile">
+              <div class="stat-tile__value-row">
+                <p class="stat-tile__value count-up" data-to="186">186</p>
+                <span class="stat-tile__arrow" aria-hidden="true">→</span>
+              </div>
+              <p class="stat-tile__label">Practice minutes</p>
+              <p class="stat-tile__delta">≈ 3.1h / week</p>
+              <div class="stat-tile__track" aria-hidden="true"><i style="height:8px"></i><i style="height:6px"></i><i style="height:11px"></i><i style="height:12px"></i><i style="height:9px"></i></div>
+            </div>
+            <div class="stat-tile">
+              <div class="stat-tile__value-row">
+                <p class="stat-tile__value count-up" data-to="82">82</p>
+                <span class="stat-tile__arrow" aria-hidden="true">→</span>
+              </div>
+              <p class="stat-tile__label">Average score</p>
+              <p class="stat-tile__delta">overall / 100</p>
+              <div class="stat-tile__track" aria-hidden="true"><i style="height:5px"></i><i style="height:7px"></i><i style="height:9px"></i><i style="height:11px"></i><i style="height:12px"></i></div>
+            </div>
+            <div class="stat-tile">
+              <div class="stat-tile__value-row">
+                <p class="stat-tile__value count-up" data-to="386">386</p>
+                <span class="stat-tile__arrow" aria-hidden="true">→</span>
+              </div>
+              <p class="stat-tile__label">Sentences spoken</p>
+              <p class="stat-tile__delta">≈ 9.2 / session</p>
+              <div class="stat-tile__track" aria-hidden="true"><i style="height:9px"></i><i style="height:11px"></i><i style="height:8px"></i><i style="height:12px"></i><i style="height:10px"></i></div>
+            </div>
+            <div class="stat-tile">
+              <div class="stat-tile__value-row">
+                <p class="stat-tile__value count-up" data-to="6">6</p>
+                <span class="stat-tile__arrow" aria-hidden="true">→</span>
+              </div>
+              <p class="stat-tile__label">Day streak</p>
+              <p class="stat-tile__delta">current run</p>
+              <div class="stat-tile__track" aria-hidden="true"><i style="height:4px"></i><i style="height:6px"></i><i style="height:8px"></i><i style="height:10px"></i><i style="height:12px"></i></div>
+            </div>
+            <div class="stat-tile">
+              <div class="stat-tile__value-row">
+                <p class="stat-tile__value count-up" data-to="4" data-prefix="+">+4</p>
+                <span class="stat-tile__arrow" aria-hidden="true">→</span>
+              </div>
+              <p class="stat-tile__label">vs 4 weeks ago</p>
+              <p class="stat-tile__delta">avg score up</p>
+              <div class="stat-tile__track" aria-hidden="true"><i style="height:7px"></i><i style="height:9px"></i><i style="height:6px"></i><i style="height:12px"></i><i style="height:10px"></i></div>
+            </div>
+          </div>
+
+          <article class="report-card" style="margin-top: 1.25rem;">
+            <h3 class="report-card__title">Easy to get wrong: stress &amp; tense</h3>
+            <p class="report-card__desc">Where the last report marks you down most often.</p>
+            <div style="margin-top: 0.75rem;">
+              <div class="error-row"><span class="error-row__label">Word stress</span><span class="error-row__bar"><i style="width:100%"></i></span><span class="error-row__value">41</span></div>
+              <div class="error-row"><span class="error-row__label">Vowel length</span><span class="error-row__bar"><i style="width:78%"></i></span><span class="error-row__value">32</span></div>
+              <div class="error-row"><span class="error-row__label">Consonant clusters</span><span class="error-row__bar"><i style="width:58%"></i></span><span class="error-row__value">24</span></div>
+              <div class="error-row"><span class="error-row__label">Linking</span><span class="error-row__bar"><i style="width:44%"></i></span><span class="error-row__value">18</span></div>
+              <div class="error-row"><span class="error-row__label">Intonation</span><span class="error-row__bar"><i style="width:20%"></i></span><span class="error-row__value">8</span></div>
+            </div>
+            <div class="report-card__foot"><p class="report-card__meta">Error frequency list · top 5</p><span class="report-card__arrows" aria-hidden="true">↑↑</span></div>
+          </article>
+        </aside>
+      </div>
+    </section>
+
+    <!-- FLUENCY FEATURES（单次会话详情） -->
+    <section class="mx-auto w-full max-w-275 px-6 py-10 sm:px-10">
+      <div class="fade-in">
+        <header class="report-head">
+          <div>
+            <p class="report-kicker">Report detail</p>
+            <h2 class="report-subtitle">Fluency features · one turn</h2>
+          </div>
+          <p class="report-head-side">Demo data for one practice turn — the same table every session writes into.</p>
+        </header>
+
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="report-kpi">
+            <p class="report-kpi__label">Speech rate · WPM</p>
+            <p class="report-kpi__value count-up" data-to="145.8" data-dec="1">145.8</p>
+            <p class="report-kpi__meta">target 150 · close to steady</p>
+          </div>
+          <div class="report-kpi">
+            <p class="report-kpi__label">Articulation rate</p>
+            <p class="report-kpi__value count-up" data-to="229.5" data-dec="1">229.5</p>
+            <p class="report-kpi__meta">syllables/min · natural pace</p>
+          </div>
+          <div class="report-kpi">
+            <p class="report-kpi__label">Pauses</p>
+            <p class="report-kpi__value">1</p>
+            <p class="report-kpi__meta">longest 1.1s</p>
+          </div>
+          <div class="report-kpi">
+            <p class="report-kpi__label">Pause ratio</p>
+            <p class="report-kpi__value count-up" data-to="36.5" data-dec="1" data-suffix="%">36.5%</p>
+            <p class="report-kpi__meta">target 39.3% · −2.9% vs last week</p>
+          </div>
+        </div>
+
+        <!-- 停顿时间轴 -->
+        <article class="report-card" style="margin-top: 1rem;">
+          <h3 class="report-card__title">Pause timeline</h3>
+          <p class="report-card__desc">Width = duration of pause, red = over 0.5s. One pause sits ahead of the signal word.</p>
+          <div class="timeline" aria-label="Pause timeline words: hello, I, would, like, a, coffee, please">
+            <span class="timeline-chip">hello</span>
+            <span class="timeline-chip">I</span>
+            <span class="timeline-chip">would</span>
+            <span class="timeline-chip">like</span>
+            <span class="timeline-chip">a</span>
+            <span class="timeline-chip timeline-chip--hl">coffee</span>
+            <span class="timeline-chip">please.</span>
+          </div>
+          <p class="timeline-note">Pause #1 · 1.1s before “coffee” — long pause: unfinished ending, pause before the signal word.</p>
+        </article>
+
+        <div class="grid gap-4 lg:grid-cols-2" style="margin-top: 1rem;">
+          <!-- 转写 + 词段时间码 -->
+          <article class="report-card">
+            <h3 class="report-card__title">Transcription (en)</h3>
+            <p class="report-transcript">“hello, I would like a coffee, please.”</p>
+            <table class="report-table">
+              <thead>
+                <tr><th>Word</th><th>Start</th><th>End</th><th>Gap</th><th>Conf.</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>hello</td><td>0.10</td><td>0.34</td><td>—</td><td>0.98</td></tr>
+                <tr><td>I</td><td>0.42</td><td>0.50</td><td>0.08</td><td>0.97</td></tr>
+                <tr><td>would</td><td>0.58</td><td>0.86</td><td>0.08</td><td>0.99</td></tr>
+                <tr><td>like</td><td>0.94</td><td>1.14</td><td>0.08</td><td>0.98</td></tr>
+                <tr><td>a</td><td>1.22</td><td>1.30</td><td>0.08</td><td>0.95</td></tr>
+                <tr class="report-row-hl"><td>coffee</td><td>2.35</td><td>2.72</td><td>1.05</td><td>0.99</td></tr>
+                <tr><td>please.</td><td>2.80</td><td>2.98</td><td>0.08</td><td>0.98</td></tr>
+              </tbody>
+            </table>
+            <div class="report-card__foot"><p class="report-card__meta">Word timestamps · ms · from attempt[0]</p><span class="report-card__arrows" aria-hidden="true">↑↑</span></div>
+          </article>
+
+          <!-- ISE 评分 + 口径说明 -->
+          <article class="report-card">
+            <h3 class="report-card__title">ISE pronunciation score</h3>
+            <p class="report-card__desc">Reference scoring, non-ASR.</p>
+            <div class="report-score" style="margin-top: 1.2rem;">
+              <span class="report-score__value count-up" data-to="90.9" data-dec="1">90.9</span>
+              <span class="report-score__unit">overall</span>
+            </div>
+            <div class="grid grid-cols-2 gap-4" style="margin-top: 1.1rem;">
+              <div>
+                <p class="report-kpi__label">Pronunciation</p>
+                <p class="report-kpi__value count-up" data-to="92.6" data-dec="1" style="font-size: 22px;">92.6</p>
+              </div>
+              <div>
+                <p class="report-kpi__label">Grammar</p>
+                <p class="report-kpi__value" style="font-size: 22px; color: color-mix(in srgb, var(--foreground) 40%, transparent);">Not enabled</p>
+                <p class="report-kpi__meta">grammar left off</p>
+              </div>
+            </div>
+            <div class="report-note">
+              Notes:
+              <ul>
+                <li>Fluency &amp; pauses are auxiliary metrics.</li>
+                <li>After the pause annotation, the turn is not scored (interrupted speech).</li>
+                <li>One turn ≤ 15s of audio; scores come from attempts[].wpm / fluency_features.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 底部返回 -->
+    <section class="mx-auto w-full max-w-275 px-6 pb-16 sm:px-10">
+      <div class="fade-in flex flex-col items-center gap-5 border-t border-foreground/10 pt-10 text-center">
+        <p class="report-kicker">That is the shape of a report</p>
+        <h2 class="font-serif text-[2rem] font-medium leading-[1.1] tracking-tight sm:text-[2.5rem]">
+          See it on your own numbers.
+        </h2>
+        <a href="stats.html" class="report-back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+          Back to Stats
+        </a>
+      </div>
+    </section>
+
+    <div class="h-12 sm:h-16"></div>
+  </main>
+
+  <script src="js/vendor/lenis.min.js"></script>
+  <script src="js/theme.js" defer></script>
+  <script src="js/gooey-nav.js" defer></script>
+  <script src="js/nav.js" defer></script>
+  <script src="js/animations.js" defer></script>
+  <script src="js/shader-flow.js" defer></script>
+  <script src="js/nav-reveal.js" defer></script>
+  <script src="js/main.js" defer></script>
+  <script src="js/footer.js" defer></script>
+  <script type="module" src="js/aero-shards-init.js"></script>
+  <script src="js/vendor/gsap.min.js" defer></script>
+  <script src="js/vendor/ScrollTrigger.min.js" defer></script>
+  <script src="js/vendor/SplitText.min.js" defer></script>
+  <script src="js/split-text.js" defer></script>
+  <script src="js/report-interactions.js" defer></script>
+  <script>
+    // 六维成绩点阵图：按 seed 生成确定性的明暗点阵（单色系，opacity 分档）
+    (function () {
+      'use strict';
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.querySelectorAll('.report-dots').forEach(function (svg) {
+        var rows = parseInt(svg.getAttribute('data-rows'), 10) || 6;
+        var cols = parseInt(svg.getAttribute('data-cols'), 10) || 19;
+        var seed = parseInt(svg.getAttribute('data-seed'), 10) || 1;
+        var bands = [1, 0.75, 0.5, 0.3, 0.15]; // 90-100 → 50-59
+        var ns = 'http://www.w3.org/2000/svg';
+        for (var r = 0; r < rows; r++) {
+          for (var c = 0; c < cols; c++) {
+            var h = (seed * 9301 + (r * 31 + c) * 49297) % 233280;
+            var idx = Math.floor(h / 233280 * bands.length);
+            var dot = document.createElementNS(ns, 'circle');
+            dot.setAttribute('cx', (12 + c * 15.7).toFixed(1));
+            dot.setAttribute('cy', (16 + r * 27).toFixed(1));
+            dot.setAttribute('r', '4.6');
+            dot.setAttribute('fill', 'currentColor');
+            dot.setAttribute('style', 'color:var(--foreground)');
+            var bandVal = [95, 84, 74, 64, 55][idx];
+            var titleEl = document.createElementNS(ns, 'title');
+            titleEl.textContent = String(bandVal) + ' / band ' + (idx === 0 ? '90-100' : idx === 1 ? '80-89' : idx === 2 ? '70-79' : idx === 3 ? '60-69' : '50-59');
+            dot.appendChild(titleEl);
+            if (!reduce) {
+              dot.setAttribute('data-o', String(bands[idx]));
+              dot.style.opacity = '0';
+              dot.style.transform = 'scale(0.2)';
+              dot.style.transformBox = 'fill-box';
+              dot.style.transformOrigin = 'center';
+            } else {
+              dot.setAttribute('opacity', String(bands[idx]));
+            }
+            svg.appendChild(dot);
+          }
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
