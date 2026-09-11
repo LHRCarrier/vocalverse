@@ -2087,7 +2087,7 @@ body.has-page-bg .outer-wrapper { background: transparent; }
 
 /* ============================================================
    v11: 原型 project-card 严格复刻（滚动区功能卡）
-   唯一权威来源：D:\WorklingL\vocalverse\原型
+   唯一权威来源：原型源页面（即本归档目录；原注释指向作者本机路径，已移除）
    - 令牌照抄 tailwind.input.css 的 :root / .dark
    - 卡片/图片/图标数值以 styles.css 编译产物为准（rounded-3xl=1.5rem
      rounded-2xl=1rem rounded-lg=.5rem、aspect-ratio 752/497 或 1024/768 等）

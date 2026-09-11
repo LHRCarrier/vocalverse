@@ -1,172 +1,95 @@
-# UI Concept Design
+# web-prototypes · VocalVerse Web 静态原型合集
 
-> **模板驱动的现代 UI 设计系统** —— 明亮通透、大圆角、胶囊按钮风。
-> 一套视觉语言覆盖 **Web / 移动 / 桌面** 原型，并可直接作为 skill 加载进 AI 编码代理。
-
-设计参考帧（`references/`）、精确设计令牌（`tokens/`）、可运行示例（`examples/`）与可选代码模板（`templates/`）四位一体：
-
-**只凭抽象原则写出来的 UI 一定平庸，必须对着参考帧和 tokens 做。**
-
-> **定位说明**：本系统是**面向原型设计的**——不管你用 Web、移动端还是桌面端做原型，视觉语言都是一套；
-> WinForms 只是附带的可选代码模板之一，不是本系统的范围限定。
+> **静态归档目录，不是产品代码。** 这里存放 VocalVerse Web 端的原型页面（早于/并行于 `apps/web` 的设计稿），
+> 供评审、对照、答辩取材用；**不参与任何门禁**——没有根级 lint/typecheck/test/build 覆盖本目录，
+> CI 中只有 `secret-scan`（全仓 trufflehog）会扫到它。
+>
+> 产品实现以 `apps/web` 为准；本目录只做视觉与交互对照，**不保证与产品代码逐像素一致**，改动也不要求同步回产品。
 
 ---
 
-## 效果展示
+## 一、页面清单（根目录 9 个整站页面）
 
-### App 移动端 · 三屏
-
-![App 移动端三屏](https://github.com/LHRCarrier/ui-concept-design/raw/master/assets/app-screens-iphone.png)
-
-| 屏幕 | 落地的组件 |
-|---|---|
-| **① 今日学习主页** | 底部浮动 Tab 栏 · 打卡徽章 · 统计卡 · 全宽分段控件 · 点线时间轴任务卡 |
-| **② 场景对话** | 对话气泡 · 语言点 chip · 录音大按钮（波纹动效） |
-| **③ 唱歌评分报告** | 深紫成绩卡（chip + 光晕）· 四维统计行 · 逐句评分列表 |
-
-三个页面都是 **390px 手机视口的单文件页面**（源码见 `examples/app/`），浏览器直接打开即可运行。
-
-### Web 端 · 三个完整页面
-
-**Landing 页** —— 双侧手绘线稿插画 hero、胶囊按钮（hover 颜色插值）、信任条、统计数据行、分段控件、点线时间轴列表卡、toast 微交互
-
-![Landing 示例](https://github.com/LHRCarrier/ui-concept-design/raw/master/assets/screenshot-landing.png)
-
-**Speaking Practice 页** —— 56px 分段控件、深藏青推荐卡（chip badge + 幽灵按钮 + 光晕）、场景卡网格（实色图标块）、统计行
-
-![Practice 示例](https://github.com/LHRCarrier/ui-concept-design/raw/master/assets/screenshot-practice.png)
-
-**Fitness 运动打卡仪表盘** —— 本页由**独立子代理仅凭 `SKILL.md` + `tokens/design-tokens.md` 生成**（无其他提示），
-作为 skill 效果验证：双侧线稿插画 hero、统计行、56px 分段控件、实色图标块运动卡网格、深青推荐卡（chip + 光晕 + 幽灵按钮）、点线时间轴活动记录
-
-![Fitness 示例](https://github.com/LHRCarrier/ui-concept-design/raw/master/assets/screenshot-fitness.png)
-
----
-
-## 设计语言速览
-
-一眼看清这套系统"长什么样"。完整取值见 [`tokens/design-tokens.md`](tokens/design-tokens.md)。
-
-| 维度 | 取值 | 要点 |
+| 文件 | 页面 | 说明 |
 |---|---|---|
-| **主背景** | `paper` `#F5F4F1` | 米白纸面，不是纯白也不是灰 |
-| **卡片** | `card` `#FFFFFF` · `r-card` **24px** | 纯白大圆角，**无描边**，阴影仅一档 `0 8 24 rgba(28,28,26,.06)` |
-| **主按钮** | `ink` `#1C1C1A` 胶囊 · 高 **48px** | 炭黑不是纯黑，**禁止彩色渐变按钮** |
-| **点缀色** | `accent` `#2F6BFF`（唯一）· `star` `#FFC83D` | 彩色总面积 **<10%** |
-| **圆角** | 卡片 24 / 内嵌图 18 / 按钮与分段 999（胶囊）/ 小标签 12 | 禁止直角与 ≤8px 小圆角按钮 |
-| **字号** | Display **48–56** · Stat **32+** · Title 22–24 · Body 15–16 · Caption 13 | 每视图 ≤3 种字号字重组合 |
-| **间距** | 8px 网格 · 页边距 **40–56** · 卡内边距 **32** | **用留白分组，不用分隔线** |
-| **图标块** | 品牌色**实底** + 白色线性图标 · r-14 | 不是"浅色底 + 彩色图标" |
-| **视觉锚点** | 手绘线稿插画：2.5px `ink` 圆头线 + `pop-green` `#A8E05F` 单色填涂 | 热气球 / 日历 / 星星 / 音符，每屏至少 1 处 |
-| **深色** | 只允许有色深色展示卡（深藏青 `#232044` / 深紫 `#3A2440` / 深绿 `#1E2B26` / 深青 `#16303A`） | **每屏最多 1 张，禁止纯黑与灰蓝深色主题** |
+| `index.html` | 首页 Landing | 全屏视频 Hero + 品牌导航 + 大标题 + 「今日练习」输入卡；单页内联样式，仅外链 `css/footer.css` |
+| `about.html` | About | 手绘线稿插画 + 品牌叙事 + 联系按钮（`js/contact.js` 悬停展开/点击复制邮箱） |
+| `community.html` | Community | 社区主页原型（帖子流 + 滚动展开区 `css/scroll-expand.css`） |
+| `practice.html` | AI Oral Practice | 口语陪练页（LLM 场景角色扮演 + 语音识别卖点） |
+| `recommend.html` | Personalized Learning | 个性化学习路径/推荐内容页 |
+| `report.html` | Learning Report | 学习报告页（`css/report.css` + `js/report-interactions.js`，借鉴参考图的信息结构） |
+| `sing.html` | English Song Singing | 英文歌跟唱页 |
+| `stats.html` | Visual Reports | 数据可视化报告页 |
+| `showcase.html` | Design Showcase | 设计展示页（组件/动效陈列） |
 
-### 禁止清单（这些就是"程序员风"的来源）
+> 除 `index.html` 外的页面共用一套壳：`css/styles.css`（Tailwind v4 编译产物）+ `css/site-nav.css` /
+> `css/nav-reveal.css` / `css/gooey-nav.css`（胶囊导航，含 GooeyNav 气泡动效）+ `css/footer.css`，
+> 由 `common.js` 在非首页注入全屏视频背景、`js/footer.js` 注入统一页脚。
 
-小圆角按钮 · 直角卡片 · 彩色渐变 · 粗描边堆叠 · 深灰蓝主题 · 浅色底彩图标 · 靠分隔线分组。
-标准答案只有一句：**米白纸面、白卡 r-24 无描边、炭黑胶囊主按钮、克制的蓝黄点缀、一处手绘线稿插画。**
-
----
-
-## 核心设计理念（为 AI 代理设定）
-
-本系统不是给人类设计师看的参考集，而是**写给 AI 代理的行为规范**——直接作为 skill 加载到
-AI 编码代理（Claude / GPT / DeepSeek 等）的工作流中。以下理念是它的灵魂，违反任何一条都算失败：
-
-**1. 先看，再动手。**
-AI 最容易犯的错是"凭抽象原则生成 UI"——原则是对的，产出却是平庸的。本系统强制：
-打开 `references/` 参考帧 → 记住它的圆角、留白、按钮形状 → 才开始写代码。参考帧是视觉正本，
-不是装饰。
-
-**2. 查表，禁止自造。**
-所有色值、圆角、字号、间距、阴影都来自 `tokens/design-tokens.md`，一次都不要"差不多"。
-自查口令：这个颜色查过表吗？这个圆角是 24 吗？这个按钮是胶囊吗？
-
-**3. 每屏一个视觉锚点。**
-大幅线稿插画（气球、日历、星星——2.5px 黑线 + 单色填涂）不是装饰，是"像设计成品"与
-"像普通后台"的分界线。没有插画锚点的页面不许定稿。
-
-**4. 尺度宁大勿小。**
-Display ≥48px、统计数字 ≥32px、按钮高 48px、分段控件高 56px、页面边距 40px+。
-做完把页面缩到 50% 跟参考帧并排：你的标题显小 = 不够大。
-
-**5. 永远"程序员风"检查。**
-小圆角按钮、直角卡片、彩色渐变、粗描边堆叠、深灰蓝主题、浅色底彩图标——这些机器生成的
-"标准后台样式"全部禁止。标准答案：米白纸面、白卡 r-24 无描边、炭黑胶囊主按钮、克制的蓝黄点缀。
-
-**6. 验收清单是底线。**
-每页完成必须过 8 条自检（见 `SKILL.md` 第四节），全部答"是"才算完成；截图与参考帧并排对比，
-不达标就回到第 1 步重来。
-
----
-
-## 特性
-
-- **多端通用**：一套视觉语言覆盖 Web / 移动 / 桌面原型（参考帧全部尺寸无关，tokens 按 px 直接落各端 CSS）。
-- **精确设计令牌**：色板 / 圆角 / 字号 / 间距 / 组件规格全部查表取值，禁止"差不多"。
-- **7 张内置参考帧**：覆盖首页英雄区、分段控件、统计卡、时间线卡、图片卡、深色展示卡等主要界面形态，动手前必看。
-- **组件决策树**：要做什么 → 用哪个模板 / 参考帧 / 组件，减少空白区的即兴发挥。
-- **完整源码示例**：`examples/web/`（landing / practice / fitness 三个单文件页面）+ `examples/app/`（home / speaking / report 三个手机页面），含微交互动效，全部值来自 tokens；`examples/README.md` 提供图标库与动效库的开源选型。
-- **可选 WinForms 模板**：`templates/winforms/`（`Theme.cs` + `ThemeControls.cs`），仅供 C# 桌面项目套用，已通过编译与运行时渲染验证；其他平台跳过即可。
-- **验收清单**：8 条可自检的问答，全部答"是"才算完成。
-
-## 目录结构
+## 二、子目录
 
 ```
-├── SKILL.md                  # 设计规范主体：硬约束 / 概念速查 / 工作流程 / 决策树 / 验收清单
-├── references/               # 7 张内置设计参考帧（视觉正本）
-├── tokens/
-│   └── design-tokens.md      # 精确色值 / 圆角 / 字号 / 间距 / 组件规格
-├── templates/
-│   └── winforms/             # 可选：仅供 C#/WinForms 项目（其他平台跳过）
-│       ├── Theme.cs          # 色板与字体令牌代码
-│       └── ThemeControls.cs  # 组件代码骨架（PillButton / CardPanel / SegmentedControl / Badge 等）
-├── examples/
-│   ├── README.md             # 图标库选型（Lucide/Tabler/Phosphor）与动效库（Motion/Magic UI/Hover.css）
-│   ├── web/
-│   │   ├── landing.html      # 单文件可运行的 Landing 示例
-│   │   ├── practice.html     # 单文件可运行的练习页示例
-│   │   └── fitness.html      # 运动打卡仪表盘（子代理按 SKILL.md 生成，skill 效果验证）
-│   └── app/                  # 移动端 App 示例（390px 手机视口）
-│       ├── home.html         # 今日学习主页（底部浮动 Tab 栏）
-│       ├── speaking.html     # 场景对话（气泡 + 录音大按钮）
-│       └── report.html       # 唱歌评分报告（深色卡 + 统计行）
-└── assets/                   # README 效果展示截图
+web-prototypes/
+├── *.html                   # 上表 9 个整站页面
+├── styles.css               # index 等页共用的编译后样式（含 Tailwind 产物 + 手写覆盖）
+├── common.js / nav.js       # 页面壳：背景视频、移动端菜单、滚动状态
+├── reveal.js                # 滚动入场（IntersectionObserver）
+├── css/                     # 分页样式：styles / report / gooey-nav / nav-reveal / site-nav /
+│                            #           scroll-expand / experience / aero-shards / footer / tailwind.input
+├── js/                      # 交互脚本：gooey-nav / scroll-expand / shader-flow / split-text /
+│                            #           portrait-morph / stack / report-interactions / showcase-interactions …
+├── js/vendor/               # 第三方库（版本与许可见第四节）
+└── assets/
+    ├── app-screens/         # App 移动端三屏静态稿（home / speaking / report，iPhone 框单文件页面）
+    ├── feature-screens/     # 组件六屏展示（输入 / 按钮 / 控件 / 图片卡 / 灯箱 / 弹窗）+ gen.js 生成脚本
+    ├── app-screens-iphone.png / feature-*.png   # 上面两组合集的截图
+    ├── josh.webp / josh_wave.webp               # 人像素材
+    └── linkedin.svg / x.svg                     # 页脚社交图标
 ```
 
-## 快速上手
+## 三、本地预览
 
-1. **看参考帧**：打开 `references/` 中与当前界面最像的 1-2 张，记住圆角、留白、按钮形状、文字层级。
-2. **锁 tokens**：从 `tokens/design-tokens.md` 抄色板 / 圆角 / 字号（WinForms 抄到 `Theme.cs`，其他平台写成 CSS 变量），不改值。
-3. **画视觉锚点**：先画线稿插画 / 大幅图形锚点（气球、日历、星星…），再在上面摆组件——**插画先于布局**。
-4. **套示例起步**：Web / 移动从 `examples/web/`、`examples/app/` 的单文件页面克隆改造；WinForms 从 `templates/winforms/` 复制组件骨架。任何平台都直接按 tokens 写样式。
-5. **跑起来截图**，与参考帧并排对比（圆角够大吗？按钮是胶囊吗？有插画锚点吗？留白够吗？）。
-6. **不达标就回到第 1 步**。
+在**本目录**（`web-prototypes/`，不是仓库根）起一个静态服务即可，页面之间用相对路径互链：
 
-<details>
-<summary><b>验收清单（8 条，全部答"是"才算完成）</b></summary>
+```powershell
+cd web-prototypes
+python -m http.server 8080     # 或： npx --yes serve .
+# 浏览器打开 http://127.0.0.1:8080/index.html
+```
 
-1. 主背景是 `paper` 米白，卡片纯白 r-24，无描边或极轻阴影？
-2. 每个按钮都是胶囊（全圆角）？主按钮是炭黑不是彩色？
-3. 彩色只有 accent 蓝 / star 黄 / 语义色，且总面积 <10%？
-4. 文字层级 ≤3 级，大标题够大够粗（Display ≥48px / Stat ≥32px）？
-5. 间距全是 8 的倍数，相关元素近、无关元素远？
-6. 每个可交互元素有 hover/pressed/disabled 反馈，过渡 ≤150ms？
-7. **有手绘线稿插画/图形锚点吗？图标块是实色底白图标吗？**
-8. 截图和参考帧放一起看，风格一致、不"程序员风"？
+直接双击 `file://` 打开多数页面也能看，但剪贴板等安全上下文 API 会降级（`js/contact.js` 已做兜底）。
 
-</details>
+**外部依赖（需联网，离线时页面仍可打开但会掉素材）**：
 
-## 参考帧说明
+| 依赖 | 用在哪 | 备注 |
+|---|---|---|
+| Google Fonts（Poppins / Geist / Fraunces） | 全部页面 `font-family` | 断网回退系统字体 |
+| 两条 CloudFront `.mp4` | `index.html` Hero 背景、`common.js` 非首页背景视频 | **第三方账号托管的演示素材**，随时可能失效；失效只影响背景，不影响页面结构 |
+| Unsplash 图 / `images.higgs.ai` webp | 视频封面、滚动展开区配图 | 同上，演示用外链 |
+| `cdn.simpleicons.org` | about/showcase 的品牌 logo 墙 | 断网则图标缺失 |
 
-本项目 `references/` 下的图片**仅作为本设计系统的内置风格参考**，展示了本系统追求的视觉语言
-（米白纸面、白色大圆角卡片、炭黑胶囊按钮、克制的蓝黄点缀、手绘线稿插画）。这些帧为公开设计素材的
-**局部截取，仅用于风格学习与对照**，不包含任何第三方品牌标识。若你的项目需要发布或再分发这些图片，
-请自行确认原素材的许可与合规性；如不放心，可在发布时移除 `references/` 目录（设计令牌与规范不受影响）。
+## 四、第三方代码与许可
 
-## License
+库文件都原样保留上游版权头；`js/vendor/vgpu.LICENSE` 为 vgpu 许可原文。
 
-[MIT](LICENSE)
+| 文件 / 来源 | 版本 | 许可 | 上游 |
+|---|---|---|---|
+| `js/vendor/gsap.min.js` | 3.13.0 | **GSAP Standard License**（非 MIT） | gsap.com |
+| `js/vendor/ScrollTrigger.min.js` | 3.13.0 | 同上 | gsap.com |
+| `js/vendor/SplitText.min.js` | 3.13.0 | 同上（原 Club 插件，现纳入标准许可） | gsap.com |
+| `js/vendor/lenis.min.js` | 1.3.26 | MIT | darkroom.engineering/lenis |
+| `js/vendor/matter.min.js` | 0.20.0 | MIT | brm.io/matter-js |
+| `js/vendor/vgpu.js`（`@vgpu/core` 构建产物） | — | MIT（Vercel, Inc.） | vercel-labs/vgpu |
+| `styles.css` / `css/tailwind.input.css` | Tailwind v4.3.3 | MIT | tailwindcss.com |
+| `js/gooey-nav.js` + `css/gooey-nav.css` | — | 移植改造自 React Bits 的 GooeyNav（React→原生 JS） | reactbits.dev（文件头逐条列了与上游的差异） |
 
----
+`css/report.css` 标注的「Learning Report / FLUENCY FEATURES 参考图」仅作**信息结构与版式对照**，
+不包含第三方代码或素材文件。
 
-*由 [LHRCarrier](https://github.com/LHRCarrier) 维护。*
+## 五、维护约定
+
+- 本目录是**归档快照**：新增/删除页面无需改任何 workflow、无需过 `apps/web` 门禁；
+- 产品内可交互的概念预览页在 `apps/web/src/views/preview/`（UIC 概念三页 `uic-*`，dev-only 子树），
+  与本目录各自演进，互不同步；
+- 页面文案为原型英文稿，非最终产品文案；
+- 归档前请确认不含密钥/真实用户数据（红线见仓库根 `README.md` 与 `AGENTS.md`）。
