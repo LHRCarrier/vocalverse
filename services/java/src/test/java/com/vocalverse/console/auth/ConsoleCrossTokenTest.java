@@ -3,6 +3,7 @@ package com.vocalverse.console.auth;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
@@ -130,12 +131,28 @@ class ConsoleCrossTokenTest extends AbstractConsoleApiTest {
   @Test
   @org.springframework.transaction.annotation.Transactional
   void console_token_with_matching_sub_cannot_impersonate_app_user() throws Exception {
-    String appUsername = uniqueName("appu");
-    appUserToken(appUsername); // 注册出 users 行
-    Long appUserId = users.findByUsernameIgnoreCase(appUsername).orElseThrow().getId();
-
-    // 造一个 id 与 App 用户相同的控制台账号：用原生插入把 id 钉死
+    // 造一个 id 与 App 用户相同的控制台账号：用原生插入把 id 钉死。
+    //
+    // ⚠️ 必须挑一个**在 admin_users 里空闲**的 id（2026-09-11 CI 实测缺陷）：
+    // `users.id` 与 `admin_users.id` 是两条**独立**的自增序列，直接拿某个 App 用户的 id 去插
+    // admin_users 会撞上已有行 → `Unique index or primary key violation: PRIMARY KEY ON admin_users(ID)`
+    // （CI 上撞了 id=18；本地执行顺序不同就没事 —— 典型的**顺序依赖**，不是本用例的逻辑错）。
+    // 用例意图不变（它要证的正是"sub 数值相同也不能冒充"），只是把"钉哪个 id"改成先探测空闲：
+    // 逐个注册新 App 用户，谁的 id 在 admin_users 里没被占就用谁。两张表的 id 区间很快错开，通常一次就中。
     seedRbac();
+    Long appUserId = null;
+    String appUsername = null;
+    for (int attempt = 0; attempt < 30 && appUserId == null; attempt++) {
+      String candidate = uniqueName("appu");
+      appUserToken(candidate); // 注册出 users 行
+      Long candidateId = users.findByUsernameIgnoreCase(candidate).orElseThrow().getId();
+      if (!adminUsers.existsById(candidateId)) {
+        appUserId = candidateId;
+        appUsername = candidate;
+      }
+    }
+    assertNotNull(appUserId, "连续 30 次都找不到「在 admin_users 中空闲」的 App 用户 id（两条 id 序列没拉开？）");
+
     AdminUserEntityRow row =
         insertAdminWithExplicitId(appUserId, uniqueName("csu"), superRoleCode());
     String consoleToken = login(row.username(), FIXTURE_PASSWORD);
