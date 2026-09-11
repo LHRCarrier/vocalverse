@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>功能展示 · 分段控件与图标按钮</title>
+<link rel="stylesheet" href="screen.css">
+<style>
+  .icons { display: flex; align-items: center; justify-content: center; gap: 12px; }
+  /* Tooltip 演示区单独留白，避免与下方图标行读成同一排 */
+  .tipdemo { display: flex; justify-content: center; padding-top: 34px; }
+  .spec { padding: 22px 24px; }
+  .spec dl { display: grid; grid-template-columns: 96px 1fr; row-gap: 9px; font-size: 13px; }
+  .spec dt { color: var(--weak); }
+  .spec dd { color: var(--ink); font-weight: 600; }
+  .spec dd em { font-style: normal; color: var(--sub); font-weight: 400; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <h1 class="h1">分段控件与图标按钮</h1>
+  <p class="sub">分段控件宁大勿小：高 56px、字号 16px、图标 24px</p>
+
+  <div class="sec">
+    <div class="sec-label">分段控件 · 纯文字（3 项）</div>
+    <div class="segment">
+      <span class="on">全部</span><span>口语</span><span>唱歌</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-label">分段控件 · 图标 + 文字（2 项）</div>
+    <div class="segment">
+      <span class="on">
+        <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
+        跟读
+      </span>
+      <span>
+        <svg viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>
+        对话
+      </span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-label">图标按钮 · 图标-only 必须带 Tooltip</div>
+    <div class="tipdemo">
+      <span class="tip">
+        <span class="iconbtn is-hover">
+          <svg viewBox="0 0 24 24"><path d="M12 20.5S3.5 15 3.5 9.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8.5 2.5c0 5.5-8.5 11-8.5 11z"/></svg>
+        </span>
+        <span class="tip-bubble">收藏</span>
+      </span>
+    </div>
+    <div class="icons" style="margin-top: 30px">
+      <span class="iconbtn"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg></span>
+      <span class="iconbtn"><svg viewBox="0 0 24 24"><path d="M12 20.5S3.5 15 3.5 9.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8.5 2.5c0 5.5-8.5 11-8.5 11z"/></svg></span>
+      <span class="iconbtn"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.1M8.2 13.2l7.6 4.1"/></svg></span>
+      <span class="iconbtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg></span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="card spec">
+      <dl>
+        <dt>分段控件</dt><dd>高 56px · r-pill <em>（选中 = 白色浮起胶囊）</em></dd>
+        <dt>图标按钮</dt><dd>48 × 48 <em>· r-pill · 1.5px 线性图标</em></dd>
+      </dl>
+    </div>
+  </div>
+</div>
+</body>
+</html>

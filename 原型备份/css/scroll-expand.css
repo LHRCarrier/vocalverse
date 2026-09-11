@@ -1,0 +1,342 @@
+/* ============================================================
+   ScrollExpand 滚轮展开组件 · VocalVerse 原型（黑白版）
+   移植自 apps/web/src/assets/convix 的 scroll-expand.css，并沿用
+   convix/styles.css 中 .scrollexpand 页面级配套样式。仅使用
+   --background / --foreground / --muted 派生色（黑白灰），
+   不含任何绿色元素；字体与排版沿用原型设计令牌，明暗主题自适应。
+   ============================================================ */
+
+/* —— 组件根：占满父容器 —— */
+.scroll-expand {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* —— 容器内滚动模式（data-se-use-window-scroll="false"）—— */
+.scroll-expand--scroller {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior: contain;
+}
+
+.scroll-expand--scroller::-webkit-scrollbar {
+  display: none;
+}
+
+/* —— 滚动轨道：高度 = stage × (1 + scrollDistance + holdDistance)，由 JS 计算 —— */
+.scroll-expand__track {
+  position: relative;
+  width: 100%;
+}
+
+/* —— 粘性舞台：固定视口高度，滚动期间保持在视口内 —— */
+.scroll-expand__stage {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  overflow: hidden;
+  --se-title-size: clamp(2.75rem, 7vw, 5.25rem);
+}
+
+/* —— 首帧占位（防"跳一下"）——
+   轨道与舞台的高度都由 JS 在 measure() 里算：
+     stage = innerHeight；track = stage × (1 + scrollDistance + holdDistance)
+   而 measure() 要等 defer 脚本执行才发生。在那之前两者都是 0 高，整个文档只有
+   100vh；脚本一跑轨道撑到 255vh，下方内容（如联系区）会在一帧里被推下两千多
+   像素 —— 实测冷启动 CLS 0.40，肉眼就是"跳一下/闪一下"。
+   这里按同一个公式先占好位：5 个用到本组件的页面 data-se-scroll-distance 都是
+   1.2、hold-distance 都是 0.35（→ 255vh），数字与 measure() 完全一致；
+   JS 就位后写行内高度覆盖它，前后一致，视觉上不再有任何跳动。
+   静态降级（无 ResizeObserver）时 JS 不再设高度，故排除 --static；
+   容器内滚动模式（data-se-use-window-scroll="false"）的 stage 是 root.clientHeight
+   而不是视口高，公式不同，也一并排除。改 data-se-* 参数时记得同步这两个值。 */
+.js-scroll-expand:not(.scroll-expand--static):not([data-se-use-window-scroll="false"]) .scroll-expand__stage {
+  height: 100vh;
+  height: 100dvh;
+}
+
+.js-scroll-expand:not(.scroll-expand--static):not([data-se-use-window-scroll="false"]) .scroll-expand__track {
+  height: 255vh;
+  height: 255dvh;
+}
+
+/* —— 媒体帧：clip-path / 圆角由 JS 按滚动进度驱动；背景保持透明，
+   让页面背后的装饰层（如 shader 粒子）完整透出 —— */
+.scroll-expand__frame {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(0% 0% 0% 0% round 24px);
+  will-change: clip-path;
+  background: transparent; /* 无媒体源时不再铺底色，避免遮挡背后装饰 */
+}
+
+/* —— 媒体（img / video；无 data-se-media-src 时不注入）—— */
+.scroll-expand__media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  will-change: transform;
+  transform-origin: center;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* —— 常驻微遮罩：保证大标题与展开后的卡片在任何底色上可读 —— */
+.scrollexpand .scroll-expand__frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom,
+    color-mix(in srgb, var(--foreground) 5%, transparent) 0%,
+    transparent 35%,
+    color-mix(in srgb, var(--foreground) 9%, transparent) 100%);
+}
+
+/* —— 展开过程中渐显的暗角（scrim）—— */
+.scroll-expand__scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to top,
+    color-mix(in srgb, var(--foreground) 16%, transparent),
+    transparent 45%,
+    color-mix(in srgb, var(--foreground) 10%, transparent));
+  opacity: 0;
+}
+
+/* —— 大标题状态：占满舞台居中；滚动后整体淡出、上移、轻微放大 —— */
+.scroll-expand__title {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0 6%;
+  text-align: center;
+  cursor: default;
+  pointer-events: none;
+  will-change: opacity, transform;
+  text-wrap: balance;
+}
+
+.scrollexpand .scroll-expand__title h1 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--se-title-size);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--foreground);
+}
+
+.se-title-sub {
+  margin: 0;
+  max-width: 36ch;
+  font-size: clamp(1.05rem, 2vw, 1.375rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--foreground) 65%, transparent);
+}
+
+/* —— 滚动提示：文字 + 上下往复的小箭头（微交互）—— */
+.scroll-expand__hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: center;
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--foreground) 50%, transparent);
+  pointer-events: none;
+  will-change: opacity, transform;
+}
+
+.se-hint-arrow {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: se-hint-bounce 1.8s ease-in-out infinite;
+}
+
+@keyframes se-hint-bounce {
+  0%, 100% { transform: translateY(0); opacity: 0.65; }
+  50% { transform: translateY(6px); opacity: 1; }
+}
+
+/* —— 展开后的卡片层：初始隐藏，由 JS 按滚动进度渐显；内容超高时可滚动 —— */
+.scroll-expand__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 4.75rem 0 1.75rem;
+  overflow-y: auto;
+  opacity: 0;
+  will-change: opacity, transform;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.scroll-expand__overlay::-webkit-scrollbar {
+  display: none;
+}
+
+.se-overlay-inner {
+  position: relative;
+  width: 100%;
+  max-width: 1100px;
+  margin: auto; /* 内容不足视口时垂直居中；超高时顶部对齐并滚动画布 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .se-overlay-inner { padding: 0 2.5rem; }
+}
+
+/* —— 玻璃标签行（eyebrow）—— */
+.se-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.4rem 1.1rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 8%, transparent),
+    0 8px 20px color-mix(in srgb, var(--foreground) 8%, transparent);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.se-eyebrow-line {
+  width: 26px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--foreground) 38%, transparent));
+}
+
+.se-eyebrow-line:last-child { transform: scaleX(-1); }
+
+/* —— 点线分隔（呼应原型编辑风排版）—— */
+.se-dotline {
+  position: relative;
+  width: min(440px, 80%);
+  height: 1px;
+}
+
+.se-dotline::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--foreground) 38%, transparent) 1.5px, transparent 1.6px);
+  background-size: 12px 2px;
+  background-repeat: repeat-x;
+  background-position: center;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+}
+
+/* —— 卡片列式布局（沿用原型 columns 版式）—— */
+.se-projects {
+  width: 100%;
+  columns: 1;
+  column-gap: 1.5rem; /* gap-6 = 24px */
+}
+
+@media (min-width: 768px) {
+  .se-projects { columns: 2; column-gap: 1.75rem; } /* md:gap-7 */
+}
+
+/* overlay 内卡片包装层：交由滚动进度驱动（禁用 fade-in 的一次性 CSS 入场过渡，
+   否则会与 JS 内联 transform/opacity 产生双重动画）。透明度与位移由 scroll-expand.js 内联控制：
+   内联样式优先于此处普通规则；下方规则仅需高于 .fade-in 基态特异性即可。 */
+.se-projects .fade-in {
+  opacity: 1;
+  transform: none;
+  transition: none;
+  will-change: transform;
+}
+
+/* —— 实时媒体（视频 / 图片）展开到最全后钉住视口（渐变占位媒体不钉住）—— */
+.scrollexpand .scroll-expand__media--pinned {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+/* —— 无 ResizeObserver 的旧环境降级：静态展示全部内容（overlay / title / scrim 常显）—— */
+.scroll-expand--static .scroll-expand__overlay,
+.scroll-expand--static .scroll-expand__title,
+.scroll-expand--static .scroll-expand__hint {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.scroll-expand--static .scroll-expand__scrim { opacity: 0.45 !important; }
+
+/* —— 系统减弱动效：箭头不再往复 —— */
+@media (prefers-reduced-motion: reduce) {
+  .se-hint-arrow { animation: none; }
+}
+
+/* ============================================================
+   全透明化（仅 overlay 容器层）：容器背景保持透明，让背景装饰
+   （AeroShards 雕塑等）从卡片间隙透出；卡片 / 标签恢复自身
+   底色（回落到页面既有工具类 / 组件样式），保证卡片内文字与
+   图片在装饰背景上清晰可读。
+   home / about 不含该元素，不受影响。
+   ============================================================ */
+.scroll-expand__overlay {
+  background: transparent;
+  background-image: none;
+}
+
+/* ============================================================
+   渐变占位移除（无 data-se-media-src 时无媒体注入，背景仅剩
+   两层"渐变感"来源，此处一并去掉，让页面装饰层完整透出）：
+   a. .scroll-expand__frame::after —— 常驻微遮罩（顶部 5% → 底部
+      9% 前景色线性渐变），无论有无媒体都在；
+   b. .scroll-expand__scrim —— 展开过程中渐显的暗角渐变
+      （JS 仍会写内联 opacity = overlayScrim * p，故用 !important
+      归零；元素保留以维持 JS 生命周期，仅不可见）。
+   卡片 / 标题 / eyebrow / 滚动提示均保留不动。
+   ============================================================ */
+.scrollexpand .scroll-expand__frame::after {
+  display: none;
+}
+
+.scrollexpand .scroll-expand__scrim {
+  background: transparent;
+  background-image: none;
+  opacity: 0 !important;
+}

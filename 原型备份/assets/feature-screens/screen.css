@@ -1,0 +1,222 @@
+/* ============================================================
+   功能展示屏 · 共享样式
+   全部取值来自 tokens/design-tokens.md，禁止自造：
+   色板 §1 / 圆角 §2 / 排版 §3 / 间距 §4 / 组件规格 §5 / 动效 §6
+   屏幕 390×844，顶部留 70px 给灵动岛安全区。
+   ============================================================ */
+:root {
+  --paper: #F5F4F1;
+  --card: #FFFFFF;
+  --ink: #1C1C1A;
+  --ink-hover: #333330;
+  --ink-pressed: #000000;
+  --sub: #6F6F6A;
+  --weak: #A6A6A0;
+  --track: #ECEAE5;
+  --track-hover: #E2E0DA;
+  --accent: #2F6BFF;
+  --star: #FFC83D;
+  --pop-green: #A8E05F;
+  --success: #16A34A;
+  --error: #DC2626;
+  --divider: #EFEDE8;
+  /* 有色深色展示卡 §1 */
+  --deep-navy: #232044;
+  --deep-purple: #3A2440;
+  --r-card: 24px;
+  --r-inner: 18px;
+  --r-pill: 999px;
+  --r-chip: 12px;
+  /* 阴影只有一档 §5 */
+  --shadow-card: 0 8px 24px rgba(28, 28, 26, .06);
+  --shadow-float: 0 2px 8px rgba(28, 28, 26, .08);
+  --font: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 844px; overflow: hidden; background: var(--paper); }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.screen {
+  position: relative;
+  width: 390px;
+  height: 844px;
+  padding: 70px 20px 24px;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+/* —— 排版 §3：Display / Title / Body / Caption —— */
+.h1 { font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
+.sub { margin-top: 5px; font-size: 13px; color: var(--weak); line-height: 1.5; }
+.sec { margin-top: 26px; }
+.sec-label {
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--weak);
+  letter-spacing: .02em;
+}
+.note { margin-top: 8px; font-size: 13px; color: var(--weak); line-height: 1.5; }
+
+svg { display: block; }
+
+/* —— 胶囊输入框（SKILL 概念表：输入框 = 胶囊浅灰底）—— */
+.field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 20px;
+  border-radius: var(--r-pill);
+  background: var(--track);
+  font-size: 15px;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+.field:last-child { margin-bottom: 0; }
+.field .ph { color: var(--weak); }
+.field svg { width: 20px; height: 20px; flex: none; stroke: var(--weak); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.field .grow { flex: 1; min-width: 0; }
+/* 聚焦态：accent 描边 + 光晕（tokens 未定义 focus，取唯一点缀色） */
+.field.is-focus { background: var(--card); box-shadow: 0 0 0 1.5px var(--accent), 0 0 0 4px rgba(47, 107, 255, .15); }
+.field.is-focus svg { stroke: var(--accent); }
+/* 禁用态：低透明度 §5 */
+.field.is-disabled { opacity: .45; }
+
+/* —— 按钮 §5：Primary 高 48 / 胶囊 / ink 实心 —— */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 32px;
+  border: none;
+  border-radius: var(--r-pill);
+  font: 600 15px var(--font);
+  white-space: nowrap;
+  transition: background-color 150ms ease-out, color 150ms ease-out, box-shadow 150ms ease-out;
+}
+.btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.btn-primary { background: var(--ink); color: #fff; }
+.btn-primary.is-hover { background: var(--ink-hover); }
+.btn-primary.is-pressed { background: var(--ink-pressed); }
+.btn-primary.is-disabled { opacity: .45; }
+
+/* Secondary：纸面上 = 白底 + 1.5px ink 描边；白卡上 = track 浅灰底 */
+.btn-secondary { background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.btn-secondary.on-card { background: var(--track); box-shadow: none; }
+.btn-secondary.on-card.is-hover { background: var(--track-hover); }
+
+/* Ghost：深色卡 / 浮层上 = 1.5px 白 60% 描边 */
+.btn-ghost { background: transparent; color: #fff; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .6); }
+
+/* 危险操作 = 白底 error 红字（不是红底）*/
+.btn-danger { background: var(--card); color: var(--error); box-shadow: inset 0 0 0 1.5px var(--ink); }
+
+/* —— 分段控件 §5：高 56 / 字号 16 / 图标 24 —— */
+.segment {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 56px;
+  padding: 4px;
+  border-radius: var(--r-pill);
+  background: var(--track);
+}
+.segment > span {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 48px;
+  border-radius: var(--r-pill);
+  color: var(--sub);
+  font: 600 16px var(--font);
+}
+.segment > span.on { background: var(--card); color: var(--ink); box-shadow: var(--shadow-float); }
+.segment svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+/* —— 图标按钮 §5：线性图标，全部 pill —— */
+.iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-pill);
+  background: var(--track);
+  color: var(--ink);
+  transition: background-color 150ms ease-out;
+}
+.iconbtn.is-hover { background: var(--track-hover); }
+.iconbtn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Tooltip：图标-only 按钮必须带 Tooltip */
+.tip { position: relative; display: inline-block; }
+.tip .tip-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: var(--r-chip);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(28, 28, 26, .12);
+}
+
+/* —— 卡片 §5：白底 r-24，无描边，极轻阴影 —— */
+.card { background: var(--card); border-radius: var(--r-card); box-shadow: var(--shadow-card); }
+/* 左图标块 = 品牌色实底 + 白色线性图标 r-14 */
+.icon-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border-radius: 14px;
+  color: #fff;
+}
+.icon-block svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+/* —— 统计行 §5：Caption weak 在上，Stat Bold 大数字在下 —— */
+.stat-label { font-size: 13px; color: var(--weak); }
+.stat-value { margin-top: 2px; font-size: 32px; font-weight: 700; letter-spacing: -.5px; }
+
+/* —— Toast §6：白底 pill 卡片 r-16，左侧彩色圆点 + ink 文字 —— */
+.toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 20px;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: 0 12px 32px rgba(28, 28, 26, .14);
+  font-size: 14px;
+  font-weight: 600;
+}
+.toast .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+
+/* —— 遮罩 §6 —— */
+.scrim-light { position: absolute; inset: 0; background: rgba(245, 244, 241, .7); }
+.scrim-dark { position: absolute; inset: 0; background: rgba(28, 28, 26, .35); }
+.scrim-photo { position: absolute; inset: 0; background: rgba(28, 28, 26, .92); }
+
+/* —— 空状态 §5 决策树：线性简笔图标 + Title + Caption，垂直居中 —— */
+.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; }
+.empty svg { width: 56px; height: 56px; stroke: var(--weak); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.empty h3 { font-size: 22px; font-weight: 700; color: var(--ink); }
+.empty p { font-size: 13px; color: var(--weak); line-height: 1.6; max-width: 26ch; }

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>功能展示 · 按钮五态</title>
+<link rel="stylesheet" href="screen.css">
+<style>
+  /* 三列网格：6 个状态压成两行，给底部 Secondary / 危险按钮留出空间 */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 10px; }
+  .cell { display: flex; flex-direction: column; gap: 6px; }
+  .cell .btn { width: 100%; padding: 0 10px; font-size: 14px; }
+  .cell .lb { font-size: 12px; color: var(--weak); text-align: center; line-height: 1.3; }
+  .spinner {
+    width: 16px; height: 16px; border-radius: 50%; flex: none;
+    border: 2px solid rgba(255, 255, 255, .35);
+    border-top-color: #fff;
+  }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+  .on-ink { background: var(--deep-purple); border-radius: var(--r-card); padding: 20px; display: flex; }
+  .on-ink .btn { flex: 1; }
+  .sec { margin-top: 22px; }
+  .sec-label { margin-bottom: 10px; }
+  .wrap-card { padding: 16px 20px; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <h1 class="h1">按钮五态</h1>
+  <p class="sub">Primary = 炭黑胶囊实心，高 48px，水平内边距 32px</p>
+
+  <div class="sec">
+    <div class="sec-label">Primary · 五态</div>
+    <div class="grid">
+      <div class="cell"><span class="btn btn-primary">开始练习</span><span class="lb">Default</span></div>
+      <div class="cell"><span class="btn btn-primary is-hover">开始练习</span><span class="lb">Hover</span></div>
+      <div class="cell"><span class="btn btn-primary is-pressed">开始练习</span><span class="lb">Pressed</span></div>
+      <div class="cell"><span class="btn btn-primary is-disabled">开始练习</span><span class="lb">Disabled .45</span></div>
+      <div class="cell">
+        <span class="btn btn-primary"><span class="spinner"></span>评分中</span>
+        <span class="lb">Loading</span>
+      </div>
+      <div class="cell">
+        <span class="btn btn-primary" style="box-shadow:0 0 0 3px rgba(47,107,255,.45)">开始练习</span>
+        <span class="lb">Focus</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-label">Secondary · 按底色选（纸面上 / 白卡上）</div>
+    <div class="card wrap-card">
+      <div class="stack">
+        <span class="btn btn-secondary">查看排行榜</span>
+        <span class="btn btn-secondary on-card">发消息</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-label">Ghost / 危险操作</div>
+    <div class="on-ink">
+      <span class="btn btn-ghost">立即购买</span>
+    </div>
+    <div style="height:12px"></div>
+    <span class="btn btn-danger" style="width:100%">删除这次记录</span>
+  </div>
+</div>
+</body>
+</html>

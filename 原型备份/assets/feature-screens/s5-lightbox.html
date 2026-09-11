@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>功能展示 · 近黑浮层预览</title>
+<link rel="stylesheet" href="screen.css">
+<style>
+  /* 底下的图库页：只有图片卡，不放标题，避免与浮层顶栏打架 */
+  .under { padding: 132px 20px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .under .thumb {
+    height: 150px;
+    border-radius: var(--r-inner);
+    background: var(--deep-navy);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .under .thumb:nth-child(2n) { background: var(--deep-purple); }
+  .under .thumb svg { width: 74px; height: 74px; }
+  .under .thumb .line { fill: none; stroke: #fff; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .under .thumb .green { fill: var(--pop-green); }
+
+  /* 近黑浮层：铺满屏幕 */
+  .lightbox {
+    position: absolute;
+    inset: 0;
+    background: rgba(28, 28, 26, .92);
+    display: flex;
+    flex-direction: column;
+    padding: 74px 24px 32px;
+  }
+  .lb-top { display: flex; align-items: center; justify-content: space-between; }
+  .lb-top span { font-size: 13px; color: rgba(255, 255, 255, .55); }
+  .lb-close {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; border-radius: var(--r-pill);
+    background: rgba(255, 255, 255, .12); color: #fff;
+  }
+  .lb-close svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; }
+  .lb-stage { flex: 1; display: flex; align-items: center; justify-content: center; }
+  .lb-art { width: 210px; height: 210px; }
+  .lb-art .line { fill: none; stroke: #fff; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .lb-art .green { fill: var(--pop-green); }
+  .lb-foot h2 { font-size: 22px; font-weight: 700; color: #fff; }
+  .lb-foot p { margin-top: 6px; font-size: 13px; line-height: 1.6; color: rgba(255, 255, 255, .6); }
+  .lb-acts { display: flex; gap: 12px; margin-top: 20px; }
+  .lb-acts .btn { flex: 1; }
+</style>
+</head>
+<body>
+<div class="screen" style="padding:0">
+
+  <!-- 底下真实的图库页（被浮层压暗）-->
+  <div class="under">
+    <div class="thumb">
+      <svg viewBox="0 0 120 120"><rect class="line" x="26" y="32" width="68" height="64" rx="10"/><path class="line" d="M26 52h68M44 24v16M76 24v16"/><rect class="green" x="66" y="66" width="18" height="18" rx="4"/></svg>
+    </div>
+    <div class="thumb">
+      <svg viewBox="0 0 120 120"><path class="line" d="M60 30l26 15v30L60 90 34 75V45z"/><path class="line" d="M60 30v30M34 45l26 15 26-15M60 60v30"/></svg>
+    </div>
+    <div class="thumb">
+      <svg viewBox="0 0 120 120"><circle class="line" cx="60" cy="62" r="26"/><path class="line" d="M60 44v18l12 8"/></svg>
+    </div>
+    <div class="thumb">
+      <svg viewBox="0 0 120 120"><path class="line" d="M40 84V40l40-8v44"/><circle class="line" cx="33" cy="84" r="9"/><circle class="line" cx="73" cy="76" r="9"/><rect class="green" x="52" y="24" width="14" height="14" rx="3"/></svg>
+    </div>
+  </div>
+
+  <!-- 近黑浮层预览 -->
+  <div class="lightbox">
+    <div class="lb-top">
+      <span>3 / 8</span>
+      <span class="lb-close">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </span>
+    </div>
+
+    <div class="lb-stage">
+      <svg class="lb-art" viewBox="0 0 120 120">
+        <path class="line" d="M60 20c15 0 27 12 27 27 0 13-9 20-14 26-3 3-4 6-4 9H51c0-3-1-6-4-9-5-6-14-13-14-26 0-15 12-27 27-27z"/>
+        <path class="line" d="M51 82h18M53 91h14"/>
+        <rect class="green" x="49" y="98" width="22" height="15" rx="3"/>
+        <path class="line" d="M33 47h54M60 20v63"/>
+      </svg>
+    </div>
+
+    <div class="lb-foot">
+      <h2>热气球之旅</h2>
+      <p>大图预览 = 近黑浮层 + 幽灵描边按钮；背景内容完全压暗，视线只落在图上。</p>
+      <div class="lb-acts">
+        <span class="btn btn-ghost">设为封面</span>
+        <span class="btn btn-ghost">分享</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

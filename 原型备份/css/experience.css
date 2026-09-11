@@ -1,0 +1,25 @@
+/* ============================================================
+   Modules 折叠列表（about 页）· 平滑展开增强
+   覆盖 css/styles.css 中的旧规则。旧实现由 JS 在 176px 与 auto 之间
+   切换 height，而 auto 不可插值 → 展开/收起实际是瞬间跳变（僵硬）。
+   新版：JS 先测量完整高度、以 px 值触发过渡，配合 expo-out 曲线；
+   底部模糊遮罩改为淡入淡出（替代旧版 display 硬切）。
+   ============================================================ */
+
+/* —— 高度过渡：0.65s expo-out，流畅滑开/滑合 —— */
+.experience-inner {
+  transition: height 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+  will-change: height;
+}
+
+/* —— 底部模糊遮罩：展开淡出 / 收起淡入（不用 display 硬切，避免闪跳）—— */
+.experience-fade {
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+
+/* —— 展开后完整展示时不再需要遮罩（JS 会把 opacity 置 0）—— */
+[data-experience].open .experience-fade {
+  opacity: 0;
+}
