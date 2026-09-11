@@ -259,7 +259,7 @@ public class ConsoleAuthService {
     return new LoginResult(
         access,
         session.getRefreshTokenPlain(),
-        ConsoleJwtService.ACCESS_TTL_SECONDS,
+        jwt.accessTtlSeconds(),
         user.getId(),
         user.getUsername(),
         user.getDisplayName(),
@@ -347,7 +347,7 @@ public class ConsoleAuthService {
     return new LoginResult(
         access,
         next.getRefreshTokenPlain(),
-        ConsoleJwtService.ACCESS_TTL_SECONDS,
+        jwt.accessTtlSeconds(),
         user.getId(),
         user.getUsername(),
         user.getDisplayName(),
