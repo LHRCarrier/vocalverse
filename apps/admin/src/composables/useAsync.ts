@@ -4,6 +4,23 @@ import { onBeforeUnmount, onMounted, shallowRef } from 'vue'
  *
  * 四态 = idle / loading / error / ready —— 少一个都会出现"白屏但没报错"，
  * 这是控制台最常见的体验缺陷（docs/50 §11.4）。
+ *
+ * ## ⚠️ 只能**整体替换** `state.value`，绝不要原地改它的属性（2026-09-10 实测缺陷）
+ *
+ * 状态用 `shallowRef` 存，而 `shallowRef` 的语义是：**只有 `.value` 被整体替换才触发更新**，
+ * 改内层属性（`state.value.data = x`）**不触发任何依赖**（这正是它区别于 `ref` 的地方）。
+ * 之前的写法就是原地改，后果**不是"偶尔不刷新"而是"恒不刷新"**：
+ * 页面首帧 `data` 还是 null，接口 200 拿回数据写进 `state.value.data` 后，
+ * 依赖它的 `computed` 永远不重算 —— **后端有数据、界面恒为空、且不报错**
+ * （`error` 也是 null，四态里连"失败"都算不上）。实测：角色权限页后端返回 6 个角色，
+ * 界面显示「角色数 0 / 还没有任何角色」；工作台/运维/指标/trace 等所有用本 composable
+ * 的页面都是同一个症状。
+ *
+ * 所以统一走下面的 `patch()`（对象展开后整体赋值）。回归测试：
+ * `composables/__tests__/useAsync.test.ts`（修复前 2/3 红）。
+ *
+ * 对照：`usePagedList` 用的是 `items.value = res.items`（整体替换）+ 各自独立的 `ref`，
+ * 所以**列表页一直是好的** —— 这也正是当初没被发现的原因。
  */
 export interface AsyncState<T> {
   data: T | null
@@ -22,22 +39,26 @@ export function useAsync<T>(loader: () => Promise<T>) {
   const state = shallowRef<AsyncState<T>>({ data: null, loading: false, error: null, errorCode: null })
   const lastLoadedAt = shallowRef<number | null>(null)
 
+  /** 唯一的状态写入口：整体替换（原因见文件头注释） */
+  function patch(next: Partial<AsyncState<T>>): void {
+    state.value = { ...state.value, ...next }
+  }
+
   async function run(): Promise<T | null> {
-    state.value.loading = true
-    state.value.error = null
-    state.value.errorCode = null
+    patch({ loading: true, error: null, errorCode: null })
     try {
       const data = await loader()
-      state.value.data = data
+      patch({ data, loading: false })
       lastLoadedAt.value = Date.now()
       return data
     } catch (err) {
       const e = err as { message?: string; code?: number }
-      state.value.error = e.message ?? '加载失败'
-      state.value.errorCode = typeof e.code === 'number' ? e.code : null
+      patch({
+        error: e.message ?? '加载失败',
+        errorCode: typeof e.code === 'number' ? e.code : null,
+        loading: false,
+      })
       return null
-    } finally {
-      state.value.loading = false
     }
   }
 
