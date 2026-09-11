@@ -1,0 +1,82 @@
+/* ============================================================
+   导航栏悬浮显现（非首页）· VocalVerse 原型
+   需求：未悬浮时导航从顶部隐藏；鼠标进入顶部触发区后从上往下滑入；
+   鼠标离开导航后重新隐藏。home（index.html）未接入触发区，保持常显。
+   说明：css/styles.css 中另有一段同功能尝试（:has() + 1s 动画，无触发区、
+   会把首页导航也一并隐藏），此处以本文件为准：同特异性 + 后加载 +
+   重要声明，完整覆盖旧规则并修复首页。
+   Tailwind v4 的 -translate-x-1/2 走 CSS `translate` 属性居中，
+   本文件的 `transform` 只负责垂直滑入/滑出，二者互不干扰。
+   ============================================================ */
+
+/* —— 顶部悬浮触发区：透明横条，高度覆盖导航所在区域 —— */
+.nav-reveal-zone {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4rem;          /* 触发区 64px：略宽于导航(约 44px)，保证容易触发 */
+  z-index: 49;           /* 低于导航 z-50、高于页面内容 */
+  pointer-events: auto;
+  background: transparent;
+}
+
+/* —— 导航默认态：隐藏（上移出视口 + 透明 + 不拦截鼠标）——
+   注意：覆盖 styles.css 中 nav:has([data-nav-pill]) 的旧规则
+   （其 :hover 动画不能胜过作者重要声明，故悬浮时依旧保持本状态，
+   显现只由下方 .nav-reveal--visible / :focus-within 驱动）。 */
+nav[aria-label="Primary"],
+nav[aria-label="Primary"]:has([data-nav-pill]) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(calc(-100% - 3.25rem)) !important;
+  transition:
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.35s ease !important;
+  will-change: transform, opacity;
+  animation: none !important;
+}
+
+/* —— 悬浮（由 nav-reveal.js 控制）或键盘聚焦时：从上往下滑入 —— */
+nav[aria-label="Primary"].nav-reveal--visible,
+nav[aria-label="Primary"]:focus-within,
+nav[aria-label="Primary"]:has([data-nav-pill]).nav-reveal--visible,
+nav[aria-label="Primary"]:has([data-nav-pill]):focus-within {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(0) !important;
+  animation: none !important;
+}
+
+/* —— 首页（未接入触发区）保持常显：修复旧规则把首页导航一并隐藏的问题 —— */
+body:not(:has(.nav-reveal-zone)) nav[aria-label="Primary"],
+body:not(:has(.nav-reveal-zone)) nav[aria-label="Primary"]:has([data-nav-pill]) {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+/* —— 站内跳转后到达的新页面：这一次显现"直接落位"，不做 0.5s 滑入 ——
+   （否则 GoeyNav 的气泡动画前 0.5s 会被滑入的淡入盖住，看不清；
+     由 nav-reveal.js 临时挂 .nav-reveal--instant，两帧后摘掉，
+     之后的悬浮/移出仍按原节奏过渡。） */
+nav[aria-label="Primary"].nav-reveal--instant,
+nav[aria-label="Primary"].nav-reveal--instant:has([data-nav-pill]) {
+  transition: none !important;
+}
+
+/* —— 触摸端（无 hover 能力）：保持常显，避免导航不可达 —— */
+@media (hover: none) {
+  .nav-reveal-zone { display: none; }
+
+  nav[aria-label="Primary"],
+  nav[aria-label="Primary"]:has([data-nav-pill]) {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transform: translateY(0) !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}

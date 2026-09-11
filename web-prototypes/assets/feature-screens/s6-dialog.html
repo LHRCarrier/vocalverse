@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>功能展示 · 遮罩弹窗 / Toast / 空状态</title>
+<link rel="stylesheet" href="screen.css">
+<style>
+  .empty svg { stroke: var(--sub); }
+  /* 空状态：居中在 Toast 与弹窗之间的可视区（这样弹窗不会把它完全盖住）*/
+  .empty-wrap {
+    position: absolute;
+    left: 20px; right: 20px; top: 126px;
+    height: 394px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* 浅色遮罩 + 白卡 r-24 弹窗（贴底，避免遮住底层空状态）*/
+  .dialog {
+    position: absolute;
+    left: 24px; right: 24px; bottom: 44px;
+    padding: 28px 24px 24px;
+    border-radius: var(--r-card);
+    background: var(--card);
+    box-shadow: 0 24px 60px rgba(28, 28, 26, .22);
+    text-align: center;
+  }
+  .dialog .badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 56px; height: 56px; border-radius: 18px;
+    background: #E8EDFF; color: var(--accent);
+    margin-bottom: 16px;
+  }
+  .dialog .badge svg { width: 26px; height: 26px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .dialog h2 { font-size: 22px; font-weight: 700; }
+  .dialog p { margin-top: 8px; font-size: 15px; line-height: 1.6; color: var(--sub); }
+  .dialog .acts { display: flex; gap: 12px; margin-top: 24px; }
+  .dialog .acts .btn { flex: 1; padding: 0 12px; }
+
+  /* 顶部 Toast：白胶囊 + 左侧彩色圆点 */
+  .toast-wrap {
+    position: absolute;
+    top: 78px; left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+  }
+</style>
+</head>
+<body>
+<div class="screen" style="padding:0">
+
+  <!-- ① 空状态（被遮罩压住的底层页面）-->
+  <div class="empty-wrap">
+    <div class="empty">
+      <svg viewBox="0 0 56 56">
+        <path d="M14 20h28v24a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4z"/>
+        <path d="M22 20v-4a6 6 0 0 1 12 0v4"/>
+        <path d="M24 32h8"/>
+      </svg>
+      <h3>还没有练习记录</h3>
+      <p>完成一次场景对话或跟唱，这里就会长出一条时间轴记录。</p>
+    </div>
+  </div>
+
+  <!-- ② 浅色遮罩 -->
+  <div class="scrim-light"></div>
+
+  <!-- ③ 白卡 r-24 弹窗 -->
+  <div class="dialog">
+    <span class="badge">
+      <svg viewBox="0 0 24 24"><path d="M12 3.5c1 2.5 4.5 4 4.5 8.5a4.5 4.5 0 0 1-9 0c0-1.8.8-3 1.7-4.2.4 1 .9 1.6 1.8 2.2-.3-2.2.2-4.6 1-6.5z"/></svg>
+    </span>
+    <h2>开始今天的练习？</h2>
+    <p>你已连续打卡 12 天，再完成 1 次就能解锁本月的「全勤」徽章。</p>
+    <div class="acts">
+      <span class="btn btn-secondary on-card">稍后</span>
+      <span class="btn btn-primary">开始练习</span>
+    </div>
+  </div>
+
+  <!-- ④ Toast：浮在最上层 -->
+  <div class="toast-wrap">
+    <span class="toast">
+      <span class="dot" style="background:var(--success)"></span>
+      已保存到我的练习
+    </span>
+  </div>
+
+</div>
+</body>
+</html>

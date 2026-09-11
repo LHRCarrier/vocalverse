@@ -1,0 +1,79 @@
+/* ============================================================
+   顶部胶囊导航（非首页）· 尺寸 / 间距 / 响应式 —— VocalVerse 原型
+   只作用于带 .site-nav 的导航（practice / sing / recommend / stats /
+   community / about / report / showcase）。首页 index.html 用的是另一套
+   .nav__nav，既不加载本文件也没有 .site-nav，尺寸不受影响。
+
+   为什么单独一个文件、而不是改内联 Tailwind 类：
+   css/styles.css 是编译产物，text-base / h-10 这类类名并不在里面，写了不生效。
+   本文件不加 @layer，按级联层规则天然压过 Tailwind 的 utilities 层，所以这里
+   写的就是最终值；以后要调尺寸只改这一处。
+
+   —— 尺寸对照（改前 → 改后，宽屏）——
+     链接文字      14px / 20px   →  16px / 24px     字号 +2
+     链接内边距    6px  / 16px   →  8px  / 24px     文字与边框的间距
+     菜单项间距    4px           →  8px
+     容器内边距    6px           →  7px
+     主题按钮      32×32         →  40×40
+     ── 结果 ──
+     整栏高度      46px          →  56px            +21.7%
+     相邻文字间距  36px          →  56px            +20px
+
+   三个断点都保持 56px 高度（高度不占横向空间，窄屏没必要削），
+   窄屏只收横向留白与项间距，且任何一档都不低于改前的 16px / 4px。
+   ============================================================ */
+
+/* —— 基准（宽屏）—— */
+.site-nav {
+  /* 任何宽度下都不出屏：放不下时交给下面条子的横向滚动，而不是被裁掉 */
+  max-width: calc(100vw - 24px);
+}
+.site-nav__bar {
+  padding: 7px;
+  gap: 8px;
+  /* 溢出兜底：内容放不下时条子可横向滚动（滚动条隐藏，靠滑动/触控板） */
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.site-nav__bar::-webkit-scrollbar { display: none; }
+.site-nav__list {
+  gap: 8px;
+  /* flex: none + 不换行 —— 否则溢出时 flex 会先把菜单项压扁，而不是让条子滚 */
+  flex: none;
+  /* auto 外边距而不是 justify-content:center：后者在溢出时会把开头几项裁掉且滚不回去 */
+  margin-inline: auto;
+}
+.site-nav__list > li > a {
+  font-size: 1rem;        /* 16px */
+  line-height: 1.5rem;    /* 24px → 链接高 40px */
+  padding: 8px 24px;
+  white-space: nowrap;
+}
+.site-nav__bar > [data-theme-toggle] {
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+.site-nav__bar > [data-theme-toggle] > span,
+.site-nav__bar > [data-theme-toggle] svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* —— 中等屏（≤1049px）：字号降到 15px（仍 +1），靠行高与内边距把高度守住 56px ——
+   （985px 宽的条子 + 两侧各 24px 余量 ≈ 1033px，故断点取 1049） */
+@media (max-width: 1049px) {
+  .site-nav__list { gap: 6px; }
+  .site-nav__list > li > a {
+    font-size: 0.9375rem;   /* 15px */
+    line-height: 1.375rem;  /* 22px */
+    padding: 9px 18px;      /* 链接高 40px → 整栏仍 56px */
+  }
+}
+
+/* —— 窄屏（≤879px）：只收项间距，横向内边距保持 18px（仍大于改前的 16px）——
+   再窄（约 <813px）条子自动横向滚动，不再继续缩字号，避免小屏文字读不清。 */
+@media (max-width: 879px) {
+  .site-nav__list { gap: 4px; }
+}
