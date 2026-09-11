@@ -3,6 +3,45 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-10 控制台"后端有数据、前端不渲染"的真凶：`useAsync` 的 shallowRef 内层赋值（I-19）
+
+- **起因**：需求方截图——角色权限页显示「角色数 0 / 内置角色 0 / 权限码总数 0 / 还没有任何角色」，
+  而同屏的响应面板里后端**明明返回了 6 个角色**（含内置 4 个：super/ops/operator/moderator）。
+
+- **定位（三步）**：
+  1. 先排两端契约：`GET /roles`、`GET /permissions` 的 `data` 都是**数组**，
+     前端 `consoleHttp.get<AdminRoleRow[]>` 也按数组读 —— **形状是齐的**，不是 DTO 漂移；
+  2. 再看视图：`RolesView` 用 `useAsync` + `computed(() => rolesState.value.data ?? [])`，
+     `onMounted` 里确实调了 `run()`；而 `AsyncBlock` 显示的是**空态**（不是错误态）⇒ `data` 为 null 且 `error` 为 null；
+  3. 看 `useAsync` 实现：`state` 是 `shallowRef<AsyncState<T>>`，而 `run()` 写的是
+     **`state.value.data = data`（原地改内层属性）**。`shallowRef` 的语义是**只有 `.value` 整体替换才触发**，
+     改内层**不触发任何依赖** —— 于是 `computed` 永远停留在首帧的 `[]`。
+
+- **性质：恒不刷新，不是偶发**。首帧 `data=null` → 接口 200 → 写进 `state.value.data` → 无人被通知
+  → 界面永远空、且**连错误态都不显示**。工作台、服务总览、性能指标、LLM Trace 全是同一症状
+  —— 也就是说前几轮"页面没数据"里，**除已修的后端 500 之外，还有一个前端总闸**。
+
+- **为什么长期没被发现**（两条都值得记）：
+  1. **对照组是好的**：`usePagedList` 写的是 `items.value = res.items`（整体替换），
+     所以**列表页一直正常**，只有走 `useAsync` 的页面中招 —— 于是看起来像"某些页面没数据"；
+  2. **没有渲染级测试**：既有 68 例全是契约/纯函数测试，一个能坏掉**全部**页面的缺陷可以全绿通过。
+
+- **修法**：`useAsync` 增加唯一状态写入口 `patch()`，**对象展开后整体替换** `state.value`；
+  文件头写清"为什么不能原地改"（附实测症状），并把 `usePagedList` 作对照写进去。
+  单测 `composables/__tests__/useAsync.test.ts`（3 例）**修复前 2/3 红**
+  （`expected +0 to be 3`、`expected false to be true`），修复后 3/3 绿。
+
+- **顺带修掉一个门禁缺口（I-20）**：`apps/admin` 的 eslint 只忽略 `dist/node_modules/coverage`，
+  **漏了 `.vite/**`**（Vite 依赖预打包缓存，`pnpm dev`/`vitest` 一跑就生成）。
+  实测：起过 dev server 后 `pnpm lint` **凭空多出 87 条错误**（全在 `.vite/deps/*.js`），
+  而 CI 因为全新检出没有该目录**全绿** —— "本地假红 + CI 假绿"组合最容易让人去改无关代码。
+  两端 eslint 配置均补 `.vite/**`。
+
+- **验证（实跑）**：`apps/admin` `lint` 0 error / `typecheck` 0 error / `test:run` **71 passed**（68 → 71）/
+  `build` 成功；`apps/web` `lint` 通过。刷新控制台页面即可看到角色列表。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 修 main 上的 python-ci：Python 契约快照缺 21 条控制台路由
 
 - **起因**：直推 main 后 CI 报 `Some checks were not successful`——`python-ci / lint · test · alembic` 1 分钟后失败，
