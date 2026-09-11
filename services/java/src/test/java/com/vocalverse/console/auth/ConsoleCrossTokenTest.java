@@ -3,7 +3,6 @@ package com.vocalverse.console.auth;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
@@ -131,30 +130,23 @@ class ConsoleCrossTokenTest extends AbstractConsoleApiTest {
   @Test
   @org.springframework.transaction.annotation.Transactional
   void console_token_with_matching_sub_cannot_impersonate_app_user() throws Exception {
-    // 造一个 id 与 App 用户相同的控制台账号：用原生插入把 id 钉死。
+    // 场景：控制台账号的 id 与某个**真实 App 用户**的 id 数值相同 —— 要证的是这种同名 sub
+    // 也不能让控制台令牌变成那个用户。
     //
-    // ⚠️ 必须挑一个**在 admin_users 里空闲**的 id（2026-09-11 CI 实测缺陷）：
-    // `users.id` 与 `admin_users.id` 是两条**独立**的自增序列，直接拿某个 App 用户的 id 去插
-    // admin_users 会撞上已有行 → `Unique index or primary key violation: PRIMARY KEY ON admin_users(ID)`
-    // （CI 上撞了 id=18；本地执行顺序不同就没事 —— 典型的**顺序依赖**，不是本用例的逻辑错）。
-    // 用例意图不变（它要证的正是"sub 数值相同也不能冒充"），只是把"钉哪个 id"改成先探测空闲：
-    // 逐个注册新 App 用户，谁的 id 在 admin_users 里没被占就用谁。两张表的 id 区间很快错开，通常一次就中。
+    // ⚠️ 怎么造这个场景本身就是个坑（2026-09-11 CI 两连红才收敛）：
+    // `users.id` 与 `admin_users.id` 是两条**独立**的自增序列，"数值相同"只能显式指定 id。而
+    //   ① 借用某个已注册 App 用户的 id → 该 id 可能已在 admin_users 里被别的测试占用
+    //      （`Unique index or primary key violation: PRIMARY KEY ON admin_users(ID)`，CI 撞在 id=18）；
+    //   ② 逐个注册新 App 用户去"撞"一个空闲 id → admin_users 稠密时连开 30 个也全被占（CI 第二轮就是这么红的）。
+    // 两种都是**顺序依赖**：本地顺序不撞、CI 撞。所以改成按构造取：
+    //   取两表 `max(id)` 的更大者 + 1000 —— 这个数值在两表里**不可能**已有行，
+    //   两侧各原生插一行把它钉住，用例意图（sub 相同）一字不动，且不再依赖执行顺序。
     seedRbac();
-    Long appUserId = null;
-    String appUsername = null;
-    for (int attempt = 0; attempt < 30 && appUserId == null; attempt++) {
-      String candidate = uniqueName("appu");
-      appUserToken(candidate); // 注册出 users 行
-      Long candidateId = users.findByUsernameIgnoreCase(candidate).orElseThrow().getId();
-      if (!adminUsers.existsById(candidateId)) {
-        appUserId = candidateId;
-        appUsername = candidate;
-      }
-    }
-    assertNotNull(appUserId, "连续 30 次都找不到「在 admin_users 中空闲」的 App 用户 id（两条 id 序列没拉开？）");
-
+    long sharedId = nextFreeSharedId();
+    String appUsername = uniqueName("appu");
+    insertAppUserWithExplicitId(sharedId, appUsername);
     AdminUserEntityRow row =
-        insertAdminWithExplicitId(appUserId, uniqueName("csu"), superRoleCode());
+        insertAdminWithExplicitId(sharedId, uniqueName("csu"), superRoleCode());
     String consoleToken = login(row.username(), FIXTURE_PASSWORD);
 
     // 控制台令牌在控制台上可用
@@ -301,6 +293,38 @@ class ConsoleCrossTokenTest extends AbstractConsoleApiTest {
   }
 
   private record AdminUserEntityRow(Long id, String username) {}
+
+  /**
+   * 取一个在 {@code users} 与 {@code admin_users} 里都**不可能已存在**的 id。
+   *
+   * <p>两表 id 是独立序列，"两张表里都存在且数值相同"这个场景必须显式指定 id； 而"借某个已存在行的 id"会撞主键、且撞不撞取决于测试执行顺序（CI 两连红的根因）。 取两表
+   * max(id) 之上的一段（+1000，留出同一用例外的余量）即可**按构造**避免冲突： identity 序列的当前值远小于它，测试期间也不会有人插到那里。
+   */
+  private long nextFreeSharedId() {
+    Number maxUsers =
+        (Number) em.createNativeQuery("SELECT COALESCE(MAX(id), 0) FROM users").getSingleResult();
+    Number maxAdmins =
+        (Number)
+            em.createNativeQuery("SELECT COALESCE(MAX(id), 0) FROM admin_users").getSingleResult();
+    return Math.max(maxUsers.longValue(), maxAdmins.longValue()) + 1000L;
+  }
+
+  /** 用原生 SQL 插入指定 id 的 {@code users} 行（显式 id 插入 IDENTITY 列，H2/PG 均支持）。 */
+  private void insertAppUserWithExplicitId(long id, String username) {
+    Instant now = Instant.now();
+    // 必填列照 `UserEntity` 的 `nullable = false` 抄：username / password_hash / nickname / role / status
+    // / created_at / updated_at（`email` 可空）。少一列就是 H2 的 "NULL not allowed for column ..."。
+    em.createNativeQuery(
+            "INSERT INTO users (id, username, password_hash, nickname, role, status,"
+                + " created_at, updated_at)"
+                + " VALUES (:id, :u, :h, :u, 'user', 'active', :now, :now)")
+        .setParameter("id", id)
+        .setParameter("u", username)
+        .setParameter("h", passwordEncoder.encode(FIXTURE_PASSWORD))
+        .setParameter("now", now)
+        .executeUpdate();
+    em.clear();
+  }
 
   /** 用原生 SQL 插入指定 id 的 admin_users 行（显式 id 插入 IDENTITY 列，H2/PG 均支持）。 */
   private AdminUserEntityRow insertAdminWithExplicitId(Long id, String username, String roleCode) {
