@@ -3,6 +3,55 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-11 管理端「登录后全页 401」：两个独立根因（Python 密钥留空 + 续期令牌被写成 "undefined"）
+
+- **起因**：需求方实测贴图 —— `admin` **能登录进控制台**（顶栏「超级管理员 · 已授予 36 个权限码」、
+  侧栏菜单完整），但 DevTools 里 `ops/*`、`library/*`、`traces/*` 一片 **401**，
+  另有一条 `POST /manage/api/v1/console/auth/refresh 401`。
+
+- **根因 1（配置，占那 9 条 401）**：`VOICEVERSE_CONSOLE_JWT_SECRET` 与 `APP_CONSOLE_JWT_SECRET`
+  **都没配**。两侧留空的失败方式**不对称**，这才是它难查的原因：
+  Java 侧有显式回退分支（`ConsoleJwtService` 回退用 `JWT_SECRET` 签）→ **登录完全正常**；
+  Python 侧是 **fail-closed**（`app/console/api/deps.py`：密钥为空直接 46001/401，
+  绝不用空密钥验签）→ 所有 Python 域控制台端点 401。
+  ⇒ 症状就是本案：**能登进去，但页面全报错，且报错不提密钥**。
+  **仓库级根因**：`.env.example` 把 bootstrap 账号给了可直接复制的值（`admin`/`demo123456`），
+  却把这两个密钥**留空** —— 「照 `.env.example` 复制一份」这条最自然的路径**必然掉坑**
+  （注释用 12 行精确描述了本坑，但同一文件里的示例值自相矛盾）。
+  修：`.env.example` 补同风格的**本地联调值**（与 `JWT_SECRET` 同风格、且刻意与之不同 ——
+  生产档 Python 启动期会断言"控制台密钥 ≠ App 密钥"）；本机 `.env` 同步配置。
+
+- **根因 2（前端真代码 bug，就是那条 refresh 401）**：`apps/admin/src/api/client.ts` 的
+  `refreshOnce()` 按**平铺**读续期响应（`body.data.accessToken`），而后端
+  `POST /auth/refresh` 回的是 `ConsoleAuthController.SessionView` —— 令牌**嵌在 `data.token` 下**，
+  与登录响应同形。于是 `saveTokens(body.data)` 两个字段都取到 `undefined`，
+  而 `localStorage.setItem(k, undefined)` 会把令牌**存成字符串 `"undefined"`**（truthy、非删除）：
+  下一次续期发 `refreshToken:"undefined"` → Java 回 **46001「刷新令牌无效」**；
+  之后所有请求带 `Authorization: Bearer undefined` → **整站 401**。
+  **证据链闭合**：Java 日志的 `46001 刷新令牌无效` 恰好出现在每次**成功轮换后 ~118ms**；
+  `admin_sessions` 里 5→6 / 7→8 / 9→10 三轮轮换**各紧跟一次**该失败 ——
+  不是偶发竞态，是"续期一次坏一次"，access token 15 分钟一过期必然复现。
+  登录路径（`stores/auth.ts` 写 `saveTokens(session.token)`）一直是对的，**只有续期路径漏了解包**。
+
+- **同批必须落的第二处（否则修完反而更糟）**：重试分支原为 `noRefresh: false`，
+  即每次重试都会**再续期一轮**。修好令牌写入后，「续期永远成功、401 永远不消失」
+  就退化成**无限续期循环**（每轮烧掉一条 `admin_sessions` 轮换）。
+  此前没暴露，只因令牌被写坏后下一轮必然失败 —— **偶然的刹车**；
+  修好写入就必须显式补回这个刹车。改为 `noRefresh: true`：续期一次、重试一次，
+  仍 401 就清令牌回登录页。实证：把 `client.ts` 单独回退到修复前跑新测试，
+  **不是断言失败，而是 vitest 进程 OOM 崩溃**
+  （`FATAL ERROR: Ineffective mark-compacts near heap limit`）—— 无限递归的直接证据。
+
+- **验证**：`pnpm lint` / `pnpm typecheck` 干净；`pnpm test:run` **73 passed**（7 文件，含新增 2 例）；
+  `pnpm build` 绿（24.85s）。修复前 5 个 Python 域端点（`ops/overview`、`ops/services`、
+  `ops/alerts/events`、`ops/traces/stats`、`library/books`）**全 401**，修复后**全 200**。
+  真实浏览器路径（走 `:5174` Vite 代理）四步全通：登录 200 → `ops/overview` 200 →
+  续期 200（形状确认为 `data.token.*`）→ **用新令牌**打 `ops/services` 200。
+  契约未被破坏：口令错误仍是 `404 + 46004 用户名或口令不正确`（反枚举语义不变）。
+  归档：`worklog/BUG实测/管理端-登录后全页401-密钥留空与续期令牌写坏.md`。
+
+—— 执行人：Faust-sudo（AI 代工，2026-09-11）
+
 ## 2026-09-11 修 java-ci 的"本地绿、CI 红"：跨端用例的顺序依赖（两轮才收敛）
 
 - **现象**：直推 main 后手动 dispatch `java-ci`，**连续两轮红**，而本地同一条 `mvn -B clean verify` 一直绿。
