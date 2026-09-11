@@ -3,6 +3,38 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-11 修 java-ci 的"本地绿、CI 红"：跨端用例的顺序依赖（两轮才收敛）
+
+- **现象**：直推 main 后手动 dispatch `java-ci`，**连续两轮红**，而本地同一条 `mvn -B clean verify` 一直绿。
+
+- **第一轮**：`ConsoleCrossTokenTest.console_token_with_matching_sub_cannot_impersonate_app_user`
+  → `Unique index or primary key violation: PRIMARY KEY ON PUBLIC.ADMIN_USERS(ID) /* key:18 */`。
+  根因：该用例要造"控制台账号 id == 某个真实 App 用户 id"的场景，用**原生插入**把 `admin_users.id` 钉成
+  那个 App 用户的 id；但 **`users.id` 与 `admin_users.id` 是两条独立的自增序列**，
+  那个 id 可能已被别的测试建过 → 撞主键。**本地不撞、CI 撞，纯顺序依赖**（我新加的
+  `ConsoleAccessTtlTest` 改了类之间的执行顺序，把它暴露出来）。
+  第一版修法：逐个注册新 App 用户、取其 id、确认在 `admin_users` 里空闲才用。
+
+- **第二轮：第一版也没过**，而且是我自己的断言报的 ——
+  `连续 30 次都找不到「在 admin_users 中空闲」的 App 用户 id`。
+  说明"两表 id 区间会自然错开"是**错误假设**：CI 顺序下 `admin_users` 稠密得多，连开 30 个也全被占。
+
+- **最终修法（构造性，不再依赖顺序）**：取两表 `MAX(id)` 的更大者 **+1000** 作为共享 id，
+  再从 `users` 与 `admin_users` 两侧各原生插一行把它钉住 —— 该 id 在两表里**都不可能已有行**，
+  主键冲突不可能发生。为此新增 `insertAppUserWithExplicitId()`（必填列照 `UserEntity` 的
+  `nullable = false` 抄；**少一列就撞 `NULL not allowed for column "NICKNAME"`**，第一次跑就踩到，已写进注释）。
+  用例断言一字未改。
+
+- **验证**：该测试类 7/7 绿；`mvn -B clean verify` → **172 tests / 0 failures / 0 errors**、spotless 干净；
+  推送后**第三次** dispatch `java-ci` → **success**；`30d7431` 上 secret-scan / docker-build / java-ci 全绿。
+
+- **教训（与 I-18/I-19 同族）**：**"本地绿"从来不是证据** —— 只要断言依赖执行顺序、或依赖
+  "某张表现在长什么样"，它就有可能在另一个顺序下红。要么让测试按构造不依赖顺序（本次），
+  要么把它变成能稳定复现的用例。另外 `java-ci`/`frontend-ci`/`admin-ci` **都只挂 `pull_request` +
+  `workflow_dispatch`**（没有 push:main），直推 main 时它们**根本不会跑** —— 必须手动 dispatch 复核。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-11）
+
 ## 2026-09-10 控制台 access TTL 改可配（本机 3 小时）：默认仍 900s，不推翻安全口径
 
 - **需求**：联调时每 15 分钟被登出一次（"测一会就退出来"），要把管理员 token 有效期改成 3 小时。
