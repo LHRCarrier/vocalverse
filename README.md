@@ -150,6 +150,14 @@ mvn spring-boot:run
 > - 想换口令：登录后走「权限控制台 → 账号管理 → 重置口令」，或删掉 `admin_users` 里的账号再重启；
 > - 口令长度下限 10 位，且拒绝 `password`/`password123` 一类弱口令（`ConsoleAdminBootstrap.WEAK_PASSWORDS`）；
 > - ⚠️ **生产环境必须改掉**：bootstrap 只用于一次性建号，建完即改密并清空 `..._PASSWORD`。
+>
+> ⏱️ **联调时老被登出？** 控制台 access token 默认 **900 秒（15 分钟）**（docs/50 §4.1：它同时是
+> 「权限变更最长滞后多久」的上界），过期后由 12 小时 refresh token 自动续期；若仍频繁掉线，
+> 可在根 `.env` 直接放大有效期（**仅本地**，生产保持默认）：
+> ```env
+> VOICEVERSE_CONSOLE_ACCESS_TTL_SECONDS=10800   # 3 小时
+> ```
+> 改完重启 Java 生效；启动日志会对非默认值打一行 WARN（提醒它放宽了什么）。
 
 ### 3.5 手机端（Android APK · 今日交付形态）
 
