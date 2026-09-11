@@ -7,6 +7,9 @@ export default tseslint.config(
       'dist/**',
       'node_modules/**',
       'coverage/**',
+      // Vite 依赖预打包缓存（`pnpm dev` / `vitest` 生成）：构建产物，非源码。
+      // 不忽略会让"起过 dev server 的人"跑 lint 时多出一批与本次改动无关的错误。
+      '.vite/**',
       // 生成物（gen:api 再生成；lint 噪声，不设行为准则）
       'src/api/generated/**',
     ],

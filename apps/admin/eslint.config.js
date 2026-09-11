@@ -7,7 +7,11 @@ import tseslint from 'typescript-eslint'
  */
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
+    // `.vite/**` 是 Vite 的依赖预打包缓存（`pnpm dev` / `vitest` 一跑就会生成）：
+    // 它是**构建产物**不是源码，但 eslint 默认不忽略隐藏目录 —— 漏了它会让
+    // 「起过 dev server 的人跑 `pnpm lint`」凭空多出 87 条错误（2026-09-10 实测），
+    // 而 CI 因为工作区是全新检出、没有 `.vite/` 而全绿 —— 典型的"本地假红"。
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '.vite/**'],
   },
   ...tseslint.configs.recommended,
   ...pluginVue.configs['flat/recommended'],
