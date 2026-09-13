@@ -81,6 +81,15 @@ def regex_contains_word(text: str, word: str) -> bool:
 
 
 def main() -> int:
+    # Windows 控制台默认 GBK 码表：打印非 GBK 字符（旧版的 ✓/✗ 就是）会让 print 抛
+    # UnicodeEncodeError → 进程退出码 1，而**退出码 1 正是本脚本用来表达「开关有漂移」的信号**
+    # → Windows 本地看到的"崩溃"与"真漂移"长得一模一样，是个会误导排查的假红。
+    # 这里只放宽错误处理、**不换编码**：中文在 GBK 下本来就能正常显示，
+    # 强行改成 UTF-8 反而会在 GBK 控制台上变成乱码。
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
+
     root = Path(__file__).resolve().parents[1]
     registry_text = (root / "docs" / "06-技术框架决策.md").read_text(encoding="utf-8")
     python_text = (root / "services" / "python" / "app" / "core" / "config.py").read_text(
@@ -93,12 +102,13 @@ def main() -> int:
 
     rows = parse_registry(registry_text)
     if not rows:
-        print(f"✗ 登记表未解析到任何开关行（docs/06 {_REGISTRY_HEADER}）", file=sys.stderr)
+        print(f"[FAIL] 登记表未解析到任何开关行（docs/06 {_REGISTRY_HEADER}）", file=sys.stderr)
         return 1
 
     failed = 0
     for row, ok, reason in check_rows(rows, python_text, java_text, readme_text):
-        mark = "✓" if ok else "✗"
+        # ASCII 标记：GBK 码表里没有 ✓/✗；两者都占 6 列，便于等宽对齐扫读
+        mark = "[OK]  " if ok else "[FAIL]"
         print(f"{mark} {row['name']:<38} [{row['location']}] {reason}")
         if not ok:
             failed += 1
