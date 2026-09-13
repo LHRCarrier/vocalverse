@@ -44,6 +44,14 @@ services:
       APP_ENV: development
       APP_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vocalverse}:${POSTGRES_PASSWORD:-vocalverse-dev}@postgres:5432/${POSTGRES_DB:-vocalverse}
       APP_REDIS_URL: redis://redis:6379/0
+      # Python → Java 内部委托基址（`POST /internal/level` 档位回写等，见 app/core/internal_client.py）。
+      # ⚠️ 必须是 compose **服务名**：容器内的 localhost 指向 Python 容器**自己**，不是 Java。
+      # 漏配的表现（2026-09-13 实测缺陷）：默认值 `http://localhost:8080` 连不上 → 内部委托失败 →
+      # 调用方按设计降级（只打一行 warning、不阻塞 finalize）→ **档位静默永不回写**，
+      # 排查时日志里只有一行 warning，极易被当成偶发抖动。
+      # 口径与 apps/web/nginx.conf、apps/admin/nginx.conf 的 `java-api:8080` 一致；
+      # 方式 B（本机 mvn 跑 Java，不经 compose）仍用 .env 里的 `localhost:8080`，互不影响。
+      APP_JAVA_BASE_URL: http://java-api:8080
       # 密钥显式必填（docs/19 P0-9：缺值 compose 直接报错；dev 值由 .env 提供，.env.example 含占位）
       APP_JWT_SECRET: ${APP_JWT_SECRET:?required}
       APP_SERVICE_TOKEN: ${APP_SERVICE_TOKEN:?required}
