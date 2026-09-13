@@ -267,32 +267,3 @@ def update_user_level(user_id: int, db: Session | None = None) -> dict:
     finally:
         if own_session:
             session.close()
-
-
-async def notify_java_level(user_id: int, level: str, level_at: datetime) -> None:
-    """委托 Java 更新 user_profiles.cefr_level（镜像 placement._callback_level + level_at 幂等）。
-
-    - 默认关（skill_callback_enabled=False，考试专属）；失败不 raise、Q-B07 对账兜底
-      （local/32 A-2.1）。
-    """
-    import httpx
-
-    from app.core.config import get_settings
-
-    s = get_settings()
-    if not s.skill_callback_enabled:
-        return
-    try:
-        async with httpx.AsyncClient(timeout=3) as client:
-            await client.post(
-                f"{s.java_base_url}/internal/level",
-                json={
-                    "user_id": user_id,
-                    "level": level,
-                    "source": "skill",
-                    "level_at": level_at.isoformat(),
-                },
-                headers={"Authorization": f"Bearer {s.service_token}"},
-            )
-    except Exception:
-        logger.exception("java level callback failed user=%s (Q-B07 对账兜底)", user_id)
