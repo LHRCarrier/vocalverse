@@ -18,7 +18,7 @@ from app.audio.fluency import compute_fluency_features
 from app.audio.upload import validate_audio_bytes
 from app.core.auth import get_current_user_id
 from app.core.config import get_settings
-from app.core.ratelimit import consume
+from app.core.ratelimit import consume_all
 from app.core.response import ok
 from app.db import get_session_factory
 from app.models import Attempt, Placement, PlacementQuestion
@@ -79,8 +79,10 @@ async def score_item(
         min_bytes=settings.min_upload_bytes,
         max_bytes=settings.max_upload_bytes,
     )
-    await consume("asr", settings.asr_rate_per_hour, user_id)
-    await consume("ise", settings.ise_rate_per_hour, user_id)
+    # P1-13：两桶**一起扣**（任一超限则全量回滚）——逐桶顺序扣会在 ISE 超限时白扣 ASR
+    await consume_all(
+        [("asr", settings.asr_rate_per_hour), ("ise", settings.ise_rate_per_hour)], user_id
+    )
     db = get_session_factory()()
     try:
         q = db.get(PlacementQuestion, item_id)

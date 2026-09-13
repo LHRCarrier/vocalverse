@@ -723,6 +723,43 @@
         }
       }
     },
+    "/internal/song/{songId}/pitch-status" : {
+      "post" : {
+        "tags" : [ "internal-song-status-controller" ],
+        "operationId" : "setPitchStatus",
+        "parameters" : [ {
+          "name" : "songId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PitchStatusRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EnvelopeLong"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/checkin" : {
       "post" : {
         "tags" : [ "internal-checkin-controller" ],
@@ -4837,6 +4874,25 @@
           "updatedAt" : {
             "type" : "string",
             "format" : "date-time"
+          }
+        }
+      },
+      "PitchStatusRequest" : {
+        "required" : [ "songId", "status" ],
+        "type" : "object",
+        "properties" : {
+          "songId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "status" : {
+            "pattern" : "missing|building|ready|invalid",
+            "type" : "string"
+          },
+          "version" : {
+            "maxLength" : 16,
+            "minLength" : 0,
+            "type" : "string"
           }
         }
       },

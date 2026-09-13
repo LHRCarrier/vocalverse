@@ -180,6 +180,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/song/{songId}/pitch-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["setPitchStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/checkin": {
         parameters: {
             query?: never;
@@ -1673,6 +1689,12 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
+        PitchStatusRequest: {
+            /** Format: int64 */
+            songId: number;
+            status: string;
+            version?: string;
+        };
         ProfileUpdate: {
             ageGroup?: string;
             cefrLevel?: string;
@@ -2611,6 +2633,32 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LevelRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EnvelopeLong"];
+                };
+            };
+        };
+    };
+    setPitchStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                songId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PitchStatusRequest"];
             };
         };
         responses: {

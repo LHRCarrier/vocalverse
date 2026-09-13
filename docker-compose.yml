@@ -49,6 +49,15 @@ services:
       APP_SERVICE_TOKEN: ${APP_SERVICE_TOKEN:?required}
       # 模型使用镜像内预下载副本（docs/06 §8 / 审计 R-11：容器网络到 HF 不可达；本地裸跑仍走 'small' 联网下载）
       APP_ASR_MODEL: /app/models/whisper-small
+      # 内部 REST 委托地址（docs/21 §4：Python → Java 的参考旋律门禁翻转 / 档位回写 / 打卡卡物化）。
+      # 必须用**容器网络服务名**：`config.py` 默认 `http://localhost:8080` 只适用于裸跑（host 上的 Java），
+      # 在容器内指容器自己 → Connection refused（2026-09-10 复测实测：提取完成却翻不了 ready，
+      # 新环境/世代重建后歌曲永久 40905）。故此处显式钉死，不受 .env 影响。
+      APP_JAVA_BASE_URL: http://java-api:8080
+      # 容器只跑运行时依赖：镜像构建是 `uv sync --frozen --no-dev`，而 `uv run` 默认**带上 dev 组**
+      # → 每次容器启动都会去 PyPI 下载 ruff/mypy/pytest 等（2026-09-10 合并期实测：网络慢时启动
+      # 卡在下载、健康检查失败、依赖它的 web 起不来）。置 UV_NO_DEV=1 让 `uv run` 跳过 dev 组同步。
+      UV_NO_DEV: "1"
     # docs/06 §8：whisper 信号量 2 下多 worker 收益为负（每进程 ≈500MB 模型）；内存 ≥2GB 显式护栏
     mem_limit: 2g
     ports:
@@ -108,6 +117,10 @@ services:
       SERVICE_TOKEN: ${SERVICE_TOKEN:?required}
     ports:
       - "8080:8080"
+    volumes:
+      # 曲目种子元数据（M3 唱歌 P0 D-G2）：SongSeeder 读 data/seed/songs.json 播种 songs+lrc；
+      # 音频本体在共享卷 ./data/audio（python-api 挂载；Java 只存路径字符串，不读音频）
+      - ./data/seed:/app/data/seed:ro
     depends_on:
       postgres:
         condition: service_healthy
