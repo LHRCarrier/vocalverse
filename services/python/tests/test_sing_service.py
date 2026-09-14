@@ -370,6 +370,166 @@ async def _fake_probe_2s(_path: str) -> float:
     return 2.0
 
 
+# ---------------------------------------------------------------------------
+# B1（PR#34 评审 · 阻塞级）：幂等键并发竞态 —— 输家不得 500
+# ---------------------------------------------------------------------------
+def _seed_winner_row(user_id: int, session_id: int, song_id: int, **overrides) -> int:
+    """在**另一个会话**里落一行，扮演并发竞态的"赢家"（已 commit）。"""
+    other = _new_db()
+    fields = {
+        "user_id": user_id,
+        "session_id": session_id,
+        "song_id": song_id,
+        "duration_s": 2,
+        "audio_url": "/data/audio/winner.wav",
+        "is_complete": False,
+        "lines": [],
+        "alignment": {},
+    }
+    fields.update(overrides)
+    row = SingAttempt(**fields)
+    other.add(row)
+    other.commit()
+    attempt_id = int(row.id)
+    other.close()
+    return attempt_id
+
+
+@pytest.mark.asyncio
+async def test_submit_lost_race_returns_winner_attempt(monkeypatch):
+    """B1（PR#34 评审 · 阻塞级 · **修复前必失败**）：并发提交的**输家**不得抛 IntegrityError。
+
+    复现路径：同一 `session_id` 并发两个 `POST /sing/sessions/{id}/audio`（双击提交 / 弱网重传）。
+    两个请求都在预检读到 `existing=None`，后提交者撞迁移 0016 的
+    `uq_sing_attempts_user_session`——修复前该 `IntegrityError` 无 except，`app/main.py` 又不覆盖
+    SQLAlchemy 异常 → **非 envelope 的 500**（唯一键只把"落两行"换成了"输家 500"）。
+
+    不靠真并发碰运气，改为**确定性交错**：在预检之后、插入之前的 `_probe_duration` 处，
+    由另一个会话抢先落行（= 赢家）。修复前 `IntegrityError` 直接冒泡出函数。
+    """
+    import app.sing.service as svc
+    from app.sing.service import submit_song_audio
+
+    monkeypatch.setattr("app.sing.service.consume_all", _fake_consume)
+    _install_pipeline_stubs(monkeypatch, Path("."))
+    svc._MEM_TASKS.clear()  # 内存任务态跨用例不清 → 否则可能读到他例遗留的 id
+
+    db = _new_db()
+    song_id = _seed_ready_song(db)
+    user_id, session_id = _seed_user_session(db, song_id=song_id)
+    db.close()
+
+    winner: dict[str, int] = {}
+
+    async def _probe_with_race(_path: str) -> float:
+        winner["id"] = _seed_winner_row(user_id, session_id, song_id)
+        return 2.0
+
+    monkeypatch.setattr("app.sing.service.probe_duration_seconds", _probe_with_race)
+
+    r = await submit_song_audio(user_id, session_id, _wav_bytes())  # 修复前：IntegrityError
+    assert r["attempt_id"] == winner["id"]  # 输家复用赢家那行
+    assert r["status"] == "queued"  # 赢家"已 commit、任务态未写"的窗口 → 已受理回执
+
+    db = _new_db()
+    rows = (
+        db.execute(select(SingAttempt).where(SingAttempt.session_id == session_id)).scalars().all()
+    )
+    assert len(rows) == 1  # 唯一键语义仍是"同会话一行"（没有被绕成两行）
+    db.close()
+
+
+@pytest.mark.asyncio
+async def test_submit_lost_race_with_finished_winner_returns_done(monkeypatch):
+    """B1 后半：赢家**已定稿**时，输家走 ① 幂等分支（返回 done），且**不重置**赢家那行。"""
+    import app.sing.service as svc
+    from app.sing.service import submit_song_audio
+
+    monkeypatch.setattr("app.sing.service.consume_all", _fake_consume)
+    _install_pipeline_stubs(monkeypatch, Path("."))
+    svc._MEM_TASKS.clear()
+
+    db = _new_db()
+    song_id = _seed_ready_song(db)
+    user_id, session_id = _seed_user_session(db, song_id=song_id)
+    db.close()
+
+    winner: dict[str, int] = {}
+
+    async def _probe_with_finished_race(_path: str) -> float:
+        winner["id"] = _seed_winner_row(
+            user_id,
+            session_id,
+            song_id,
+            lines=[{"seq": 1, "start_ms": 0, "end_ms": 3000, "pitch_score": 90.0}],
+            overall_score=88.0,
+            is_complete=True,
+        )
+        return 2.0
+
+    monkeypatch.setattr("app.sing.service.probe_duration_seconds", _probe_with_finished_race)
+
+    r = await submit_song_audio(user_id, session_id, _wav_bytes())  # 修复前：IntegrityError
+    assert r["attempt_id"] == winner["id"]
+    assert r["status"] == "done"  # ① 已完成 → 幂等返回既有结果，不重跑
+
+    db = _new_db()
+    row = db.get(SingAttempt, winner["id"])
+    assert row is not None
+    assert row.overall_score == 88.0  # ③ 的"就地重置"没有误伤赢家的定稿行
+    assert row.is_complete is True
+    db.close()
+
+
+@pytest.mark.asyncio
+async def test_submit_concurrent_double_tap_converges_to_single_row(monkeypatch, tmp_path):
+    """B1 真并发用例（评审明确要求「补并发用例」）：`asyncio.gather` 两个同会话上传同时进行。
+
+    与上面两条**确定性交错**互补：那两条钉的是"插入前输家已知赢家存在"的语义分支，这条不注入
+    任何人造赢家，让两个协程**都走完预检**（都读到 `existing=None`）再各自插入——即真实的
+    双击 / 弱网重传竞态。修复前：后提交者抛 `IntegrityError`（非 envelope 的 500）→ 本用例红。
+
+    断言三件事：① 两次调用都**正常返回**（无异常）；② 二者的 `attempt_id` **收敛为同一个**；
+    ③ 库里仍然只有一行（唯一键语义没有被兜底代码绕成两行）。
+    """
+    import app.sing.service as svc
+    from app.sing.service import submit_song_audio
+
+    monkeypatch.setattr("app.sing.service.consume_all", _fake_consume)
+    _install_pipeline_stubs(monkeypatch, Path("."))
+    svc._MEM_TASKS.clear()
+
+    db = _new_db()
+    song_id = _seed_ready_song(db)
+    user_id, session_id = _seed_user_session(db, song_id=song_id)
+    db.close()
+
+    async def _yield_probe(_path: str) -> float:
+        # 主动让出控制权若干次：保证两个协程都过了「预检 existing=None」再进入插入段，
+        # 否则先跑的那个会一路跑到 commit（中间无 await）→ 后者会走幂等分支，测不出竞态。
+        for _ in range(3):
+            await asyncio.sleep(0)
+        return 2.0
+
+    monkeypatch.setattr("app.sing.service.probe_duration_seconds", _yield_probe)
+
+    a, b = await asyncio.gather(
+        submit_song_audio(user_id, session_id, _wav_bytes()),
+        submit_song_audio(user_id, session_id, _wav_bytes()),
+    )
+
+    assert int(a["attempt_id"]) == int(b["attempt_id"]), "并发双击必须收敛到同一 attempt"
+    assert a["status"] in ("queued", "processing", "done")
+    assert b["status"] in ("queued", "processing", "done")
+
+    db = _new_db()
+    rows = (
+        db.execute(select(SingAttempt).where(SingAttempt.session_id == session_id)).scalars().all()
+    )
+    assert len(rows) == 1  # 唯一键语义仍成立（兜底不是"再插一行"）
+    db.close()
+
+
 @pytest.mark.asyncio
 async def test_submit_retry_after_failure_resets_draft_in_place(monkeypatch, tmp_path):
     """① 评分失败后"再来一次"必须能重跑（P1-3）：同 id 就地重置 → queued → 再跑可 done。
