@@ -3,6 +3,17 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-14 裸跑「听参考旋律」静默 40401 修复：共享卷目录按 cwd 解析错位（A-G7）· 2 op
+
+- **背景**：dev 分支按方式 B 裸跑起来后，组长在 `/m/sing` 点「听参考旋律」**毫无反应**；网络面板 `GET /api/v1/audio/song_twinkle.wav` 回 `{"code":40401,"message":"audio asset missing"}`，观感像「合进来的分支里没有小星星的数据源」。**核查后确认数据源齐全**：`data/audio/song_*.wav` 三首（`scripts/setup-assets.py` 已重建，1.30/0.87/0.87 MB），DB 里三首 `pitch_ref_status=ready`（pyin 提取成功）。
+- **根因（A-G7 路径三义性，已登记项）**：`practice.py:550` 取 `Path(settings.audio_dir) / name`，而 `config.py:120` 的默认值是**按进程 cwd 解析**的相对路径 `./data/audio`。容器 `WORKDIR /app` + 挂载卷 → `/app/data/audio` ✅；裸跑 cwd=`services/python` → `services/python/data/audio`（那里只有用户录音）❌ → 已发布歌曲素材分支找不到文件即 40401。同一个键在两处指向不同目录，容器侧"恰好对"，裸跑侧**必然错**，且错误码文案读起来像"库里没素材"，把排查带偏。
+- **修复（入口层收口；容器语义零变化）**：① `scripts/dev-up.ps1` 在 `APP_ASR_MODEL` 之后按同款 setdefault 语义注入 `APP_AUDIO_DIR`/`APP_MEDIA_DIR`=仓库根 `data/...`（这是方式 B 的规范入口，一行修好所有队友）；② `services/python/.env.example` 登记这两个键（`../../data/audio`）+ 说明容器为何不用配；③ `app/main.py` 启动期打印**实际解析到的绝对路径**、目录不存在时 WARNING —— 把「静默 40401」变成一眼可见。**未改 `config.py` 默认值**：`tests/conftest.py:45` 每例 `rmtree(audio_dir)`，默认值锚到仓库根会让**跑一次 pytest 删掉真素材**（风险远大于收益，已写入归档踩坑）。
+- **验证（本机真跑 · 方式 B 四端）**：启动日志 `audio_dir=F:\WorkingL\vocalverse\data\audio`；三首参考旋律直连 8000 全部 `200 / audio/wav`（1,307,168 / 873,224 / 869,696 B）；**经 Vite :5173 同一路径**（前端实际链路）也 `200`；唱歌链路整体 `local/sing_bare_run_verify.py` **16 PASS / 0 FAIL**（含 B1 真并发双击：两请求均 200、`attempt_id` 收敛、库里仍一行）。
+- **踩坑（详见归档）**：① 「资源找不到」的错误码必须把**实际查找位置**带进日志，否则文案会把根因带偏；② 相对路径 + 同名键 = 三义性，且 `audio_url` 存的是 `/data/audio/x.wav` 这种"看似绝对"的样式，更难被怀疑；③ **别 `export APP_AUDIO_DIR=<仓库根>` 再跑 pytest**——环境变量优先级高于 conftest 的 `os.environ.setdefault`，会盖掉 `data/audio-test` 隔离并删真素材；④ 本机曾有一个挂死的 `uv sync` 占着 uv 缓存锁，导致不带 `--no-sync` 的 `uv run` **卡住且零输出**（这才是「python 服务没起来、日志 0 字节」的成因之一）。
+- **产出**：`scripts/dev-up.ps1`、`services/python/.env.example`、`services/python/app/main.py`、`README.md`（FAQ 新增一行）、`worklog/BUG实测/参考旋律素材40401-裸跑音频目录错位.md`；旁证脚本 `local/sing_bare_run_verify.py`（gitignored）。
+
+—— 执行人：Faust-sudo（AI 代工），2026-09-14
+
 ## 2026-09-14 PR #34 评审意见处置（B1 阻断 + R1/R2/R5 + Q1 · 前端两条见安卓日志）· 3 op
 
 - **背景**：组长对 PR #34（`feat(sing): 唱歌模块（M3）+ 全链路审校加固`，129 文件 / +26252 行）给出 `CHANGES_REQUESTED`：**1 条阻断 B1** + 5 条建议 R1~R5 + 1 条疑问 Q1。本记录只覆盖后端/部署/CI 与记录纪律部分；**R3/R4 是 `/m/sing` 的界面状态问题，按记录纪律走 `worklog/安卓开发日志.md`**（同日条目）。
