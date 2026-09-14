@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VocalVerse — AI Oral Practice</title>
-  <meta name="description" content="Practice real English conversations with AI roleplay across 8+ scenes, scored in real time on pronunciation, grammar, and fluency." />
+  <meta name="description" content="Speak English out loud: LLM scene roleplay across 8 preset scenes, ASR transcription, and per-turn scoring on pronunciation, fluency, and grammar &mdash; plus AI Free Talk when no scene fits." />
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -12,6 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,100..900,0..100&family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/scroll-expand.css?v=3" />
+  <link rel="stylesheet" href="css/feature-blocks.css" />
+  <link rel="stylesheet" href="css/card-art.css" />
   <link rel="stylesheet" href="css/nav-reveal.css" />
   <link rel="stylesheet" href="css/site-nav.css" />
   <link rel="stylesheet" href="css/gooey-nav.css" />
@@ -103,7 +105,7 @@
         data-se-media-zoom="1.35"
         data-se-start-radius="24"
         data-se-end-radius="0"
-        data-se-scroll-distance="1.2"
+        data-se-scroll-distance="0.6"
         data-se-hold-distance="0.35"
         data-se-smoothing="0.1"
         data-se-overlay-scrim="0.45"
@@ -118,7 +120,7 @@
                 <div class="se-overlay-inner">
                   <div class="se-eyebrow">
                     <span class="se-eyebrow-line" aria-hidden="true"></span>
-                    <span class="se-eyebrow-text">Core module · AI oral practice</span>
+                    <span class="se-eyebrow-text">Practice line · speaking out loud</span>
                     <span class="se-eyebrow-line" aria-hidden="true"></span>
                   </div>
                   <div class="se-dotline" aria-hidden="true"></div>
@@ -133,43 +135,43 @@
               </header>
               <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 752 / 497">
                 <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23047857'/><stop offset='1' stop-color='%2310B981'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>🤖</text></svg>" alt="AI roleplay conversation agent" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                  <svg class="pca" viewBox="0 0 1000 661" role="img" focusable="false">
+                    <title>Scene roleplay: two dialogue bubbles, a waveform reply, and three difficulty pills</title>
+                    <defs>
+                      <pattern id="pr-dots-1" width="26" height="26" patternUnits="userSpaceOnUse">
+                        <circle class="dot" cx="2" cy="2" r="4"/>
+                      </pattern>
+                    </defs>
+                    <rect width="1000" height="661" fill="url(#pr-dots-1)"/>
+                    <rect class="line fill-7" x="110" y="118" width="380" height="172" rx="42"/>
+                    <rect class="fill-22" x="152" y="166" width="240" height="14" rx="7"/>
+                    <rect class="fill-22" x="152" y="200" width="190" height="14" rx="7"/>
+                    <rect class="fill-22" x="152" y="234" width="120" height="14" rx="7"/>
+                    <path class="line-soft dash" d="M 492 214 L 566 268"/>
+                    <rect class="line fill-7" x="510" y="248" width="380" height="172" rx="42"/>
+                    <rect class="ink" x="592" y="352" width="24" height="34" rx="12"/>
+                    <rect class="ink" x="638" y="316" width="24" height="70" rx="12"/>
+                    <rect class="ink" x="684" y="282" width="24" height="104" rx="12"/>
+                    <rect class="ink" x="730" y="316" width="24" height="70" rx="12"/>
+                    <rect class="ink" x="776" y="352" width="24" height="34" rx="12"/>
+                    <rect class="ink" x="180" y="512" width="170" height="50" rx="25"/>
+                    <text class="label label-inv" x="265" y="546" text-anchor="middle">Easy</text>
+                    <rect class="line-soft" x="382" y="512" width="196" height="50" rx="25"/>
+                    <text class="label" x="480" y="546" text-anchor="middle">Medium</text>
+                    <rect class="line-soft" x="610" y="512" width="170" height="50" rx="25"/>
+                    <text class="label" x="695" y="546" text-anchor="middle">Hard</text>
+                  </svg>
                 </div>
               </div>
               <div class="flex flex-col gap-2.5 px-1 pb-1">
                 <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  Role-play conversations in coffee shops, airports, business meetings, hospitals, and more.
+                  Eight preset scenes, from coffee shops and airports to business meetings and clinics.
                 </h3>
                 <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  8+ everyday scenes, each graded Easy, Medium, or Hard, covering ordering, travel, medical, and business needs.
+                  Every scene ships with its own role prompt, opening line, and target phrases, graded Easy, Medium, or Hard &mdash; and you choose the scene before the session starts.
                 </p>
               </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">8+ Scenes · 3 Difficulty Levels</p>
-            </article>
-          </div>
-
-          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0.06s">
-            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
-              <header class="flex items-center gap-2.5 px-1 pt-2">
-                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
-                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
-                </span>
-                <span class="text-sm font-medium tracking-tight text-foreground">ASR Transcription</span>
-              </header>
-              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
-                <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23EA580C'/><stop offset='1' stop-color='%23FDBA74'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>🎙️</text></svg>" alt="Speech recognition and transcription" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
-                </div>
-              </div>
-              <div class="flex flex-col gap-2.5 px-1 pb-1">
-                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  Speech recognition and transcription.
-                </h3>
-                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Your recording is transcribed by ASR in real time, with the audio timeline as the source of truth and subtitles as a guide.
-                </p>
-              </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Real-time · Up to 15s per Turn</p>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">8 preset scenes · 3 difficulty levels</p>
             </article>
           </div>
 
@@ -183,52 +185,51 @@
               </header>
               <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
                 <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%231D4ED8'/><stop offset='1' stop-color='%2393C5FD'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>📊</text></svg>" alt="Three-dimension speaking score" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                  <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                    <title>Three stacked score sheets carrying dimension bars, with a scale and an overall score</title>
+                    <defs>
+                      <pattern id="pr-dots-2" width="26" height="26" patternUnits="userSpaceOnUse">
+                        <circle class="dot" cx="2" cy="2" r="4"/>
+                      </pattern>
+                    </defs>
+                    <rect width="1000" height="750" fill="url(#pr-dots-2)"/>
+                    <rect class="line fill-7" x="330" y="330" width="440" height="160" rx="30"/>
+                    <rect class="line fill-7" x="290" y="280" width="440" height="160" rx="30"/>
+                    <rect class="line fill-10" x="250" y="230" width="440" height="160" rx="30"/>
+                    <rect class="ink" x="292" y="272" width="250" height="16" rx="8"/>
+                    <rect class="fill-22" x="292" y="312" width="200" height="16" rx="8"/>
+                    <rect class="fill-22" x="292" y="352" width="150" height="16" rx="8"/>
+                    <path class="line-soft" d="M 790 190 V 560"/>
+                    <path class="line-soft" d="M 790 190 H 814"/>
+                    <path class="line-soft" d="M 790 312 H 814"/>
+                    <path class="line-soft" d="M 790 434 H 814"/>
+                    <path class="line-soft" d="M 790 556 H 814"/>
+                    <text class="label" x="830" y="198">100</text>
+                    <text class="label" x="830" y="320">80</text>
+                    <text class="label" x="830" y="442">60</text>
+                    <text class="num" x="826" y="650">82</text>
+                  </svg>
                 </div>
               </div>
               <div class="flex flex-col gap-2.5 px-1 pb-1">
                 <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  Scored on pronunciation, grammar, and fluency in real time.
+                  Scored on pronunciation, fluency, and grammar &mdash; every turn.
                 </h3>
                 <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Coach notes and language-point coverage analysis pinpoint exactly where to improve next.
+                  iFlytek ISE returns the pronunciation badge, the LLM judges grammar and fluency, and a coverage bar tracks which target phrases you actually used.
                 </p>
               </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Pronunciation · Grammar · Fluency</p>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">ISE badge · 3 dimensions · coach notes</p>
             </article>
           </div>
 
-          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0.18s">
-            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
-              <header class="flex items-center gap-2.5 px-1 pt-2">
-                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
-                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
-                </span>
-                <span class="text-sm font-medium tracking-tight text-foreground">How It Works</span>
-              </header>
-              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
-                <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23047857'/><stop offset='1' stop-color='%2310B981'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>🧭</text></svg>" alt="Four steps to complete one session" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
-                </div>
-              </div>
-              <div class="flex flex-col gap-2.5 px-1 pb-1">
-                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  Four steps to complete one session.
-                </h3>
-                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Choose a scene → converse with the AI character → check your real-time score → review and move to the next round.
-                </p>
-              </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">~8 Rounds · SSE Streaming</p>
-            </article>
-          </div>
                   </div>
                 </div>
               </div>
             </div>
             <div class="scroll-expand__title">
               <h1 data-split-text>AI Oral Practice</h1>
-              <p class="se-title-sub" data-split-text>Based on LLM-driven scene roleplay and speech recognition, the core speaking module turns &ldquo;can read but can&rsquo;t speak&rdquo; into real, low-pressure conversation practice.</p>
+              <p class="se-title-sub" data-split-text>The speaking line of VocalVerse: an LLM plays the other person, ASR turns your voice into text, and every turn is scored &mdash; and when no scene fits, AI Free Talk lets you chat by mic or keyboard.</p>
             </div>
             <div class="scroll-expand__hint">
               <span>Scroll down · View core features</span>
@@ -236,6 +237,215 @@
             </div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ===== 正文：卡片与文字逐段相间（卡在右 → 全宽文字 → 卡在左） ===== -->
+    <section class="fs-section fade-in" aria-labelledby="pr-anatomy">
+      <div class="fs-duo">
+        <div class="fs-duo__text">
+          <p class="fs-kicker">Turn anatomy</p>
+          <h2 class="fs-title" id="pr-anatomy">One turn, from voice to text.</h2>
+          <p class="fs-lead">A turn is one spoken answer, capped at 15 seconds. faster-whisper transcribes it on the server: the audio timeline stays the source of truth and the subtitle follows it.</p>
+          <div class="fs-rows">
+            <div class="fs-row">
+              <span class="fs-row__label">Turn window</span>
+              <span class="fs-bar"><i style="width:100%"></i></span>
+              <span class="fs-row__value">&le;15s, auto-stop</span>
+            </div>
+            <div class="fs-row">
+              <span class="fs-row__label">Scoring</span>
+              <span class="fs-bar"><i style="width:70%"></i></span>
+              <span class="fs-row__value">pronunciation · fluency · grammar</span>
+            </div>
+            <div class="fs-row">
+              <span class="fs-row__label">Language points</span>
+              <span class="fs-bar"><i style="width:55%"></i></span>
+              <span class="fs-row__value">counted only when the phrase lands naturally</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Transport</span>
+              <span class="fs-row__value">one SSE stream per turn</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Authority</span>
+              <span class="fs-row__value">audio timeline over subtitles</span>
+            </div>
+          </div>
+        </div>
+        <div class="fs-duo__card">
+          <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+            <header class="flex items-center gap-2.5 px-1 pt-2">
+              <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+              </span>
+              <span class="text-sm font-medium tracking-tight text-foreground">ASR Transcription</span>
+            </header>
+            <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+              <div class="project-card__image-inner">
+                <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                  <title>Speech recognition: a microphone and a waveform turning into transcribed lines</title>
+                  <defs>
+                    <pattern id="pr-dots-3" width="26" height="26" patternUnits="userSpaceOnUse">
+                      <circle class="dot" cx="2" cy="2" r="4"/>
+                    </pattern>
+                  </defs>
+                  <rect width="1000" height="750" fill="url(#pr-dots-3)"/>
+                  <rect class="line fill-7" x="92" y="212" width="76" height="150" rx="38"/>
+                  <path class="line" d="M 62 340 V 372 A 68 68 0 0 0 198 372 V 340"/>
+                  <path class="line" d="M 130 440 V 496"/>
+                  <path class="line" d="M 92 496 H 168"/>
+                  <rect class="ink" x="300" y="446" width="18" height="24" rx="9"/>
+                  <rect class="ink" x="340" y="422" width="18" height="48" rx="9"/>
+                  <rect class="ink" x="380" y="390" width="18" height="80" rx="9"/>
+                  <rect class="ink" x="420" y="360" width="18" height="110" rx="9"/>
+                  <rect class="ink" x="460" y="342" width="18" height="128" rx="9"/>
+                  <rect class="ink" x="500" y="360" width="18" height="110" rx="9"/>
+                  <rect class="ink" x="540" y="390" width="18" height="80" rx="9"/>
+                  <rect class="ink" x="580" y="422" width="18" height="48" rx="9"/>
+                  <rect class="ink" x="620" y="446" width="18" height="24" rx="9"/>
+                  <path class="line-soft dash" d="M 664 470 H 714"/>
+                  <circle class="ink" cx="736" cy="470" r="9"/>
+                  <rect class="fill-22" x="768" y="404" width="200" height="14" rx="7"/>
+                  <rect class="fill-22" x="768" y="440" width="170" height="14" rx="7"/>
+                  <rect class="fill-22" x="768" y="476" width="120" height="14" rx="7"/>
+                  <rect class="ink" x="902" y="470" width="4" height="26"/>
+                  <path class="line-soft" d="M 300 600 H 700"/>
+                  <path class="line" d="M 300 600 H 560"/>
+                  <text class="label" x="500" y="654" text-anchor="middle">15s auto-stop</text>
+                </svg>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2.5 px-1 pb-1">
+              <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                Your voice becomes text while the turn is live.
+              </h3>
+              <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                faster-whisper transcribes each turn on the server; the audio timeline stays the source of truth and the subtitles follow it.
+              </p>
+            </div>
+            <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">&le;15s per turn &middot; faster-whisper ASR</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="fs-section fade-in" aria-labelledby="pr-steps">
+      <div class="fs-head">
+        <p class="fs-kicker">Session flow</p>
+        <h2 class="fs-title" id="pr-steps">Four steps to finish one session.</h2>
+      </div>
+      <div class="fs-steps">
+        <div class="fs-step">
+          <span class="fs-step__no">01</span>
+          <h3 class="fs-step__title">Choose a scene</h3>
+          <p class="fs-step__desc">Eight preset scenes across three difficulty levels; nothing starts until you pick one.</p>
+          <p class="fs-step__meta">8 scenes · Easy / Medium / Hard</p>
+        </div>
+        <div class="fs-step">
+          <span class="fs-step__no">02</span>
+          <h3 class="fs-step__title">Take the opening line</h3>
+          <p class="fs-step__desc">The AI character opens the scene and TTS plays it before your first turn.</p>
+          <p class="fs-step__meta">Pre-synthesised opening</p>
+        </div>
+        <div class="fs-step">
+          <span class="fs-step__no">03</span>
+          <h3 class="fs-step__title">Speak, 15 seconds a turn</h3>
+          <p class="fs-step__desc">Recording stops itself at 15 seconds; a turn's score can land while the next one is already running.</p>
+          <p class="fs-step__meta">&ge;8 turns</p>
+        </div>
+        <div class="fs-step">
+          <span class="fs-step__no">04</span>
+          <h3 class="fs-step__title">Read the report</h3>
+          <p class="fs-step__desc">Coach notes, language-point coverage, and the dimension scores land in the session report.</p>
+          <p class="fs-step__meta">Report</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="fs-section fade-in" aria-labelledby="pr-feedback">
+      <div class="fs-duo fs-duo--flip">
+        <div class="fs-duo__text">
+          <p class="fs-kicker">Feedback</p>
+          <h2 class="fs-title" id="pr-feedback">The report is written while you talk.</h2>
+          <div class="fs-rows">
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Coach notes</span>
+              <span class="fs-row__value">at most one line per turn, 15 words or fewer, collapsed by default</span>
+            </div>
+            <div class="fs-row">
+              <span class="fs-row__label">Coverage</span>
+              <span class="fs-bar"><i style="width:55%"></i></span>
+              <span class="fs-row__value">target phrases hit vs missed</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Rescue</span>
+              <span class="fs-row__value">two weak turns in a row &rarr; the character rephrases instead of stopping</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Report</span>
+              <span class="fs-row__value">generated when the session closes, polled by the page</span>
+            </div>
+          </div>
+          <p class="fs-note">Retry and demo turns do not count toward coverage, so the bar rewards talking rather than repeating.</p>
+        </div>
+        <div class="fs-duo__card">
+          <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+            <header class="flex items-center gap-2.5 px-1 pt-2">
+              <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
+              </span>
+              <span class="text-sm font-medium tracking-tight text-foreground">How It Works</span>
+            </header>
+            <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+              <div class="project-card__image-inner">
+                <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                  <title>Feedback: a coach note, a coverage row, a report sheet, and a recovering score line</title>
+                  <defs>
+                    <pattern id="pr-dots-4" width="26" height="26" patternUnits="userSpaceOnUse">
+                      <circle class="dot" cx="2" cy="2" r="4"/>
+                    </pattern>
+                  </defs>
+                  <rect width="1000" height="750" fill="url(#pr-dots-4)"/>
+                  <g transform="rotate(-4 300 300)">
+                    <rect class="line fill-7" x="120" y="180" width="360" height="210" rx="30"/>
+                    <rect class="fill-22" x="164" y="240" width="240" height="14" rx="7"/>
+                    <rect class="fill-22" x="164" y="276" width="180" height="14" rx="7"/>
+                    <path class="line-soft fill-10" d="M 400 180 L 480 180 L 480 260 Z"/>
+                  </g>
+                  <text class="label" x="560" y="300">Coverage</text>
+                  <rect class="ink" x="560" y="322" width="62" height="62" rx="18"/>
+                  <rect class="ink" x="636" y="322" width="62" height="62" rx="18"/>
+                  <rect class="ink" x="712" y="322" width="62" height="62" rx="18"/>
+                  <rect class="line-soft dash" x="788" y="322" width="62" height="62" rx="18"/>
+                  <rect class="line fill-7" x="700" y="120" width="200" height="140" rx="24"/>
+                  <rect class="fill-22" x="730" y="160" width="140" height="12" rx="6"/>
+                  <rect class="fill-22" x="730" y="188" width="110" height="12" rx="6"/>
+                  <rect class="fill-22" x="730" y="216" width="80" height="12" rx="6"/>
+                  <path class="line" d="M 828 232 L 848 254 L 888 206"/>
+                  <path class="line" d="M 110 620 L 210 596 L 296 664 L 382 566 L 470 648 L 566 520 L 664 486 L 776 452 L 896 414"/>
+                  <circle class="ink" cx="896" cy="414" r="9"/>
+                </svg>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2.5 px-1 pb-1">
+              <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                Nothing about a bad turn ends the session.
+              </h3>
+              <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                A turn can be low quality, rescued, or not scored at all; the session still closes at eight turns and still produces a report.
+              </p>
+            </div>
+            <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Rescue &middot; coverage &middot; report</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="fs-section fade-in">
+      <div class="fs-band">
+        <h2 class="fs-band__statement">No scene fits? Then just talk.</h2>
+        <p class="fs-band__meta">AI Free Talk &mdash; microphone or keyboard, DeepSeek streaming replies with TTS playback, and feedback with or without a scene card.</p>
       </div>
     </section>
 
@@ -253,7 +463,7 @@
                 Let&rsquo;s connect
               </h2>
               <p class="max-w-[29ch] text-[18px] leading-[1.4] tracking-tight text-foreground/65 sm:text-[22px] mb-6">
-                We&rsquo;re always open to discussing new features, creative ideas, or opportunities to shape the future of English speaking practice. Just reach out!
+                We&rsquo;re always open to discussing new features, creative ideas, or opportunities to shape the future of English learning. Just reach out!
               </p>
 
               <div class="mt-2 flex flex-wrap items-center gap-3">
@@ -296,8 +506,8 @@
                 </a>
               </div>
               <div class="flex flex-col items-center gap-1 text-center">
-                <p class="text-[13px] tracking-tight text-foreground/70">2026 &copy; Built with Next.js</p>
-                <p class="text-[12px] tracking-tight text-foreground/45">By React Bits Pro</p>
+                <p class="text-[13px] tracking-tight text-foreground/70">2026 &copy; VocalVerse</p>
+                <p class="text-[12px] tracking-tight text-foreground/45">Practice · Immerse · Sing</p>
               </div>
             </div>
           </div>

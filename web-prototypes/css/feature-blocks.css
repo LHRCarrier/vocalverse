@@ -1,0 +1,513 @@
+/* ============================================================
+   Feature blocks · 非卡片正文版块套件（practice / sing / recommend /
+   community / stats 五页共用）
+   ------------------------------------------------------------
+   为什么单独一个文件：styles.css 是 Tailwind v4 的编译产物，只包含
+   这些页面里**已出现过**的工具类；新增 md:grid-cols-3 之类的类不会
+   有任何效果。所以新版块的结构、栅格、断点全部手写在这里，只使用
+   设计令牌（--foreground / --background / --font-serif / --font-mono）
+   + color-mix 派生色，明暗主题自适应，不需要 .dark 分支。
+
+   版块清单：
+     .fs-section   版块外壳（与页面 max-w-275 / px-6 sm:px-10 同栅格）
+     .fs-head      小标 + serif 标题 + 引导句
+     .fs-steps     编号步骤条（1px hairline + 编号压线）
+     .fs-rows      定义式明细行（标签 / 条形 / 数值）
+     .fs-kpis      大数字指标条
+     .fs-list      信息流行（字标 + 主文 + 胶囊标签 + 动作行）
+     .fs-duo       成对段：一栏文字 + 一张真卡（.project-card），逐段左右换边
+     .fs-band      通栏宣言带（上下 hairline）
+
+   动效约定：只依赖既有的 .fade-in / .is-inview（js/animations.js），
+   条形为静态宽度，不新增动画，故无需 prefers-reduced-motion 分支。
+   ============================================================ */
+
+/* —— 版块外壳：与页面其它容器同宽（275 × .25rem = 68.75rem = 1100px）—— */
+.fs-section {
+  position: relative;
+  width: 100%;
+  max-width: 68.75rem;
+  margin: 0 auto;
+  padding: 6rem 1.5rem 0;
+}
+
+@media (min-width: 640px) {
+  .fs-section { padding-left: 2.5rem; padding-right: 2.5rem; }
+}
+
+/* 相邻版块之间只用一条 hairline 分组，不叠卡片、不加底色 */
+.fs-section + .fs-section {
+  margin-top: 5rem;
+  padding-top: 5rem;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+/* —— 版块头部 —— */
+.fs-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 2.75rem;
+}
+
+.fs-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 50%, transparent);
+}
+
+.fs-title {
+  margin: 0;
+  max-width: 34ch;
+  font-family: var(--font-serif);
+  font-size: clamp(1.75rem, 3.4vw, 2.75rem);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--foreground);
+  text-wrap: balance;
+}
+
+.fs-lead {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--foreground) 65%, transparent);
+}
+
+@media (min-width: 640px) {
+  .fs-lead { font-size: 1.125rem; }
+}
+
+/* 批注小字（M3 状态、口径说明等） */
+.fs-note {
+  margin: 1.5rem 0 0;
+  max-width: 70ch;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.7;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--foreground) 48%, transparent);
+}
+
+/* ============================================================
+   1. 编号步骤条
+   ============================================================ */
+.fs-steps {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.25rem;
+}
+
+@media (min-width: 768px) {
+  .fs-steps { grid-template-columns: repeat(4, 1fr); gap: 1.75rem; }
+}
+
+.fs-step {
+  position: relative;
+  padding-top: 1.35rem;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 14%, transparent);
+}
+
+/* 编号压在 hairline 上（用页面底色打底，遮住线的一小段） */
+.fs-step__no {
+  position: absolute;
+  top: -0.55rem;
+  left: 0;
+  padding-right: 0.6rem;
+  background: var(--background);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: color-mix(in srgb, var(--foreground) 45%, transparent);
+}
+
+.fs-step__title {
+  margin: 0.9rem 0 0.45rem;
+  font-size: 1.0625rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+}
+
+.fs-step__desc {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  letter-spacing: -0.005em;
+  color: color-mix(in srgb, var(--foreground) 62%, transparent);
+}
+
+.fs-step__meta {
+  margin: 0.7rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 42%, transparent);
+}
+
+/* ============================================================
+   2. 定义式明细行（标签 / 条形 / 数值）
+   ============================================================ */
+.fs-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.fs-row {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 9.5rem) 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.95rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+.fs-rows .fs-row:last-child {
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+/* 无条形：标签与数值两端对齐 */
+.fs-row--plain {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.fs-row__label {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--foreground);
+}
+
+.fs-row__value {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  letter-spacing: 0.03em;
+  text-align: right;
+  color: color-mix(in srgb, var(--foreground) 62%, transparent);
+}
+
+/* 条形：静态宽度，由 HTML 内联 style="width:NN%" 给出 */
+.fs-bar {
+  display: block;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 9%, transparent);
+  overflow: hidden;
+}
+
+.fs-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--foreground);
+}
+
+.fs-bar--sm { height: 4px; }
+
+@media (max-width: 639px) {
+  /* 窄屏：条形独占一行，标签与数值留在第一行 */
+  .fs-row:not(.fs-row--plain) {
+    grid-template-columns: 1fr auto;
+  }
+  .fs-row:not(.fs-row--plain) .fs-bar {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+  .fs-row--plain {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+  .fs-row--plain .fs-row__value { text-align: left; }
+}
+
+/* ============================================================
+   3. 大数字指标条
+   ============================================================ */
+.fs-kpis {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 0;
+}
+
+@media (min-width: 640px) {
+  .fs-kpis { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (min-width: 900px) {
+  .fs-kpis { grid-template-columns: repeat(4, 1fr); }
+}
+
+.fs-kpi {
+  padding: 1.5rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 14%, transparent);
+}
+
+@media (min-width: 900px) {
+  .fs-kpi {
+    padding: 1.75rem 1.75rem 0 1.75rem;
+    border-top: 0;
+    border-left: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+  }
+  .fs-kpi:first-child { border-left: 0; padding-left: 0; }
+}
+
+.fs-kpi__value {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--foreground);
+}
+
+.fs-kpi__label {
+  margin: 0.7rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 52%, transparent);
+}
+
+.fs-kpi__note {
+  margin: 0.55rem 0 0;
+  max-width: 28ch;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--foreground) 60%, transparent);
+}
+
+/* ============================================================
+   4. 信息流行（帖子 / 歌词行 / 推荐项）
+   ============================================================ */
+.fs-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+.fs-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 1.15rem;
+  padding: 1.35rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+.fs-item__dot {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--foreground) 14%, transparent);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--foreground) 62%, transparent);
+}
+
+.fs-item__main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.fs-item__name {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--foreground);
+}
+
+.fs-item__meta {
+  margin-left: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--foreground) 45%, transparent);
+}
+
+.fs-item__body {
+  margin: 0;
+  max-width: 58ch;
+  font-size: 1rem;
+  line-height: 1.6;
+  letter-spacing: -0.005em;
+  color: color-mix(in srgb, var(--foreground) 78%, transparent);
+}
+
+.fs-item__bar {
+  display: block;
+  max-width: 22rem;
+  margin-top: 0.15rem;
+}
+
+.fs-item__actions {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--foreground) 45%, transparent);
+}
+
+.fs-item__tag {
+  align-self: start;
+  white-space: nowrap;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 55%, transparent);
+}
+
+@media (max-width: 639px) {
+  .fs-item {
+    grid-template-columns: auto 1fr;
+    gap: 0.9rem;
+  }
+  .fs-item__tag {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* ============================================================
+   5. 成对段：一栏文字 + 一张真卡（卡片与文字相间）
+   ------------------------------------------------------------
+   卡片直接用 styles.css 里已编译好的 .project-card 组件
+   （tailwind.input.css:180-222，规则无作用域限制），hover 抬升与
+   图片缩放原样保留。约束：卡片外层不要再套 .fade-in —— .fade-in
+   自带 transform: translateY(12px)，会与 .project-card:hover 的
+   transform 打架；入场动画交给段级 .fs-section.fade-in。
+   ============================================================ */
+.fs-duo {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .fs-duo {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 3.5rem;
+    align-items: center; /* 文字栏偏高时，卡片垂直居中，避免卡下留一块空 */
+  }
+}
+
+.fs-duo__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.fs-duo__card {
+  min-width: 0;
+}
+
+/* 正文里的卡片不是链接，去掉手型暗示 */
+.fs-duo__card .project-card {
+  cursor: default;
+}
+
+/* 窄屏单列：一律「卡在上、文在下」，先给视觉锚点 */
+@media (max-width: 899px) {
+  .fs-duo__card { order: -1; }
+}
+
+/* 段与段之间换边：卡片移到左栏（≥900px） */
+@media (min-width: 900px) {
+  .fs-duo--flip .fs-duo__card { order: -1; }
+}
+
+/* 半栏里的编号步骤条：4 列会挤成一条，降为 2 列 */
+@media (min-width: 640px) {
+  .fs-duo__text .fs-steps { grid-template-columns: repeat(2, 1fr); }
+}
+
+.fs-viz {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 12rem;
+}
+
+.fs-radar {
+  display: block;
+  width: 100%;
+  max-width: 24rem;
+  height: auto;
+}
+
+/* ============================================================
+   6. 通栏宣言带
+   ============================================================ */
+.fs-band {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  padding: 3.25rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+
+@media (min-width: 900px) {
+  .fs-band {
+    grid-template-columns: 1.4fr 1fr;
+    align-items: end;
+    gap: 3rem;
+  }
+}
+
+.fs-band__statement {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(1.5rem, 2.6vw, 2.25rem);
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  color: var(--foreground);
+  text-wrap: balance;
+}
+
+.fs-band__meta {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  letter-spacing: -0.005em;
+  color: color-mix(in srgb, var(--foreground) 62%, transparent);
+}
+
+/* 版块内的段落（分栏左栏正文） */
+.fs-body {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 1rem;
+  line-height: 1.65;
+  letter-spacing: -0.005em;
+  color: color-mix(in srgb, var(--foreground) 68%, transparent);
+}
