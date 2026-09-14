@@ -326,11 +326,24 @@ class ConsoleCrossTokenTest extends AbstractConsoleApiTest {
     em.clear();
   }
 
-  /** 用原生 SQL 插入指定 id 的 admin_users 行（显式 id 插入 IDENTITY 列，H2/PG 均支持）。 */
+  /**
+   * 用原生 SQL 插入指定 id 的 admin_users 行（显式 id 插入 IDENTITY 列，H2/PG 均支持）。
+   *
+   * <p>2026-09-10（合并期修复）：显式 id 可能与**同 JVM 其它测试类**已建的 admin_users 行撞主键 （测试上下文共享同一个 H2
+   * 库，跨类不隔离）——调用场景要的是「控制台 sub 与某个 App 用户 id 数值相同」，所以先删掉该 id 上的既有控制台账号再插入；删除在测试的
+   * {@code @Transactional} 回滚范围内，不影响其它用例。
+   *
+   * <p>2026-09-14 合并说明（main ↔ sing-m3-hardening 各修过同一个 CI 两连红）：本类另有 {@link #nextFreeSharedId()}，取两表
+   * max(id) 之上的空闲 id 来**构造性**避免主键冲突。两者是**两层互补**的护栏， 保留两层是有意的、不是重复代码：调用方先取空闲 id，这里再兜一层 delete 以应对「该
+   * id 已被同 JVM 其它测试类占用」。
+   */
   private AdminUserEntityRow insertAdminWithExplicitId(Long id, String username, String roleCode) {
     var role = adminRoles.findByCode(roleCode).orElseThrow();
     String hash = passwordEncoder.encode(FIXTURE_PASSWORD);
     Instant now = Instant.now();
+    em.createNativeQuery("DELETE FROM admin_users WHERE id = :id")
+        .setParameter("id", id)
+        .executeUpdate();
     em.createNativeQuery(
             "INSERT INTO admin_users (id, username, display_name, password_hash, role_id, status,"
                 + " failed_attempts, token_epoch, created_at, updated_at)"

@@ -17,11 +17,11 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from app.audio.base import get_llm_client
-from app.audio.upload import validate_audio_bytes
+from app.audio.upload import resolve_media_type, validate_audio_bytes
 from app.console.trace.recorder import span, trace
 from app.core.auth import get_current_user_id
 from app.core.config import get_settings
-from app.core.ratelimit import bucket_limits, consume
+from app.core.ratelimit import bucket_limits, consume_all
 from app.core.response import BizError, ok
 from app.db import get_session_factory
 from app.models import Attempt, Report, ScenarioMessage
@@ -39,7 +39,10 @@ from app.practice.state import get_state_store
 router = APIRouter(prefix="/api/v1", tags=["practice"])
 logger = logging.getLogger("vocalverse")
 
-_SAFE_NAME = re.compile(r"^[0-9a-f]{32}\.mp3$")
+# 音频文件名白名单：用户录音（32 位 sha1 + 嗅探扩展名）+ 歌曲参考旋律（song_*.wav 等演示素材）；
+# 仅白名单字符 + 音频扩展名（防路径穿越；目录拼接用 Path(settings.audio_dir) / name）
+_SAFE_NAME = re.compile(r"^[0-9a-zA-Z_-]{1,64}\.(mp3|wav|m4a|ogg|webm)$")
+# 扩展名 → MIME 单一真源在 app/audio/upload.py（BUG-5：回放按内容嗅探优先）
 
 #: R-13 恢复端点回带最近消息条数（UI 重建够用；完整历史以 scenario_messages 为准）
 RESTORE_MESSAGES_LIMIT = 12
@@ -52,6 +55,7 @@ class SessionCreate(BaseModel):
     difficulty: int | None = None
     turn_limit: int | None = None
     shadow_material_id: int | None = None  # kind=shadow（DoD ④，2026-09-04）
+    song_id: int | None = None  # kind=sing（M3 唱歌 P0 D7；published+ready 校验 40905）
 
 
 @router.get("/scenarios")
@@ -111,6 +115,7 @@ async def post_session(
         difficulty=body.difficulty,
         turn_limit=body.turn_limit,
         shadow_material_id=body.shadow_material_id,
+        song_id=body.song_id,
     )
     return ok(
         {
@@ -302,12 +307,18 @@ async def post_turn(
     # - hint/demo（无音频轻分支零消耗；带音频走 LLM 段 → 仅 LLM 1）。
     limits = bucket_limits()
     if action in ("normal", "retry"):
-        await consume("asr", limits["asr"], user_id)
-        await consume("ise", limits["ise"], user_id)
-        await consume("llm", limits["llm"], user_id)
-    else:
-        if action not in ("hint", "demo") or audio is not None:
-            await consume("llm", limits["llm"], user_id)
+        # P1-13：三桶**一起扣**（`consume_all` 任一超限 → 全量回滚 + 429）；旧逐桶顺序扣会在
+        # ISE/LLM 桶超限时白扣前面的 ASR（用户重试被重复计费、额度被空转烧掉）
+        await consume_all(
+            [
+                ("asr", limits["asr"]),
+                ("ise", limits["ise"]),
+                ("llm", limits["llm"]),
+            ],
+            user_id,
+        )
+    elif action not in ("hint", "demo") or audio is not None:
+        await consume_all([("llm", limits["llm"])], user_id)
 
     orchestrator = get_orchestrator()
 
@@ -454,6 +465,80 @@ async def get_tts_audio(name: str, user_id: int = Depends(get_current_user_id)):
     )
 
 
+def _is_published_song_asset(name: str) -> bool:
+    """该音频名是否被「已发布歌曲」引用 → **平台素材**（公有领域参考旋律）。
+
+    素材与用户录音同处 `data/audio/`，但语义完全不同：素材属内容库（可重建、对全部登录
+    用户公开、生命周期 = 歌曲生命周期），用户录音属隐私数据（24h 保留 + 归属校验）。
+    二者必须在 **TTL 判定之前**分流——否则惰性清理会把素材当录音删掉（2026-09-10 BUG：
+    3 首 demo 参考旋律 age 24.7h，点一次「听参考旋律」即 410 + unlink）。
+    依据：docs/06 §8（音频存储与清理口径）、docs/06 §9.7（素材版权/保留）、docs/21 §2.1 op11。
+    """
+    from app.models import Song
+    from app.models.base import ContentStatus
+
+    db = get_session_factory()()
+    try:
+        return (
+            db.execute(
+                select(Song.id).where(
+                    Song.status == ContentStatus.PUBLISHED,
+                    Song.audio_url.like(f"%/{name}"),
+                )
+            ).first()
+            is not None
+        )
+    finally:
+        db.close()
+
+
+def _owned_by_user(name: str, user_id: int) -> bool:
+    """用户录音归属：attempts / scenario_messages / sing_attempts 任一引用即可。
+
+    （C-P1 补 SingAttempt：跟唱回放此前误 403——docs/singing/22 §4）
+    docs/19 P0-2：调用方走 to_thread（短事务，不阻塞事件循环；文件流不受影响）。
+    注意：**已发布歌曲素材的公开例外不在此处**——它在 TTL 之前由
+    :func:`_is_published_song_asset` 分流（放这里会重新被惰性清理误删）。
+    """
+    from app.models import SingAttempt
+
+    url = f"/api/v1/audio/{name}"
+    db = get_session_factory()()
+    try:
+        owned = (
+            db.execute(
+                select(Attempt.id).where(Attempt.audio_url == url, Attempt.user_id == user_id)
+            ).first()
+            or db.execute(
+                select(ScenarioMessage.id)
+                .join(DbSession, DbSession.id == ScenarioMessage.session_id)
+                .where(ScenarioMessage.audio_url == url, DbSession.user_id == user_id)
+            ).first()
+            or db.execute(
+                select(SingAttempt.id).where(
+                    SingAttempt.audio_url == url, SingAttempt.user_id == user_id
+                )
+            ).first()
+        )
+        return owned is not None
+    finally:
+        db.close()
+
+
+def _audio_stream(path: Path) -> StreamingResponse:
+    """音频回放流（MIME 按**内容嗅探**优先于扩展名，BUG-5）。"""
+
+    async def _file_stream():
+        with open(path, "rb") as f:
+            while chunk := f.read(64 * 1024):
+                yield chunk
+
+    media_type = resolve_media_type(_read_head(path), path.suffix.lstrip(".").lower())
+    return StreamingResponse(
+        _file_stream(), media_type=media_type, headers={"Cache-Control": "private, max-age=0"}
+    )
+
+
 @router.get("/audio/{name}")
 async def get_audio(
     name: str,
@@ -463,39 +548,36 @@ async def get_audio(
         raise BizError(http_status=400, code=40001, message="bad audio name")
     settings = get_settings()
     path = Path(settings.audio_dir) / name
+
+    # ① 平台素材优先分流（2026-09-10 修复）：已发布歌曲的参考旋律**不受用户音频 24h 保留期
+    #    约束，也绝不能被下面的惰性清理 unlink**。
+    #    修复前顺序是「TTL 判定 + unlink」→「归属（含歌曲豁免）」，于是素材一旦超过 24h，
+    #    第一次点「听参考旋律」就被物理删除（唱吧 demo 曲库不可逆损坏）。
+    #    依据：docs/06 §8 / §9.7、docs/21 §2.1 op11、worklog/BUG实测/参考旋律被24h过期删除.md
+    if await asyncio.to_thread(_is_published_song_asset, name):
+        if not path.exists():
+            # 素材缺失属服务端内容问题（可由 scripts/setup-assets.py 重建），不按"过期"语义返回
+            raise BizError(http_status=404, code=40401, message="audio asset missing")
+        return _audio_stream(path)
+
+    # ② 用户录音：24h 保留期 + 惰性清理（隐私口径不变，docs/06 §9.7）
     if not path.exists() or path.stat().st_mtime + settings.audio_ttl_hours * 3600 < time.time():
         if path.exists():
             path.unlink(missing_ok=True)  # 惰性清理
         raise BizError(http_status=410, code=41001, message="audio expired")
-    # 归属校验：attempts / scenario_messages 任一引用即可
-    # docs/19 P0-2：归属查询走 to_thread（短事务，不阻塞事件循环；文件流不受影响）
-    url = f"/api/v1/audio/{name}"
 
-    def _owns() -> bool:
-        db = get_session_factory()()
-        try:
-            owned = (
-                db.execute(
-                    select(Attempt.id).where(Attempt.audio_url == url, Attempt.user_id == user_id)
-                ).first()
-                or db.execute(
-                    select(ScenarioMessage.id)
-                    .join(DbSession, DbSession.id == ScenarioMessage.session_id)
-                    .where(ScenarioMessage.audio_url == url, DbSession.user_id == user_id)
-                ).first()
-            )
-            return owned is not None
-        finally:
-            db.close()
-
-    if not await asyncio.to_thread(_owns):
+    # ③ 归属校验：他人录音 → 403（越权口径不变）
+    if not await asyncio.to_thread(_owned_by_user, name, user_id):
         raise BizError(http_status=403, code=40301, message="not your audio")
 
-    async def _file_stream():
-        with open(path, "rb") as f:
-            while chunk := f.read(64 * 1024):
-                yield chunk
+    return _audio_stream(path)
 
-    return StreamingResponse(
-        _file_stream(), media_type="audio/mpeg", headers={"Cache-Control": "private, max-age=0"}
-    )
+
+def _read_head(path: Path, n: int = 64) -> bytes:
+    """读文件头若干字节用于容器嗅探（BUG-5：扩展名与内容可能不符——历史录音存成 .mp3
+    但内容是 WebM/Opus）；读失败 → b""（resolve_media_type 回落扩展名，不阻塞回放）。"""
+    try:
+        with open(path, "rb") as f:
+            return f.read(n)
+    except OSError:
+        return b""

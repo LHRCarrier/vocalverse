@@ -50,9 +50,10 @@ VocalVerse 面向不同年龄段英语学习者，产品形态 = **「练」+「
 ### 0. 先明确当前阶段能测什么
 
 - ✅ **能测**：注册/登录（Java JWT，演示账号 `demoadult`/`demoteen`/`demosenior`，密码 `demo123456`）→ 移动端全流程：**社区首页（S1 真实流：三领域 Tab + 为你推荐混排（含每日打卡卡）+ 发帖/评论/点赞/支持/分享，Java 社区接口）** → **口语**（先选场景 → 播放开场白 → 录音 ≤15s → 三维评分 + 语言点覆盖 + 教练笔记 → 8 轮收尾 → 评分报告）→ **AI 自由说**（麦克风或打字 → DeepSeek 流式 + TTS 播报）→ **英文小说阅读**（学习页「书房」→ 书架 → 书详情 → 阅读器：点词查义/生词本/划词批注/听书句级高亮/字号主题设置，docs/45；种子：`uv run python -m app.db.seed_reading`）→ **我的**；自定义答辩导师（粘贴论文 → AI 评委英文提问 → 等级反馈）；埋点 15 类事件；SSE 流式（音频为时间轴权威、文本字幕）。
+- ✅ **唱歌（M3 P0 · 2026-09-09 落地）**：`/m/sing` 唱吧全链路——选歌（参考旋律就绪门禁，未就绪/提取中/失败徽标）→ 整首跟唱（≤180s，保持前台；停止或 3min 自动收）→ 上传 → 异步评分（轮询 queued→processing→done|failed）→ 逐句音准/节奏/发音 + 综合（`0.5·音准+0.2·节奏+0.3·发音`）+ **D3 对齐图**（参考旋律线 + 用户曲线 + 逐句分柱）→ 报告（未评测句标注，发音=抽样句）。**演示曲目**：`python scripts/setup-assets.py` 合成 3 首公有领域童谣旋律（音频落 `data/audio/`，gitignored，不入库）→ Java `SongSeeder` 启动播种元数据/逐句 LRC → Python 离线 pyin 提取自动置 `pitch_ref_status=ready`（实测 6/4/4 句全部就绪）。**联调测试页**：`/preview/singing`（dev-only）。
 - ⏳ 真实语音链路需 `.env` 密钥（DeepSeek/讯飞）+ ffmpeg + whisper 模型；缺省时全链路走 Fake（`APP_TESTING=true`），联调冒烟脚本：`python scripts/poc/demo_smoke.py`。
 - ⏳ **听书引擎**：默认 edge（联网即可）；本地 KittenTTS（Apache-2.0 · CPU 实时 · 8 英文音色）可选启用——`services/python` 下 `uv sync --extra local-tts` + `.env` 置 `APP_VOICE_MODELS_DIR=<VoiceStudio 模型目录>`（模型权重不入库，docs/45 §5.1）。
-- ⏳ 唱吧/推荐/报表仍按 M3 排期推进；社区 S1 真实流已上线（发帖开关 `VOICEVERSE_COMMUNITY_POST_ENABLED=true` 演示开启、生产默认关）；**S2 关注 + 互动通知已真实化**（通知中心「通知/关注」两 tab = 真实流）；**私信 IM 已真实化**（会话列表/会话页/未读 + **SSE 长连实时推送**，弱网自动降级轮询；种子 `demoadult ↔ demoteen/demosenior`，docs/49）；搜索/嵌套楼/视频播放器（S3）后置。
+- ⏳ 推荐/报表仍按 M3 排期推进；社区 S1 真实流已上线（发帖开关 `VOICEVERSE_COMMUNITY_POST_ENABLED=true` 演示开启、生产默认关）；**S2 关注 + 互动通知已真实化**（通知中心「通知/关注」两 tab = 真实流）；**私信 IM 已真实化**（会话列表/会话页/未读 + **SSE 长连实时推送**，弱网自动降级轮询；种子 `demoadult ↔ demoteen/demosenior`，docs/49）；搜索/嵌套楼/视频播放器（S3）后置。
 
 ### 1. 一次性准备（工具链）
 
@@ -67,7 +68,7 @@ winget install ffmpeg          # 缺 ffmpeg 时（音频转码必需）
 
 ```powershell
 cd 仓库根目录
-Copy-Item .env.example .env    # 可选；不填也能起（占位符），但 AI 功能保持 stub
+Copy-Item .env.example .env    # **必须**：compose 对 POSTGRES_PASSWORD / JWT_SECRET 等显式必填（`:?required`），缺 .env 会直接报错；AI 功能密钥不填则保持 stub
 .\scripts\dev.ps1              # 构建并启动 5 个服务（首次较慢，见常见问题）
 ```
 
@@ -79,7 +80,7 @@ Copy-Item .env.example .env    # 可选；不填也能起（占位符），但 A
 | Python API 文档 | http://localhost:8000/docs | 可试 `POST /api/v1/asr`、`/tts`、`/score`、`/llm/chat`（返回 stub 结果） |
 | Python 健康检查 | http://localhost:8000/healthz 、/readyz | 返回 `{"status":"alive"}` / `code=0` |
 | Java API 文档 | http://localhost:8080/swagger-ui.html | `/actuator/health` 返回 UP |
-| 数据库 | localhost:5432 (PG) / 6379 (Redis) | 账号见根 `.env`（默认 vocalverse / vocalverse-dev） |
+| 数据库 | localhost:5432 (PG) / 6379 (Redis) | 账号见根 `.env` 的 `POSTGRES_USER` / `POSTGRES_PASSWORD`（compose 自 2026-09-14 起**无回退值**，必须先复制 `.env.example`） |
 
 停止：`docker compose down`（清数据加 `-v`）。
 
@@ -189,7 +190,7 @@ cd apps/mobile/android; .\gradlew.bat assembleDebug
 |---|---|
 | `docker compose` 报 `failed to connect to the docker API` | **Docker Desktop 没启动**：先启动 Docker Desktop 并等引擎就绪（任务栏鲸鱼图标转绿），再执行 compose |
 | `mvn spring-boot:run` 报 Hibernate `JdbcEnvironmentInitiator` / 数据库连接失败 | 方式 B 漏了起依赖：先 `docker compose up -d postgres redis` 且 `docker compose ps` 显示 healthy；若 Java 配置连的不是容器库，检查 `DB_HOST` 环境变量（默认 localhost:5432，见 `services/java` 的 `application.yml`） |
-| 启动日志含 `FATAL: password authentication failed for user "vocalverse"`（随后 `Unable to determine Dialect without JDBC metadata` 退出码 1） | **DB 密码失配**：Java 默认 `DB_PASSWORD=vocalverse-dev`，本机库实际密码必须与 compose 回退值一致——根 `.env` / `services/python/.env` / 本机 DB 三处同步（2026-09-04 实测处置：`ALTER USER ... PASSWORD 'vocalverse-dev'` 后三端恢复，见 `worklog/BUG实测/方式B-Java启动-DB密码失配.md`） |
+| 启动日志含 `FATAL: password authentication failed for user "vocalverse"`（随后 `Unable to determine Dialect without JDBC metadata` 退出码 1） | **DB 密码失配**：Java 默认 `DB_PASSWORD=vocalverse-dev`，本机库实际密码必须与根 `.env` 的 `POSTGRES_PASSWORD` 一致（compose 自 2026-09-14 起为显式必填、**无回退值**）——根 `.env` / `services/python/.env` / 本机 DB 三处同步（2026-09-04 实测处置：`ALTER USER ... PASSWORD 'vocalverse-dev'` 后三端恢复，见 `worklog/BUG实测/方式B-Java启动-DB密码失配.md`） |
 | 端口 8088/8000/8080 被占用 | `Get-NetTCPConnection -LocalPort <port> -State Listen` 找 PID 释放；或改 compose 的 ports 映射 |
 | Java 启动日志结尾报 `APPLICATION FAILED TO START ... Port 8080 was already in use` | **机器上已有 Java 实例在跑，别开第二个**（第一个是活的，不是服务挂了；2026-09-01 实测踩坑：第二个实例失败、第一个一直正常服务）。`Get-NetTCPConnection -LocalPort 8080 -State Listen` 找 PID 确认；要换新版本就 `taskkill /PID <pid> /F` 后再起 |
 | Java 启动日志显示 `using Java 24.x` / IDE 直接跑但端口被自己占 | **`JAVA_HOME` 设错**：项目钉死 JDK 21（docs/06 §3），以 Temurin 21 为准：`[Environment]::SetEnvironmentVariable('JAVA_HOME','C:\Program Files\Eclipse Adoptium\jdk-21.0.8.9-hotspot','User')` 后**重开终端**；`mvn -version` 显示 Java 21.0.x 即对齐。Java 24 跑 Spring Boot 3.3 当前能起但有一串 native-access 警告（未来版本会直接拦截）且与 CI 环境不一致 |
@@ -201,9 +202,11 @@ cd apps/mobile/android; .\gradlew.bat assembleDebug
 | Windows 长路径/编码问题 | `git config --global core.longpaths true`；`.gitattributes` 已强制 LF（.ps1/.bat 用 CRLF） |
 | Java 日志中文乱码（如「演示账号就绪」变「婕旂ず璐」） | 双重错位：① 编译期 pom 未声明编码（已钉 `project.build.sourceEncoding=UTF-8`，改 pom 后重新编译生效）；② 运行期终端码页——VSCode 终端先 `chcp 65001` 再起 Java，或 `mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"`（Java 18+ 生效）；Python/edge-tts 脚本同理：`$env:PYTHONIOENCODING='utf-8'` |
 | `.env` 忘记填密钥 | M1 不阻塞（占位符可起）；M2 起 DeepSeek/讯飞必须填，且严禁提交 `.env` |
-| seed/迁移报 `password authentication failed for user "vocalverse"` | **DB 密码与 compose 默认不一致**：`services/python/.env` 的 `APP_DATABASE_URL` 密码必须等于 `docker-compose.yml` 的 `${POSTGRES_PASSWORD:-vocalverse-dev}`（`.env.example` 默认已是 `vocalverse-dev`）；改密码需三处同步（compose 环境变量 / services/python/.env / 根 `.env` 的 `POSTGRES_PASSWORD`） |
+| seed/迁移报 `password authentication failed for user "vocalverse"` | **DB 密码与根 .env 不一致**：`services/python/.env` 的 `APP_DATABASE_URL` 密码必须等于根 `.env` 的 `POSTGRES_PASSWORD`（`.env.example` 的 dev 占位是 `vocalverse-dev`；compose 自 2026-09-14 起为 `${POSTGRES_PASSWORD:?…}` 显式必填、无回退值）；改密码需三处同步（services/python/.env / 根 `.env` 的 `POSTGRES_PASSWORD` / 本机 PG） |
 | `alembic` 命令不识别 | Windows 下 venv 不在 PATH：一律 `uv run alembic ...`（uv 前缀同样适用于 uvicorn/pytest） |
 | 8000 端口 `WinError 10013`（访问被拒） | 端口被占用（旧 uvicorn 实例等）：`Get-NetTCPConnection -LocalPort 8000 -State Listen` 找 PID 释放后再起 |
+| 唱吧里点「**听参考旋律**」没反应；网络面板 `GET /api/v1/audio/song_*.wav` 回 `{"code":40401,"message":"audio asset missing"}` | **裸跑下共享卷目录解析错位（A-G7 路径三义性）**：`APP_AUDIO_DIR` 默认 `./data/audio` 是**相对 cwd**，裸跑 cwd=`services/python` → 落到 `services/python/data/audio`（那里只有用户录音），素材却在**仓库根** `data/audio`（由 `scripts/setup-assets.py` 重建，音频不入库）。**不是曲库没数据源**——`select title,pitch_ref_status from songs` 若为 `ready` 就说明参考旋律已提取成功，纯属路径问题。处置：`scripts/dev-up.ps1` 现已自动注入该键；手工起 uvicorn 的把 `services/python/.env.example` 的 `APP_AUDIO_DIR=../../data/audio` 抄进自己的 `.env`。启动日志会打印实际解析到的绝对路径，可据此核对。归档：`worklog/BUG实测/参考旋律素材40401-裸跑音频目录错位.md` |
+| 容器里 Python 调 Java 全部 `Connection refused`（参考旋律提取完成却翻不了 ready、歌曲永久 **40905**；档位回写/打卡卡物化同样失败） | **内部委托地址在容器内指错了**：容器必须走服务名 `http://java-api:8080`，`localhost` 在容器内指容器自己。compose 已用 python-api 的 `environment.APP_JAVA_BASE_URL: ${APP_JAVA_BASE_URL_DOCKER:-http://java-api:8080}` 钉住服务名（`environment` 优先级高于 `env_file`，根 `.env` 的 `APP_JAVA_BASE_URL=…localhost…` 不会污染容器）。要让容器指向容器外的 Java，改 `APP_JAVA_BASE_URL_DOCKER`；裸跑时 Python 读的仍是 `APP_JAVA_BASE_URL`。实测归档：`worklog/BUG实测/容器内内部委托地址错-参考旋律门禁翻不了.md` |
 
 详细决策与约定见各服务 README 与 `docs/06-技术框架决策.md`。
 
@@ -277,6 +280,8 @@ worklog/          团队工作日志（主线 VocalVerse工作日志.md + App �
 | `docs/42-App功能说明书.md` | **App 功能说明书（全量汇总版）**：仿《万玄阁APP功能说明书》体例为一对一重写——第 0~21 章（产品概述/账号/社区/媒体处理/互动/推荐/资源库/商业化/支付/工具/我的/社交/推送/搜索/审核/合规/管理端/统计/体验/架构/数据库），逐章标注【已实现/排期中/远期/不做】；与 docx 同源（生成脚本 `local/gen_vv_spec.py`，产物 `local/VocalVerse声语界APP功能说明书.docx`） |
 | `docs/43-实训交付/` | **实训交付包（案例 #7 · 需求评审材料）**：`需求规格说明书.md`（F001~F009 编号需求，md-to-srs-docx 输入）、`需求调研.md`、`第1组_..._Software Requirement Specification_V1.0.docx`（8 章 SRS：封面/目录 + 用例图×10 + 活动图×5 全嵌入）、`uml/`（puml/png 图源）、`function_data.json`、`技术选型与架构说明.md`（实训选型对照 + 系统架构图）、`项目框架与P0开发说明.md`（三端框架/远程仓库/P0 完成对照） |
 | `docs/44-TTS链路整改计划.md` | **TTS 链路整改计划（对抗拷问产出 · 待评审稿）**：依据 `local/grill-voice-tts.json`（9 项 P0×3/P1×5/P2×1）+ 语音链路审计 V2.0；TTS 优先四类硬伤（句切分缩写/小数点当句号、单引擎无生命周期且 Azure 备胎零代码、文本零前处理、/tts 回 hex×2 且无响度归一）；P0-A~C（切分/生命周期/Azure 兜底）+ P1-A~E（文本归一/缓存/缺句上报/duration/输出封装+loudnorm/ssml-lite 语速停顿）+ P2（听读逐词时间轴）；每项给改动文件/做法（借鉴不拷代码，算法引上游 MIT 的 Patter/voicebox，依赖引 MIT `num2words`/ffmpeg/azure SDK）/验收（修复前必失败回归测试）/风险回退/建议 PR + 测试策略（CI 不打真 TTS/Azure，走纯函数+FakeTTSClient）+ 待评估项（crossfade/m4b/speech_rate/发音词典）+ 时间线 |
+| `docs/audit/唱歌onset检测评估-频谱起音vsF0起音.md` | **唱歌 onset 检测评估（口径 v3 item7 鲁棒性）**：频谱起音 vs F0 起音——6 类合成素材（含 ground truth）+ 6 段真实录音实测（BPM 误差均值 51.8 → 6.1 且消除 None）；三个反直觉结论（现状病根是精度非检出量 / F0 起音不能替代频谱起音（同音重复盲区）/ 必须在 BPM 层仲裁而非 onset 列表融合）+ 采纳方案 `combine_bpm`（八度校正）+ 风险控制（句窗口缩放 ratio clamp [0.67,1.5]）+ 已知边界；复现脚本 `scripts/poc/onset_eval.py` |
+| `docs/audit/唱歌模块复测报告-2026-09-10.md` | **唱歌模块全方面复测报告（P0/P1 修复后 · 真容器）**：四层测试矩阵（后端 487 passed / 前端 177 passed + build / 契约与迁移对账 / 容器 41 项检查全绿）；逐条容器级复核证据（P0-1 素材 TTL、P0-5 envelope、P1-3 唯一键、P1-11 长歌 12.3s、P1-13 桶回滚、P1-14 契约）；复测新发现并修复的两个缺陷（F2 容器内内部委托地址错 → 参考旋律门禁翻不了；F1 偏慢跟唱无节奏分 → 口径 v6 时间弯折 + 能量起唱判据）；已知边界与后续项；复现脚本 `scripts/sing_container_test.py` |
 | `docs/45-英文小说阅读功能设计.md` | **英文小说阅读（读书）功能设计（定稿 · 四官拷问后）**：定位（词汇速记落地主体）/用户路径 / 8 表数据模型（content_version 版本守卫/词形反向索引/批注偏移坐标系）/ 20 端点契约（45xxx 错误码）/ 听书 TTS（provider 链 edge+kitten、VoiceStudio jobs 模式借鉴、句级对齐）/ 前端 u-* 语义（书架/详情/阅读器/生词本 + 7 组件 + 5 composables）/ 种子（公版书 3 本 + ECDICT 子集）/ 测试与门禁 / 红线与后续登记 |
 | `docs/46-英文小说阅读拷问报告.md` | **读书功能四官拷问合流**：数据模型（V-1…V-20）/业务逻辑（B-1…B-22）/模块工程（M-1…M-18）/UI-UX（U-1…U-22）的裁决表（C-1…C-10：设计语言 u-*/词卡 sheet/桶 600·只扣真实合成/SSE 任务通道/联调页 A 落法等）+ 本地模型能力清单（KittenTTS mini 选为本地引擎；OmniVoice CC-BY-NC 禁商用等）+ VoiceStudio AGPL 红线注记 |
 | `docs/47-社区内容闭环（S3）实施设计.md` | **社区内容闭环 S3 实施设计（定稿 v2 · 六路拷问后）**：媒体上传（图/视频/头像）+ 帖子详情页 + 真实头像 + 社区正文划词查义；`media_assets` 迁移 0011（随机 `public_id` 对外 / 行级去重键 `(owner_id,sha256) WHERE ready` / 软删不动物理文件）+ `posts.media` jsonb 多图形状与 S1 向后兼容 + 3 新错误码（40403/41501/42205）+ Python `FileResponse` Range 读 + 前端 7 组件/2 页面/4 composable + 联调测试页与删除清单 |
@@ -291,7 +296,7 @@ worklog/          团队工作日志（主线 VocalVerse工作日志.md + App �
 1. **M1 骨架**（第 1 周）✅：本仓库脚手架 + 三端 CI + 语音三件套 stub 联调
 2. **M2 MVP**（第 2-3 周）✅：口语闭环（注册→入学测试→场景对话→录音→评分→建议→报告）+ 答辩导师
 3. **M2.5 移动端真形态** ✅：移动端五页重构 + **口语收敛**（场景对话「先选场景再开工」+ AI 自由说）+ **英语社区主页**（演示帧）+ 自由对话后端无状态接口（docs/14 §12）
-4. **M3 特色**（进行中）：唱歌评分做深（音准/节奏/发音）+ 推荐/报表演示化 + **社区真实流/学习画像/词汇速记（见上方演进方向）** + 四指标看板；（门禁）wav2vec2 微调
+4. **M3 特色**（进行中）：唱歌评分做深（**音准/节奏/发音 + D3 对齐图已落地 2026-09-09**）+ 推荐/报表演示化 + **社区真实流/学习画像/词汇速记（见上方演进方向）** + 四指标看板；（门禁）wav2vec2 微调
 5. **M4 联调**（第 6 周）：性能 p95 达标、演示脚本、答辩材料
 
 ## 红线（公开仓库）

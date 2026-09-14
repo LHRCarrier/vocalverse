@@ -56,6 +56,8 @@ export class VoiceRecorder {
   private startGen = 0
   /** 本次录音已被放弃：onstop 据此跳过 onStop（不上传、不推进题目） */
   private cancelled = false
+  /** 实时分析流（录音态非空；仅透传给实时音准线，不参与录音逻辑，docs/06 §9.4 注记） */
+  private _liveStream: MediaStream | null = null
 
   state: RecorderState = 'idle'
   onStateChange: ((state: RecorderState) => void) | null = null
@@ -64,6 +66,11 @@ export class VoiceRecorder {
   get supported(): boolean {
     // mediaDevices 只在「安全上下文」存在：手机端经 http://局域网IP 加载时它可能为 undefined
     return typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
+  }
+
+  /** 同一麦克风流：录音 + 实时分析共用（LivePitchChart 经 useSingPlay.getLiveStream 取用） */
+  get liveStream(): MediaStream | null {
+    return this._liveStream
   }
 
   async start(maxMs: number = MAX_RECORD_MS): Promise<void> {
@@ -100,6 +107,7 @@ export class VoiceRecorder {
         const blob = new Blob(this.chunks, { type: mime })
         const durationMs = this.recordedMs
         activeStream.getTracks().forEach((t) => t.stop())
+        this._liveStream = null
         if (this.cancelled) {
           // 放弃的录音：回到 idle，不触发 onStop（调用方不会上传）
           this.cancelled = false
@@ -113,6 +121,7 @@ export class VoiceRecorder {
       this.recordedMs = 0
       this.recordStart = Date.now()
       this.recorder.start()
+      this._liveStream = activeStream
       this.setState('recording')
 
       // 自动停止：按场景传入（对话 15s / 唱歌 180s / 默认 60s——docs/14 §3.2）
@@ -121,6 +130,7 @@ export class VoiceRecorder {
       // 权限被拒 / 无麦克风 / 无可用 mime：释放已拿到的轨道并进入 error 态。
       // 必须发出状态变更，否则「乐观置位」的调用方永远等不到复位信号 → 按钮卡死。
       stream?.getTracks().forEach((t) => t.stop())
+      this._liveStream = null
       this.recorder = null
       this.setState('error')
       throw e
