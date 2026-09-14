@@ -97,6 +97,16 @@ if (-not $env:APP_ASR_MODEL -and (Test-Path $ModelSnapshotRoot)) {
     if ($snap) { $env:APP_ASR_MODEL = $snap.FullName }
 }
 
+# 共享卷目录（2026-09-14 修复 · A-G7「路径三义性」）：`audio_dir` / `media_dir` 的默认值是
+# `./data/audio` / `./data/media`，**按进程 cwd 解析**；而裸跑的 cwd 是 services/python
+# → 解析到 services/python/data/audio（那里只有用户录音），素材却在**仓库根** data/audio
+# → 已发布歌曲的参考旋律找不到，`GET /api/v1/audio/{name}` 直接 40401「audio asset missing」。
+# 症状极具误导性：前端只表现为「听参考旋律**点了没反应**」，看着像「曲库没素材」而不是「配置错」
+# （2026-09-14 实测，排查成本高）。容器不受影响（WORKDIR /app + 挂载卷，相对路径恰好对）。
+# 与 APP_ASR_MODEL 同款 setdefault 语义：仅未显式设置时注入。
+if (-not $env:APP_AUDIO_DIR) { $env:APP_AUDIO_DIR = Join-Path $Root "data\audio" }
+if (-not $env:APP_MEDIA_DIR) { $env:APP_MEDIA_DIR = Join-Path $Root "data\media" }
+
 # 根 .env 注入（2026-09-07 部署踩坑：Java application.yml 用 `${JWT_SECRET:}`，方式 B 本地
 # 的 Maven 子进程不读 .env —— 无键时 JwtService P0-9 fail-fast 拒绝启动（8080 起不来），
 # 而 Python 侧 pydantic-settings 自己读 .env 故不受影响）。setdefault 语义：仅未显式设置时注入。

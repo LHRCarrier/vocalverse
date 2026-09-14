@@ -1,0 +1,126 @@
+{
+  "note": "演示曲目元数据（旋律/歌词公有领域，演奏为本脚本合成 → source=original）；音频不入库，由 scripts/setup-assets.py 确定性重建到 data/audio/。",
+  "songs": [
+    {
+      "title": "Twinkle Twinkle Little Star",
+      "artist": "Traditional · 合成旋律（公有领域童谣）",
+      "level": 1,
+      "duration_s": 30,
+      "bpm": 100.0,
+      "musical_key": "C",
+      "audio_url": "/data/audio/song_twinkle.wav",
+      "vocal_ref_url": null,
+      "lrc_url": "/data/seed/lrc/twinkle.lrc",
+      "cover_url": null,
+      "interest_tags": "[\"nursery\", \"classic\"]",
+      "source": "original",
+      "status": "published",
+      "lines": [
+        {
+          "offset_ms": 0,
+          "end_offset_ms": 4940,
+          "text": "Twinkle, twinkle, little star,"
+        },
+        {
+          "offset_ms": 4940,
+          "end_offset_ms": 9880,
+          "text": "How I wonder what you are."
+        },
+        {
+          "offset_ms": 9880,
+          "end_offset_ms": 14820,
+          "text": "Up above the world so high,"
+        },
+        {
+          "offset_ms": 14820,
+          "end_offset_ms": 19760,
+          "text": "Like a diamond in the sky."
+        },
+        {
+          "offset_ms": 19760,
+          "end_offset_ms": 24700,
+          "text": "Twinkle, twinkle, little star,"
+        },
+        {
+          "offset_ms": 24700,
+          "end_offset_ms": 29640,
+          "text": "How I wonder what you are."
+        }
+      ]
+    },
+    {
+      "title": "Ode to Joy",
+      "artist": "Beethoven · 合成旋律（公有领域主题）",
+      "level": 2,
+      "duration_s": 20,
+      "bpm": 100.0,
+      "musical_key": "C",
+      "audio_url": "/data/audio/song_ode_to_joy.wav",
+      "vocal_ref_url": null,
+      "lrc_url": "/data/seed/lrc/ode-to-joy.lrc",
+      "cover_url": null,
+      "interest_tags": "[\"classic\", \"anthem\"]",
+      "source": "original",
+      "status": "published",
+      "lines": [
+        {
+          "offset_ms": 0,
+          "end_offset_ms": 4960,
+          "text": "Joy, bright spark of divinity,"
+        },
+        {
+          "offset_ms": 4960,
+          "end_offset_ms": 9900,
+          "text": "Daughter of Elysium,"
+        },
+        {
+          "offset_ms": 9900,
+          "end_offset_ms": 14860,
+          "text": "Fire-inspired we tread"
+        },
+        {
+          "offset_ms": 14860,
+          "end_offset_ms": 19800,
+          "text": "Thy sanctuary."
+        }
+      ]
+    },
+    {
+      "title": "Mary Had a Little Lamb",
+      "artist": "Traditional · 合成旋律（公有领域童谣）",
+      "level": 1,
+      "duration_s": 20,
+      "bpm": 100.0,
+      "musical_key": "C",
+      "audio_url": "/data/audio/song_mary_lamb.wav",
+      "vocal_ref_url": null,
+      "lrc_url": "/data/seed/lrc/mary-lamb.lrc",
+      "cover_url": null,
+      "interest_tags": "[\"nursery\", \"easy\"]",
+      "source": "original",
+      "status": "published",
+      "lines": [
+        {
+          "offset_ms": 0,
+          "end_offset_ms": 4940,
+          "text": "Mary had a little lamb,"
+        },
+        {
+          "offset_ms": 4940,
+          "end_offset_ms": 9860,
+          "text": "Its fleece was white as snow."
+        },
+        {
+          "offset_ms": 9860,
+          "end_offset_ms": 14820,
+          "text": "And everywhere that Mary went,"
+        },
+        {
+          "offset_ms": 14820,
+          "end_offset_ms": 19720,
+          "text": "The lamb was sure to go."
+        }
+      ]
+    }
+  ]
+}

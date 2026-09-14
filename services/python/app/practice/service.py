@@ -54,6 +54,7 @@ async def create_session(
     difficulty: int | None,
     turn_limit: int | None,
     shadow_material_id: int | None = None,
+    song_id: int | None = None,
 ) -> DbSession:
     """docs/19 P0-2：同步 DB 写入收进 to_thread 短事务（async 上下文不阻塞事件循环）。"""
     session, state, warm_texts = await asyncio.to_thread(
@@ -65,8 +66,10 @@ async def create_session(
         difficulty,
         turn_limit,
         shadow_material_id,
+        song_id,
     )
-    await get_state_store().put(state)
+    if state is not None:  # sing 无对话运行时状态（异步评分任务态在 sing/service，M3 P0 D6）
+        await get_state_store().put(state)
     # 预合成预热（docs/06 §8「开场/常用句预合成」）：已知文本后台写入 TTS 缓存——
     # 进场景点「播放开场白/听示范」0ms 命中；fire-and-forget，不阻塞建会话响应
     schedule_texts_warm(warm_texts)
@@ -81,7 +84,8 @@ def _create_session_sync(
     difficulty: int | None,
     turn_limit: int | None,
     shadow_material_id: int | None = None,
-) -> tuple[DbSession, SessionState, list[str]]:
+    song_id: int | None = None,
+) -> tuple[DbSession, SessionState | None, list[str]]:
     """同步实现（线程池内执行）：建会话 + 开场白落库，返回三元组供异步侧调度。"""
     db = get_session_factory()()
     scenario = None  # dialog 分支赋值；defense/shadow 为 None（2026-09-04 修复未曾覆盖的
@@ -108,6 +112,27 @@ def _create_session_sync(
             if not sentences:
                 raise HTTPException(status_code=409, detail="shadow material has no sentences")
             assigned = turn_limit or len(sentences)
+        elif kind == SessionKinds.SING:
+            # 唱歌会话（M3 P0 D7）：song 必填 + published + 参考旋律 ready（40905）
+            from app.core.response import BizError
+            from app.models import Lrc, Song
+            from app.models.base import ContentStatus, PitchRefStatus
+
+            song = db.get(Song, song_id) if song_id else None
+            if song is None or song.status != ContentStatus.PUBLISHED:
+                raise HTTPException(status_code=404, detail="song not found")
+            if song.pitch_ref_status != PitchRefStatus.READY:
+                raise BizError(
+                    http_status=409,
+                    code=40905,
+                    message=f"reference pitch not ready (status={song.pitch_ref_status})",
+                )
+            line_count = len(
+                list(db.execute(select(Lrc.id).where(Lrc.song_id == song.id)).scalars())
+            )
+            if line_count == 0:
+                raise HTTPException(status_code=409, detail="song has no lrc")
+            assigned = turn_limit or line_count
         else:
             raise HTTPException(status_code=400, detail="unsupported kind")
 
@@ -117,12 +142,18 @@ def _create_session_sync(
             scenario_id=scenario_id,
             profile_id=profile_id,
             shadow_material_id=shadow_material_id,
+            song_id=song_id,
             status=SessionStatus.ACTIVE,
             assigned_turns=assigned,  # defense：设定题数快照（docs/18 实现决策）
             channel="web",
         )
         db.add(session)
         db.flush()
+
+        if kind == SessionKinds.SING:
+            # 唱歌无对话运行时状态（评分任务态见 sing/service：Redis+内存兜底）
+            db.commit()
+            return session, None, []
 
         state = SessionState(
             session_id=session.id,
