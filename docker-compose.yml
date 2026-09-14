@@ -76,6 +76,10 @@ services:
       # 媒体卷（社区 S3 · docs/47 §4.1）：缺卷时容器重建 → DB 行指向已消失文件 → 全部 404
       # （docs/48 B10）
       - ./data/media:/app/data/media
+      # seed 资产（2026-09-14）：读书域书封图走 `GET /api/v1/reading/covers/{name}`，从
+      # `data/seed/covers/` 读（随仓库分发的**公版**图，`.gitignore` 豁免 `data/seed/**`）。
+      # 只读挂载；migrate 服务已挂同名卷（书正文 JSON 亦在此）。
+      - ./data/seed:/app/data/seed:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,7 +99,14 @@ services:
     env_file:
       - path: .env
         required: false
-    command: ["sh", "-c", "uv run alembic upgrade head && uv run python -m app.db.seed"]
+    # 2026-09-14：补 `app.db.seed_reading`。此前 compose 只播 scenarios/placement，
+    # **读书域（books + 词典）从来没被播过** → 容器形态下书房是空的、查词必定查不到
+    # （本地之所以"有书"是因为开发时手工跑过 `-m app.db.seed_reading`，掩盖了这个缺口）。
+    # 两个 seed 都是幂等（自然键判重），重复执行安全。
+    command:
+      - "sh"
+      - "-c"
+      - "uv run alembic upgrade head && uv run python -m app.db.seed && uv run python -m app.db.seed_reading"
     volumes:
       # seed 数据在仓库根 data/seed（构建上下文仅 services/python，镜像内无）——挂载供容器内播种
       - ./data/seed:/app/data/seed

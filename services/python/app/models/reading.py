@@ -56,6 +56,10 @@ class Book(TimestampMixin, Base):
     )
     cover_color: Mapped[str | None] = mapped_column(String(16))
     cover_emoji: Mapped[str | None] = mapped_column(String(8))
+    # 书封图（2026-09-14）：站点相对路径（如 `/api/v1/reading/covers/don-quixote.jpg`）或外链；
+    # NULL = 回退到 cover_color + cover_emoji 的合成封面（历史三本保持原样）。
+    # 图片本体是**公版**资产，随仓库分发在 `data/seed/covers/`（只读；见 app/core/paths.py）。
+    cover_url: Mapped[str | None] = mapped_column(String(512))
     word_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     chapter_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     status: Mapped[str] = mapped_column(

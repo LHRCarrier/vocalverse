@@ -33,8 +33,13 @@ try:
 except IndexError:
     REPO_ROOT = Path("/app")  # 容器回退（seed.py 同款，2026-09-04 修复口径）
 
-BOOKS_SEED = REPO_ROOT / "data" / "seed" / "reading_books.json"
-DICT_SEED = REPO_ROOT / "data" / "seed" / "ecdict_subset.csv"
+# 2026-09-14：上面 `parents[4]` 的容器分支**实际触发不了**（`/app/app/db/` 的 parents[4] 是 `/`
+# 而不是 IndexError）→ 容器内会去找 `/data/seed/...` 而挂载点在 `/app/data/seed`。
+# 改用向上找标记目录的 `paths.seed_dir()`（裸跑/容器同口径，见 app/core/paths.py）。
+from app.core.paths import seed_dir  # noqa: E402
+
+BOOKS_SEED = seed_dir() / "reading_books.json"
+DICT_SEED = seed_dir() / "ecdict_subset.csv"
 
 #: exchange 键 → 词形类型（ECDICT：p 过去式 / d 过去分词 / i 现在分词 / 3 三单 /
 #: r 比较级 / t 最高级 / s 复数）
@@ -68,6 +73,7 @@ def seed_books(session) -> int:
                 source="public_domain",
                 cover_color=spec.get("cover_color"),
                 cover_emoji=spec.get("cover_emoji"),
+                cover_url=spec.get("cover_url"),
                 word_count=spec.get("word_count", 0),
                 chapter_count=len(spec.get("chapters", [])),
             )

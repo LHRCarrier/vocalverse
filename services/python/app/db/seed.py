@@ -15,22 +15,18 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
 
 from sqlalchemy import select
 
+from app.core.paths import seed_dir
 from app.db import get_session_factory
 from app.models import PlacementQuestion, Scenario
 
-try:
-    REPO_ROOT = Path(__file__).resolve().parents[4]  # 本地：services/python/app/db/seed.py → 仓库根
-except IndexError:
-    # 容器（WORKDIR /app + COPY . . → /app/app/db/seed.py，仅 4 级父目录，无「仓库根」）：
-    # seed 数据由 compose migrate 挂载 ./data/seed:/app/data/seed（2026-09-04 方式A 实测：
-    # parents[4] 越界抛 IndexError —— 与 PR#27 main.py 同类容器路径假设，一并修复）
-    REPO_ROOT = Path("/app")
-
-SCENARIOS_SEED = REPO_ROOT / "data" / "seed" / "scenarios.json"
+# 2026-09-14：原先用 `parents[4]` + `except IndexError` 兜容器，但**容器分支实际触发不了** ——
+# `/app/app/db/seed.py` 的 `parents[4]` 是 `/`（根目录的父目录还是自己），不会抛 IndexError，
+# 于是容器内去找 `/data/seed/scenarios.json`，而挂载点是 `/app/data/seed` → 播种被静默跳过。
+# 改用向上找标记目录的 `paths.seed_dir()`（裸跑/容器同口径，见 app/core/paths.py）。
+SCENARIOS_SEED = seed_dir() / "scenarios.json"
 
 # 入学测试题库（docs/06 §9.2：5 条固定朗读句 + 1 轮 QA；演示可复现）
 PLACEMENT_QUESTIONS = [

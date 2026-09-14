@@ -10,15 +10,19 @@
 from __future__ import annotations
 
 import asyncio
+import mimetypes
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.core.auth import get_current_user_id
+from app.core.paths import book_cover_dir
 from app.core.response import BizError, Envelope, ok
 from app.db import get_session_factory
 from app.models import BookChapter, DictionaryEntry
@@ -63,6 +67,8 @@ class BookView(BaseModel):
     level: str
     cover_color: str | None = None
     cover_emoji: str | None = None
+    # 真实封面图（2026-09-14）：站点相对路径；NULL → 前端回退 cover_color + cover_emoji
+    cover_url: str | None = None
     word_count: int
     chapter_count: int
     progress: ProgressView | None = None
@@ -230,6 +236,38 @@ async def book_detail(
     if detail is None:
         raise BizError(404, 45001, "book not found")
     return ok(detail)
+
+
+#: 书封文件名白名单（与 practice.py 音频回放同款安全口径：只允许字母数字 . _ -，防目录穿越）
+_SAFE_COVER_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+@router.get(
+    "/covers/{name}",
+    response_class=FileResponse,
+    # 声明真实响应体：不写的话 OpenAPI 会按默认的 `application/json` + 空 schema 出契约，
+    # 而这里实际回的是图片二进制（与 practice.py `/audio/{name}` 的历史口径一致地"更准"）。
+    responses={200: {"description": "封面图文件（image/*）", "content": {"image/*": {}}}},
+)
+async def book_cover(name: str) -> FileResponse:
+    """书封图（**公开**端点，无鉴权）。
+
+    为什么公开：书封是**非隐私的公版内容资产**，且 `<img src>` 不会带 Authorization 头 ——
+    若加鉴权，前端只能退回 fetch+blob（多一层内存与生命周期负担）。风险面被三重收窄：
+    只读、只服务 `data/seed/covers/` 白名单文件名、目录穿越由 `_SAFE_COVER_NAME` 挡掉。
+
+    资产位置：`data/seed/covers/`（随仓库分发，`.gitignore` 已豁免 `data/seed/**`）——
+    与 `books` 同属"内容域静态资产"，与用户上传的 `data/media/`（私有卷）刻意分开。
+    """
+    if not _SAFE_COVER_NAME.match(name) or ".." in name:
+        raise BizError(400, 40001, "bad cover name")
+    path = book_cover_dir() / name
+    if not path.is_file():
+        raise BizError(404, 40401, f"book cover missing: {name}")
+    media_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    return FileResponse(
+        path, media_type=media_type, headers={"Cache-Control": "public, max-age=86400"}
+    )
 
 
 @router.get("/chapters/{chapter_id}", response_model=Envelope[ChapterView])

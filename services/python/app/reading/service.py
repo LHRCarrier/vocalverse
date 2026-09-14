@@ -94,6 +94,7 @@ def list_books(
                 "level": b.level,
                 "cover_color": b.cover_color,
                 "cover_emoji": b.cover_emoji,
+                "cover_url": b.cover_url,
                 "word_count": b.word_count,
                 "chapter_count": b.chapter_count,
                 "progress": (
@@ -147,6 +148,7 @@ def get_book_detail(session: Session, user_id: int, book_id: int) -> dict[str, A
         "level": book.level,
         "cover_color": book.cover_color,
         "cover_emoji": book.cover_emoji,
+        "cover_url": book.cover_url,
         "word_count": book.word_count,
         "chapter_count": book.chapter_count,
         "progress": (
