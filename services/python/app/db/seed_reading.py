@@ -49,9 +49,6 @@ def _count_words(text: str) -> int:
 
 def seed_books(session) -> int:
     """书 + 章节（自然键 (title, author) 与 (book_id, chapter_no) 幂等）。"""
-    if not BOOKS_SEED.exists():
-        print(f"[seed_reading] 跳过书：缺 {BOOKS_SEED}")
-        return 0
     data = json.loads(BOOKS_SEED.read_text(encoding="utf-8"))
     created = 0
     for spec in data:
@@ -119,9 +116,6 @@ def _parse_exchange(raw: str | None) -> dict[str, str] | None:
 
 def seed_dictionary(session) -> int:
     """词典子集（word 唯一幂等；forms 由 exchange 派生幂等）。"""
-    if not DICT_SEED.exists():
-        print(f"[seed_reading] 跳过词典：缺 {DICT_SEED}")
-        return 0
     created = 0
     with DICT_SEED.open(encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
@@ -183,6 +177,23 @@ def seed_dictionary(session) -> int:
 
 
 def main() -> int:
+    # 缺种子文件必须**失败退出**，不能只打印一行"跳过"然后 exit 0 ——
+    # 那等于「零数据却报成功」：CI/脚本按退出码判断会误判为已播种。
+    # 2026-09-13 实测：在**没挂** ./data/seed 卷的 python-api 容器里跑，
+    # 打印「跳过书：缺 /app/data/seed/reading_books.json」但退出码为 0，
+    # books 表仍是 0 行 —— 与"真的播成功"完全无法区分。
+    # （compose 的 migrate 服务已挂 ./data/seed:/app/data/seed，正常路径不受影响。）
+    missing = [path for path in (BOOKS_SEED, DICT_SEED) if not path.exists()]
+    if missing:
+        for path in missing:
+            print(f"[seed_reading] 缺种子文件：{path}", file=sys.stderr)
+        print(
+            "[seed_reading] 种子文件位于仓库根 data/seed/；容器内需挂载该目录"
+            "（compose migrate 服务：./data/seed:/app/data/seed）。"
+            "拒绝以 0 退出，避免「没播到」被当成「播成功」。",
+            file=sys.stderr,
+        )
+        return 1
     with get_session_factory()() as session:
         seed_books(session)
         seed_dictionary(session)
