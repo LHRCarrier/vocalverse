@@ -4,7 +4,21 @@
  * - 整章预合成为 SSE 流（openSseFetch + FormData；事件类型见 ReadingStreamEvent）。
  */
 import { openSseFetch } from '@/audio/sse'
-import { loadAudioBlob, request } from '@/api/client'
+import { PYTHON_BASE, loadAudioBlob, request } from '@/api/client'
+
+/**
+ * 书封地址 → 可直接给 `<img src>` 用的地址（幂等；2026-09-14）。
+ *
+ * 为什么必须补 `PYTHON_BASE`：后端 `books.cover_url` 是**站点相对路径**
+ * （`/api/v1/reading/covers/x.jpg`）。Web 端（dev 走 Vite 代理、容器走 nginx）页面源即后端源，
+ * 相对路径没问题；但**打包壳**页面源是 `https://localhost`、后端在 `http://localhost:8000`
+ * ——直接用相对路径会把图片打到壳自身的资源服务器上 404（与 `mediaUrl()` 同理，docs/48 B5）。
+ */
+export function bookCoverUrl(path: string | null | undefined): string {
+  if (!path) return ''
+  if (/^(https?:|blob:|data:)/i.test(path)) return path
+  return `${PYTHON_BASE}${path.startsWith('/') ? path : `/${path}`}`
+}
 
 export interface ReadingProgress {
   chapter_id: number
@@ -21,6 +35,8 @@ export interface ReadingBook {
   level: string
   cover_color?: string | null
   cover_emoji?: string | null
+  /** 真实封面图（站点相对路径；空 = 用 cover_color + cover_emoji 的合成封面） */
+  cover_url?: string | null
   word_count: number
   chapter_count: number
   progress?: ReadingProgress | null

@@ -77,6 +77,7 @@ function chapterLabel(no: number): string {
                 :author="book.author"
                 :color="book.cover_color"
                 :emoji="book.cover_emoji"
+                :cover="book.cover_url"
               />
             </div>
             <div class="u-bd__meta">

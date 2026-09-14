@@ -20,6 +20,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import MobileBookCover from '@/components/mobile/MobileBookCover.vue'
 import { fetchBooks, fetchBookDetail, lookupWord } from '@/api/reading'
 import '@/styles/mobile-uic.css'
 import '@/styles/reader-uic.css'
@@ -77,6 +78,25 @@ async function doLookup() {
           <span class="u-bd__chapter-no">{{ b.id }}</span>
           <span class="u-bd__chapter-title">{{ b.title }} · {{ b.author }}</span>
         </button>
+      </section>
+
+      <section v-if="books.length" class="u-bd__chapters">
+        <p class="u-learn-detail__sub">
+          ①′ 书封面（2026-09-14 新增）：`books.cover_url` 非空 → 走
+          `GET /reading/covers/{name}` 渲染真图；为空 → 回退色块 + emoji 合成封面
+        </p>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap">
+          <div v-for="b in books" :key="b.id" style="width: 92px">
+            <MobileBookCover
+              :title="b.title"
+              :author="b.author"
+              :color="b.cover_color"
+              :emoji="b.cover_emoji"
+              :cover="b.cover_url"
+            />
+            <p class="u-vb__count">{{ b.cover_url ? '真实封面图' : '合成封面' }}</p>
+          </div>
+        </div>
       </section>
 
       <section v-if="detail" class="u-bd__chapters">

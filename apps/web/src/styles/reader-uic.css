@@ -572,6 +572,17 @@
   line-height: 1;
 }
 
+/* 真实封面图（2026-09-14）：铺满封面框。`aspect-ratio` 已由 .u-bs-card__cover 定死，
+   故 img 撑满即可；`object-fit: cover` 让不同长宽比的公版封面都不变形。
+   注意 padding 归属：图要盖满整个圆角框，故用负 margin 抵消父级 padding。 */
+.u-bs-card__img {
+  display: block;
+  width: calc(100% + 24px);
+  height: calc(100% + 28px);
+  margin: -14px -12px;
+  object-fit: cover;
+}
+
 .u-bs-card__title {
   display: block;
   margin-top: 10px;

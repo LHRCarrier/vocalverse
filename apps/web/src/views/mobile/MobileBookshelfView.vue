@@ -77,6 +77,7 @@ function pct(progress: { char_offset: number; content_version: number } | null |
             :author="book.author"
             :color="book.cover_color"
             :emoji="book.cover_emoji"
+            :cover="book.cover_url"
           />
           <span v-if="book.progress" class="u-bs-card__track" aria-hidden="true">
             <span class="u-bs-card__fill" :style="{ width: `${pct(book.progress)}%` }" />
