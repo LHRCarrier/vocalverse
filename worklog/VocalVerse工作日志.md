@@ -3,6 +3,20 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-14 书封真实图片支持（迁移 0017）+ 导入公版书《堂吉诃德》· 4 op
+
+- **背景**：演示需要"书架上是一本本真书"，而读书域此前**只有合成封面**（`cover_color` + `cover_emoji`，前端渲染色块 + emoji），`books` 表没有 `cover_url`（`songs` 早就有）。组长拍板：加真实封面图支持。**UI 部分见安卓日志同日条目**（本条只记后端/迁移/契约/数据）。
+- **版权口径（重要）**：需求方原本点名《百年孤独》英译本。**未采纳**——马尔克斯 2014 年卒（保护期 life+70），Rabassa 1970 英译另行受版权保护，全球无合法免费全文；复制整部长篇不属"合理使用"，且本仓 `data/seed/reading_books.json` 是**入库文件**（公开仓库），`books` 表自带 `source IN ('public_domain','original','demo_only')` CHECK、实体注释写明"公版书"，现有三本全公版。改用**公版**且同为西语文学谱系的 **《堂吉诃德》(Don Quixote)**：Cervantes 卒于 1616、Ormsby 英译 1885，两者均已进入公有领域。
+- **数据导入（真取，非手写）**：从 Project Gutenberg **#996** 取纯文本（2.39 MB）与 EPUB3 内的高清封面（1274×1650 / 236 KB，19 世纪烫金装帧图），解析出 **Part I 52 章 / 197,318 词 / 1,806 段**（章号连续、无空章），追加进 `data/seed/reading_books.json`（934 KB → 1.92 MB；formatting 逐字节 round-trip 一致，零伪 diff）；封面落 `data/seed/covers/don-quixote.jpg`（公版资产，`.gitignore` 已豁免 `data/seed/**`）。原始文本/解析脚本留在 `local/don-quixote/`（gitignored）。**未取 Part II**（另 74 章），需要可再补。
+- **后端改动**：① 迁移 **0017** `books.cover_url`（String(512) 可空，NULL = 前端回退合成封面，历史三本零行为变化）；② 新增 `GET /api/v1/reading/covers/{name}` —— **公开**端点（`<img src>` 不带 Authorization，加鉴权只会逼前端走 fetch+blob），白名单文件名 `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` + 只读 `data/seed/covers/`，缺图回 envelope 40401（不是框架的 `{"detail":...}`）；③ `BookView.cover_url` 入 DTO，契约快照 +50 行、`pnpm gen:api` 重生成；④ compose：python-api 补挂 `./data/seed:ro`。
+- **顺带修掉两个「本地能跑、容器必错」的路径隐患**：新增 `app/core/paths.py`（**向上找含 `data/seed` 的祖先**定仓库根，容器回退 `/app`），替换 `seed.py` / `seed_reading.py` 里的 `parents[4]`。原写法的 `except IndexError` **在容器里根本触发不了**（`/app/app/db/seed.py` 的 `parents[4]` 是 `/`）→ 容器会去找 `/data/seed/...` 而挂载点在 `/app/data/seed`。**并且 compose 的 migrate 只跑了 `app.db.seed`，读书域（books + 词典）从来没被播过** —— 容器形态下书房是空的、查词必查不到；已把 `app.db.seed_reading` 补进 migrate 命令（两者都幂等）。
+- **本机实跑（真 PG / 真服务，经 Vite :5173 前端实际链路）**：书架 4 本（Don Quixote `cover_url` 已透出）；`GET /api/v1/reading/covers/don-quixote.jpg` → **200 / image/jpeg / 236,364 B**；书详情 52 章、首章标题正确；词典播种 **10,612 条**（adventure / giant 查得到）。
+- **门禁**：Python `ruff` 绿 + `pytest` **665 passed**（+9 例）；前端 `lint` / `typecheck` / `test:run` **292 passed (49 files)** / `build` / `check-bundle` 全绿；8 份 workflow + compose + application.yml `yaml.safe_load` 通过；契约快照 == `app.openapi()`（**+50 行，零伪 diff**）。
+- **踩坑**：① **`refresh-openapi.ps1` 对 Python 侧也会写紧凑格式**（`Invoke-WebRequest.Content` 是单行 JSON），照着跑会把 8,444 行美化快照压成 1 行 —— 正确做法是从进程内 `app.openapi()` 用 `json.dumps(..., ensure_ascii=False, indent=2)` 写（已登记工具缺陷，本轮先手工规避）；② **给组件新增 import 会打穿所有 `vi.mock('@/api/reading')` 的桩件**——`MobileBookCover` 引入 `bookCoverUrl` 后，`MobileReadingBack.test.ts` 的桩缺该导出，组件 setup 抛 `No "bookCoverUrl" export is defined on the mock`，表现为**三个无关用例红**（不是断言错，是导入错）；③ 未收录词是**子集口径**不是 bug：`ecdict_subset.csv` 仅 1.06 万条，`knight`/`windmill` 查不到、`adventure`/`giant` 查得到 —— 演示时挑常见词，别拿专名试。
+- **产出**：`app/core/paths.py`、`alembic/versions/0017_book_cover_url.py`、`models/reading.py`、`db/seed.py`、`db/seed_reading.py`、`reading/service.py`、`api/routes/reading.py`、`docker-compose.yml`、契约快照与生成类型、`data/seed/reading_books.json`（+《堂吉诃德》）、`data/seed/covers/don-quixote.jpg`、`tests/test_reading_routes.py`（+7 例）、`docs/10` 表清单、`docs/45` §6、安卓日志同日条目。
+
+—— 执行人：Faust-sudo（AI 代工），2026-09-14
+
 ## 2026-09-14 裸跑「听参考旋律」静默 40401 修复：共享卷目录按 cwd 解析错位（A-G7）· 2 op
 
 - **背景**：dev 分支按方式 B 裸跑起来后，组长在 `/m/sing` 点「听参考旋律」**毫无反应**；网络面板 `GET /api/v1/audio/song_twinkle.wav` 回 `{"code":40401,"message":"audio asset missing"}`，观感像「合进来的分支里没有小星星的数据源」。**核查后确认数据源齐全**：`data/audio/song_*.wav` 三首（`scripts/setup-assets.py` 已重建，1.30/0.87/0.87 MB），DB 里三首 `pitch_ref_status=ready`（pyin 提取成功）。
