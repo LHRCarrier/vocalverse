@@ -111,6 +111,12 @@ export function useSingPlay(): SingPlay {
    * 请求仍会落地并写 `result/phase`，于是"评分中关面板→换歌→等落地"会在**新歌标题下渲染旧歌
    * 成绩**（拷问报告 P1-2 / A-F2 实测：RTT 放大到 5s 时 100% 命中）。
    * 依据：docs/21 §3.6（轮询语义）、docs/35（App 交互确定性）。
+   *
+   * **世代不变量（2026-09-14 评审 R4 收紧）**：一次提交 + 它引发的整轮轮询**共用一个世代**
+   * （`submitAudio` 取一次、`poll(my)` 沿用）；`poll()` **不得自增**——旧写法在 `poll()` 里
+   * 再自增一次，会覆盖 `reset()`/`openSong()` 在 `uploadSingAudio` await 期间的 bump
+   * （`my === epoch` 成立）→ 迟到结果照写，"换歌/重置即作废"并没真正成立。
+   * 会在飞请求作废的入口：`openSong()`（换歌）、`reset()`（关面板/再来一遍）、`retry()`。
    */
   let epoch = 0
   let pollAbort: AbortController | null = null
@@ -150,9 +156,17 @@ export function useSingPlay(): SingPlay {
   async function openSong(songId: number): Promise<boolean> {
     // P1-2/P1-5：换歌即作废旧轮询与在录录音——否则旧 attempt 的结果会写到新歌上
     stop()
+    // 评审 R4：换歌也必须作废**在飞**的提交（只 abort 轮询挡不住 submitAudio 的 await——
+    // 否则旧歌的上传落地后会写 status/phase 并在新歌页面上继续轮询旧 attempt）。
+    epoch += 1
     recorder.cancel()
+    // 评审 R3：换歌要清干净——`reset()` 清的 `status`/`result`/`phase` 这里同样要清，
+    // 否则**报告态直接换歌**时旧报告仍挂在状态里（新歌标题下渲染旧成绩）。
     detail.value = null // 清旧详情：避免换歌瞬间旧标题/歌词/图表串台
+    status.value = null
+    result.value = null
     error.value = null
+    phase.value = 'idle'
     try {
       detail.value = await fetchSongDetail(songId)
     } catch (e) {
@@ -215,12 +229,17 @@ export function useSingPlay(): SingPlay {
 
   async function submitAudio(blob: Blob) {
     if (!detail.value) return
-    epoch += 1 // P1-2：新一次提交立即作废上一轮在飞轮询
+    stop()
+    // 评审 R4：本轮的**唯一**一次自增——提交 + 它引发的整轮轮询共用这个世代；
+    // 期间任何换歌/重置/重试都会再自增 → 下面每个 await 之后都要重新校验。
+    const my = ++epoch
     phase.value = 'uploading'
     try {
       const sess = await createSingSession(detail.value.id)
+      if (my !== epoch) return // 期间换歌/重置：不写 sessionId，也不提交
       sessionId = sess.id
       const submitted = await uploadSingAudio(sessionId, blob)
+      if (my !== epoch) return // 期间换歌/重置：丢弃迟到回执（不写 attemptId/status/phase）
       attemptId = submitted.attempt_id
       // 受理回执只有 {attempt_id, status}（无 progress）；补一条本地 queued 快照，
       // 让 `status` 的类型与实际字段一致（P1-14：旧的手写 DTO 声称 ack 带 progress，
@@ -233,17 +252,18 @@ export function useSingPlay(): SingPlay {
         error: null,
       }
       phase.value = 'processing'
-      poll()
+      poll(my) // 沿用同一世代（poll 内部不再自增）
     } catch (e) {
+      if (my !== epoch) return // 世代失效（含 abort 引发的异常）：不作为失败上报
       phase.value = 'failed'
       error.value = singErrorMessage(e)
     }
   }
 
-  function poll() {
+  /** 轮询一次（递归续期）。`generation` 由调用方给出，**本函数不自增世代**（见 `epoch` 注释）。 */
+  function poll(generation: number = epoch) {
     stop()
-    epoch += 1
-    const my = epoch
+    const my = generation
     pollTimer = setTimeout(async () => {
       pollAbort = new AbortController()
       const signal = pollAbort.signal
@@ -265,7 +285,7 @@ export function useSingPlay(): SingPlay {
           error.value = singFailureMessage(s)
           return
         }
-        poll()
+        poll(my) // 续期沿用同一世代
       } catch (e) {
         if (my !== epoch) return // 世代失效（含 abort 引发的异常）：不作为失败上报
         phase.value = 'failed'
