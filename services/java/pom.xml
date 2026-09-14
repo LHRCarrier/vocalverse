@@ -23,7 +23,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <springdoc.version>2.6.0</springdoc.version>
-    <spotless.version>2.43.0</spotless.version>
+    <spotless.version>3.10.2</spotless.version>
     <!-- J-07：@Tag("integration") 默认排除（CI 跳过·本地必跑）；mvn verify -Pintegration 覆盖为空 → 全跑 -->
     <surefire.excludedGroups>integration</surefire.excludedGroups>
     <!-- 覆盖 spring-boot-dependencies BOM 的 1.19.8：docker-java 3.3.x 与 Docker Engine 29.x
