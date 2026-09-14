@@ -5,6 +5,10 @@
  * 头像上传（`kind=avatar`）+ 昵称 / @handle 编辑 → `PATCH /api/v1/users/me`。
  * 读取沿用 `auth.fetchMe()`（GET /auth/me 已扩展 avatarUrl/handle）。
  *
+ * 2026-09-14（组长手机实测：改了头像 + 名称，社区列表不刷新、点进详情才更新）：
+ * 保存成功后必须把新资料同步进社区 feed store —— 列表用的是**作者快照缓存**，
+ * 不显式同步就会一直显示改资料前的旧头像/旧昵称（见 `useCommunityStore.applyMyProfile`）。
+ *
  * 纪律：弹层内错误内联展示（不用 toast，docs/48 B13）；保存中禁用按钮；
  * 头像 URL 只接受本服务媒体地址（后端二次校验，前端先拦一道）。
  */
@@ -18,6 +22,7 @@ import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { patchMe } from '@/api/users'
 import { useMobileBack } from '@/composables/useMobileBack'
 import { useAuthStore } from '@/stores/auth'
+import { useCommunityStore } from '@/stores/community'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
@@ -25,6 +30,7 @@ import type { MediaAssetView } from '@/api/media'
 
 const router = useRouter()
 const auth = useAuthStore()
+const community = useCommunityStore()
 const ui = useUiStore()
 const goBack = useMobileBack('/m/home')
 
@@ -58,11 +64,14 @@ async function save() {
   saving.value = true
   errorText.value = ''
   try {
-    await patchMe({
+    const updated = await patchMe({
       nickname: nickname.value.trim(),
       handle: handle.value.trim() || undefined,
       avatarUrl: avatarUrl.value ?? '',
     })
+    // 社区列表/卡片用的是作者快照（store 按 domain 缓存，命中即不发请求）→
+    // 不在这里同步，「返回社区」仍是旧头像旧昵称，只有点进详情（重新拉帖）才是新的。
+    community.applyMyProfile(updated)
     await auth.fetchMe()
     ui.showToast('已保存')
   } catch (e) {

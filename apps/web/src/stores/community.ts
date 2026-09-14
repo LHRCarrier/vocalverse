@@ -11,7 +11,15 @@ import { ref } from 'vue'
 import { coinPost, fetchFeed, likePost, sharePost } from '@/api/community'
 import { useUiStore } from '@/stores/ui'
 
-import type { CommunityPostView } from '@/types/community'
+import type { AuthorView, CommunityPostView } from '@/types/community'
+
+/** 「我」的资料快照：`GET /auth/me`（MeView）与 `PATCH /api/v1/users/me`（MeProfile）回包的公共字段 */
+export interface MyProfileSnapshot {
+  userId: number
+  nickname: string
+  handle?: string | null
+  avatarUrl?: string | null
+}
 
 export const useCommunityStore = defineStore('community', () => {
   const items = ref<CommunityPostView[]>([])
@@ -113,6 +121,35 @@ export const useCommunityStore = defineStore('community', () => {
     })
   }
 
+  /**
+   * 改完资料（昵称 / @handle / 头像）后，把「我」同步进 feed：`items` 与**所有** domain 缓存里的
+   * 本人作者快照就地改写（2026-09-14 组长手机实测：在 `/m/me/profile` 改了头像和名称，
+   * 回社区列表仍是旧头像旧昵称，**点进详情才更新**——同一屏里顶栏已是新头像）。
+   *
+   * 根因与 `prepend` 同源：`load()` 命中按 domain 的缓存就 return、**不发请求**，而改资料发生在
+   * 另一个页面 → 回 `/m/home` 看到的还是改资料前的作者快照；详情页自己 `fetchPost` 重拉，
+   * 所以「点进去才是新的」。
+   *
+   * 传服务端回包（`GET /auth/me` / `PATCH /users/me`）而非本地输入值：`AuthorView` 每次请求都从
+   * users + user_profiles 现拼（`CommunityService.loadAuthors`），回包即服务端真值。
+   * 刻意**不** `invalidate()`：缓存此刻已被改成正确值，清缓存只会让回首页多闪一次骨架屏。
+   */
+  function applyMyProfile(me: MyProfileSnapshot | null | undefined) {
+    if (!me?.userId) return
+    const patch: Partial<AuthorView> = {
+      nickname: me.nickname,
+      handle: me.handle ?? null,
+      avatarUrl: me.avatarUrl ?? null,
+    }
+    const apply = (list: CommunityPostView[]) => {
+      for (const post of list) {
+        if (post.author?.id === me.userId) Object.assign(post.author, patch)
+      }
+    }
+    apply(items.value)
+    for (const entry of cache.values()) apply(entry.items)
+  }
+
   /** 失效全部缓存（下次 load 强制重拉） */
   function invalidate() {
     cache.clear()
@@ -184,6 +221,7 @@ export const useCommunityStore = defineStore('community', () => {
     syncCommentCount,
     patchItem,
     prepend,
+    applyMyProfile,
     invalidate,
   }
 })
