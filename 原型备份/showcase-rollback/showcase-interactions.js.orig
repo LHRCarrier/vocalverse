@@ -17,9 +17,7 @@
      零、手机框渲染
      机身几何与 React 版 Iphone 组件完全一致：
        PHONE 433×882 / SCREEN 21.25,19.25 + 389.5×843.5 / r 55.75
-     屏幕内容两种模式：
-       · img —— 真实运行中的 app（Vue 前端）在 390×844 @2x 下的截图，当前默认
-       · src —— 活页面 iframe（保留：本地单文件页面仍可直接装进来）
+     屏幕内容用 iframe 装真页面（390×844），非贴图。
      说明文字走站点令牌渲染，因此深浅主题都会跟着变 —— 这是换成活框的主要收益。
      ============================================================ */
   var PHONE_W = 433, PHONE_H = 882;
@@ -27,35 +25,21 @@
   /* 屏幕区尺寸与圆角：路径里已按数值写死，这里留作几何参照（与 CSS 的 .uc-phone__screen 对应）*/
   var SCREEN_W = 389.5, SCREEN_H = 843.5, SCREEN_R = 55.75;
 
-  /* 屏幕内容：VocalVerse 移动端真实界面（截图来自运行中的 app，390×844 @2x）。
-     早期这里是设计系统自带的通用样例（app-screens/*.html、feature-screens/s*.html），
-     展示的是别处的 demo，与产品无关 —— 现按真实界面重排成 3 组 × 3 台：
-       uc-1 学习与评分   uc-2 社区与投稿   uc-3 消息与笔记
-     （Web 端截图 assets/app-shots/web-*.png 仍在目录里，但页面不再展示。） */
   var PHONE_GROUPS = {
     "uc-1": [
-      { img: "assets/app-shots/learn-center.png", title: "学习中心",
-        desc: "以问候语和本周小结开场；等级徽章带 70 / 500 XP 进度条，右侧是连续打卡 12 天；近 30 天学习热力图标出当天 +75 XP；下方依次是我的单词、书房、社区足迹、我的发音四个入口，底部五个 Tab 主导航。" },
-      { img: "assets/app-shots/report.png", title: "评分报告",
-        desc: "一次跟唱的完整复盘：曲目与时间、总分 92.4，拆成发音 93 · 语法 91 · 流利 88 · 覆盖 100%；再往下是逐句评分（95 / 88 / 81），每句配一句点评，底部提供「再唱一遍」。" },
-      { img: "assets/app-shots/sing.png", title: "唱吧 · 曲库",
-        desc: "顶部是上一遍的诊断：88.1 分、音准 93、节奏 91，并给出「稳住节奏就能破 90」的建议；下方按全部 / 热门 / 收藏分组的歌曲库，每首带最佳成绩与等级标签（Perfect Night 88.1 新纪录、Yesterday Once More 91.5 优秀）。" }
+      { src: "assets/app-screens/home.html", title: "今日学习主页", desc: "底部浮动 Tab 栏 · 打卡徽章 · 统计卡 · 全宽分段控件" },
+      { src: "assets/app-screens/speaking.html", title: "场景对话", desc: "对话气泡 · 语言点 chip · 录音大按钮（波纹动效）" },
+      { src: "assets/app-screens/report.html", title: "唱歌评分报告", desc: "深紫成绩卡 · 四维统计行 · 逐句评分列表" }
     ],
     "uc-2": [
-      { img: "assets/app-shots/community.png", title: "社区动态",
-        desc: "为你推荐流，按新闻稿 / 教学分享 / 海外生活三频道组织；每张卡片带作者与等级、发布时间、正文摘要，以及点赞 / 评论 / 收藏数——例如 VocalVerse News 的 AI 英语学习长文、Teacher Amy 的职场闲聊三句式。" },
-      { img: "assets/app-shots/post-detail.png", title: "帖子详情",
-        desc: "从动态流点进去的完整文章页：标题、作者徽章、正文与配图，底部是评论数与评论区入口，用来把一条动态读完整。" },
-      { img: "assets/app-shots/compose.png", title: "发帖",
-        desc: "发布页：0/280 字数、与动态流一致的三个频道，图片最多 9 张（≤20MB）或视频 1 个（MP4/WebM，≤64MB）且不能同时发，可加话题标签与表情。" }
+      { src: "assets/feature-screens/s1-inputs.html", title: "胶囊输入框", desc: "默认 / 填充 / 聚焦 / 禁用 四态" },
+      { src: "assets/feature-screens/s2-buttons.html", title: "按钮五态", desc: "Hover · Pressed · Disabled · Loading · Focus" },
+      { src: "assets/feature-screens/s3-controls.html", title: "分段控件与图标按钮", desc: "56px 分段 · 图标-only 必带 Tooltip" }
     ],
     "uc-3": [
-      { img: "assets/app-shots/notifications.png", title: "通知中心",
-        desc: "私信 / 通知 / 关注三条独立流；每条带对方等级与时间，例如老年高级 LV4 分享阅读笔记、青少年初级 LV1 询问跟读方法；弱网时自动降级，不依赖长连。" },
-      { img: "assets/app-shots/messages.png", title: "私信会话",
-        desc: "通知里点进去的一对一聊天：对方等级徽章、左右气泡与时间戳，用于把社区里的互动接下去。" },
-      { img: "assets/app-shots/notes.png", title: "笔记 · 语言点",
-        desc: "学习过程中自动沉淀的生词与短语本，按全部 / 口语 / 阅读 / 文化筛选：pick up、run out of、shadowing、procrastinate……每条保留释义、来源与日期。" }
+      { src: "assets/feature-screens/s4-imagecard.html", title: "图片卡", desc: "大图 r-24 · 文字压图底 · hover 浮出操作" },
+      { src: "assets/feature-screens/s5-lightbox.html", title: "近黑浮层预览", desc: "全屏压暗 · 幽灵描边按钮" },
+      { src: "assets/feature-screens/s6-dialog.html", title: "遮罩弹窗 · Toast · 空状态", desc: "白卡 r-24 + 浅色遮罩 · Toast 浮顶" }
     ]
   };
 
@@ -101,12 +85,10 @@
       '<div class="uc-phone__body" data-uc-tilt>' +
       '<div class="uc-phone__tilt">' +
       '<div class="uc-phone__screen">' +
-      /* 两种屏幕内容：img = 真实 app 截图（当前），src = 本地活页面 iframe。
-         截图刻意不加 loading="lazy"：9 台机一次性加载更可预期，
+      /* 刻意不加 loading="lazy"：9 台机一次性加载更可预期，
+         且这些页面都是本地单文件、无外部字体/图片请求，代价可忽略；
          lazy 若未按预期触发，机身里就是一片空白，不划算。 */
-      (item.img
-        ? '<img src="' + item.img + '" alt="' + item.title + '" draggable="false">'
-        : '<iframe src="' + item.src + '" scrolling="no" title="' + item.title + '"></iframe>') +
+      '<iframe src="' + item.src + '" scrolling="no" title="' + item.title + '"></iframe>' +
       '<span class="uc-phone__glare" aria-hidden="true"></span>' +
       "</div>" +
       frameSvg() +
@@ -136,8 +118,8 @@
     });
 
     /* —— 屏幕内容等比缩放进机身屏幕区 ——
-       素材统一按 390×844 视口准备（截图是 @2x，CSS 尺寸仍按 390×844），
-       再整体缩放到屏幕框实际宽度，保证按设计视口排版而不是被挤压变形。 */
+       iframe 固定按 390×844 渲染，再整体缩放到屏幕框尺寸，
+       保证页面按设计视口排版而不是被挤压变形。 */
     var screens = [];
     Array.prototype.forEach.call(hosts, function (host) {
       Array.prototype.forEach.call(host.querySelectorAll(".uc-phone__screen"), function (s) {
@@ -147,12 +129,12 @@
 
     function fit() {
       screens.forEach(function (s) {
-        var el = s.querySelector("iframe, img");
-        if (!el) return;
+        var iframe = s.querySelector("iframe");
+        if (!iframe) return;
         var w = s.clientWidth;
         if (!w) return;
         var scale = w / 390;
-        el.style.transform = "scale(" + scale.toFixed(5) + ")";
+        iframe.style.transform = "scale(" + scale.toFixed(5) + ")";
       });
     }
     fit();

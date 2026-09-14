@@ -138,11 +138,24 @@
   display: grid;
   place-items: center;
   z-index: 1;
+
+  /* 差异 7：药丸"滑过去"。JS 只写 left/top/width/height（内联样式），
+     过渡统一交给这里 —— 上游是"瞬移 + 原地 0→1 生长"，在多页站点里就是
+     "背景色立即填充"的僵硬感。四条几何属性一起插值：从宽链接滑到窄链接
+     是"边收缩边滑"，不会先跳位再变宽。曲线与站点其它 400ms 过渡同源。 */
+  transition:
+    left 400ms cubic-bezier(0.22, 1, 0.36, 1),
+    top 400ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 400ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 400ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+/* 关掉过渡：窄屏横向滚动跟手、尺寸重排、跨页接力起手落位 —— 这三处必须瞬时 */
+.gooey-nav.no-glide .effect { transition: none; }
 
 .gooey-nav .effect.text {
   color: var(--gooey-ink);
-  transition: color 0.3s ease;
+  transition: color 0.3s ease, opacity 0.18s ease;
   /* 与 site-nav.css 里链接文字同字号/字重，避免镜像层比真身高一档而露边 */
   font-size: 1rem;
   line-height: 1.5rem;
@@ -152,6 +165,18 @@
 
 .gooey-nav .effect.text.active {
   color: var(--gooey-on-ink);
+}
+
+/* 差异 10 · 跨页接力期间（.is-arriving）
+   药丸正从"上一页的高亮项"滑向"本页高亮项"，这 300ms 里：
+   a. 镜像文字先藏起来 —— 否则"本页的高亮文字"会顶着旧链接的位置横穿导航；
+   b. 高亮项文字先保持普通字色（与其它链接同为 60% 墨色），药丸到位前再翻成
+      反色 —— 否则字会立刻变成与导航底色同色（--gooey-on-ink = --background），
+      在药丸到达之前整段看不见。 */
+.gooey-nav.is-arriving .effect.text { opacity: 0; }
+
+.gooey-nav.is-arriving .site-nav__list > li.active > a > span {
+  color: color-mix(in srgb, var(--foreground) 60%, transparent);
 }
 
 /* 滤镜层：blur + contrast 造出"金属球"式的阈值场，药丸与气泡因此能互相吸附 */
@@ -187,11 +212,10 @@
   animation: pill 0.3s ease both;
 }
 
-/* 静止态（挂载/跳转到达时）：药丸直接落位，不播 0→1 的生长。
-   否则新页面第一帧里"文字已经变成药丸反色、药丸却还没长出来"，
-   激活项的字会短暂地变成白字压白底（浅色主题）／黑字压黑底（深色主题）。
-   由 js/gooey-nav.js 在挂载时挂上，第一次点击切换时才摘掉，
-   把"生长形变"留给真正需要它的那一次过渡。 */
+/* 静止态（挂载 / 跳转到达时）：药丸直接落位，不播 0→1 的生长。
+   差异 9 之后这条常驻不摘：生长形变已由"滑过去"取代，药丸恒为满尺寸，
+   位置变化全部由 .effect 上的几何过渡完成；保留本条是为了压掉
+   .effect.active::after 的 pill 动画，避免药丸在滑动途中又被缩放一次。 */
 .gooey-nav .effect.filter.is-settled::after {
   animation: none;
   transform: scale(1);
@@ -296,4 +320,10 @@
     font-size: 0.9375rem;
     line-height: 1.375rem;
   }
+}
+
+/* 系统减弱动效：位移直接落位（JS 侧同时跳过多页接力），不做 400ms 滑动 */
+@media (prefers-reduced-motion: reduce) {
+  .gooey-nav .effect { transition: none; }
+  .gooey-nav.is-arriving .effect.text { opacity: 1; }
 }
