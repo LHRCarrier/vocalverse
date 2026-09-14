@@ -8,11 +8,11 @@ on:
       # 契约快照/生成文件变更也重新对账（ContractSnapshotTest，docs/06 §7）
       - "apps/web/src/api/specs/java-openapi.json"
       - "apps/web/src/api/generated/java-api.d.ts"
-  # 手动补跑（2026-09-07 评审处置：本仓 pull_request 触发当前未生效——PR 分支推送 0 run；
-  # 与 python-ci 同款兜底，见其注释）
-  # 2026-09-10 补：push(main) 兜底（与 python-ci:10-14 对齐）——本仓 PR 触发不可靠，
-  # 仅靠 pull_request 会让 main 上的 Java 代码零自动验证（唱歌模块审计 E-2 实测：
-  # java-ci/frontend-ci 自 2026-09-07 起再无自动运行）。
+  # 手动补跑（2026-09-07 评审处置）与 push(main) 兜底（2026-09-10 补）。
+  # **论断更正（2026-09-14 · PR#34 评审 Q1）**：旧注释写的"本仓 pull_request 触发当前未生效"与
+  # "java-ci/frontend-ci 自 2026-09-07 起再无自动运行"已被 PR#34 实证**证伪**——该 PR 的 4 个 check
+  # 全部由 `pull_request` 事件在 PR head（314ad7d）上真实跑过（java 34544126422 等，见 PR#34 评论）。
+  # 保留 push(main) 的理由改为**纵深防御**（合入 main 后再验一次），不再是"PR 触发不可靠"。
   push:
     branches: [main]
     paths:
