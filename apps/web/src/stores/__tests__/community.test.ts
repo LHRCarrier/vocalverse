@@ -27,6 +27,9 @@ const page = (items: CommunityPostView[], nextCursor: string | null, hasMore: bo
   nextCursor,
   hasMore,
 })
+/** 带作者快照的帖子（改资料场景用：author.id 与「我」的 userId 比较） */
+const authored = (id: number, authorId: number, nickname: string, handle: string | null, avatarUrl: string | null) =>
+  ({ id, author: { id: authorId, nickname, handle, tint: null, level: 'L3', avatarUrl } }) as unknown as CommunityPostView
 
 describe('community store（fe-03 竞态守卫 + fe-04 上限裁剪）', () => {
   beforeEach(() => {
@@ -144,5 +147,72 @@ describe('community store（fe-03 竞态守卫 + fe-04 上限裁剪）', () => {
     store.invalidate()
     await store.load(null)
     expect(vi.mocked(communityApi.fetchFeed)).toHaveBeenCalledTimes(2)
+  })
+
+  /**
+   * 2026-09-14 组长手机实测：在「我的资料」改了头像和名称 → 社区列表卡片仍是旧头像/旧昵称，
+   * **点进详情才更新**（同一屏顶栏已是新头像）。根因同 `prepend`：`load()` 命中 domain 缓存
+   * 就不发请求，改资料发生在另一个页面 → 回首页看到的是改资料前的作者快照。
+   */
+  it('改资料后：本人作者快照就地更新，命中缓存也不回退旧昵称/旧头像', async () => {
+    const store = useCommunityStore()
+    vi.mocked(communityApi.fetchFeed).mockResolvedValue(
+      page(
+        [
+          authored(1, 7, '成年中级', 'demo_adult', null),
+          authored(2, 9, 'Emma', 'emmaenglish', '/api/v1/media/emma'),
+        ],
+        'c1',
+        false,
+      ),
+    )
+    await store.load(null)
+    expect(store.items[0].author.nickname).toBe('成年中级')
+
+    // 资料页保存成功 → 同步服务端回包
+    store.applyMyProfile({ userId: 7, nickname: '林浩然', handle: 'lin', avatarUrl: '/api/v1/media/new' })
+
+    expect(store.items[0].author.nickname).toBe('林浩然')
+    expect(store.items[0].author.handle).toBe('lin')
+    expect(store.items[0].author.avatarUrl).toBe('/api/v1/media/new')
+    // 别人的作者快照不受影响
+    expect(store.items[1].author.nickname).toBe('Emma')
+    expect(store.items[1].author.avatarUrl).toBe('/api/v1/media/emma')
+
+    // 返回社区首页：命中缓存（不发请求）也必须是新资料（修复前是旧昵称）
+    await store.load(null)
+    expect(vi.mocked(communityApi.fetchFeed)).toHaveBeenCalledTimes(1)
+    expect(store.items[0].author.nickname).toBe('林浩然')
+    expect(store.items[0].author.avatarUrl).toBe('/api/v1/media/new')
+  })
+
+  it('改资料：其他 domain 的缓存条目同步（切 Tab 不弹回旧昵称）', async () => {
+    const store = useCommunityStore()
+    // 每次请求返回**新对象**（真实链路每次 JSON 解析都是新实例 → 各 domain 缓存不共享引用）
+    vi.mocked(communityApi.fetchFeed).mockImplementation(async () =>
+      page([authored(1, 7, '成年中级', 'demo_adult', null)], 'c1', false),
+    )
+    await store.load('news')
+    await store.load(null) // 两个 domain 各自入缓存
+
+    store.applyMyProfile({ userId: 7, nickname: '林浩然', handle: null, avatarUrl: null })
+    expect(store.items[0].author.nickname).toBe('林浩然')
+
+    // 切回已缓存的 news：命中缓存也不回退（修复前是旧昵称）
+    await store.load('news')
+    expect(vi.mocked(communityApi.fetchFeed)).toHaveBeenCalledTimes(2)
+    expect(store.items[0].author.nickname).toBe('林浩然')
+    expect(store.items[0].author.handle).toBeNull()
+  })
+
+  it('applyMyProfile：userId 缺失时不动任何作者快照（宁可不改，不可改错人）', async () => {
+    const store = useCommunityStore()
+    vi.mocked(communityApi.fetchFeed).mockResolvedValue(
+      page([authored(1, 7, '成年中级', 'demo_adult', null)], 'c1', false),
+    )
+    await store.load(null)
+    store.applyMyProfile(null)
+    store.applyMyProfile({ userId: 0, nickname: '林浩然' })
+    expect(store.items[0].author.nickname).toBe('成年中级')
   })
 })
