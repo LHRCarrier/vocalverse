@@ -3,6 +3,15 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-14 记录纪律 · 署名更正：AI 代工一律署 LHRCarrier（不是分支 owner）· 1 op
+
+- **组长指正**：本轮 AI 代工的产出被署成了 `Faust-sudo`（worklog 署名 70 处 + `git` 提交作者），**两处都错**——把「分支 owner / PR 作者」当成了执行人。**AI 代工的署名应是下指令并认领的人**（AGENTS.md §工作流程 1：署名以认领人为准）。
+- **已改（worklog）**：`worklog/VocalVerse工作日志.md` 56 处 + `worklog/安卓开发日志.md` 14 处，共 **70 处** `—— 执行人：` 统一改为 `LHRCarrier（AI 代工）`；另把安卓日志「实时音准线」条目的归属结论行一并更正；顺带修掉 **2 处**「签名行与下一节标题粘连」（缺换行，会让 `## 标题` 失效）的历史遗留。**未动**叙事里提及 Faust-sudo 的两处（「认领：… Faust-sudo、xiaoqing-one 不涉及」「PR #22（Faust-sudo…）」），它们不是署名。
+- **`git` 提交作者**：后续提交一律用本机身份 `羁木轮 <1844622298@qq.com>`（该邮箱即组长 GitHub 账号邮箱）——不再用 `-c user.name` 覆盖成任何队友。**已推送的历史提交**（`main`/`dev`/`feat/sing-m3-hardening`/`fix/console-post-login-401` 上的约 19 个）是否重写待组长拍板：重写需 force-push 共享分支、所有 SHA 变化、已合入的 PR#34/#36 的 merge 引用会悬空（记录仍显示 merged），**收益是归属正确、代价是历史不再稳定**。
+- **排查口径（供后人）**：`git log --author='<姓名>'` 只反映**提交里写的字符串**；`Faust-sudo@users.noreply.github.com` 这种 noreply 邮箱会让 GitHub 把提交**归属到该用户账号**（贡献图/PR 作者页都会算他），所以「署名给谁」是有对外可见后果的决定，不能顺手套用。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-14
+
 ## 2026-09-14 书封真实图片支持（迁移 0017）+ 导入公版书《堂吉诃德》· 4 op
 
 - **背景**：演示需要"书架上是一本本真书"，而读书域此前**只有合成封面**（`cover_color` + `cover_emoji`，前端渲染色块 + emoji），`books` 表没有 `cover_url`（`songs` 早就有）。组长拍板：加真实封面图支持。**UI 部分见安卓日志同日条目**（本条只记后端/迁移/契约/数据）。
@@ -15,7 +24,7 @@
 - **踩坑**：① **`refresh-openapi.ps1` 对 Python 侧也会写紧凑格式**（`Invoke-WebRequest.Content` 是单行 JSON），照着跑会把 8,444 行美化快照压成 1 行 —— 正确做法是从进程内 `app.openapi()` 用 `json.dumps(..., ensure_ascii=False, indent=2)` 写（已登记工具缺陷，本轮先手工规避）；② **给组件新增 import 会打穿所有 `vi.mock('@/api/reading')` 的桩件**——`MobileBookCover` 引入 `bookCoverUrl` 后，`MobileReadingBack.test.ts` 的桩缺该导出，组件 setup 抛 `No "bookCoverUrl" export is defined on the mock`，表现为**三个无关用例红**（不是断言错，是导入错）；③ 未收录词是**子集口径**不是 bug：`ecdict_subset.csv` 仅 1.06 万条，`knight`/`windmill` 查不到、`adventure`/`giant` 查得到 —— 演示时挑常见词，别拿专名试。
 - **产出**：`app/core/paths.py`、`alembic/versions/0017_book_cover_url.py`、`models/reading.py`、`db/seed.py`、`db/seed_reading.py`、`reading/service.py`、`api/routes/reading.py`、`docker-compose.yml`、契约快照与生成类型、`data/seed/reading_books.json`（+《堂吉诃德》）、`data/seed/covers/don-quixote.jpg`、`tests/test_reading_routes.py`（+7 例）、`docs/10` 表清单、`docs/45` §6、安卓日志同日条目。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-14
+—— 执行人：LHRCarrier（AI 代工），2026-09-14
 
 ## 2026-09-14 裸跑「听参考旋律」静默 40401 修复：共享卷目录按 cwd 解析错位（A-G7）· 2 op
 
@@ -26,14 +35,15 @@
 - **踩坑（详见归档）**：① 「资源找不到」的错误码必须把**实际查找位置**带进日志，否则文案会把根因带偏；② 相对路径 + 同名键 = 三义性，且 `audio_url` 存的是 `/data/audio/x.wav` 这种"看似绝对"的样式，更难被怀疑；③ **别 `export APP_AUDIO_DIR=<仓库根>` 再跑 pytest**——环境变量优先级高于 conftest 的 `os.environ.setdefault`，会盖掉 `data/audio-test` 隔离并删真素材；④ 本机曾有一个挂死的 `uv sync` 占着 uv 缓存锁，导致不带 `--no-sync` 的 `uv run` **卡住且零输出**（这才是「python 服务没起来、日志 0 字节」的成因之一）。
 - **产出**：`scripts/dev-up.ps1`、`services/python/.env.example`、`services/python/app/main.py`、`README.md`（FAQ 新增一行）、`worklog/BUG实测/参考旋律素材40401-裸跑音频目录错位.md`；旁证脚本 `local/sing_bare_run_verify.py`（gitignored）。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-14
+—— 执行人：LHRCarrier（AI 代工），2026-09-14
 
 ## 2026-09-14 PR #34 评审意见处置（B1 阻断 + R1/R2/R5 + Q1 · 前端两条见安卓日志）· 3 op
 
 - **背景**：组长对 PR #34（`feat(sing): 唱歌模块（M3）+ 全链路审校加固`，129 文件 / +26252 行）给出 `CHANGES_REQUESTED`：**1 条阻断 B1** + 5 条建议 R1~R5 + 1 条疑问 Q1。本记录只覆盖后端/部署/CI 与记录纪律部分；**R3/R4 是 `/m/sing` 的界面状态问题，按记录纪律走 `worklog/安卓开发日志.md`**（同日条目）。
 - **B1（阻断 · 幂等键并发竞态 → 非 envelope 的 500）· 已修**：`submit_song_audio` 的「先查后插」在并发双击 / 弱网重传下，两个请求都读到 `existing=None`（读事务已结束），各自 `db.add(SingAttempt)` + `commit()` → 后提交者撞迁移 0016 的 `uq_sing_attempts_user_session`，抛 `IntegrityError`；`app/main.py` 只有 BizError / ConsoleBizError / RequestValidationError / HTTPException 四个 handler，**不覆盖 SQLAlchemy 异常** → 唯一键只把「落两行」换成了「输家 500」，P1-3 的幂等语义并未闭合。修复：插入段包 `try/except IntegrityError` → `rollback()` → 回读赢家已落的那行 → 按既有三分支返回（① 已定稿 → 幂等返回结果；② 任务态在跑 / 赢家「已 commit、任务态未写」的窄窗口 → 已受理回执；③ 失败草稿就地重置**不适用**——能撞唯一键说明赢家是刚落的草稿，重置会清掉赢家那行并二次起 worker）。写法与仓内既有四处同款（`reading/service.py:267`、`favorites.py`、`events.py`、`media/service.py`）。
 - **B1 的「修复前必失败」实证（不是"测试全绿"）**：新增 3 个用例，并把 `service.py` 的兜底临时摘掉复跑 —— **3 例全红**，报错即评审描述的那条：`sqlite3.IntegrityError: UNIQUE constraint failed: sing_attempts.user_id, sing_attempts.session_id`；还原后 3 例全绿。其中 `test_submit_concurrent_double_tap_converges_to_single_row` 是**真并发**（`asyncio.gather` 两个同会话上传，probe 桩里让出控制权保证两者都过预检再各自插入），正是评审要求的「顺序双调用覆盖不到」的那条路径；另两条用**确定性交错**（在预检之后、插入之前的 `_probe_duration` 处由另一会话抢先落行）钉住两个语义分支（赢家在建任务态 / 赢家已定稿），比真并发更好复现。
-- **R1（记录纪律 · 署名）· 已补**：主线日志本 PR 新增条目中前 9 条缺 `—— 执行人：`，且全部署名为「AI 代签（正式署名待组长确认）」；现按组长 2026-09-14 确认，**每条独立小节各自补/改为 `—— 执行人：Faust-sudo（AI 代工）`**（含被一并迁出的 2026-09-09 各条；不再有共用一行的情况）。
+- **R1（记录纪律 · 署名）· 已补**：主线日志本 PR 新增条目中前 9 条缺 `—— 执行人：`，且全部署名为「AI 代签（正式署名待组长确认）」；现按组长 2026-09-14 确认，**每条独立小节各自补/改为 `—— 执行人：LHRCarrier（AI 代工）`**（含被一并迁出的 2026-09-09 各条；不再有共用一行的情况）。
+  > ⚠️ **署名更正（2026-09-14 晚 · 组长指正）**：本条最初误填为 `Faust-sudo（AI 代工）`——把「分支 owner / PR 作者」当成了执行人；**AI 代工的署名应是下指令并认领的人**。已把两份工作日志共 **70 处** `—— 执行人：` 署名统一改为 `LHRCarrier（AI 代工）`，并顺带修掉 2 处「签名行与下一节标题粘连（缺换行 → markdown 标题失效）」的历史遗留。体例对齐 `docs/23`/`docs/36`（「执行人：LHRCarrier（AI 代笔）」）。<br>另：**`git` 提交作者**同样误用了 `Faust-sudo <...@users.noreply.github.com>`（会把提交归属记到队友账号上），后续提交一律用本机身份（`羁木轮 <1844622298@qq.com>` = 组长 GitHub 账号邮箱）；已推送的历史提交如何处置见下方「署名更正」条目。
 - **R2（记录纪律 · 归属）· 已迁**：「2026-09-09 实时音准线」整条是 App UI（`/m/sing` + `LivePitchChart.vue` + `mobile-sing.css` 边距 + `lib/yin.ts`），Python / Java 零改动，**不是混合条目** → 按「App 端 UI 一律入安卓日志、不得放主线日志」整体移到 `worklog/安卓开发日志.md`（合并进该文件已有的同名条目，主线那份删除，避免两处真值）。
 - **R5（部署可维护性）· 已改**：① python-api 的 `APP_JAVA_BASE_URL` 由钉死字面量 `http://java-api:8080` 改为 `${APP_JAVA_BASE_URL_DOCKER:-http://java-api:8080}`。**没有照评审建议直接写 `${APP_JAVA_BASE_URL:-…}`**：compose 会用**根 .env** 做变量插值，而该键在 .env 里的语义是「裸跑 = localhost」，有 .env 时默认值永不生效 → 等于把 2026-09-10 的 F2（容器内 Connection refused → 歌曲永久 40905）装回去。实测证据：本机临时用 `${APP_JAVA_BASE_URL:-http://java-api:8080}` 渲染，结果就是 `http://localhost:8080`。故开**容器侧独立键**（`environment` 优先级高于 `env_file`，根 .env 的同名键不污染容器），默认值即服务名；`.env.example` 按注释形式登记该键（避免又一处真值）。② `POSTGRES_PASSWORD` 由 `${…:-vocalverse-dev}` 改 `${…:?required}`（与同文件 JWT_SECRET / SERVICE_TOKEN 同款）：忘记复制 `.env` 直接报错，而不是静默用弱口令起库。实测：缺 .env 时 `docker compose config` 报 `required variable POSTGRES_PASSWORD is missing a value`；补 .env 后渲染正常，且**逐服务核对**——`python-api → http://java-api:8080`、`java-api` / `migrate → http://localhost:8080`（裸跑语义未被污染）、`POSTGRES_PASSWORD=vocalverse-dev`。
 - **Q1（疑问）· 已按组长拍板处置**：三份 workflow（frontend-ci / java-ci / python-ci）`push(main)` 兜底注释里「本仓 pull_request 触发当前未生效 / PR 分支推送 0 run / 自 2026-09-07 起再无自动运行」的论断**被本 PR 自己证伪**（4 个 check 全部由 `pull_request` 触发在 314ad7d 上真实跑过）→ **保留 push(main) 作纵深防御**，但把理由与历史论断一并更正，避免后人误读成「PR 触发是坏的」。
@@ -42,7 +52,7 @@
 - **踩坑**：① 「评审建议直接照抄」会把修好的 BUG 装回去——`${VAR:-默认}` 在 compose 里不是"默认值"而是"**先看根 .env**"；② 并发用例不能只靠 `gather` 碰运气：`submit_song_audio` 在预检与插入之间只有 `await` 才切协程，桩函数不 await 的话两个协程会被串行执行、根本测不出竞态（必须在 probe 桩里显式 `asyncio.sleep(0)` 让出）；③ 本机 `.venv` 曾被上一轮操作搬成半损坏状态（缺 `pygments/plugin.py`、`_distutils_hack`）→ `uv sync --frozen` 可原地修复，不必重建；④ **`mvn ... | Select-String ...` 会把 mvn 自己的退出码吞掉**——合并期第一次跑 Java 门禁时 spotless 其实是红的（手写 Javadoc 不合 google-java-format），却因管道末条命令是 `Select-String` 而看着"成功"；`mvn spotless:apply` 后复跑才真绿。**判据必须取 mvn 的退出码或抓 `BUILD SUCCESS`，不能看管道的退出码**。
 - **产出**：`services/python/app/sing/service.py`（B1 兜底）、`apps/web/src/composables/sing.ts`（R3/R4）、`services/python/tests/test_sing_service.py`（+3）、`apps/web/src/composables/__tests__/sing-epoch.test.ts`（新，+3）、`docker-compose.yml` / `.env.example` / `README.md`（R5）、三份 workflow（Q1）、本条 + 安卓日志同日条目。**注**：`apps/web` 的 `sing-epoch.test.ts` 抽成独立文件而非塞进 `sing.test.ts`，是该文件已逼近 eslint `max-lines 350`（新代码不豁免）。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-14
+—— 执行人：LHRCarrier（AI 代工），2026-09-14
 
 ## 2026-09-11 管理端「登录后全页 401」：两个独立根因（Python 密钥留空 + 续期令牌被写成 "undefined"）
 
@@ -91,7 +101,7 @@
   契约未被破坏：口令错误仍是 `404 + 46004 用户名或口令不正确`（反枚举语义不变）。
   归档：`worklog/BUG实测/管理端-登录后全页401-密钥留空与续期令牌写坏.md`。
 
-—— 执行人：Faust-sudo（AI 代工，2026-09-11）
+—— 执行人：LHRCarrier（AI 代工，2026-09-11）
 
 ## 2026-09-11 修 java-ci 的"本地绿、CI 红"：跨端用例的顺序依赖（两轮才收敛）
 
@@ -204,7 +214,7 @@
 - **踩坑**：① 两侧各自新建迁移必然撞号——**跨分支合并时先看 `alembic heads` 再谈其它**，并把「重排 + 引用同步 + 重建库」当作合并的一部分；② "keep both sides" 的机械合并对**代码块**不成立（preview 路由/registry 被拼成非法 TS），必须逐块看内容；③ 生成物（快照/类型）永远重生成，不手改；④ 冲突 PR 无 CI 是**平台行为**，不是工作流写错（本地 YAML 合法 + main 上工作流正常）；⑤ 本机只有 JDK 8、跑不了 Java 门禁——用 `maven:3.9-eclipse-temurin-21` 容器跑 `mvn clean verify` 才等价 CI：**挂载仓库根**（`-w /repo/services/java`，否则依赖 `data/seed` 与契约快照相对路径的用例假失败）、且**必须 clean**（不清 target 的增量编译会让 JPA 实体扫描失败，153 errors 全是假象）。
 - **产出**：合并提交（本记录所属）+ PR #34 更新（冲突已解、CI 可跑）。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 ## 2026-09-10 口径 v6（F1 修复）：句窗时间弯折 + 起唱判据换能量口径（组长拍板方案 A）· 1 op
 
@@ -217,7 +227,7 @@
 - **已知边界（未根治，另案）**：整首 DTW 仍是 ±10% Sakoe-Chiba 带，"偏慢 20% + 每句换气"（实测总时长 +39%）远超带宽 → 窗口放置仍会漂（v6 借 onset 比值缓解）；后续可考虑按 onset 比值**预拉伸**用户序列后再对齐。
 - **归档**：`worklog/BUG实测/偏慢跟唱无节奏分-起唱判据与句窗弯折.md`。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 ## 2026-09-10 唱歌模块全方面复测（P0/P1 修复后 · 真容器）：发现并修复 F2，另报 F1 待拍板
 
@@ -227,7 +237,7 @@
 - **F1（复测发现 · 待组长拍板）**：**句窗口起点未按速度弯折**（`sing.py:1138` `win_start = ref_start + offset`，只有句长乘了 `scale`）→ `bpm_ratio<1`（用户偏慢）时窗口起点落到上一句句腹 → v5 逐句起唱判据只能判"延续" → **整首节奏维度为 None**（`overall` 静默按 0.5/0.3 重算）。PG 历史数据佐证：26 条 attempt 中 14 条有 `rhythm_score`，**ratio<1 的那批全部没有**，ratio>1 的都有（方向性与推演一致）；演示素材 `local/sing_test_user.wav` 正是 ratio=0.826 → 演示链路长期缺"节奏"分项。证据脚本 `local/window_mapping_probe.py`；四个候选修法（A 时间弯折+截距拟合 / B 只补起点 / C 加兜底 / D 仅文档化）见 `docs/audit/唱歌模块复测报告-2026-09-10.md` §4.4，**本批未改代码**。
 - **产出**：`docs/audit/唱歌模块复测报告-2026-09-10.md`（测试矩阵 + 逐条容器证据 + F1/F2 + 其他观察）、`scripts/sing_container_test.py`（可复跑容器复测脚本）、`local/window_mapping_probe.py`（F1 证据）。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 ## 2026-09-10 P1 批次收尾（P1-3 / P1-11 / P1-12 / P1-13 / P1-14）：全量门禁与契约对账
 
@@ -243,7 +253,7 @@
   3. 分支 `feat/sing-m3` 仍**未推送**——本批所有 CI 关卡（快照对账 / 生成零 diff / 迁移单头）本地已复核，但远程尚无一次真实运行；是否推送/开 PR 待拍板；
   4. 后端改动需 `docker compose up -d --build python-api web` 才生效（镜像内代码为构建期拷贝），迁移 0012 需随部署执行。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 ## 2026-09-10 P1-11（后端性能）：整首 DTW 护栏死代码修复（组长拍板方案 A）· 1 op
 
@@ -255,7 +265,7 @@
 - **文档**：docs/06 §9.4「对齐」行增规模护栏说明（实测数字 + 量化代价 + 未做治本项）。
 - **归档**：`worklog/BUG实测/整曲DTW护栏死代码-48秒与506MB.md`。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 ## 2026-09-10 P1-14（后端契约 + 前端类型）：唱歌端点补 response_model，前端改吃生成类型 · 1 op
 
@@ -269,7 +279,7 @@
 - **文档**：docs/21 §2.1 增「响应 schema 补齐（P1-14）」注（DTO 清单 + `extra="allow"` + `Literal` 代价）。
 - **归档**：`worklog/BUG实测/唱歌端点响应无schema-前端手写DTO漂移.md`。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 ## 2026-09-10 P1-13（后端）：多桶限流全有或全无（consume_all + 全量回滚）· 1 op
 
@@ -281,7 +291,7 @@
 - **门禁**：ruff check 绿、ruff format --check 159 files、`pytest -q` **474 passed**（原 468 + 6）。
 - **归档**：`worklog/BUG实测/多桶限流顺序扣导致重复计费.md`。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 ## 2026-09-10 P1-12（后端）：提取并发闸门逐任务取许可 + 重试预算随世代复位 · 1 op
 
@@ -293,7 +303,7 @@
 - **门禁**：见本批收尾记录（ruff / format / pytest 全绿）。
 - **归档**：`worklog/BUG实测/提取并发闸门失效与重试上限永久封死.md`。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 ## 2026-09-10 P1-3（后端 + 迁移 0012）：同会话幂等键 + 失败草稿可就地重跑 · 1 op
 
@@ -307,7 +317,7 @@
 - **踩坑（2 条，详见归档）**：① 迁移里的自检 SQL 在 `alembic upgrade --sql` 离线渲染下 `op.get_bind().execute(...)` 返回 `None` → `AttributeError`，须 `context.is_offline_mode()` 守卫（`test_alembic_offline_pg_render` 拦下）；② 任务态内存兜底 `_MEM_TASKS` 是模块级 dict、跨用例残留，模拟"任务态丢失"必须 monkeypatch `_task_get`（否则读到上个用例的 `done`）。
 - **归档**：`worklog/BUG实测/重试永久失败-同会话复用失败行.md`（复现 / 根因 / 修复 / 验证 / 踩坑）。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 ## 2026-09-10 P1 批次（后端）：任务态 done 判据 + R3 覆盖率分母（口径 v5.1）· 2 op
 
@@ -320,7 +330,7 @@
 - **归档**：`worklog/BUG实测/P1批次-任务态判据与覆盖率口径.md`。
 - **遗留（P1 余项）**：P1-3（幂等失败不可重试 + `sing_attempts(user_id,session_id)` 唯一键，需迁移 0012；**已探真库确认无重复行**，可安全加）、P1-11（180s 整曲 DTW 实测 48.7s/0.5GB）、P1-12（提取信号量被 gather 架空 + 重试上限无复位口）、P1-13 余项（sing→ise 顺序扣白扣）、P1-14（唱歌 5 端点补 `response_model` + 前端 `bpm_source` 值域修正）。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 
 ## 2026-09-10 P0-6：请求体上限双层护栏（应用中间件 + nginx 纵深防御）· 2 op
@@ -334,7 +344,7 @@
 - **归档**：`worklog/BUG实测/匿名大body打爆容器.md`（复现/根因/修复/验证/踩坑）。
 - **遗留**：① 若部署层再加网关（nginx 之外），需按同口径加 `client_max_body_size`；② "鉴权前置"（连小 body 都不解析）本次**未做**——因为体量护栏已消除资源风险，重复鉴权逻辑收益低（组长方案 A 已明确）；③ `docs/21 §1.1` 的 `security` 全空（R-1）仍未闭合。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 
 ## 2026-09-10 P0-5：错误码契约虚设修复（HTTPException → envelope 全局 handler + 唱歌失败态码化）· 2 op
@@ -348,7 +358,7 @@
 - **归档**：`worklog/BUG实测/错误码契约虚设-HTTPException绕过envelope.md`（复现/根因/修复/验证/踩坑；含"踩坑 5：`max-lines` 门禁这轮真的拦下了我——对照 P0-0 的空操作 typecheck，门禁有效性的正反例"）。
 - **遗留**：① 未登记的 4xx/5xx 兜底码（40001/50002）属安全网，实际抛出集合已核对（400/401/404/409/422/429/502/503）；② **`docs/21 §1.1` 的 `security` 全空问题（R-1）仍未闭合**（`Depends` 非 `Security` → 快照无 security 声明、`x-test-user-id` 进公开契约），属独立项；③ 限流「sing→ise 顺序扣导致单侧失败白扣」与「done 判据 vs v5 overall=None」仍为 P1（本批只做码化，未改语义）；④ P0-6（multipart 解析早于鉴权 + 无 body 上限）待做。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 
 ## 2026-09-10 唱吧评分口径 v5：R1 起唱判据下沉逐句（P0 整改第 2 批，组长拍板方案 A）· 2 op
@@ -363,7 +373,7 @@
 - **归档**：`worklog/BUG实测/乱唱恒95分-R1闸门可绕过.md`（复现/根因/修复/验证/踩坑）。
 - **遗留**：① 本批与第 1 批后端修复需 `docker compose up -d --build python-api` 才在 demo 环境生效；② **前端报告区尚未展示 `no_onset`**（非 skipped 行的 `reason` 目前只在 skipped 行渲染）→ 建议 P2 补一行「该句节奏未计分」文案映射（含 `reason` 枚举中英映射，顺带解决拷问报告 D 路「reason 直出英文枚举」）；③ P0-4（面板 absolute 定位致滚动后白屏）/P0-5（40101/42901/50003 契约虚设）/P0-6（multipart 解析早于鉴权 + 无 body 上限）待续。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 
 ## 2026-09-10 唱歌模块 P0 整改（第 1 批：门禁 / 素材误删 / 发音切窗）· 3 op
@@ -377,7 +387,7 @@
 - **踩坑**：① 破坏性分支（`unlink`）之前必须跑完所有豁免判定——"豁免写在归属查询里"看似实现实则对超期文件永不生效；② 同一不变式在两侧各写一遍，必有一处写反（时间轴/正负号类 bug 建议抽公共映射函数，已登记 P2）；③ Fake 空心化掩盖整类缺陷（ISE 假打分器 offset=0 使 `±offset` 等价 → 回归必须构造**非零 offset**）；④ "门禁存在≠门禁生效"：命令语义随 tsconfig 结构变化而失效会形成**永久假绿**，判据是 `--listFiles` 能数出文件；⑤ 改 workflow 必须本地 `yaml.safe_load`（AGENTS.md 硬性要求）。
 - **遗留（下一步）**：P0-3 R1 换气闸门（`has_breath_structure` 整轨判据 + `_first_new_run` 的 `start==0` → 乱唱仍恒 95，**需组长拍板改判据**）；P0-4 面板 `absolute` 定位致滚动后白屏；P0-5 40101/42901/50003 契约虚设（HTTPException 无 envelope handler）；P0-6 multipart 解析早于鉴权 + 无 body 上限；以及 `feat/sing-m3` **推送/开 PR**（否则新门禁覆盖不到历史代码，需有写权限者执行）；本批修复需 `docker compose up -d --build python-api` 才在 demo 环境生效。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 
 ## 2026-09-10 唱吧收藏后端落地（song_favorites + 迁移 0011 + 收藏/取消端点 + 契约登记）· 4 op
@@ -393,7 +403,7 @@
 - **踩坑**：① **`max-lines` 350 又踩一次**——直接在 `MobileSingView.vue` 加行会 373/350 超限，处置是把歌单行抽成 `MobileSongRow.vue`（净减行数，见安卓日志）；② `pnpm typecheck`（`vue-tsc --noEmit`，不构建 project references）**不检查**测试夹具，而 `pnpm build`（`vue-tsc -b`）会——新增必填字段 `favorited` 后两处夹具（`LivePitchChart.test.ts` / `sing.test.ts`）只有 build 报错，**门禁必须跑 build**（本例即是）；③ 迁移在 SQLite 上跑不通（0002 起 `ALTER` 约束不支持，历史既有事实）——本地验证靠 `test_models` 的 **PG 方言离线渲染**（upgrade/downgrade 全路径编译）+ CI 同款快照对账，不臆造「迁移已实跑」；④ **容器代码 = 构建期快照**：`docker compose restart`/`up -d` 不带 `--build` 不生效；**迁移镜像同样不自动更新**——`run --rm migrate` 用 09-07 的旧镜像直接报 `Can't locate revision identified by '0010'`（是镜像旧，不是 DB 坏），必须 `--build`；⑤ **通用 toast 让排查变贵**：首版失败只有「请重试」，定位靠人工五段探测（前端/代理/路由/容器源码/DB），已改为按 HTTP 状态分流文案（404=后端未重建 / 401=登录过期 / 5xx=确认迁移），并落 5 例测试。
 - **遗留**：① ~~真容器/PG 实跑未做~~ → **已补**（同上端到端验证；本地无容器时仍以 PG 离线渲染 + SQLite 单测兜底）；② 收藏排序/收藏夹分组不做（docs/38 反借鉴清单已列）；③ 收藏态无本地缓存（断网/后端不可用 → 按钮操作失败 toast + 回滚，不做离线队列）；④ 演示/答辩前建议在**重建镜像后**先 `GET /openapi.json` 确认新端点在位再演示（本次教训固化为 BUG 实测踩坑 3）。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 
 ## 2026-09-10 真机反馈「胡乱唱也有高分」→ 评分口径 v4（乱唱鲁棒性 R1/R2/R3）· 5 op
@@ -409,7 +419,7 @@
 - **复现工具（入库）**：`local/hit_tol_scan.py`（命中率容差扫描）、`local/contour_corr_scan.py`（轮廓相关性验证）、`local/chaos_probe.py`（乱唱诊断）、`local/v4_false_positive_check.py`（误杀检查）——后续调判据前应先跑可分性验证（本轮踩坑 ①）。
 - **遗留**：① 命中率判据对"缓慢匀速滑音式演唱"仍会命中（物理上确实经过每个音，已在 BUG 实测记为已知边界）；② 准唱的命中率实测 58%（判据本身的路径/切分误差）→ 衰减下限取 0.6 已缓解，**SG-14 真机抽检后应复核**；③ 前端"在调音符占比"提示为新增文案，真机观感待验。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 
 ## 2026-09-10 唱歌 onset 检测评估（P2 遗留项①）→ F0 起音双通道仲裁实施 + BUG-5 回放 Content-Type 修复 · 4 op
@@ -422,7 +432,7 @@
 - **登记（docs）**：新增 `docs/audit/唱歌onset检测评估-频谱起音vsF0起音.md`（评估报告：方法/数据表/三结论/采纳方案/风险控制/已知边界；README 文档索引已登记）；docs/06 §9.4 item7 行更新（双通道仲裁 + `bpm_source` 值域）、§8 音频存储行补 BUG-5 修正；`worklog/BUG实测/录音回放ContentType与内容不符.md` 归档；主线日志本条。
 - **遗留**：① F0 起音参数（跳变 60 cent/桥接 96ms/去抖 120ms）由合成素材标定，**SG-14 真机抽检后应复核**；② 评估素材为合成音色，不含真人滑音/装饰音——真实录音只做了形态核对（无 ground truth）；③ 相位声码器场景（F1 0.26）非真实输入，仅作极端参考。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 
 ## 2026-09-10 唱歌模块功能测试（真容器全链路）→ 修复 4 个问题 · 5 op
@@ -436,7 +446,7 @@
 - **登记（docs）**：docs/06 §9.4 增「口径 v3 端到端实测与修复」表（BUG-1/2/3/4 → 修复后口径）；docs/10 §3.2 补「世代升级重提取走幂等 upsert + 重试上限注意」、§song_pitch_refs 补 `pitch_ref` 契约含 `onsets_ms`；主线日志本条 + 4 份 BUG 实测。
 - **遗留**：① 用户侧 onset 检测在"柔起音/连唱"下可能检出不足（本轮用相位声码器素材复现过极端情形）→ 建议 P2 评估 F0 起音兜底；② 真机验证（录音/实时音准线/AudioContext）仍待 M3 演示前；③ SG-14 人工抽检（FF 模糊化口径）待真实评审数据。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-10
+—— 执行人：LHRCarrier（AI 代工），2026-09-10
 
 
 ## 2026-09-09 SG-14 抽检一致性评审 P1（FF 模糊化 · 论文 s41598-026-46791-5 借鉴）· 2 op
@@ -449,7 +459,7 @@
 - **登记（docs）**：docs/06 §9.4 人工抽检行扩展（FF 模糊化口径 + review.py/CLI 位置 + 论文引用 + CRITIC/MAIRCA 不引入说明）；本文档本条。
 - **遗留**：真抽检数据（5 首×5 句）由组长组织评审填写 → `local/review_*.json`（gitignore）→ CLI 出报告入答辩材料；P2 探索（选歌 CRITIC-MAIRCA 排序、轻量近似维度补全）待排期，均不动评分公式。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-09
+—— 执行人：LHRCarrier（AI 代工），2026-09-09
 
 
 ## 2026-09-09 唱歌评分口径 v3（第二层「算法增强」· 组长拍板 item5~8 推荐项）· 4 op
@@ -463,7 +473,7 @@
 - **踩坑**：① `median_filter_f0` 首版漏「0 帧强制归零」——静音段边缘帧被"窗口内有 ≥2 个有声邻居"拉成音高（测试 `out[14:18]==0` 红）→ 补 `out[arr == 0] = 0.0`；② 真 pyin 端到端用例首版在 `APP_TESTING` 下静默走 `FakePitchExtractor`（恒 440Hz）→ 移调统计被污染、断言 40.0 分红——必须显式 monkeypatch 回真提取器；③ `_weighted_overall` 按 2 位小数四舍五入，测试断言容差 1e-6 → 0.01；④ 前端 `MobileSingView` 报告块 +2 行提示即触发 max-lines 350 门禁（357 超限）→ 提示并入既有 hint 块 + `statusBadge` switch 改 map 压缩（无行为变化，未进灰名单）。
 - **遗留**：SG-14 人工抽检 5 首×5 句 r≥0.7 未跑（v3 口径变化纳入抽检评估口径）；v3 素材真机验证（3 首 demo 与真人演唱）待 M3 演示前；`vocal_ref` 启用真声参考后颤音滤波的"仅用户侧"决策需按抽检复评。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-09
+—— 执行人：LHRCarrier（AI 代工），2026-09-09
 
 
 ## 2026-09-09 唱歌评分口径 v2（第一层「真实性」修正 · 组长拍板 A3/B2/C1）· 4 op
@@ -476,7 +486,7 @@
 - **踩坑**：① 局部 DTW 成本若用"双方各自中位归一化"的序列，会引入两条序列的基准偏移 → DTW 目标与评分目标不一致（对齐后仍 250 cent）；改为**绝对折叠 cent 差**的成本矩阵（句级规模可承受）才正确；② 门槛判"DTW 路径对数"会二次打折，改判"用户窗口有声帧数"；③ `math.ceil` 而非 `round`（30% 门槛 155 帧：round=46 与语义不符）。
 - **登记（docs）**：docs/06 §9.4 增「口径 v2」对照表（v1 缺陷 → v2 做法 + 实测依据）；docs/10 §4.3 `lines[i]` 结构补 `onset_dev_ms`/`cent_dev` 与 `low_frames` 原因；本文档本条。**遗留**：第二层（音域自适应移调/颤音滤波/onset 估 BPM）与第三层（LLM 教练点评/TTS 示范/个性化基准）待排期；SG-14 人工抽检 r≥0.7 仍是可信度硬证据。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-09
+—— 执行人：LHRCarrier（AI 代工），2026-09-09
 
 ## 2026-09-09 唱歌素材物化 + 曲目播种（SG-13/D-G2 · 组长拍板 A+B 方案）· 3 op
 
@@ -488,7 +498,7 @@
 - **踩坑**：① 首次提取全失败——本地裸跑 cwd=`services/python` 而素材在**仓库根** `data/audio`，`APP_AUDIO_DIR` 默认 `./data/audio` 解析错位（A-G7 路径三义性既有登记项）；容器内 `/app/data/audio` 正确，本地验证需显式 `APP_AUDIO_DIR=<仓库根>/data/audio`；② 失败 job 由扫描自动恢复（failed 且 attempts<上限 → 重置 queued），无需手工清库；③ `docker compose up -d --build` 首次 python 镜像下载依赖期间健康检查窗口超时 → 依赖它的 java/web 被跳过（Created 未启动），**再跑一次 `up -d java-api web`** 即恢复（非代码缺陷，登记为部署注意项）。
 - **遗留**：真人清唱素材替换路径已备（组长提供音频 + 歌词后：放 `data/audio/` → 在 `data/seed/songs.json` 追加条目（`vocal_ref_url` 可填独立人声轨）→ Java Seeder 幂等新增 → 提取自动 ready）；`scripts/setup-assets.ps1`（原计划 PowerShell 形态）以 Python 形态落地（跨平台 + 复用 numpy/soundfile）；素材仅 3 首童谣（演示足够，扩展由管理端 CRUD 或追加 seed 条目）。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-09
+—— 执行人：LHRCarrier（AI 代工），2026-09-09
 
 ## 2026-09-09 M3 唱歌 P0 六项全链路落地（D1~D7 组长拍板 · feat/sing-m3 分支 · 未推送）· 12 op
 
@@ -502,7 +512,9 @@
 - **踩坑**：① 计划书 40904/50002 与 origin/main J-08 登记冲突 → 顺延 40905/50003；② 单写方探针是文件级粗粒度守护——jobs.py 合法混读 Java 表与写 Python 表也会命中 `db.execute(update(...))` 模式 → 写形式改 ORM 属性赋值 + 探针清单修正（SongPitchRef 实为 Python 写方，docs/20 §4.1）；③ Java 测试 `.getBytes()` 只作用于最后一个字符串字面量（缺括号）→ 请求体损坏 400「请求体无法解析」（踩坑实录）；④ `sf.read(..., format=)` 非法参数被静默 except 吞掉 → 发音抽样恒空（改 sf.read 无 format）；⑤ 发音抽样后须重算 pron/overall（评分器聚合时 pron 未知）；⑥ SQLite 删空后 rowid 复用（PG IDENTITY 单调）——test 断言只比对引用不比对 revision 字符串；⑦ 移动端样式拆 `mobile-sing.css` 过大文件免责（max-lines 350 门禁）。
 - **遗留登记**：发音「weak 句优先」为 P2 增强（当前前 N 句）；重唱薄弱句（SG-15）M3 弹性未做；人工抽检 5 首×5 句 r≥0.7 排期在 W3（SG-14）；评分信号量观测与 60s 部署预热未跑（M4）；`sing_attempts` 无 (user_id,session_id) 唯一约束（幂等为应用层查重，DB 级守护留 P2）。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-09## 2026-09-10 修 main 上的 python-ci：Python 契约快照缺 21 条控制台路由
+—— 执行人：LHRCarrier（AI 代工），2026-09-09
+
+## 2026-09-10 修 main 上的 python-ci：Python 契约快照缺 21 条控制台路由
 
 - **起因**：直推 main 后 CI 报 `Some checks were not successful`——`python-ci / lint · test · alembic` 1 分钟后失败，
   其余 4 项（docker-build ×3、secret-scan）成功。
@@ -1400,7 +1412,7 @@
 - 验证：`mvn verify` 全绿（含 ContractSnapshotTest 契约对账、AuthFlowTest 5 例）；前端配套（记住我/退出接线/测试）见安卓日志同日期条；Python 零改动（`/auth` 全走 Java）；
 - 边界：登出后旧 refresh 立即 401，「30 天窗口可续命」关闭；登录限流、演示账号弱密码（demo123456）为已知项（安全评审意见，未在本轮范围，建议答辩前处理）。
 
-—— 执行人：Faust-sudo（AI 代工）
+—— 执行人：LHRCarrier（AI 代工）
 
 ## 2026-09-07 提交与 PR：fix/p0-hardening（P0 全集+R-18+P0-7+asr_failed 修复，10 commits）
 
@@ -1419,7 +1431,7 @@
 - **提交前门禁**：pytest **230 passed, 1 skipped**（含 pg/redis 容器用例）；ruff/format 绿；`compose config` exit 0；5 份 workflow `yaml.safe_load` 通过；此前全量检测（三端 CI 等价 + 实机 12 项）全过；
 - **备注**：CI 触发路径 = PR 上 python-ci/java-ci/frontend-ci（pull_request）；docker-build 仅 push main 触发，合入后生效。
 
-—— 执行人：Faust-sudo（AI 代工整理）
+—— 执行人：LHRCarrier（AI 代工整理）
 
 ## 2026-09-07 BUG-0xx 修复：「管线提示 asr_failed」—— whisper 模型未预下载 / 容器到 HF 不可达（审计 R-11 欠账兑现）
 
@@ -1428,7 +1440,7 @@
 - **验证**：重建镜像 → 容器 healthy 且无预热失败告警 → **真音频回合全序列通过**（user_transcript→text_delta×15→score_delta→audio_chunk×3→meta_block→turn_end，零 error）；本地 `WhisperModel(本地目录)` 加载 OK；
 - **踩坑（详见 BUG实测 归档）**：① 本机 Python SSL 证书链坏（uv 自带 CPython 无 local issuer；requests/httpx/huggingface_hub 全 `CERTIFICATE_VERIFY_FAILED`，curl `--ssl-no-revoke` 正常）——下载绕道 curl；② HF 仓库无 `preprocessor_config.json`（"Entry not found" 文本会被误存为脏文件）；③ 真音频热路径此前零实机覆盖（仅 Fake ASR 单测 + start 冒烟）。
 
-—— 执行人：Faust-sudo（AI 代工整理）
+—— 执行人：LHRCarrier（AI 代工整理）
 
 ## 2026-09-07 项目全量检测（P0 全集+R-18+P0-7 后终态 · 全项通过 · 可提交状态）
 
@@ -1440,7 +1452,7 @@
 - **结论**：全项通过、无回归、可提交；剩余非 P0 登记项：defense/shadow DB 小段 to_thread、pg/redis 用例接 CI、DB 角色方案（M3）；**建议下一步按模块分批本地 commit（不 push）**；
 - **产物**：`local/full-audit-report-2026-09-07.md`。
 
-—— 执行人：Faust-sudo（AI 代工整理）
+—— 执行人：LHRCarrier（AI 代工整理）
 
 ## 2026-09-07 P0-7 写方唯一性 AST 探针落地（docs/10 §3.1 矩阵 · docs/19 P0-7 · 纯 CI 面 · P0 全集收口）
 
@@ -1451,7 +1463,7 @@
 - **踩坑（环境级,已修）**：importlib `module_from_spec` 未注册进 `sys.modules` 时,Python 3.13 dataclasses `_is_type` 走 `sys.modules[cls.__module__].__dict__` → NoneType AttributeError —— 测试加载器必须先 `sys.modules[name] = mod` 再 exec_module（本机 anaconda 3.13 与 uv 3.12 均复现）;
 - **至此 P0 全集收口**：P0-1/2/3/4/5/7/8/9 + R-04/06/10/12/18 全部落地（剩余非 P0 项：defense/shadow DB 小段 to_thread、pg/redis 用例接 CI、DB 角色方案 M3 再议）。
 
-—— 执行人：Faust-sudo（AI 代工整理）
+—— 执行人：LHRCarrier（AI 代工整理）
 
 ## 2026-09-07 R-18 SSE 心跳落地（审计 R-18 · 拍板：心跳 15s / 前端超时 90s · P0-7 顺延）
 
@@ -1461,7 +1473,7 @@
 - **验证**：pytest **223 passed, 1 skipped**（+5）；前端 lint/typecheck/**77 tests**/build 绿；ruff/format 绿；实机重建 python-api 后回合 SSE 事件完整（turn_start/text_delta15/audio_chunk3/meta_block/turn_end），快流无 ping 符合预期；契约快照零影响（注释行≠JSON 事件，SSE 本就不进 OpenAPI）；
 - **踩坑**：① `heartbeat_stream` 默认 serializer=sse_payload —— 若内部流已预序列化会二次序列化（free_chat 首版因此破，改为内部产出**事件对象**、由 wrapper 统一 serialize）；② 前端测试假 Response 必须带 `ok: true`（否则走错误分支）；③ 假 reader 的分支工厂若同步 resolve，三条 read 会挤在同一 tick，测不到"重置"（须按真实时序 setTimeout 分布）。
 
-—— 执行人：Faust-sudo（AI 代工整理）
+—— 执行人：LHRCarrier（AI 代工整理）
 
 ## 2026-09-07 P0 批次 0-3 后全栈回归 R2（三端门禁+契约对账+实机 · 1 处自引注释差异已修 · 全部通过）
 
@@ -1469,7 +1481,7 @@
 - **唯一发现（自引，非功能）**：`GET /api/v1/scenarios` 契约快照对账红 —— 批次 1 给 `list_scenarios` **docstring** 加了"P0-2 to_thread"一行 → FastAPI 将路由 docstring 写入 OpenAPI `description` → 文本级对账（CI 同口径）必红；**处置**：说明移入函数体注释、docstring 复原 → 对账 ok（exit 0）；**踩坑登记**：路由 docstring 属契约面，实现说明一律写代码注释；
 - **产物**：`local/regression-report-R2-2026-09-07.md`；后续建议（报告 §7）：A. P0-7 探针（0.5 天）→ B. R-18 SSE 心跳（1 天，前后端）→ C. defense/shadow DB 小段 → D. 集成用例接 CI。
 
-—— 执行人：Faust-sudo（AI 代工整理）
+—— 执行人：LHRCarrier（AI 代工整理）
 
 ## 2026-09-07 P0 批次四：边生成边合成（首声预算）+ orchestrator 落库短事务化（docs/19 P0-5/P0-2 · 审计 R-04 · 拍板：音频=流文本/仅运行时缓存/仅 dialog 段）
 
@@ -1481,7 +1493,7 @@
 - **验证**：pytest **218 passed, 1 skipped**（+8 切分器用例；pg/redis 容器用例仍绿）；ruff/format 绿；**实机 SSE 事件序 `turn_start → text_delta×18 → audio_chunk×3（逐句按序） → meta_block → turn_end`**；缓存 4 条 + 音频落盘确认；
 - **踩坑**：① `Path` 忘记导入（TTS 缓存接线后任何合成即 NameError——靠 test_shadow 全回合抓到）；② `rstrip` 而非 `strip`——句尾引号会被边界匹配吞入句内（"Great job!  \""）；③ `tts_sentences` 移除引用后需确认无残留使用。
 
-—— 执行人：Faust-sudo（AI 代工整理）
+—— 执行人：LHRCarrier（AI 代工整理）
 
 ## 2026-09-07 P0 批次三：Testcontainers 安全网 + 会话态切 Redis + 同步 IO 短事务化（docs/19 P0-1/P0-2 · 审计 R-12/R-10 · 拍板：本地安全网/分级降级/安全子集）
 
@@ -1492,7 +1504,7 @@
 - **安全网首次抓到方言差异**：① testcontainers 4.15 PG URL 为 `postgresql+psycopg2://`（须归一为 +psycopg）；② 真 PG FK 强制（SQLite 不校验）——完整回合用例须先种 `users` 行（测试内修正，非代码缺陷）；③ legacy `RedisContainer` 无 `get_connection_url()`（手工拼 URL）；④ pytest-asyncio 每用例独立事件循环 → redis 连接绑定 loop（客户端改**函数级**、容器保持模块级）；
 - **待办登记**：pyproject/uv.lock 变更待审；pg/redis 标记用例接入 CI 留单独 PR（本次按拍板未动 workflow）。
 
-—— 执行人：Faust-sudo（AI 代工整理）
+—— 执行人：LHRCarrier（AI 代工整理）
 
 ## 2026-09-07 P0 批次回归测试（全栈门禁 + 实机冒烟 · 无回归 · 放行 Batch 2）
 
@@ -1501,7 +1513,7 @@
 - **环境告警（非代码）**：本机 `apps/web/node_modules` 缺 `@vue/test-utils`（package.json/lockfile 已声明）→ `pnpm install --frozen-lockfile` 补齐后全绿；CI 新鲜安装无影响；
 - **产物**：`local/regression-report-2026-09-07.md`（过程性报告，不入库）。
 
-—— 执行人：Faust-sudo（AI 代工整理）
+—— 执行人：LHRCarrier（AI 代工整理）
 
 ## 2026-09-07 P0 批次二：会话/报告越权守卫 + 报告幂等（docs/19 P0-3/P0-8 · 审计 R-05 · 拍板：短路+upsert 兜底/继续仅工作区）
 
@@ -1511,7 +1523,7 @@
 - **验证**：pytest **205 passed**（+4）；ruff check/format 绿；契约快照零新增 diff（无接口签名变化）；python-api 重建后 healthy + 无 token /tts 仍 401；仍仅工作区、未 commit/未推送；
 - **踩坑**：① 归属校验前置改变了校验顺序——凡"故意用不存在的会话测输入守卫/限流"的用例都必须改为真实会话；② `Report` 原为函数内局部 import，重构后须提升到模块级（`from app.models import Report`）。
 
-—— 执行人：Faust-sudo（AI 代工整理）
+—— 执行人：LHRCarrier（AI 代工整理）
 
 ## 2026-09-07 P0 止血批次开工：裸端点鉴权限流 + 信号量 + 密钥三档（docs/19 P0-4/P0-9 · 审计 R-06/R-10 · 拍板：三档策略/全链路统一扣减/仅工作区）
 
@@ -1522,7 +1534,7 @@
 - **验证**：pytest **201 passed**(新增 4 例:生产档抛错/开发档告警/testing 回退/显式值不被覆盖 + audio 401 失败用例);ruff check+format 绿;`mvn verify` **BUILD SUCCESS**(spotless 66 files clean,测试全绿——测试档密钥走既有 `application-test.yml`,零 CI 改动);compose config 校验通过;契约快照待刷新(4 端点新增 header 参数,结构 diff 已核对);
 - **踩坑**：① pydantic-settings 下测试进程 env `APP_TESTING=true` 会让 production 用例走 testing 档——用例须显式 `testing=False`;② `.env`(GBK)非 UTF-8,常规文本工具读写会乱码,追加用 `Add-Content -Encoding Default`。
 
-—— 执行人：Faust-sudo（AI 代工整理）
+—— 执行人：LHRCarrier（AI 代工整理）
 
 # 2026-09-06 /auth/forgot 忘记密码（演示口径：工单闭环 + 防枚举 · 51 op）
 
@@ -1791,7 +1803,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 4. **根 `.env` 编码**：本机为 GBK（用户历史）；后续编辑务必按原编码（936）读写，UTF-8 工具会毁中文注释（已在归档踩坑 3 记录）。
 5. **容器侧 HF 缓存未闭合（K03）**：compose 无 `hf-cache` 卷、无 `HF_*` 变量注入——容器内模型加载仍回退默认路径（无本地缓存时首次联网下载，被墙即 500）；建议后续独立 PR 补齐 compose（volume + XET 变量），本 PR 只保证不更坏、不误导。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 
 
 ## 2026-09-04 入学测试评分恒为 90/86 → 密钥填错文件（根 .env vs services/python/.env）
@@ -1804,7 +1816,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 
 **教训**：① .env 按「哪个进程读它」分账——compose 读根 .env、方式 B 读 services/{py,java}/.env，填错位置 = 配置不生效且无任何日志；② `--reload` 只管 .py，.env 变更必须硬重启；③ 「恒定评分」先验桩/真（`FakeScorerClient` 常数即 90/86），再谈算法——README FAQ「语音接口返回固定文本」已写此约定。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 
 
 ## 2026-09-04 入学测试录音 500 排障 · 方式 B 缺 HF 缓存约定（whisper 模型加载失败）
@@ -1820,7 +1832,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 
 **验证**（无 HF 环境变量冷起 :8001 隔离实例）：readyz OK → edge-tts 合成语音提交 → `code=0`，转写逐词正确、pron 90/flu 86/wpm 203.7；测试 attempt 已清理。复审后补：容器布局模拟导入 ✓（修复前 IndexError: 3）。详见 `worklog/BUG实测/方式B-Python-ASR-HF缓存失配.md`（踩坑 5 条：httpx 栈分同步/异步定位第三方库、报错文案反查 site-packages、预热吞异常、容器/本地环境变量契约缺口应落代码默认值、ASR 无 fail-open）。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 
 
 ## 2026-09-04 方式 B（`mvn spring-boot:run`）Java 启动失败排障 · 三端 DB 密码对齐
@@ -1838,7 +1850,7 @@ if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
 
 **验证**：`mvn spring-boot:run` → `Started VocalverseApplication in 8.505s`；`/actuator/health`=UP；`/api/v1/ping` code=0；DemoSeeder 就绪。详见 `worklog/BUG实测/方式B-Java启动-DB密码失配.md`（含踩坑 5 条：Dialect 表象、密码同步口径含 Java、根 .env 是 GBK 编码、`POSTGRES_PASSWORD` 仅初始化生效、PG 排查三步次序）。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 
 ## 2026-09-04 影子跟读联调台：录音完成 → 试听自己读的 → 确认提交/重录
 
@@ -2234,7 +2246,7 @@ SVG 图在各自 fn 开头自清空），与看板文件路径一致。
 
 **待办（后续）**：① 前端推荐位联调（impression/click 上报）；② Java UserProfileEntity 补 interest_tags 映射 + InternalLevelController 幂等 PUT（A-2.2）；③ 迁移 0003 在真 PG 上 `alembic upgrade` + `alembic check` 零 diff；④ docs/10 写权矩阵补 shadow_materials（A-2.3）；⑤ 3 张新表演示账号/难度标签的契约（C10/D7）待 M3 排期。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 ## 2026-09-02 推荐系统落地实现 · 阶段 4（规则推荐引擎 + 路由）
 
 > 阶段 3（掌握度 + 收尾挂钩）已交付。本阶段落地**体系三匹配**：`app/rec` 的 recommend_scenes/recommend_shadow + 路由 `GET /api/v1/recommendations`。**可按评审后进入阶段 5（演示数据播种 + 端到端联调）。**
@@ -2282,7 +2294,7 @@ L2 无 L4（C1/C8）/ 已掌握垫底（C9）/ 冷启动零档案返回默认（
 
 阶段 5：演示数据播种 + 端到端联调（`batch_calculate_difficulty --db` 预置 8 场景先验、3 个水平演示账号 L2/L3/L4 预置 user_skill_state、前端推荐位联调），并对齐 local/32 A-5.1~A-5.5 的演示前置。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 ## 2026-09-02 推荐系统落地实现 · 阶段 3（掌握度写入 + 会话收尾挂钩）
 
 > 阶段 2（素材难度专家规则）已交付。本阶段落地**体系三**：`app/mastery` 写 user_mastery（场景级）+ user_corpus_mastery（句级），并把 `update_user_level` + `update_session_mastery` 挂进 `complete_session` 收尾（A-3.3/A-6.5 完成）。**可按评审后进入阶段 4（推荐引擎 recommend_*）。**
@@ -2323,7 +2335,7 @@ L2 无 L4（C1/C8）/ 已掌握垫底（C9）/ 冷启动零档案返回默认（
 
 阶段 4：推荐引擎 `app/rec`（`recommend_scenes`/`recommend_shadow`，主查询 SQL + 扩档 + L4 复习席 + 曝光埋点 + Redis 缓存/主动失效 + 路由 `GET /api/v1/recommendations`）。前置于此：跑 `batch_calculate_difficulty --db` 把 8 场景先验写进 material_difficulty（推荐 SQL 靠它）。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 ## 2026-09-02 推荐系统落地实现 · 阶段 2（素材难度专家规则）
 
 > 阶段 1（update_user_level）已交付。本阶段落地**体系二**专家规则：三维度（词汇/句法/发音）+ CEFR 语义锚定 + 批量脚本。**可按评审后进入阶段 3（掌握度写入）。**
@@ -2376,7 +2388,7 @@ dim_to_100 / 词汇 CEFR 白名单修正（easy<3 且 hard>3）/ 句法嵌套 / 
 
 阶段 3：掌握度写入（`app/mastery`，user_mastery + user_corpus_mastery 会话收尾按 corpus_hit/attempts 聚合写入）。在此之前先补一个**演示前置**：`batch_calculate_difficulty --db` 要把 8 场景先验写进 material_difficulty（推荐 SQL 靠它，A-5.3）。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 ## 2026-09-02 推荐系统落地实现 · 阶段 1（`update_user_level` 核心函数）
 
 > 阶段 0（配置+5 表模型+迁移 0003）已交付并验证。本阶段落地**体系一核心** `app/skill/service.py`，含冷启动/滞回/低谷保护/难度归一化(符号修正)/幂等/事务。**可按评审后进入阶段 2（素材难度脚本）。**
@@ -2432,7 +2444,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 
 阶段 2：素材难度专家规则脚本（`app/difficulty/rules.py` + `batch_calculate_difficulty`，含 CEFR 锚定表 + 句法维度补全 local/32 A-1.2/A-1.3）。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 ## 2026-09-02 推荐系统落地实现 · 阶段 0（地基：配置 + 数据模型 + 迁移 0003）
 
 > 依据 local/31 §2（5 表 DDL）+ local/32 六维拷问修订（config 零落地/滞回/低谷保护等）。**可按评审通过后进入阶段 1（update_user_level）。** 每步均已验证。
@@ -2480,7 +2492,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 
 阶段 1：`app/skill/service.py` 的 `update_user_level(user_id)`（含冷启动/滞回/低谷保护/事务/幂等）。请先审本阶段，**确认 OK 再开下一阶段**。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 ## 2026-09-02 推荐系统六维火力拷问（算法侧交付物，归档 local/32）
 
 派 6 个子代理对 local/26~31 推荐系统设计做对抗式拷问（20 问 × 6 维度：数据冷启动/算法严谨/工程集成/边缘降级/验收演示/排期资源），全部实读代码+文档，产出 `local/32-语音链路现状与风险清单·推荐系统六维拷问.md`（正文 20 问逐项答辩 + 附录 A 六维度证据级增补）。**未改代码、未动现有文档。**
@@ -2491,14 +2503,14 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 
 待拍板（汇总）：① 验收口径修订（docs/06 §9.5 换 scope 还是扩候选）；② 推荐做多深（保底规则版 1~1.5 人日 vs 全量 P1 5~8）；③ 影子跟读身份（二期扩展 vs 主玩法）；④ 难度秒变入口归属（Python internal 接口）；⑤ 复习席 mastery>80% 触发；⑥ 通用化滞回 + 低谷保护列。建议开工前补 docs/20-M3 实施计划。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 ## 2026-09-02 推荐系统详细设计说明书（汇总定稿，归档 local/31）
 
 整合 local/26~30 全部讨论为一份可交付设计说明书（`local/31-推荐系统详细设计说明书.md`），作为 M3 实现与答辩的统一依据。结构：设计目标与约束（技术栈/写方唯一性矩阵/统一尺度/四水平消歧）→ 三套评价体系（5 张新表 DDL：user_skill_state / material_difficulty / user_mastery / user_corpus_mastery / shadow_materials）→ 联动数据流图 + 端到端旅程（甲 t0~t3 复算表）→ 核心算法伪代码（update_user_level 含滞回与幂等、batch_calibrate 含触发阈值、recommend_scenes/shadow 主查询 SQL）→ 冷启动与降级 7 层 → 验收标准（6 组 40+ 单测用例含 I1~I5 不变量与 local/30 修订回归）。
 
 **本文为准的三处修订**（相对 local/26~29）：① confidence 统一 `min(1, n/window)`（修 0.8→0.5 跳变）；② est_level 滞回带 [67,70)（skill_band_hysteresis=3，升即时/降滞后）；③ 空池兜底宁缺毋滥（限 L−1 档 + fallback 标记，<3 返回空态）。配置项汇总 18 项 + 待拍板 6 项集中到 §7.2。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 ## 2026-09-02 三套体系联动端到端数值模拟（算法侧交付物，归档 local/30）
 
 把 local/26/27/28/29 串成完整用户旅程并做数值验证（`local/30-三套体系联动·端到端数值模拟.md`），**全部数字脚本复算**（venv python）。
@@ -2509,7 +2521,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 - **模拟发现 3 个逻辑漏洞**：① local/27 confidence 不连续（n=4→0.8、n=5→0.5，两分支公式不一）→ 统一 conf=min(1,n/window)；② 档位边界震荡无滞回（est 70±0.5 → 推荐窗口整窗翻转）→ 滞回带 [67,70)，升即时/降滞后，skill_band_hysteresis=3 进配置；③ 极端空池兜底会推 L1 给 L3 → 宁缺毋滥（兜底限 L−1 档 + fallback 标记，池<3 返回空态）。
 - 不变量 I1~I5 全部成立（正常路径无"L3 用户被推 L1"）。待拍板 3 项：滞回设计、confidence 修订随 0003、宁缺毋滥兜底。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 ## 2026-09-02 规则推荐引擎详细实现（算法侧交付物，归档 local/29）
 
 承接 local/26~28，落地规则推荐引擎（`local/29-规则推荐引擎·详细实现.md`）。先实读核实：**user_corpus_mastery 不存在**（0001/0002 共 20 表），一并设计；user_mastery/user_skill_state/material_difficulty/shadow_materials 均为设计稿（迁移 0003+ 待落地）。
@@ -2518,7 +2530,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 
 交付：`user_corpus_mastery` DDL（句级明细，与 user_mastery 场景级快照分工：推荐直读 user_mastery，句级喂聚合/报告/复习调度）；`recommend_scenes(user_id, limit=6)` + `recommend_shadow(user_id, limit=3)` 完整 SQLAlchemy 实现（主查询+扩档+复习席+曝光埋点，只写 events）。待拍板 3 项：复习席比例/间隔窗口进配置、scenario_id 归档语义、L1~L3 是否也开复习席。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 ## 2026-09-02 素材难度评价分阶段实施策略（算法侧交付物，归档 local/28）
 
 承接 local/26 §4 + local/27 §1/§3/§7，产出素材难度两阶段实施策略（`local/28-素材难度评价·分阶段实施策略.md`）。先核实依赖：numpy 是直接依赖（pyproject.toml L24），但脚本刻意用纯 Python stdlib（40 条量级阈值映射无向量化收益，CI/单测零额外依赖）。
@@ -2529,7 +2541,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 - **DB 字段**：material_difficulty 增 difficulty_source('expert'|'blend'|'calibrated')/prior_score/calibrated_score/calibration_count/distinct_users/last_calibrated_at，features JSONB 存维度明细。
 - 待拍板 3 项：CEFR 词表白名单 vs 标定兜底、校准频率、source 三态展示口径。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 ## 2026-09-02 用户水平动态评价实现细节深化（算法侧交付物，归档 local/27）
 
 承接 local/26，深化动态水平体系为可落地实现（`local/27-用户水平动态评价·实现细节深化.md`）。先实读代码核实：练习轮 ISE 以 ASR 转写为参考（自参照评分，`orchestrator.py:161/454`）；`complete_session` 是会话收尾唯一咽喉（orchestrator 三处 + practice.py 路由）；回调先例 `placement.py::_callback_level`（httpx + service-token）；Java `InternalLevelController` 现为无条件覆盖（需扩 level_at 幂等 PUT，`user_profiles.cefr_level_at` 列已存在）。
@@ -2538,7 +2550,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 
 交付：完整 `update_user_level(user_id)`（SQLAlchemy，含冷启动分支、事务回滚、三层幂等：收敛重算/行锁/唯一约束）、`notify_java_level` httpx 回调（level_at 幂等 PUT，默认关、考试专属）、集成点 diff（complete_session 末尾 + placement finalize）、单测清单 7 条。事务回滚与幂等性已主动内建（预期追问项，未漏）。
 
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 ## 2026-09-02 推荐系统整体框架设计（算法侧交付物，归档 local/26）
 
 算法负责人产出推荐系统整体框架设计稿，先实读代码核实约束再成稿：40 条场景语料 = `data/seed/scenarios.json` 8 场景 × 5 句（已逐条核对）；影子跟读素材尚无内容表。交付物（`local/26-推荐系统整体框架设计·三套评价体系与统一尺度映射.md`）：
@@ -2549,7 +2561,7 @@ local/27 §4.1 公式写 `s = 0.6·pron + 0.4·flu − (diff_score − 70)`，�
 - 全程守写方唯一性：不写 `scenarios.difficulty` / `user_profiles.cefr_level`（只读映射兜底），动态档位只落 Python 表；推荐埋点复用既有 `events.recommend_impression/click`，CTR 口径复用 `reports`。
 
 待组长拍板：§9.3 开放项 4 条（场景难度聚合系数、0.75 锚点参数化、影子跟读是否进 sessions.kind、难度缺行兜底）。
-—— 执行人：Faust-sudo
+—— 执行人：LHRCarrier
 
 ## 2026-09-02 lieflat-charts 表盘美化（预览高保真）：按技能选型规则出图，不"接入"库
 
