@@ -22,6 +22,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.audio.ffmpeg_utils import probe_duration_seconds
 from app.audio.pitch import to_16k_mono_wav
@@ -212,7 +213,49 @@ async def submit_song_audio(user_id: int, session_id: int, audio: bytes) -> dict
                 alignment={},
             )
             db.add(attempt)
-            db.commit()
+            try:
+                db.commit()
+            except IntegrityError:
+                # B1（PR#34 评审 · 阻塞级）：**并发双击 / 弱网重传**时两个请求都在上面读到
+                # `existing=None`（读事务已结束），于是各自走到这里提交——后提交者撞迁移 0016 的
+                # `uq_sing_attempts_user_session`。修复前此处无 except → `IntegrityError` 冒泡出
+                # 函数，而 `app/main.py` 只有 BizError / ConsoleBizError / RequestValidationError /
+                # HTTPException 四个 handler，**不覆盖 SQLAlchemy 异常** → 非 envelope 的 500。
+                # 也就是说唯一键只把"落两行"换成了"输家 500"，P1-3 的幂等语义并没闭合。
+                # 兜底写法与仓内既有四处同款（DB 原子性兜底）：
+                #   reading/service.py:267（用户词表）/ favorites.py / events.py / media/service.py
+                #   —— 回滚 → 回读**赢家已落**的那一行 → 按既有幂等分支返回。
+                db.rollback()
+                again = (
+                    db.execute(
+                        select(SingAttempt)
+                        .where(
+                            SingAttempt.user_id == user_id,
+                            SingAttempt.session_id == session_id,
+                        )
+                        .order_by(SingAttempt.id.desc())
+                    )
+                    .scalars()
+                    .first()
+                )
+                if again is None:  # 行随后被并发删掉（理论竞态）→ 原样抛出，不掩盖
+                    raise
+                logger.info(
+                    "sing attempt submit lost race: reuse attempt=%s (user=%s)",
+                    int(again.id),
+                    user_id,
+                )
+                # ①②：赢家已定稿 → 幂等返回既有结果；赢家已建任务态 → 幂等返回状态。
+                # ③（失败草稿就地重置）**不适用**：能撞上唯一键说明赢家是刚刚落下的草稿，
+                # 重置会清掉赢家正在跑的那一行、并二次起 worker —— 输家只回报状态。
+                if _attempt_finished(again):
+                    return await _status_payload(int(again.id))
+                task = await _task_get(int(again.id))
+                if task is None:
+                    # 赢家"已 commit、任务态尚未写入"的极窄窗口：按已受理回执返回
+                    # （与正常返回同形），真实状态由随后 status 轮询给出。
+                    return {"attempt_id": int(again.id), "status": "queued"}
+                return await _status_payload(int(again.id))
             attempt_id = int(attempt.id)
     finally:
         db.close()
