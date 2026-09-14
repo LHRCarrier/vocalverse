@@ -68,7 +68,7 @@ winget install ffmpeg          # 缺 ffmpeg 时（音频转码必需）
 
 ```powershell
 cd 仓库根目录
-Copy-Item .env.example .env    # 可选；不填也能起（占位符），但 AI 功能保持 stub
+Copy-Item .env.example .env    # **必须**：compose 对 POSTGRES_PASSWORD / JWT_SECRET 等显式必填（`:?required`），缺 .env 会直接报错；AI 功能密钥不填则保持 stub
 .\scripts\dev.ps1              # 构建并启动 5 个服务（首次较慢，见常见问题）
 ```
 
@@ -80,7 +80,7 @@ Copy-Item .env.example .env    # 可选；不填也能起（占位符），但 A
 | Python API 文档 | http://localhost:8000/docs | 可试 `POST /api/v1/asr`、`/tts`、`/score`、`/llm/chat`（返回 stub 结果） |
 | Python 健康检查 | http://localhost:8000/healthz 、/readyz | 返回 `{"status":"alive"}` / `code=0` |
 | Java API 文档 | http://localhost:8080/swagger-ui.html | `/actuator/health` 返回 UP |
-| 数据库 | localhost:5432 (PG) / 6379 (Redis) | 账号见根 `.env`（默认 vocalverse / vocalverse-dev） |
+| 数据库 | localhost:5432 (PG) / 6379 (Redis) | 账号见根 `.env` 的 `POSTGRES_USER` / `POSTGRES_PASSWORD`（compose 自 2026-09-14 起**无回退值**，必须先复制 `.env.example`） |
 
 停止：`docker compose down`（清数据加 `-v`）。
 
@@ -182,7 +182,7 @@ cd apps/mobile/android; .\gradlew.bat assembleDebug
 |---|---|
 | `docker compose` 报 `failed to connect to the docker API` | **Docker Desktop 没启动**：先启动 Docker Desktop 并等引擎就绪（任务栏鲸鱼图标转绿），再执行 compose |
 | `mvn spring-boot:run` 报 Hibernate `JdbcEnvironmentInitiator` / 数据库连接失败 | 方式 B 漏了起依赖：先 `docker compose up -d postgres redis` 且 `docker compose ps` 显示 healthy；若 Java 配置连的不是容器库，检查 `DB_HOST` 环境变量（默认 localhost:5432，见 `services/java` 的 `application.yml`） |
-| 启动日志含 `FATAL: password authentication failed for user "vocalverse"`（随后 `Unable to determine Dialect without JDBC metadata` 退出码 1） | **DB 密码失配**：Java 默认 `DB_PASSWORD=vocalverse-dev`，本机库实际密码必须与 compose 回退值一致——根 `.env` / `services/python/.env` / 本机 DB 三处同步（2026-09-04 实测处置：`ALTER USER ... PASSWORD 'vocalverse-dev'` 后三端恢复，见 `worklog/BUG实测/方式B-Java启动-DB密码失配.md`） |
+| 启动日志含 `FATAL: password authentication failed for user "vocalverse"`（随后 `Unable to determine Dialect without JDBC metadata` 退出码 1） | **DB 密码失配**：Java 默认 `DB_PASSWORD=vocalverse-dev`，本机库实际密码必须与根 `.env` 的 `POSTGRES_PASSWORD` 一致（compose 自 2026-09-14 起为显式必填、**无回退值**）——根 `.env` / `services/python/.env` / 本机 DB 三处同步（2026-09-04 实测处置：`ALTER USER ... PASSWORD 'vocalverse-dev'` 后三端恢复，见 `worklog/BUG实测/方式B-Java启动-DB密码失配.md`） |
 | 端口 8088/8000/8080 被占用 | `Get-NetTCPConnection -LocalPort <port> -State Listen` 找 PID 释放；或改 compose 的 ports 映射 |
 | Java 启动日志结尾报 `APPLICATION FAILED TO START ... Port 8080 was already in use` | **机器上已有 Java 实例在跑，别开第二个**（第一个是活的，不是服务挂了；2026-09-01 实测踩坑：第二个实例失败、第一个一直正常服务）。`Get-NetTCPConnection -LocalPort 8080 -State Listen` 找 PID 确认；要换新版本就 `taskkill /PID <pid> /F` 后再起 |
 | Java 启动日志显示 `using Java 24.x` / IDE 直接跑但端口被自己占 | **`JAVA_HOME` 设错**：项目钉死 JDK 21（docs/06 §3），以 Temurin 21 为准：`[Environment]::SetEnvironmentVariable('JAVA_HOME','C:\Program Files\Eclipse Adoptium\jdk-21.0.8.9-hotspot','User')` 后**重开终端**；`mvn -version` 显示 Java 21.0.x 即对齐。Java 24 跑 Spring Boot 3.3 当前能起但有一串 native-access 警告（未来版本会直接拦截）且与 CI 环境不一致 |
@@ -194,9 +194,10 @@ cd apps/mobile/android; .\gradlew.bat assembleDebug
 | Windows 长路径/编码问题 | `git config --global core.longpaths true`；`.gitattributes` 已强制 LF（.ps1/.bat 用 CRLF） |
 | Java 日志中文乱码（如「演示账号就绪」变「婕旂ず璐」） | 双重错位：① 编译期 pom 未声明编码（已钉 `project.build.sourceEncoding=UTF-8`，改 pom 后重新编译生效）；② 运行期终端码页——VSCode 终端先 `chcp 65001` 再起 Java，或 `mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"`（Java 18+ 生效）；Python/edge-tts 脚本同理：`$env:PYTHONIOENCODING='utf-8'` |
 | `.env` 忘记填密钥 | M1 不阻塞（占位符可起）；M2 起 DeepSeek/讯飞必须填，且严禁提交 `.env` |
-| seed/迁移报 `password authentication failed for user "vocalverse"` | **DB 密码与 compose 默认不一致**：`services/python/.env` 的 `APP_DATABASE_URL` 密码必须等于 `docker-compose.yml` 的 `${POSTGRES_PASSWORD:-vocalverse-dev}`（`.env.example` 默认已是 `vocalverse-dev`）；改密码需三处同步（compose 环境变量 / services/python/.env / 根 `.env` 的 `POSTGRES_PASSWORD`） |
+| seed/迁移报 `password authentication failed for user "vocalverse"` | **DB 密码与根 .env 不一致**：`services/python/.env` 的 `APP_DATABASE_URL` 密码必须等于根 `.env` 的 `POSTGRES_PASSWORD`（`.env.example` 的 dev 占位是 `vocalverse-dev`；compose 自 2026-09-14 起为 `${POSTGRES_PASSWORD:?…}` 显式必填、无回退值）；改密码需三处同步（services/python/.env / 根 `.env` 的 `POSTGRES_PASSWORD` / 本机 PG） |
 | `alembic` 命令不识别 | Windows 下 venv 不在 PATH：一律 `uv run alembic ...`（uv 前缀同样适用于 uvicorn/pytest） |
 | 8000 端口 `WinError 10013`（访问被拒） | 端口被占用（旧 uvicorn 实例等）：`Get-NetTCPConnection -LocalPort 8000 -State Listen` 找 PID 释放后再起 |
+| 容器里 Python 调 Java 全部 `Connection refused`（参考旋律提取完成却翻不了 ready、歌曲永久 **40905**；档位回写/打卡卡物化同样失败） | **内部委托地址在容器内指错了**：容器必须走服务名 `http://java-api:8080`，`localhost` 在容器内指容器自己。compose 已用 python-api 的 `environment.APP_JAVA_BASE_URL: ${APP_JAVA_BASE_URL_DOCKER:-http://java-api:8080}` 钉住服务名（`environment` 优先级高于 `env_file`，根 `.env` 的 `APP_JAVA_BASE_URL=…localhost…` 不会污染容器）。要让容器指向容器外的 Java，改 `APP_JAVA_BASE_URL_DOCKER`；裸跑时 Python 读的仍是 `APP_JAVA_BASE_URL`。实测归档：`worklog/BUG实测/容器内内部委托地址错-参考旋律门禁翻不了.md` |
 
 详细决策与约定见各服务 README 与 `docs/06-技术框架决策.md`。
 
