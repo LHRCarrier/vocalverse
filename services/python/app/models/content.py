@@ -9,11 +9,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    DateTime,
     ForeignKey,
     Index,
     Numeric,
@@ -30,6 +32,7 @@ from .base import (
     ContentStatus,
     CreatedAtMixin,
     MessageRoles,
+    PitchJobStatus,
     PitchRefStatus,
     TimestampMixin,
     bigint_pk,
@@ -161,9 +164,14 @@ class Song(TimestampMixin, Base):
     )
     # 参考旋律就绪状态（docs/11 Q-B11）：LRC 重写→song_pitch_refs 级联清→离线重提取期间
     # 跟唱请求见 status!='ready' 返回「生成中/缺词」，不静默算分；由 Python 离线任务翻转
+    # （2026-09-09 唱歌 P0 D2 拍板：songs 属 Java 独占写，Python 经 /internal/song/{id}/pitch-status
+    # 内部 REST 委托 Java 翻转，本列只作读侧门禁）
     pitch_ref_status: Mapped[str] = mapped_column(
         String(24), nullable=False, server_default=text(f"'{PitchRefStatus.MISSING}'")
     )
+    # 独立参考人声轨（2026-09-09 唱歌 P0 D1 拍板）：无语义/有则优先音频提取输入
+    # （pyin 输入「vocal_ref 有→用它；无→audio_url」两级回退）；Java SongUpsert 可选字段
+    vocal_ref_url: Mapped[str | None] = mapped_column(String(512))
 
     __table_args__ = (
         CheckConstraint("level BETWEEN 1 AND 4", name="level"),
@@ -239,6 +247,57 @@ class SongPitchRef(CreatedAtMixin, Base):
     version: Mapped[str] = mapped_column(String(16), nullable=False)
 
     __table_args__ = (UniqueConstraint("lrc_id", name="uq_song_pitch_refs_lrc_id"),)
+
+
+class PitchExtractJob(CreatedAtMixin, Base):
+    """参考旋律提取任务（Python 独有 · 事实源；2026-09-09 唱歌 P0 D2/D6 拍板）。
+
+    - 与 songs.pitch_ref_status（读侧门禁，Java 写）解耦：本表承载 queued/running/done/failed
+      全生命周期与重试，是「该歌参考旋律是否就绪」的权威事实源；
+    - revision：LRC 世代（"lrc={lrc_id}" 或含时间戳），LRC 整首重写 → 旧行级联删除 →
+      自动重建新任务（lrc_id FK CASCADE）；
+    - 唯一部分索引 UNIQUE(lrc_id) WHERE status IN ('queued','running')：
+      同一 LRC 世代只允许一个进行中任务（防启动扫描与手动触发并发建任务）；
+    - payload：提取参数/错误信息/耗时快照（JSONB）。
+    """
+
+    __tablename__ = "pitch_extract_jobs"
+
+    id: Mapped[int] = bigint_pk()
+    song_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("songs.id", ondelete="RESTRICT"), nullable=False
+    )
+    lrc_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("lrc.id", ondelete="CASCADE"), nullable=False
+    )
+    revision: Mapped[str] = mapped_column(String(64), nullable=False)  # LRC 世代 ID
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text(f"'{PitchJobStatus.QUEUED}'")
+    )
+    payload: Mapped[dict] = mapped_column(jsonb(), nullable=False, server_default=text("'{}'"))
+    attempts: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("0"))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint(
+            f"status IN ('{PitchJobStatus.QUEUED}', '{PitchJobStatus.RUNNING}', "
+            f"'{PitchJobStatus.DONE}', '{PitchJobStatus.FAILED}')",
+            name="status",
+        ),
+        # 同一 LRC 世代只允许一个进行中任务（PG/SQLite 双方言部分唯一索引）
+        Index(
+            "uq_pitch_extract_jobs_lrc_active",
+            "lrc_id",
+            unique=True,
+            sqlite_where=text(f"status IN ('{PitchJobStatus.QUEUED}', '{PitchJobStatus.RUNNING}')"),
+            postgresql_where=text(
+                f"status IN ('{PitchJobStatus.QUEUED}', '{PitchJobStatus.RUNNING}')"
+            ),
+        ),
+        Index("ix_pitch_extract_jobs_status", "status"),
+        Index("ix_pitch_extract_jobs_song_id", "song_id"),
+    )
 
 
 class ListeningMaterial(TimestampMixin, Base):

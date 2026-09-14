@@ -13,7 +13,10 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-vocalverse}
       POSTGRES_USER: ${POSTGRES_USER:-vocalverse}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vocalverse-dev}
+      # 显式必填（PR#34 评审 R5）：原写法 `${POSTGRES_PASSWORD:-vocalverse-dev}` 会在忘记 .env 时
+      # 静默用弱口令起库；本文件对 JWT_SECRET / SERVICE_TOKEN 早就是 `:?required`，此处对齐。
+      # 缺值 → `docker compose up` 直接报错（README §2 已同步为"必须复制 .env"）。
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required (copy .env.example to .env)}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -42,13 +45,28 @@ services:
         required: false
     environment:
       APP_ENV: development
-      APP_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vocalverse}:${POSTGRES_PASSWORD:-vocalverse-dev}@postgres:5432/${POSTGRES_DB:-vocalverse}
+      APP_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vocalverse}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required (copy .env.example to .env)}@postgres:5432/${POSTGRES_DB:-vocalverse}
       APP_REDIS_URL: redis://redis:6379/0
       # 密钥显式必填（docs/19 P0-9：缺值 compose 直接报错；dev 值由 .env 提供，.env.example 含占位）
       APP_JWT_SECRET: ${APP_JWT_SECRET:?required}
       APP_SERVICE_TOKEN: ${APP_SERVICE_TOKEN:?required}
       # 模型使用镜像内预下载副本（docs/06 §8 / 审计 R-11：容器网络到 HF 不可达；本地裸跑仍走 'small' 联网下载）
       APP_ASR_MODEL: /app/models/whisper-small
+      # 内部 REST 委托地址（docs/21 §4：Python → Java 的参考旋律门禁翻转 / 档位回写 / 打卡卡物化）。
+      # 必须用**容器网络服务名**：`config.py` 默认 `http://localhost:8080` 只适用于裸跑（host 上的 Java），
+      # 在容器内指容器自己 → Connection refused（2026-09-10 复测实测：提取完成却翻不了 ready，
+      # 新环境/世代重建后歌曲永久 40905）。
+      # PR#34 评审 R5：不再是钉死的字面量，但**不能用** `${APP_JAVA_BASE_URL:-...}`——
+      # 根 `.env` 会被 compose 读入插值，而它的 `APP_JAVA_BASE_URL` 语义是"裸跑地址"（localhost），
+      # 那样等于把 F2 重新装回去（compose 的默认值只在 .env 缺该键时生效）。
+      # 故容器侧独立键 `APP_JAVA_BASE_URL_DOCKER`，默认即服务名；要指向容器外
+      # （如 host.docker.internal:8080 上的 Java）时显式覆盖它即可。
+      # `environment:` 优先级高于 `env_file:`，所以根 .env 的同名键不会污染容器。
+      APP_JAVA_BASE_URL: ${APP_JAVA_BASE_URL_DOCKER:-http://java-api:8080}
+      # 容器只跑运行时依赖：镜像构建是 `uv sync --frozen --no-dev`，而 `uv run` 默认**带上 dev 组**
+      # → 每次容器启动都会去 PyPI 下载 ruff/mypy/pytest 等（2026-09-10 合并期实测：网络慢时启动
+      # 卡在下载、健康检查失败、依赖它的 web 起不来）。置 UV_NO_DEV=1 让 `uv run` 跳过 dev 组同步。
+      UV_NO_DEV: "1"
     # docs/06 §8：whisper 信号量 2 下多 worker 收益为负（每进程 ≈500MB 模型）；内存 ≥2GB 显式护栏
     mem_limit: 2g
     ports:
@@ -83,7 +101,7 @@ services:
       - ./data/seed:/app/data/seed
     environment:
       APP_ENV: development
-      APP_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vocalverse}:${POSTGRES_PASSWORD:-vocalverse-dev}@postgres:5432/${POSTGRES_DB:-vocalverse}
+      APP_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vocalverse}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required (copy .env.example to .env)}@postgres:5432/${POSTGRES_DB:-vocalverse}
       APP_REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres:
@@ -102,12 +120,16 @@ services:
       DB_PORT: 5432
       DB_NAME: ${POSTGRES_DB:-vocalverse}
       DB_USER: ${POSTGRES_USER:-vocalverse}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-vocalverse-dev}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required (copy .env.example to .env)}
       # 密钥显式必填（docs/19 P0-9：缺值 compose 直接报错；dev 值由 .env 提供，.env.example 含占位）
       JWT_SECRET: ${JWT_SECRET:?required}
       SERVICE_TOKEN: ${SERVICE_TOKEN:?required}
     ports:
       - "8080:8080"
+    volumes:
+      # 曲目种子元数据（M3 唱歌 P0 D-G2）：SongSeeder 读 data/seed/songs.json 播种 songs+lrc；
+      # 音频本体在共享卷 ./data/audio（python-api 挂载；Java 只存路径字符串，不读音频）
+      - ./data/seed:/app/data/seed:ro
     depends_on:
       postgres:
         condition: service_healthy

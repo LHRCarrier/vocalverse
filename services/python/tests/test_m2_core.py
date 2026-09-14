@@ -385,6 +385,69 @@ def test_save_audio_and_ownership(client, auth_headers):
     assert resp.status_code == 403
 
 
+def test_published_song_asset_survives_ttl(client, auth_headers, settings):
+    """平台素材（已发布歌曲参考旋律）不受 24h 惰性过期约束，且**不得被物理删除**。
+
+    2026-09-10 BUG 回归（**修复前必失败**：旧实现「TTL+unlink」在素材豁免之前，
+    超 24h 的参考旋律会被点一次「听参考旋律」直接删除 → demo 曲库不可逆损坏）。
+    依据：docs/06 §8（音频存储与清理）、docs/21 §2.1 op11。
+    """
+    import os
+    import time
+    from pathlib import Path
+
+    from app.db import get_session_factory
+    from app.models import Song
+    from app.models.base import ContentStatus, PitchRefStatus
+
+    db = get_session_factory()()
+    try:
+        db.add(
+            Song(
+                title="TTL Probe",
+                level=1,
+                audio_url="/data/audio/song_ttl_probe.wav",
+                status=ContentStatus.PUBLISHED,
+                pitch_ref_status=PitchRefStatus.READY,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    asset = Path(settings.audio_dir) / "song_ttl_probe.wav"
+    asset.parent.mkdir(parents=True, exist_ok=True)
+    asset.write_bytes(b"RIFF\x24\x00\x00\x00WAVEfmt ")  # 有效 wav 头（回放不解码内容）
+    expired = time.time() - (settings.audio_ttl_hours + 1) * 3600
+    os.utime(asset, (expired, expired))
+
+    resp = client.get("/api/v1/audio/song_ttl_probe.wav", headers=auth_headers)
+    assert resp.status_code == 200, resp.text  # 修复前：410 audio expired
+    assert asset.exists(), "平台素材被惰性清理删除（修复前行为）"
+
+
+def test_user_recording_still_expires_after_ttl(client, auth_headers, settings):
+    """用户录音的 24h 保留期不因上面的分流而失效（隐私口径回归护栏）。
+
+    素材豁免只对「已发布歌曲引用的文件」生效；普通录音超 TTL 仍应删除并 410（docs/06 §9.7）。
+    """
+    import time
+    from pathlib import Path
+
+    rec = Path(settings.audio_dir) / "deadbeef00.mp3"
+    rec.parent.mkdir(parents=True, exist_ok=True)
+    rec.write_bytes(b"ID3\x03\x00\x00\x00")
+    expired = time.time() - (settings.audio_ttl_hours + 1) * 3600
+    import os
+
+    os.utime(rec, (expired, expired))
+
+    resp = client.get("/api/v1/audio/deadbeef00.mp3", headers=auth_headers)
+    assert resp.status_code == 410
+    assert resp.json()["code"] == 41001
+    assert not rec.exists(), "超期用户录音应被惰性清理"
+
+
 # ---------------------------------------------------------------------------
 # 埋点：幂等去重
 # ---------------------------------------------------------------------------

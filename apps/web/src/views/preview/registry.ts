@@ -40,6 +40,12 @@ export const previewPages: PreviewPage[] = [
     layout: 'gallery',
   },
   {
+    path: '/preview/singing',
+    label: '唱歌评分 · 全链路联调台（M3 P0）',
+    group: '用户端',
+    layout: 'gallery',
+  },
+  {
     path: '/preview/community-s3',
     label: '社区内容 S3 · 媒体闭环联调台（docs/47）',
     group: '用户端',
