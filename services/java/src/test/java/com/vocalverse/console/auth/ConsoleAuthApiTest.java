@@ -54,7 +54,10 @@ class ConsoleAuthApiTest extends AbstractConsoleApiTest {
 
     JsonNode data = loginData(username, FIXTURE_PASSWORD);
     assertEquals(
-        900L, data.path("token").path("expiresIn").asLong(), "access TTL 必须是 900s（docs/50 §4.1）");
+        900L,
+        data.path("token").path("expiresIn").asLong(),
+        "access TTL **默认**必须是 900s（docs/50 §4.1；测试档未覆盖 VOICEVERSE_CONSOLE_ACCESS_TTL_SECONDS，"
+            + "所以这里断言的就是默认值——覆盖行为本身由 ConsoleAccessTtlTest 钉住）");
     assertEquals("Bearer", data.path("token").path("tokenType").asText());
     assertTrue(
         data.path("token").path("refreshToken").asText().length() >= 64, "refresh 为 32 字节 hex");

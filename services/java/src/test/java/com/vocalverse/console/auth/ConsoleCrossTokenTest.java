@@ -130,14 +130,23 @@ class ConsoleCrossTokenTest extends AbstractConsoleApiTest {
   @Test
   @org.springframework.transaction.annotation.Transactional
   void console_token_with_matching_sub_cannot_impersonate_app_user() throws Exception {
-    String appUsername = uniqueName("appu");
-    appUserToken(appUsername); // 注册出 users 行
-    Long appUserId = users.findByUsernameIgnoreCase(appUsername).orElseThrow().getId();
-
-    // 造一个 id 与 App 用户相同的控制台账号：用原生插入把 id 钉死
+    // 场景：控制台账号的 id 与某个**真实 App 用户**的 id 数值相同 —— 要证的是这种同名 sub
+    // 也不能让控制台令牌变成那个用户。
+    //
+    // ⚠️ 怎么造这个场景本身就是个坑（2026-09-11 CI 两连红才收敛）：
+    // `users.id` 与 `admin_users.id` 是两条**独立**的自增序列，"数值相同"只能显式指定 id。而
+    //   ① 借用某个已注册 App 用户的 id → 该 id 可能已在 admin_users 里被别的测试占用
+    //      （`Unique index or primary key violation: PRIMARY KEY ON admin_users(ID)`，CI 撞在 id=18）；
+    //   ② 逐个注册新 App 用户去"撞"一个空闲 id → admin_users 稠密时连开 30 个也全被占（CI 第二轮就是这么红的）。
+    // 两种都是**顺序依赖**：本地顺序不撞、CI 撞。所以改成按构造取：
+    //   取两表 `max(id)` 的更大者 + 1000 —— 这个数值在两表里**不可能**已有行，
+    //   两侧各原生插一行把它钉住，用例意图（sub 相同）一字不动，且不再依赖执行顺序。
     seedRbac();
+    long sharedId = nextFreeSharedId();
+    String appUsername = uniqueName("appu");
+    insertAppUserWithExplicitId(sharedId, appUsername);
     AdminUserEntityRow row =
-        insertAdminWithExplicitId(appUserId, uniqueName("csu"), superRoleCode());
+        insertAdminWithExplicitId(sharedId, uniqueName("csu"), superRoleCode());
     String consoleToken = login(row.username(), FIXTURE_PASSWORD);
 
     // 控制台令牌在控制台上可用
@@ -286,11 +295,47 @@ class ConsoleCrossTokenTest extends AbstractConsoleApiTest {
   private record AdminUserEntityRow(Long id, String username) {}
 
   /**
+   * 取一个在 {@code users} 与 {@code admin_users} 里都**不可能已存在**的 id。
+   *
+   * <p>两表 id 是独立序列，"两张表里都存在且数值相同"这个场景必须显式指定 id； 而"借某个已存在行的 id"会撞主键、且撞不撞取决于测试执行顺序（CI 两连红的根因）。 取两表
+   * max(id) 之上的一段（+1000，留出同一用例外的余量）即可**按构造**避免冲突： identity 序列的当前值远小于它，测试期间也不会有人插到那里。
+   */
+  private long nextFreeSharedId() {
+    Number maxUsers =
+        (Number) em.createNativeQuery("SELECT COALESCE(MAX(id), 0) FROM users").getSingleResult();
+    Number maxAdmins =
+        (Number)
+            em.createNativeQuery("SELECT COALESCE(MAX(id), 0) FROM admin_users").getSingleResult();
+    return Math.max(maxUsers.longValue(), maxAdmins.longValue()) + 1000L;
+  }
+
+  /** 用原生 SQL 插入指定 id 的 {@code users} 行（显式 id 插入 IDENTITY 列，H2/PG 均支持）。 */
+  private void insertAppUserWithExplicitId(long id, String username) {
+    Instant now = Instant.now();
+    // 必填列照 `UserEntity` 的 `nullable = false` 抄：username / password_hash / nickname / role / status
+    // / created_at / updated_at（`email` 可空）。少一列就是 H2 的 "NULL not allowed for column ..."。
+    em.createNativeQuery(
+            "INSERT INTO users (id, username, password_hash, nickname, role, status,"
+                + " created_at, updated_at)"
+                + " VALUES (:id, :u, :h, :u, 'user', 'active', :now, :now)")
+        .setParameter("id", id)
+        .setParameter("u", username)
+        .setParameter("h", passwordEncoder.encode(FIXTURE_PASSWORD))
+        .setParameter("now", now)
+        .executeUpdate();
+    em.clear();
+  }
+
+  /**
    * 用原生 SQL 插入指定 id 的 admin_users 行（显式 id 插入 IDENTITY 列，H2/PG 均支持）。
    *
    * <p>2026-09-10（合并期修复）：显式 id 可能与**同 JVM 其它测试类**已建的 admin_users 行撞主键 （测试上下文共享同一个 H2
    * 库，跨类不隔离）——调用场景要的是「控制台 sub 与某个 App 用户 id 数值相同」，所以先删掉该 id 上的既有控制台账号再插入；删除在测试的
    * {@code @Transactional} 回滚范围内，不影响其它用例。
+   *
+   * <p>2026-09-14 合并说明（main ↔ sing-m3-hardening 各修过同一个 CI 两连红）：本类另有 {@link #nextFreeSharedId()}，取两表
+   * max(id) 之上的空闲 id 来**构造性**避免主键冲突。两者是**两层互补**的护栏， 保留两层是有意的、不是重复代码：调用方先取空闲 id，这里再兜一层 delete 以应对「该
+   * id 已被同 JVM 其它测试类占用」。
    */
   private AdminUserEntityRow insertAdminWithExplicitId(Long id, String username, String roleCode) {
     var role = adminRoles.findByCode(roleCode).orElseThrow();

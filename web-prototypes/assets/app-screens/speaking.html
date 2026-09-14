@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UI Concept Design · App Speaking</title>
+<!--
+  Mobile App 示例 ② 场景对话（口语陪练）
+  组件：返回 pill、场景标题、对话气泡（AI 浅灰胶囊 / 用户炭黑胶囊）、
+  语言点标签（chip）、底部录音大按钮（ink 实心圆形 + 波纹）。
+  全部取值来自上游设计系统 ui-concept-design 的 tokens/design-tokens.md
+  （该 skill 仓未随本归档收录，取值已在下文 :root 内固化）。
+-->
+<style>
+  :root {
+    --paper:#F5F4F1; --card:#FFFFFF; --ink:#1C1C1A; --ink-hover:#333330;
+    --sub:#6F6F6A; --weak:#A6A6A0; --track:#ECEAE5; --track-hover:#E2E0DA;
+    --accent:#2F6BFF; --star:#FFC83D; --pop-green:#A8E05F;
+    --r-card:24px; --r-pill:999px; --r-chip:12px;
+    --shadow-card:0 8px 24px rgba(28,28,26,.06);
+    --shadow-float:0 2px 8px rgba(28,28,26,.08);
+    --font:'Segoe UI','Microsoft YaHei UI','Microsoft YaHei',sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { background:#EDECE8; }
+  body { font-family:var(--font); color:var(--ink); -webkit-font-smoothing:antialiased; }
+  .phone { width:390px; margin:0 auto; min-height:844px; background:var(--paper); position:relative; overflow:hidden; }
+  .content { padding:24px 20px 180px; }
+
+  /* 头部：返回 + 场景 */
+  .head { display:flex; align-items:center; gap:14px; margin-bottom:6px; }
+  .back { width:44px; height:44px; border-radius:var(--r-pill); background:var(--track);
+    border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--ink);
+    transition:background-color 150ms ease-out; }
+  .back:hover { background:var(--track-hover); }
+  .head h1 { font-size:22px; font-weight:700; }
+  .head .scene-sub { font-size:13px; color:var(--weak); margin-top:3px; }
+
+  /* 回合指示 badge */
+  .round { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 12px; border-radius:var(--r-pill);
+    background:#E8EDFF; color:var(--accent); font-size:12px; font-weight:600; margin:18px 0 16px; }
+
+  /* 对话气泡 */
+  .chat { display:flex; align-items:flex-end; gap:10px; margin-bottom:16px; }
+  .chat .ava { width:32px; height:32px; border-radius:11px; flex:none;
+    display:flex; align-items:center; justify-content:center; color:#fff; }
+  .bubble { max-width:270px; padding:14px 18px; font-size:15px; line-height:1.55; }
+  .bubble.ai { background:var(--track); color:var(--ink); border-radius:20px 20px 20px 6px; }
+  .bubble.user { background:var(--ink); color:#fff; border-radius:20px 20px 6px 20px; margin-left:auto; }
+  .chat.user { justify-content:flex-end; }
+
+  /* 语言点 chip */
+  .tips { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 24px 42px; }
+  .tip { display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 12px;
+    border-radius:var(--r-chip); background:#E8EDFF; color:var(--accent); font-size:12px; font-weight:600; }
+  .tip.green { background:#DCFCE7; color:#15803D; }
+
+  /* 录音按钮：ink 实心圆形 + 外圈波纹 */
+  .rec { position:absolute; left:50%; transform:translateX(-50%); bottom:48px;
+    width:76px; height:76px; border-radius:50%; background:var(--ink); color:#fff;
+    border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 12px 28px rgba(28,28,26,.3); transition:background-color 150ms ease-out, transform 150ms ease-out; }
+  .rec:hover { background:var(--ink-hover); }
+  .rec:active { transform:translateX(-50%) scale(.96); }
+  .rec .ring { position:absolute; inset:-10px; border-radius:50%; border:1.5px solid rgba(28,28,26,.18);
+    animation:pulse 2.4s ease-out infinite; }
+  .rec-label { position:absolute; left:50%; transform:translateX(-50%); bottom:146px;
+    font-size:13px; color:var(--weak); }
+
+  @keyframes pulse { 0%{transform:scale(.92);opacity:1} 70%{transform:scale(1.15);opacity:0} 100%{opacity:0} }
+</style>
+
+<!-- ============================================================
+     展示用副本：内容与 ui-concept-design/examples/app/<同名文件> 一致，
+     仅追加下面这层「机身适配」，让它能正确塞进 433×882 的机身框：
+       · .phone 锁死 844 高度 —— 否则内容变高会把 absolute 的底部控件顶出屏幕；
+       · 顶部留 70px —— 灵动岛侵入屏幕区 47.75px，不留就会被盖住标题。
+     规则值取自 tokens/design-tokens.md 的 8px 网格。
+     ============================================================ -->
+<style>
+  html, body { height: 844px; overflow: hidden; }
+  .phone { height: 844px; min-height: 844px; overflow: hidden; }
+  .content { padding-top: 70px; }
+</style>
+
+<style>
+  .content {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    height: 844px;
+    padding: 0 20px 180px;
+  }
+  .head { padding-top: 70px; margin-bottom: auto; flex: none; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="content">
+    <header class="head">
+      <button class="back" title="Back">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div>
+        <h1>Airport Check-in</h1>
+        <div class="scene-sub">L4 · 4 min · 10 rounds</div>
+      </div>
+    </header>
+
+    <div class="round">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+      Round 3 / 10
+    </div>
+
+    <!-- AI 气泡 -->
+    <div class="chat">
+      <span class="ava" style="background:#16303A">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 12h2"/></svg>
+      </span>
+      <div class="bubble ai">Good morning! Where are you flying today?</div>
+    </div>
+
+    <!-- 用户气泡 -->
+    <div class="chat user">
+      <div class="bubble user">I'm flying to New York, JFK. Here's my passport.</div>
+    </div>
+
+    <!-- AI 气泡 + 语言点 -->
+    <div class="chat">
+      <span class="ava" style="background:#16303A">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 12h2"/></svg>
+      </span>
+      <div class="bubble ai">Nice! Could you place your baggage on the scale, please?</div>
+    </div>
+    <div class="tips">
+      <span class="tip">"place sth on" 放置</span>
+      <span class="tip green">baggage 行李</span>
+    </div>
+
+    <div class="chat">
+      <span class="ava" style="background:#16303A">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 12h2"/></svg>
+      </span>
+      <div class="bubble ai">Sure. Does it contain any liquids over 100ml?</div>
+    </div>
+
+    <div class="chat user">
+      <div class="bubble user">Just some perfume, it's 90ml. That's fine, right?</div>
+    </div>
+
+    <div class="chat">
+      <span class="ava" style="background:#16303A">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 12h2"/></svg>
+      </span>
+      <div class="bubble ai">Perfect, that's within the limit. Your seat is 23A, boarding at 10:30.</div>
+    </div>
+  </div>
+
+  <div class="rec-label">Hold to talk</div>
+  <button class="rec" title="Hold to record" onclick="toast('Recording started')">
+    <span class="ring"></span>
+    <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+  </button>
+
+  <div class="toast" id="toast" style="position:fixed;top:24px;left:50%;transform:translateX(-50%) translateY(-8px);display:flex;align-items:center;gap:10px;height:44px;padding:0 20px;border-radius:16px;background:var(--card);box-shadow:var(--shadow-card);font-size:14px;opacity:0;transition:opacity 200ms ease-out,transform 200ms ease-out;pointer-events:none;z-index:9;">
+    <span style="width:8px;height:8px;border-radius:50%;background:var(--accent)"></span><span id="toastText"></span>
+  </div>
+</div>
+
+<script>
+  let tt; function toast(msg){ const t=document.getElementById('toast');
+    document.getElementById('toastText').textContent=msg; t.style.opacity=1; t.style.transform='translateX(-50%) translateY(0)';
+    clearTimeout(tt); tt=setTimeout(()=>{ t.style.opacity=0; t.style.transform='translateX(-50%) translateY(-8px)'; },2500); }
+</script>
+</body>
+</html>

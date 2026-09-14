@@ -45,6 +45,11 @@ vocalverse:
     # （两服务共享该密钥才能互相验签；跨端隔离由 aud/typ 双向校验承担，不靠密钥差异）。
     # 生产建议配置独立密钥；此处**不做 fail-fast**，因为回退有明确的安全依据（见 ConsoleJwtService 注释）。
     jwt-secret: ${VOICEVERSE_CONSOLE_JWT_SECRET:}
+    # 控制台 access token 有效期（秒）。**默认 900（15 分钟）**，与 docs/50 §4.1 一致：
+    # 这个值同时是「权限/停用变更最长滞后多久」的上界（令牌里的 perms 在有效期内不刷新，
+    # 即时失效走 token_epoch 那条路）。**调大仅供本地联调**（反复被登出很烦），生产保持默认。
+    # 用法：根 .env 写 VOICEVERSE_CONSOLE_ACCESS_TTL_SECONDS=10800（3 小时）。
+    access-ttl-seconds: ${VOICEVERSE_CONSOLE_ACCESS_TTL_SECONDS:900}
     # 控制台独立 SPA 的 CORS 源（逗号分隔）。既有 8 个源恒在，此处只做追加 ——
     # 硬编码在配置类里会让「换域名要改代码」，而 CORS 是部署形态相关的（本地 5174 / 生产域名）。
     cors-origins: ${VOICEVERSE_CONSOLE_CORS_ORIGINS:}

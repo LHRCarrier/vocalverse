@@ -54,8 +54,8 @@ class JwtAlgorithmPinningTest {
   }
 
   private static ConsoleJwtService consoleService(String secret) {
-    // 两个构造参数：控制台密钥 + App 密钥（回退用）。测试里都给同一个值，避免回退分支干扰。
-    return new ConsoleJwtService(secret, secret);
+    // 三个构造参数：控制台密钥 + App 密钥（回退用）+ access TTL。测试里给同一密钥，避免回退分支干扰。
+    return new ConsoleJwtService(secret, secret, ConsoleJwtService.DEFAULT_ACCESS_TTL_SECONDS);
   }
 
   @Test

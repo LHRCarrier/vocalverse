@@ -1,0 +1,299 @@
+/* ============================================================
+   GooeyNav · React Bits（JavaScript + CSS 变体）原生移植 —— 样式
+   应用范围：除首页（index.html）外的全部页面。
+   首页是另一套 .nav__nav 导航（没有 .site-nav，也不会加载本文件），不受影响。
+
+   结构（与原组件一致）：
+     <nav class="site-nav gooey-nav">      ← 挂载点，由 js/gooey-nav.js 加类
+       <div class="site-nav__bar">
+         <ul class="site-nav__list">…</ul>
+       </div>
+       <span class="effect filter">…</span> ← 底布 + 药丸 + 气泡（滤镜层）
+       <span class="effect text">…</span>   ← 激活项文字的镜像层
+     </nav>
+
+   类名与关键帧名沿用上游（.effect / .filter / .text / .particle / .point /
+   pill / particle / point），只把作用域收进 .gooey-nav，避免与 styles.css
+   的通用选择器互相污染。
+
+   —— 与上游 CSS 的差异（每一条都是"塞进本站现有胶囊导航"所必需）——
+   1) 底布 .filter::before 不再是"铺满一大块"的黑底，而是"与导航底色同源、比药丸
+      四周各外扩 --gooey-field"的一圈。上游把底布铺成 inset:-75px 的纯黑，靠
+      mix-blend-mode:lighten 融进深色页面才隐形；本站导航是 fixed 定位，fixed
+      自身即层叠上下文，混合只在本导航内部发生，那块黑底会直接盖在 Hero / 视频
+      上变成黑方框。改成"与导航底色同源"后，深浅两套主题都天然隐形，也省掉了
+      lighten / darken 两套反相规则。外扩这一圈是必需的：底布与药丸同框时，
+      blur(7px) 会把药丸自己的边糊成一圈光晕（实测），外扩后药丸的边落在不透明
+      区内，才能被 contrast(100) 切成硬边。
+   2) 因此不再使用 mix-blend-mode：药丸取 --gooey-ink（跟随 --foreground），
+      深色主题自动近白、浅色主题自动近黑，与站点主题变量同源；
+      气泡在没有底布的地方也能保持本色，不必按主题反相。
+   3) 激活项文字色取 --gooey-on-ink（= --background）：白药丸配黑字、
+      黑药丸配白字，两套主题共用同一条规则。
+   4) 静止态药丸只留 .effect.filter::after 一个：上游另有 li.active::after
+      做静态底，两者完全重叠；这里改由挂载时给 .effect.filter 加 .active，
+      让这一层自己承担静止态（见 js/gooey-nav.js 差异 4）。
+   5) 滤镜层的包含块由 .gooey-nav-container 换成外层 <nav class="site-nav">：
+      .site-nav__bar 上有 overflow-x:auto，气泡挂进去会被裁掉。
+   6) 上游 .gooey-nav-container nav 上的 transform: translate3d(…) 未搬过来：
+      本导航的 transform 由 nav-reveal.css 用 !important 掌管滑入滑出。
+   ============================================================ */
+
+:root {
+  /* 上游保留项：目前没有规则引用，留着以免后续引入其它 React Bits 组件缺值 */
+  --linear-ease: linear(
+    0,
+    0.068,
+    0.19 2.7%,
+    0.804 8.1%,
+    1.037,
+    1.199 13.2%,
+    1.245,
+    1.27 15.8%,
+    1.274,
+    1.272 17.4%,
+    1.249 19.1%,
+    0.996 28%,
+    0.949,
+    0.928 33.3%,
+    0.926,
+    0.933 36.8%,
+    1.001 45.6%,
+    1.013,
+    1.019 50.8%,
+    1.018 54.4%,
+    1 63.1%,
+    0.995 68%,
+    1.001 85%,
+    1
+  );
+
+  --gooey-ink: var(--foreground);      /* 药丸：深色主题近白 / 浅色主题近黑 */
+  --gooey-canvas: var(--background);   /* 底布：与导航底色同源，故隐形 */
+  --gooey-on-ink: var(--background);   /* 药丸上的文字色 */
+}
+
+/* 气泡颜色：对应原组件 props.colors 里的数字索引 → var(--color-N)。
+   本站按需求取单色 —— 与药丸同色，于是浅色模式是黑气泡、深色模式是白气泡，
+   和底布（反色）对比始终拉满，contrast(100) 压完也是干净的纯黑/纯白。
+   想恢复上游的彩色气泡：把这四行改成四种颜色即可（或页面标签上写
+   data-gooey-colors="1,2,3"）。注意 contrast(100) 会把每个通道压到 0/255，
+   挑色时要保证压完之后仍然两头分明，否则容易在纯黑/纯白底布上消失。 */
+.gooey-nav {
+  --color-1: var(--gooey-ink);
+  --color-2: var(--gooey-ink);
+  --color-3: var(--gooey-ink);
+  --color-4: var(--gooey-ink);
+
+  /* 阈值场（底布）比药丸四周外扩的宽度。
+     底布必须比药丸大出一圈，药丸的边才会落在"不透明底布"里面，
+     被 contrast(100) 切成硬边；底布与药丸同框的话，blur 会把药丸自己的边
+     糊掉，静止态就是一圈光晕（实测如此）。
+     取值应 ≈ blur 半径；且不能超过导航条的内边距，否则底布会透到条子外面，
+     所以 js/gooey-nav.js 会按条子实际内边距再夹一次，并把夹过的值写回本变量
+     （药丸的内缩量与滤镜层的外扩量因此始终相等）。 */
+  --gooey-field: 7px;
+}
+
+/* ===== 旧的弹簧 pill 让位 =====
+   js/nav.js 仍在运行（窄屏把当前页滚进视野等行为保留），只是不再显示它自己的
+   指示器；保留该节点可以维持 styles.css / nav-reveal.css 里 :has([data-nav-pill])
+   那套选择器的原有分支，不做无谓的连锁改动。 */
+.gooey-nav [data-nav-pill] {
+  display: none;
+}
+
+/* ===== 列表抬到效果层之上：真实链接文字永远压住底布与气泡 =====
+   .site-nav__bar 不是层叠上下文，所以这里的 z-index 直接和 .effect 的 z-index
+   在同一层里比较，3 > 1 即可。 */
+.gooey-nav .site-nav__list {
+  position: relative;
+  z-index: 3;
+}
+
+/* 激活项文字：药丸在下面，文字用"药丸反色"。
+   选择器权重高于 Tailwind 的 .text-foreground（且未被 @layer 包裹），稳定生效。
+   注意：颜色本身不带过渡 —— 挂载（含站内跳转到达）时这一笔换色必须与药丸落位
+   发生在同一次样式更新里，否则会看到"字先变色、药丸还没铺到"的中间态
+   （浅色主题白字压白底 / 深色主题黑字压黑底）。过渡只给点击切换用，
+   由 js/gooey-nav.js 初始化完成后加 .is-ready 才挂上。 */
+.gooey-nav .site-nav__list > li.active > a > span {
+  color: var(--gooey-on-ink);
+}
+
+.gooey-nav.is-ready .site-nav__list > li.active > a > span {
+  /* 与药丸生长同为 .3s：点击切换时文字换色与药丸铺开同拍 */
+  transition: color 0.3s ease;
+}
+
+/* ===== 效果层（滤镜层 / 文字镜像层）===== */
+.gooey-nav .effect {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  opacity: 1;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  z-index: 1;
+}
+
+.gooey-nav .effect.text {
+  color: var(--gooey-ink);
+  transition: color 0.3s ease;
+  /* 与 site-nav.css 里链接文字同字号/字重，避免镜像层比真身高一档而露边 */
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.gooey-nav .effect.text.active {
+  color: var(--gooey-on-ink);
+}
+
+/* 滤镜层：blur + contrast 造出"金属球"式的阈值场，药丸与气泡因此能互相吸附 */
+.gooey-nav .effect.filter {
+  filter: blur(7px) contrast(100) blur(0);
+}
+
+/* 底布（差异 1）：铺满滤镜层整块 —— 滤镜层本身由 JS 撑到"激活项 + --gooey-field"，
+   因此底布比药丸四周各大出一圈，药丸的边落在不透明区内，才能被切成硬边。 */
+.gooey-nav .effect.filter::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: var(--gooey-canvas);
+  border-radius: 100vw;
+}
+
+/* 药丸（差异 4：静止态由它自己承担）：从滤镜层四边各内缩 --gooey-field，
+   正好落回激活项的框（= 原来的 pill 尺寸），外圈留给底布做阈值场。 */
+.gooey-nav .effect.filter::after {
+  content: '';
+  position: absolute;
+  inset: var(--gooey-field, 7px);
+  background: var(--gooey-ink);
+  transform: scale(0);
+  opacity: 0;
+  z-index: -1;
+  border-radius: 100vw;
+}
+
+.gooey-nav .effect.active::after {
+  animation: pill 0.3s ease both;
+}
+
+/* 静止态（挂载/跳转到达时）：药丸直接落位，不播 0→1 的生长。
+   否则新页面第一帧里"文字已经变成药丸反色、药丸却还没长出来"，
+   激活项的字会短暂地变成白字压白底（浅色主题）／黑字压黑底（深色主题）。
+   由 js/gooey-nav.js 在挂载时挂上，第一次点击切换时才摘掉，
+   把"生长形变"留给真正需要它的那一次过渡。 */
+.gooey-nav .effect.filter.is-settled::after {
+  animation: none;
+  transform: scale(1);
+  opacity: 1;
+}
+
+@keyframes pill {
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ===== 气泡 =====
+   .particle 负责位移与旋转，.point 负责颜色与缩放（与上游一致）。
+   没有底布的地方（气泡飞出导航条之外）只会被 blur 柔化边缘，
+   颜色不受影响 —— 看起来像一圈发光的气泡。 */
+.gooey-nav .particle,
+.gooey-nav .point {
+  display: block;
+  opacity: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 100%;
+  transform-origin: center;
+}
+
+.gooey-nav .particle {
+  --time: 5s;
+  position: absolute;
+  top: calc(50% - 8px);
+  left: calc(50% - 8px);
+  animation: particle calc(var(--time)) ease 1 -350ms;
+}
+
+.gooey-nav .point {
+  /* 上游兜底色是 white（深色页面专用）；这里换成 --gooey-ink 以兼顾浅色主题 */
+  background: var(--color, var(--gooey-ink));
+  opacity: 1;
+  animation: point calc(var(--time)) ease 1 -350ms;
+}
+
+@keyframes particle {
+  0% {
+    transform: rotate(0deg) translate(calc(var(--start-x)), calc(var(--start-y)));
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+
+  70% {
+    transform: rotate(calc(var(--rotate) * 0.5)) translate(calc(var(--end-x) * 1.2), calc(var(--end-y) * 1.2));
+    opacity: 1;
+    animation-timing-function: ease;
+  }
+
+  85% {
+    transform: rotate(calc(var(--rotate) * 0.66)) translate(calc(var(--end-x)), calc(var(--end-y)));
+    opacity: 1;
+  }
+
+  100% {
+    transform: rotate(calc(var(--rotate) * 1.2)) translate(calc(var(--end-x) * 0.5), calc(var(--end-y) * 0.5));
+    opacity: 1;
+  }
+}
+
+@keyframes point {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+
+  25% {
+    transform: scale(calc(var(--scale) * 0.25));
+  }
+
+  38% {
+    opacity: 1;
+  }
+
+  65% {
+    transform: scale(var(--scale));
+    opacity: 1;
+    animation-timing-function: ease;
+  }
+
+  85% {
+    transform: scale(var(--scale));
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+
+/* 中等屏：与 site-nav.css 的断点保持一致，镜像层文字同步降到 15px */
+@media (max-width: 1049px) {
+  .gooey-nav .effect.text {
+    font-size: 0.9375rem;
+    line-height: 1.375rem;
+  }
+}

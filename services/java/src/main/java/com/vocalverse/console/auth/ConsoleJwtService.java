@@ -64,15 +64,28 @@ public class ConsoleJwtService {
   public static final String ISSUER = "vocalverse-java";
   public static final String TYP_ACCESS = "console-access";
 
-  /** access TTL 固定 900s（docs/50 §4.1；不开放配置，避免被调大后破坏「15 分钟内权限滞后」的上界承诺）。 */
-  public static final long ACCESS_TTL_SECONDS = 900L;
+  /**
+   * access TTL **默认** 900s（docs/50 §4.1）。
+   *
+   * <p>可用 `vocalverse.console.access-ttl-seconds`（环境变量 {@code
+   * VOICEVERSE_CONSOLE_ACCESS_TTL_SECONDS}） 覆盖，**仅建议本地联调使用**：该值同时是**「权限/停用变更最长滞后多久」的上界** —— 令牌里的
+   * {@code perms} 在有效期内不会刷新（即时失效靠的是 {@code epo}/token_epoch 那条路）。 调大它等于放宽这个上界，生产应保持默认。
+   */
+  public static final long DEFAULT_ACCESS_TTL_SECONDS = 900L;
 
   private final SecretKey key;
   private final boolean usingFallbackSecret;
+  private final long accessTtlSeconds;
 
   public ConsoleJwtService(
       @Value("${vocalverse.console.jwt-secret:}") String consoleSecret,
-      @Value("${vocalverse.jwt.secret:}") String appSecret) {
+      @Value("${vocalverse.jwt.secret:}") String appSecret,
+      @Value("${vocalverse.console.access-ttl-seconds:900}") long accessTtlSeconds) {
+    if (accessTtlSeconds <= 0) {
+      throw new IllegalArgumentException(
+          "vocalverse.console.access-ttl-seconds 必须为正数（当前 " + accessTtlSeconds + "）");
+    }
+    this.accessTtlSeconds = accessTtlSeconds;
     String secret = consoleSecret;
     boolean fallback = false;
     if (secret == null || secret.isBlank()) {
@@ -92,10 +105,24 @@ public class ConsoleJwtService {
               + "本地开发可接受（两个服务本就共享该密钥，Python 侧因此可验证控制台令牌）；"
               + "生产环境必须配置独立密钥。跨端令牌混淆由 aud/typ 双向校验阻断，不依赖密钥差异。");
     }
+    if (accessTtlSeconds != DEFAULT_ACCESS_TTL_SECONDS) {
+      // 非默认值一定要在启动日志里可见：它是「权限变更最长滞后多久」的上界，
+      // 被无意中调大时不该只有"某天发现权限改了 15 分钟还没生效"这一种发现方式。
+      log.warn(
+          "控制台 access TTL 被覆盖为 {}s（默认 {}s，docs/50 §4.1）：有效期内的权限声明不会刷新，"
+              + "停用/改权只靠 token_epoch 即时失效。仅建议本地联调使用。",
+          accessTtlSeconds,
+          DEFAULT_ACCESS_TTL_SECONDS);
+    }
   }
 
   public boolean usingFallbackSecret() {
     return usingFallbackSecret;
+  }
+
+  /** 当前 access TTL（秒）。签发处的 exp 与登录响应的 expiresIn 都取自它，保证两处不漂移。 */
+  public long accessTtlSeconds() {
+    return accessTtlSeconds;
   }
 
   /** 签发 access token（{@code perms} 为已展开的权限码集合；{@code epo}/{@code sid} 见类注释）。 */
@@ -121,7 +148,7 @@ public class ConsoleJwtService {
         .claim("sid", sessionId)
         .claim("uname", username)
         .issuedAt(Date.from(now))
-        .expiration(Date.from(now.plusSeconds(ACCESS_TTL_SECONDS)))
+        .expiration(Date.from(now.plusSeconds(accessTtlSeconds)))
         // ⚠️ 必须**显式钉死 HS256**，不能只写 `.signWith(key)`（2026-09-10 实测缺陷）：
         // JJWT 的 `Keys.hmacShaKeyFor(bytes)` 会**按密钥长度**决定 key 的算法 ——
         // ≥64 字节 → HmacSHA512、≥48 字节 → HmacSHA384、≥32 字节 → HmacSHA256；

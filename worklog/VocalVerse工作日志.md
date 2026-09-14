@@ -18,6 +18,105 @@
 
 —— 执行人：Faust-sudo（AI 代工），2026-09-14
 
+## 2026-09-11 修 java-ci 的"本地绿、CI 红"：跨端用例的顺序依赖（两轮才收敛）
+
+- **现象**：直推 main 后手动 dispatch `java-ci`，**连续两轮红**，而本地同一条 `mvn -B clean verify` 一直绿。
+
+- **第一轮**：`ConsoleCrossTokenTest.console_token_with_matching_sub_cannot_impersonate_app_user`
+  → `Unique index or primary key violation: PRIMARY KEY ON PUBLIC.ADMIN_USERS(ID) /* key:18 */`。
+  根因：该用例要造"控制台账号 id == 某个真实 App 用户 id"的场景，用**原生插入**把 `admin_users.id` 钉成
+  那个 App 用户的 id；但 **`users.id` 与 `admin_users.id` 是两条独立的自增序列**，
+  那个 id 可能已被别的测试建过 → 撞主键。**本地不撞、CI 撞，纯顺序依赖**（我新加的
+  `ConsoleAccessTtlTest` 改了类之间的执行顺序，把它暴露出来）。
+  第一版修法：逐个注册新 App 用户、取其 id、确认在 `admin_users` 里空闲才用。
+
+- **第二轮：第一版也没过**，而且是我自己的断言报的 ——
+  `连续 30 次都找不到「在 admin_users 中空闲」的 App 用户 id`。
+  说明"两表 id 区间会自然错开"是**错误假设**：CI 顺序下 `admin_users` 稠密得多，连开 30 个也全被占。
+
+- **最终修法（构造性，不再依赖顺序）**：取两表 `MAX(id)` 的更大者 **+1000** 作为共享 id，
+  再从 `users` 与 `admin_users` 两侧各原生插一行把它钉住 —— 该 id 在两表里**都不可能已有行**，
+  主键冲突不可能发生。为此新增 `insertAppUserWithExplicitId()`（必填列照 `UserEntity` 的
+  `nullable = false` 抄；**少一列就撞 `NULL not allowed for column "NICKNAME"`**，第一次跑就踩到，已写进注释）。
+  用例断言一字未改。
+
+- **验证**：该测试类 7/7 绿；`mvn -B clean verify` → **172 tests / 0 failures / 0 errors**、spotless 干净；
+  推送后**第三次** dispatch `java-ci` → **success**；`30d7431` 上 secret-scan / docker-build / java-ci 全绿。
+
+- **教训（与 I-18/I-19 同族）**：**"本地绿"从来不是证据** —— 只要断言依赖执行顺序、或依赖
+  "某张表现在长什么样"，它就有可能在另一个顺序下红。要么让测试按构造不依赖顺序（本次），
+  要么把它变成能稳定复现的用例。另外 `java-ci`/`frontend-ci`/`admin-ci` **都只挂 `pull_request` +
+  `workflow_dispatch`**（没有 push:main），直推 main 时它们**根本不会跑** —— 必须手动 dispatch 复核。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-11）
+
+## 2026-09-10 控制台 access TTL 改可配（本机 3 小时）：默认仍 900s，不推翻安全口径
+
+- **需求**：联调时每 15 分钟被登出一次（"测一会就退出来"），要把管理员 token 有效期改成 3 小时。
+
+- **口径裁决（没有直接把常量改成 3 小时）**：`ACCESS_TTL_SECONDS = 900` 是 `docs/50 §4.1` 的
+  **安全口径**而非随手数字 —— 它同时是「**权限/停用变更最长滞后多久**」的上界
+  （令牌里的 `perms` 有效期内不刷新，即时失效靠 `token_epoch`）。直接改成 3 小时等于把上界放宽 12 倍，
+  而放宽应当是**部署时的选择**。所以按 App 侧 `vocalverse.jwt.access-ttl-seconds` 的同款做成配置项：
+  `VOICEVERSE_CONSOLE_ACCESS_TTL_SECONDS`，**默认仍 900**，本机 `.env` 设 `10800`。
+
+- **顺带修掉一处潜在漂移**：登录/刷新响应里的 `expiresIn` 原先引用那个常量、签发处的 `exp` 也引用它，
+  两处是"同一个常量"但概念上是两件事；现在统一走 `jwt.accessTtlSeconds()`，**响应说的与实际过期时间同源**。
+  另加：非正整数 **fail-fast**（0/负数会让令牌一签发就过期）；非默认值**启动日志打 WARN**
+  —— 放宽了上界就该在日志里看得见。
+
+- **验证（实跑）**：`mvn -B clean verify` → **172 tests / 0 failures / 0 errors**（169 → 172），
+  spotless `155 files clean`；带新配置重启后：启动日志出现
+  `控制台 access TTL 被覆盖为 10800s（默认 900s…）` 的 WARN；登录响应 `expiresIn = 10800`；
+  **令牌内部 `exp - iat = 10800`**（iat 09:06:15 → exp 12:06:15）；
+  **refresh 流程验证通过**（12h refresh 换新 access，HTTP 200，新 `expiresIn` 同为 10800）；
+  用该长令牌打 Python 侧控制台端点 **200**（跨服务不受影响）。
+
+- **顺带发现（值得说）**：控制台本来就有 12 小时 refresh token，且前端在 401 后会续期一次 ——
+  也就是说"15 分钟被登出"本不该发生。若放长 TTL 后仍偶发掉线，问题就不在 access TTL 上，
+  需要抓 401/46001 的具体请求再看。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
+## 2026-09-10 控制台"后端有数据、前端不渲染"的真凶：`useAsync` 的 shallowRef 内层赋值（I-19）
+
+- **起因**：需求方截图——角色权限页显示「角色数 0 / 内置角色 0 / 权限码总数 0 / 还没有任何角色」，
+  而同屏的响应面板里后端**明明返回了 6 个角色**（含内置 4 个：super/ops/operator/moderator）。
+
+- **定位（三步）**：
+  1. 先排两端契约：`GET /roles`、`GET /permissions` 的 `data` 都是**数组**，
+     前端 `consoleHttp.get<AdminRoleRow[]>` 也按数组读 —— **形状是齐的**，不是 DTO 漂移；
+  2. 再看视图：`RolesView` 用 `useAsync` + `computed(() => rolesState.value.data ?? [])`，
+     `onMounted` 里确实调了 `run()`；而 `AsyncBlock` 显示的是**空态**（不是错误态）⇒ `data` 为 null 且 `error` 为 null；
+  3. 看 `useAsync` 实现：`state` 是 `shallowRef<AsyncState<T>>`，而 `run()` 写的是
+     **`state.value.data = data`（原地改内层属性）**。`shallowRef` 的语义是**只有 `.value` 整体替换才触发**，
+     改内层**不触发任何依赖** —— 于是 `computed` 永远停留在首帧的 `[]`。
+
+- **性质：恒不刷新，不是偶发**。首帧 `data=null` → 接口 200 → 写进 `state.value.data` → 无人被通知
+  → 界面永远空、且**连错误态都不显示**。工作台、服务总览、性能指标、LLM Trace 全是同一症状
+  —— 也就是说前几轮"页面没数据"里，**除已修的后端 500 之外，还有一个前端总闸**。
+
+- **为什么长期没被发现**（两条都值得记）：
+  1. **对照组是好的**：`usePagedList` 写的是 `items.value = res.items`（整体替换），
+     所以**列表页一直正常**，只有走 `useAsync` 的页面中招 —— 于是看起来像"某些页面没数据"；
+  2. **没有渲染级测试**：既有 68 例全是契约/纯函数测试，一个能坏掉**全部**页面的缺陷可以全绿通过。
+
+- **修法**：`useAsync` 增加唯一状态写入口 `patch()`，**对象展开后整体替换** `state.value`；
+  文件头写清"为什么不能原地改"（附实测症状），并把 `usePagedList` 作对照写进去。
+  单测 `composables/__tests__/useAsync.test.ts`（3 例）**修复前 2/3 红**
+  （`expected +0 to be 3`、`expected false to be true`），修复后 3/3 绿。
+
+- **顺带修掉一个门禁缺口（I-20）**：`apps/admin` 的 eslint 只忽略 `dist/node_modules/coverage`，
+  **漏了 `.vite/**`**（Vite 依赖预打包缓存，`pnpm dev`/`vitest` 一跑就生成）。
+  实测：起过 dev server 后 `pnpm lint` **凭空多出 87 条错误**（全在 `.vite/deps/*.js`），
+  而 CI 因为全新检出没有该目录**全绿** —— "本地假红 + CI 假绿"组合最容易让人去改无关代码。
+  两端 eslint 配置均补 `.vite/**`。
+
+- **验证（实跑）**：`apps/admin` `lint` 0 error / `typecheck` 0 error / `test:run` **71 passed**（68 → 71）/
+  `build` 成功；`apps/web` `lint` 通过。刷新控制台页面即可看到角色列表。
+
+—— 执行人：组长 LHRCarrier（AI 代工，2026-09-10）
+
 ## 2026-09-10 合并 main 到唱歌分支（PR #34 解冲突）：迁移编号重排 + 合并期修复 · 1 op
 
 - **背景**：PR #34（`feat/sing-m3-hardening`）因分支落后 `origin/main` 59 个提交而 **CONFLICTING**——GitHub 对冲突 PR 不生成 merge ref ⇒ **一个 CI check 都不会跑**。组长拍板由我合 main 解冲突。共 23 处冲突（`git merge origin/main`）。
@@ -328,8 +427,7 @@
 - **踩坑**：① 计划书 40904/50002 与 origin/main J-08 登记冲突 → 顺延 40905/50003；② 单写方探针是文件级粗粒度守护——jobs.py 合法混读 Java 表与写 Python 表也会命中 `db.execute(update(...))` 模式 → 写形式改 ORM 属性赋值 + 探针清单修正（SongPitchRef 实为 Python 写方，docs/20 §4.1）；③ Java 测试 `.getBytes()` 只作用于最后一个字符串字面量（缺括号）→ 请求体损坏 400「请求体无法解析」（踩坑实录）；④ `sf.read(..., format=)` 非法参数被静默 except 吞掉 → 发音抽样恒空（改 sf.read 无 format）；⑤ 发音抽样后须重算 pron/overall（评分器聚合时 pron 未知）；⑥ SQLite 删空后 rowid 复用（PG IDENTITY 单调）——test 断言只比对引用不比对 revision 字符串；⑦ 移动端样式拆 `mobile-sing.css` 过大文件免责（max-lines 350 门禁）。
 - **遗留登记**：发音「weak 句优先」为 P2 增强（当前前 N 句）；重唱薄弱句（SG-15）M3 弹性未做；人工抽检 5 首×5 句 r≥0.7 排期在 W3（SG-14）；评分信号量观测与 60s 部署预热未跑（M4）；`sing_attempts` 无 (user_id,session_id) 唯一约束（幂等为应用层查重，DB 级守护留 P2）。
 
-—— 执行人：Faust-sudo（AI 代工），2026-09-09
-## 2026-09-10 修 main 上的 python-ci：Python 契约快照缺 21 条控制台路由
+—— 执行人：Faust-sudo（AI 代工），2026-09-09## 2026-09-10 修 main 上的 python-ci：Python 契约快照缺 21 条控制台路由
 
 - **起因**：直推 main 后 CI 报 `Some checks were not successful`——`python-ci / lint · test · alembic` 1 分钟后失败，
   其余 4 项（docker-build ×3、secret-scan）成功。
