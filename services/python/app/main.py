@@ -91,6 +91,21 @@ async def _prewarm_asr() -> None:
 async def lifespan(app: FastAPI):
     settings = get_settings()
     logger.info("vocalverse python-api %s starting (env=%s)", __version__, settings.app_env)
+    # 共享卷目录自检（2026-09-14 · A-G7 路径三义性）：`audio_dir` / `media_dir` 是**按 cwd 解析**的
+    # 相对路径，裸跑 cwd=services/python 时默认 `./data/audio` 会落到 `services/python/data/audio`
+    # （那里只有用户录音）→ 已发布歌曲的参考旋律找不到 → `GET /api/v1/audio/{name}` 静默 40401
+    # 「audio asset missing」，前端只表现为「听参考旋律点了没反应」，不像配置错、极难反查。
+    # 这里把**实际解析到的绝对路径**在启动期打出来（并提示目录不存在），把这笔账变成一眼可见。
+    _audio_dir = Path(settings.audio_dir).resolve()
+    _media_dir = Path(settings.media_dir).resolve()
+    logger.info("共享卷目录：audio_dir=%s media_dir=%s", _audio_dir, _media_dir)
+    for _label, _dir in (("APP_AUDIO_DIR", _audio_dir), ("APP_MEDIA_DIR", _media_dir)):
+        if not _dir.exists():
+            logger.warning(
+                "%s 指向的目录不存在：%s（裸跑应指向仓库根 data/，见 README 常见问题）",
+                _label,
+                _dir,
+            )
     await _prewarm_asr()  # whisper 预热（docs/06 §8：防首个请求卡 30s；testing/无模型跳过）
     # TTS 预合成预热（docs/06 §8「开场/常用句预合成」；后台异步不阻塞启动；testing 跳过）
     from app.audio.warmup import schedule_startup_warmup
