@@ -592,6 +592,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reading/covers/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Book Cover
+         * @description 书封图（**公开**端点，无鉴权）。
+         *
+         *     为什么公开：书封是**非隐私的公版内容资产**，且 `<img src>` 不会带 Authorization 头 ——
+         *     若加鉴权，前端只能退回 fetch+blob（多一层内存与生命周期负担）。风险面被三重收窄：
+         *     只读、只服务 `data/seed/covers/` 白名单文件名、目录穿越由 `_SAFE_COVER_NAME` 挡掉。
+         *
+         *     资产位置：`data/seed/covers/`（随仓库分发，`.gitignore` 已豁免 `data/seed/**`）——
+         *     与 `books` 同属"内容域静态资产"，与用户上传的 `data/media/`（私有卷）刻意分开。
+         */
+        get: operations["book_cover_api_v1_reading_covers__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reading/chapters/{chapter_id}": {
         parameters: {
             query?: never;
@@ -1515,6 +1542,8 @@ export interface components {
             cover_color?: string | null;
             /** Cover Emoji */
             cover_emoji?: string | null;
+            /** Cover Url */
+            cover_url?: string | null;
             /** Word Count */
             word_count: number;
             /** Chapter Count */
@@ -3533,6 +3562,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_BookDetailView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    book_cover_api_v1_reading_covers__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 封面图文件（image/*） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": unknown;
                 };
             };
             /** @description Validation Error */

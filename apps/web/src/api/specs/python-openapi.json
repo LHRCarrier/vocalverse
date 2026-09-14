@@ -2186,6 +2186,45 @@
         }
       }
     },
+    "/api/v1/reading/covers/{name}": {
+      "get": {
+        "tags": [
+          "reading"
+        ],
+        "summary": "Book Cover",
+        "description": "书封图（**公开**端点，无鉴权）。\n\n为什么公开：书封是**非隐私的公版内容资产**，且 `<img src>` 不会带 Authorization 头 ——\n若加鉴权，前端只能退回 fetch+blob（多一层内存与生命周期负担）。风险面被三重收窄：\n只读、只服务 `data/seed/covers/` 白名单文件名、目录穿越由 `_SAFE_COVER_NAME` 挡掉。\n\n资产位置：`data/seed/covers/`（随仓库分发，`.gitignore` 已豁免 `data/seed/**`）——\n与 `books` 同属\"内容域静态资产\"，与用户上传的 `data/media/`（私有卷）刻意分开。",
+        "operationId": "book_cover_api_v1_reading_covers__name__get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "封面图文件（image/*）",
+            "content": {
+              "image/*": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/reading/chapters/{chapter_id}": {
       "get": {
         "tags": [
@@ -6074,6 +6113,17 @@
               }
             ],
             "title": "Cover Emoji"
+          },
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
           },
           "word_count": {
             "type": "integer",
