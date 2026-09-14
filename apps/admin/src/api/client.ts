@@ -1,5 +1,6 @@
 import { ApiError, ERR } from './types'
 import type { Envelope } from './types'
+import type { ConsoleSession } from './dto/identity'
 
 /**
  * 控制台 HTTP 客户端（docs/50 §3.2 / §10.1）。
@@ -71,6 +72,16 @@ let refreshing: Promise<boolean> | null = null
 /**
  * 单飞刷新：并发 401 只触发一次 refresh，其余请求等同一个 Promise。
  * 刷新失败 → 清空令牌 → 交回调用方抛 46001。
+ *
+ * ⚠️ 响应形状（2026-09-11 实测缺陷）：`POST /auth/refresh` 的 data 是
+ * `ConsoleAuthController.SessionView` —— 令牌**嵌在 `data.token` 下**
+ * （`{token:{accessToken,refreshToken,tokenType,expiresIn}, adminUserId, …}`），与登录响应**同形**。
+ * 此前这里按平铺读写（`body.data.accessToken`），于是 `saveTokens(body.data)` 取到两个 undefined，
+ * `localStorage.setItem(k, undefined)` 把令牌**存成字符串 "undefined"** → 下一次刷新发
+ * `refreshToken:"undefined"` → Java 回 46001「刷新令牌无效」→ 令牌清空、整站 401。
+ * 触发路径：登录后等 access token 过期（15min），或任意 401 引发续期 —— 必然复现。
+ * 登录路径（`stores/auth.ts` 写 `saveTokens(session.token)`）一直是对的，
+ * 两条路径对同一响应形状的口径必须一致。
  */
 async function refreshOnce(): Promise<boolean> {
   if (refreshing) return refreshing
@@ -83,9 +94,9 @@ async function refreshOnce(): Promise<boolean> {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
       })
-      const body = (await res.json()) as Envelope<{ accessToken: string; refreshToken: string }>
-      if (body.code !== ERR.OK || !body.data) return false
-      saveTokens(body.data)
+      const body = (await res.json()) as Envelope<ConsoleSession>
+      if (body.code !== ERR.OK || !body.data?.token) return false
+      saveTokens(body.data.token)
       return true
     } catch {
       return false
@@ -146,7 +157,13 @@ async function request<T>(base: string, path: string, opts: RequestOptions = {})
 
   if (res.status === 401 && !opts.anonymous && !opts.noRefresh) {
     const ok = await refreshOnce()
-    if (ok) return request<T>(base, path, { ...opts, noRefresh: false })
+    // 重试**只重试一次**（noRefresh=true）：续期成功后仍然 401，说明问题不在令牌
+    // （Python 侧 fail-closed、token_epoch 被吊销、权限/配置错误都会 401）。
+    // 若这里放开（此前是 noRefresh:false），每次重试都会再续期一轮 —— 续期永远成功、
+    // 401 永远不消失，就是一个无限续期循环（每轮烧掉一条 admin_sessions 轮换）。
+    // 此前它没暴露，只是因为续期把令牌写坏成 "undefined" 后下一轮必然失败，属于
+    // **偶然的刹车**；修好令牌写入后必须显式保留这个刹车。
+    if (ok) return request<T>(base, path, { ...opts, noRefresh: true })
     clearTokens()
     onUnauthorized()
     throw new ApiError(ERR.NOT_LOGGED_IN, '登录已过期，请重新登录', null)
