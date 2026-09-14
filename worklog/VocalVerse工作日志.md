@@ -3,6 +3,21 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-14 PR #34 评审意见处置（B1 阻断 + R1/R2/R5 + Q1 · 前端两条见安卓日志）· 3 op
+
+- **背景**：组长对 PR #34（`feat(sing): 唱歌模块（M3）+ 全链路审校加固`，129 文件 / +26252 行）给出 `CHANGES_REQUESTED`：**1 条阻断 B1** + 5 条建议 R1~R5 + 1 条疑问 Q1。本记录只覆盖后端/部署/CI 与记录纪律部分；**R3/R4 是 `/m/sing` 的界面状态问题，按记录纪律走 `worklog/安卓开发日志.md`**（同日条目）。
+- **B1（阻断 · 幂等键并发竞态 → 非 envelope 的 500）· 已修**：`submit_song_audio` 的「先查后插」在并发双击 / 弱网重传下，两个请求都读到 `existing=None`（读事务已结束），各自 `db.add(SingAttempt)` + `commit()` → 后提交者撞迁移 0016 的 `uq_sing_attempts_user_session`，抛 `IntegrityError`；`app/main.py` 只有 BizError / ConsoleBizError / RequestValidationError / HTTPException 四个 handler，**不覆盖 SQLAlchemy 异常** → 唯一键只把「落两行」换成了「输家 500」，P1-3 的幂等语义并未闭合。修复：插入段包 `try/except IntegrityError` → `rollback()` → 回读赢家已落的那行 → 按既有三分支返回（① 已定稿 → 幂等返回结果；② 任务态在跑 / 赢家「已 commit、任务态未写」的窄窗口 → 已受理回执；③ 失败草稿就地重置**不适用**——能撞唯一键说明赢家是刚落的草稿，重置会清掉赢家那行并二次起 worker）。写法与仓内既有四处同款（`reading/service.py:267`、`favorites.py`、`events.py`、`media/service.py`）。
+- **B1 的「修复前必失败」实证（不是"测试全绿"）**：新增 3 个用例，并把 `service.py` 的兜底临时摘掉复跑 —— **3 例全红**，报错即评审描述的那条：`sqlite3.IntegrityError: UNIQUE constraint failed: sing_attempts.user_id, sing_attempts.session_id`；还原后 3 例全绿。其中 `test_submit_concurrent_double_tap_converges_to_single_row` 是**真并发**（`asyncio.gather` 两个同会话上传，probe 桩里让出控制权保证两者都过预检再各自插入），正是评审要求的「顺序双调用覆盖不到」的那条路径；另两条用**确定性交错**（在预检之后、插入之前的 `_probe_duration` 处由另一会话抢先落行）钉住两个语义分支（赢家在建任务态 / 赢家已定稿），比真并发更好复现。
+- **R1（记录纪律 · 署名）· 已补**：主线日志本 PR 新增条目中前 9 条缺 `—— 执行人：`，且全部署名为「AI 代签（正式署名待组长确认）」；现按组长 2026-09-14 确认，**每条独立小节各自补/改为 `—— 执行人：Faust-sudo（AI 代工）`**（含被一并迁出的 2026-09-09 各条；不再有共用一行的情况）。
+- **R2（记录纪律 · 归属）· 已迁**：「2026-09-09 实时音准线」整条是 App UI（`/m/sing` + `LivePitchChart.vue` + `mobile-sing.css` 边距 + `lib/yin.ts`），Python / Java 零改动，**不是混合条目** → 按「App 端 UI 一律入安卓日志、不得放主线日志」整体移到 `worklog/安卓开发日志.md`（合并进该文件已有的同名条目，主线那份删除，避免两处真值）。
+- **R5（部署可维护性）· 已改**：① python-api 的 `APP_JAVA_BASE_URL` 由钉死字面量 `http://java-api:8080` 改为 `${APP_JAVA_BASE_URL_DOCKER:-http://java-api:8080}`。**没有照评审建议直接写 `${APP_JAVA_BASE_URL:-…}`**：compose 会用**根 .env** 做变量插值，而该键在 .env 里的语义是「裸跑 = localhost」，有 .env 时默认值永不生效 → 等于把 2026-09-10 的 F2（容器内 Connection refused → 歌曲永久 40905）装回去。实测证据：本机临时用 `${APP_JAVA_BASE_URL:-http://java-api:8080}` 渲染，结果就是 `http://localhost:8080`。故开**容器侧独立键**（`environment` 优先级高于 `env_file`，根 .env 的同名键不污染容器），默认值即服务名；`.env.example` 按注释形式登记该键（避免又一处真值）。② `POSTGRES_PASSWORD` 由 `${…:-vocalverse-dev}` 改 `${…:?required}`（与同文件 JWT_SECRET / SERVICE_TOKEN 同款）：忘记复制 `.env` 直接报错，而不是静默用弱口令起库。实测：缺 .env 时 `docker compose config` 报 `required variable POSTGRES_PASSWORD is missing a value`；补 .env 后渲染正常，且**逐服务核对**——`python-api → http://java-api:8080`、`java-api` / `migrate → http://localhost:8080`（裸跑语义未被污染）、`POSTGRES_PASSWORD=vocalverse-dev`。
+- **Q1（疑问）· 已按组长拍板处置**：三份 workflow（frontend-ci / java-ci / python-ci）`push(main)` 兜底注释里「本仓 pull_request 触发当前未生效 / PR 分支推送 0 run / 自 2026-09-07 起再无自动运行」的论断**被本 PR 自己证伪**（4 个 check 全部由 `pull_request` 触发在 314ad7d 上真实跑过）→ **保留 push(main) 作纵深防御**，但把理由与历史论断一并更正，避免后人误读成「PR 触发是坏的」。
+- **门禁（本机真跑，非"CI 绿"）**：前端 `pnpm lint` 绿 / `pnpm typecheck` 绿（修正后的真门禁）/ `pnpm test:run` **288 passed (48 files)**（原 285/47，+3 例）/ `pnpm build` 绿 / `node scripts/check-bundle.mjs` 绿 / `pnpm gen:api` 零 drift；Python `ruff check` 绿 / `ruff format --check` 228 files / `pytest -q` **652 passed, 4 skipped**（4 skip 是本机没起 PG/Redis 的容器集成用例；CI 会同款跑）；Java `mvn clean verify` **BUILD SUCCESS**（spotless + **176 tests, 0 failures**）；`.github/workflows/*.yml` + `docker-compose.yml` + `application.yml` 共 8 份全部 `yaml.safe_load` 通过。
+- **踩坑**：① 「评审建议直接照抄」会把修好的 BUG 装回去——`${VAR:-默认}` 在 compose 里不是"默认值"而是"**先看根 .env**"；② 并发用例不能只靠 `gather` 碰运气：`submit_song_audio` 在预检与插入之间只有 `await` 才切协程，桩函数不 await 的话两个协程会被串行执行、根本测不出竞态（必须在 probe 桩里显式 `asyncio.sleep(0)` 让出）；③ 本机 `.venv` 曾被上一轮操作搬成半损坏状态（缺 `pygments/plugin.py`、`_distutils_hack`）→ `uv sync --frozen` 可原地修复，不必重建。
+- **产出**：`services/python/app/sing/service.py`（B1 兜底）、`apps/web/src/composables/sing.ts`（R3/R4）、`services/python/tests/test_sing_service.py`（+3）、`apps/web/src/composables/__tests__/sing-epoch.test.ts`（新，+3）、`docker-compose.yml` / `.env.example` / `README.md`（R5）、三份 workflow（Q1）、本条 + 安卓日志同日条目。**注**：`apps/web` 的 `sing-epoch.test.ts` 抽成独立文件而非塞进 `sing.test.ts`，是该文件已逼近 eslint `max-lines 350`（新代码不豁免）。
+
+—— 执行人：Faust-sudo（AI 代工），2026-09-14
+
 ## 2026-09-10 合并 main 到唱歌分支（PR #34 解冲突）：迁移编号重排 + 合并期修复 · 1 op
 
 - **背景**：PR #34（`feat/sing-m3-hardening`）因分支落后 `origin/main` 59 个提交而 **CONFLICTING**——GitHub 对冲突 PR 不生成 merge ref ⇒ **一个 CI check 都不会跑**。组长拍板由我合 main 解冲突。共 23 处冲突（`git merge origin/main`）。
@@ -15,6 +30,8 @@
 - **踩坑**：① 两侧各自新建迁移必然撞号——**跨分支合并时先看 `alembic heads` 再谈其它**，并把「重排 + 引用同步 + 重建库」当作合并的一部分；② "keep both sides" 的机械合并对**代码块**不成立（preview 路由/registry 被拼成非法 TS），必须逐块看内容；③ 生成物（快照/类型）永远重生成，不手改；④ 冲突 PR 无 CI 是**平台行为**，不是工作流写错（本地 YAML 合法 + main 上工作流正常）；⑤ 本机只有 JDK 8、跑不了 Java 门禁——用 `maven:3.9-eclipse-temurin-21` 容器跑 `mvn clean verify` 才等价 CI：**挂载仓库根**（`-w /repo/services/java`，否则依赖 `data/seed` 与契约快照相对路径的用例假失败）、且**必须 clean**（不清 target 的增量编译会让 JPA 实体扫描失败，153 errors 全是假象）。
 - **产出**：合并提交（本记录所属）+ PR #34 更新（冲突已解、CI 可跑）。
 
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
+
 ## 2026-09-10 口径 v6（F1 修复）：句窗时间弯折 + 起唱判据换能量口径（组长拍板方案 A）· 1 op
 
 - **背景**：全方面复测发现的 F1——**用户唱得比参考慢（`bpm_ratio<1`）时整首没有节奏分**（`reason='no_onset'` 6/6 句，`overall` 静默按 0.5/0.3 重算）。PG 历史 26 条 attempt 中 `ratio<1` 的**全部**无 `rhythm_score`、`ratio>1` 的都有（方向性明确）；演示素材 `local/sing_test_user.wav` 正是 `ratio=0.826`，演示链路「节奏」维度长期为空。
@@ -26,6 +43,8 @@
 - **已知边界（未根治，另案）**：整首 DTW 仍是 ±10% Sakoe-Chiba 带，"偏慢 20% + 每句换气"（实测总时长 +39%）远超带宽 → 窗口放置仍会漂（v6 借 onset 比值缓解）；后续可考虑按 onset 比值**预拉伸**用户序列后再对齐。
 - **归档**：`worklog/BUG实测/偏慢跟唱无节奏分-起唱判据与句窗弯折.md`。
 
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
+
 ## 2026-09-10 唱歌模块全方面复测（P0/P1 修复后 · 真容器）：发现并修复 F2，另报 F1 待拍板
 
 - **测试矩阵**：后端 `ruff` + `pytest -q` **481 passed / 0 skipped**（Docker 起后含 PG/Redis 集成）；新增 `tests/test_sing_journey.py`（4 用例·真路由 HTTP 旅程：主链路 / P1-3 失败重试 / 边界 40101·40401·40905·40002·41302·41301·42901 / 不存在资源）；前端 `lint`+`typecheck`+**177 passed**+`build`+`check-bundle` 全绿；契约快照 == `app.openapi()` 且 `pnpm gen:api` 幂等；真 PG 执行迁移 0012 并核对唯一键；容器层新增 `scripts/sing_container_test.py`（**42 项检查 41 PASS**）。
@@ -33,6 +52,8 @@
 - **F2（复测发现 · P0 级 · 已修复）**：容器内 `APP_JAVA_BASE_URL` 缺省为 `http://localhost:8080`（指容器自己）→ Python→Java 三个内部委托（参考旋律门禁翻转 / 档位回写 / 打卡卡物化）全部 Connection refused；提取成功但 `songs.pitch_ref_status` 翻不回来 → 新环境首次提取或世代重建后歌曲**永久 40905**（补偿分支对 `building` 主动跳过，救不回来）。修复：compose 给 python-api 显式钉死 `APP_JAVA_BASE_URL: http://java-api:8080`（+`.env.example` 注释区分裸跑/容器；首版误加 `depends_on: java-api` 触发依赖环，已回退）。验证：同一实验修复前停 missing、修复后 90s 内自动 `ready` 且无失败日志。归档：`worklog/BUG实测/容器内内部委托地址错-参考旋律门禁翻不了.md`。
 - **F1（复测发现 · 待组长拍板）**：**句窗口起点未按速度弯折**（`sing.py:1138` `win_start = ref_start + offset`，只有句长乘了 `scale`）→ `bpm_ratio<1`（用户偏慢）时窗口起点落到上一句句腹 → v5 逐句起唱判据只能判"延续" → **整首节奏维度为 None**（`overall` 静默按 0.5/0.3 重算）。PG 历史数据佐证：26 条 attempt 中 14 条有 `rhythm_score`，**ratio<1 的那批全部没有**，ratio>1 的都有（方向性与推演一致）；演示素材 `local/sing_test_user.wav` 正是 ratio=0.826 → 演示链路长期缺"节奏"分项。证据脚本 `local/window_mapping_probe.py`；四个候选修法（A 时间弯折+截距拟合 / B 只补起点 / C 加兜底 / D 仅文档化）见 `docs/audit/唱歌模块复测报告-2026-09-10.md` §4.4，**本批未改代码**。
 - **产出**：`docs/audit/唱歌模块复测报告-2026-09-10.md`（测试矩阵 + 逐条容器证据 + F1/F2 + 其他观察）、`scripts/sing_container_test.py`（可复跑容器复测脚本）、`local/window_mapping_probe.py`（F1 证据）。
+
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
 
 ## 2026-09-10 P1 批次收尾（P1-3 / P1-11 / P1-12 / P1-13 / P1-14）：全量门禁与契约对账
 
@@ -48,6 +69,8 @@
   3. 分支 `feat/sing-m3` 仍**未推送**——本批所有 CI 关卡（快照对账 / 生成零 diff / 迁移单头）本地已复核，但远程尚无一次真实运行；是否推送/开 PR 待拍板；
   4. 后端改动需 `docker compose up -d --build python-api web` 才生效（镜像内代码为构建期拷贝），迁移 0012 需随部署执行。
 
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
+
 ## 2026-09-10 P1-11（后端性能）：整首 DTW 护栏死代码修复（组长拍板方案 A）· 1 op
 
 - **背景**：拷问报告 P1-11。`max_sing_seconds=180` 的歌做整首粗对齐：成本矩阵 + 累积矩阵各 `n²×8B` ≈ **506MB**、带内纯 Python 双层循环 ≈630 万次 ≈ **48.3s**（本机实测）；`sing_concurrency=2` 两首并发近 1GB，容器 2GB 还要装 whisper → 有 OOM 风险。
@@ -57,6 +80,8 @@
 - **测试（test，+3）**：`test_sing_scorer.py`——`test_align_frames_downsamples_long_song` **修复前必失败**（`assert 5625 <= 2813`：旧护栏下 `_dtw_path` 收到全量帧）+ offset 量化单位断言；`test_align_frames_keeps_full_resolution_for_short_song`（反向护栏：3000 帧不得降采样）；`test_global_dtw_step_boundaries`（4000/4001/5625/9375 → 1/2/2/4）。
 - **文档**：docs/06 §9.4「对齐」行增规模护栏说明（实测数字 + 量化代价 + 未做治本项）。
 - **归档**：`worklog/BUG实测/整曲DTW护栏死代码-48秒与506MB.md`。
+
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
 
 ## 2026-09-10 P1-14（后端契约 + 前端类型）：唱歌端点补 response_model，前端改吃生成类型 · 1 op
 
@@ -70,6 +95,8 @@
 - **文档**：docs/21 §2.1 增「响应 schema 补齐（P1-14）」注（DTO 清单 + `extra="allow"` + `Literal` 代价）。
 - **归档**：`worklog/BUG实测/唱歌端点响应无schema-前端手写DTO漂移.md`。
 
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
+
 ## 2026-09-10 P1-13（后端）：多桶限流全有或全无（consume_all + 全量回滚）· 1 op
 
 - **背景**：拷问报告 P1-13。一次请求消耗多个桶时逐桶顺序 `await consume(a)` / `await consume(b)`——b 抛 429 时 a **已扣且不回滚**：跟唱 `sing`（5/h）被重试重复计费、ISE 耗尽期间 `sing` 被空转烧干（用户始终拿不到结果）；Redis 路径 429 时 `INCR` 仍执行，被拒请求不断抬高计数。
@@ -80,6 +107,8 @@
 - **门禁**：ruff check 绿、ruff format --check 159 files、`pytest -q` **474 passed**（原 468 + 6）。
 - **归档**：`worklog/BUG实测/多桶限流顺序扣导致重复计费.md`。
 
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
+
 ## 2026-09-10 P1-12（后端）：提取并发闸门逐任务取许可 + 重试预算随世代复位 · 1 op
 
 - **背景**：拷问报告 P1-12（2-C）。参考旋律提取编排（`app/sing/jobs.py`）两处工程缺陷：并发限流形同虚设、失败重试上限把换代后的歌永久封死。
@@ -89,6 +118,8 @@
 - **文档**：docs/10 §3.2 第 2 条增「重试预算随世代复位」段（原「世代升级前需确认无达上限的失败 job」的人工绕行说明已被自动复位取代）；docs/06 §9.4 D6 行补「提取信号量必须逐任务获取」澄清。
 - **门禁**：见本批收尾记录（ruff / format / pytest 全绿）。
 - **归档**：`worklog/BUG实测/提取并发闸门失效与重试上限永久封死.md`。
+
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
 
 ## 2026-09-10 P1-3（后端 + 迁移 0012）：同会话幂等键 + 失败草稿可就地重跑 · 1 op
 
@@ -102,6 +133,8 @@
 - **踩坑（2 条，详见归档）**：① 迁移里的自检 SQL 在 `alembic upgrade --sql` 离线渲染下 `op.get_bind().execute(...)` 返回 `None` → `AttributeError`，须 `context.is_offline_mode()` 守卫（`test_alembic_offline_pg_render` 拦下）；② 任务态内存兜底 `_MEM_TASKS` 是模块级 dict、跨用例残留，模拟"任务态丢失"必须 monkeypatch `_task_get`（否则读到上个用例的 `done`）。
 - **归档**：`worklog/BUG实测/重试永久失败-同会话复用失败行.md`（复现 / 根因 / 修复 / 验证 / 踩坑）。
 
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
+
 ## 2026-09-10 P1 批次（后端）：任务态 done 判据 + R3 覆盖率分母（口径 v5.1）· 2 op
 
 - **背景**：P0 七条收口后继续 P1。本批处理拷问报告 §3.2 的 **P1-1**（合法完成的 attempt 被报失败）与 **P1-10**（用户把有参考的句唱全仍拿不到综合分）。
@@ -113,7 +146,7 @@
 - **归档**：`worklog/BUG实测/P1批次-任务态判据与覆盖率口径.md`。
 - **遗留（P1 余项）**：P1-3（幂等失败不可重试 + `sing_attempts(user_id,session_id)` 唯一键，需迁移 0012；**已探真库确认无重复行**，可安全加）、P1-11（180s 整曲 DTW 实测 48.7s/0.5GB）、P1-12（提取信号量被 gather 架空 + 重试上限无复位口）、P1-13 余项（sing→ise 顺序扣白扣）、P1-14（唱歌 5 端点补 `response_model` + 前端 `bpm_source` 值域修正）。
 
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-10
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
 
 
 ## 2026-09-10 P0-6：请求体上限双层护栏（应用中间件 + nginx 纵深防御）· 2 op
@@ -127,7 +160,7 @@
 - **归档**：`worklog/BUG实测/匿名大body打爆容器.md`（复现/根因/修复/验证/踩坑）。
 - **遗留**：① 若部署层再加网关（nginx 之外），需按同口径加 `client_max_body_size`；② "鉴权前置"（连小 body 都不解析）本次**未做**——因为体量护栏已消除资源风险，重复鉴权逻辑收益低（组长方案 A 已明确）；③ `docs/21 §1.1` 的 `security` 全空（R-1）仍未闭合。
 
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-10
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
 
 
 ## 2026-09-10 P0-5：错误码契约虚设修复（HTTPException → envelope 全局 handler + 唱歌失败态码化）· 2 op
@@ -141,7 +174,7 @@
 - **归档**：`worklog/BUG实测/错误码契约虚设-HTTPException绕过envelope.md`（复现/根因/修复/验证/踩坑；含"踩坑 5：`max-lines` 门禁这轮真的拦下了我——对照 P0-0 的空操作 typecheck，门禁有效性的正反例"）。
 - **遗留**：① 未登记的 4xx/5xx 兜底码（40001/50002）属安全网，实际抛出集合已核对（400/401/404/409/422/429/502/503）；② **`docs/21 §1.1` 的 `security` 全空问题（R-1）仍未闭合**（`Depends` 非 `Security` → 快照无 security 声明、`x-test-user-id` 进公开契约），属独立项；③ 限流「sing→ise 顺序扣导致单侧失败白扣」与「done 判据 vs v5 overall=None」仍为 P1（本批只做码化，未改语义）；④ P0-6（multipart 解析早于鉴权 + 无 body 上限）待做。
 
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-10
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
 
 
 ## 2026-09-10 唱吧评分口径 v5：R1 起唱判据下沉逐句（P0 整改第 2 批，组长拍板方案 A）· 2 op
@@ -156,7 +189,7 @@
 - **归档**：`worklog/BUG实测/乱唱恒95分-R1闸门可绕过.md`（复现/根因/修复/验证/踩坑）。
 - **遗留**：① 本批与第 1 批后端修复需 `docker compose up -d --build python-api` 才在 demo 环境生效；② **前端报告区尚未展示 `no_onset`**（非 skipped 行的 `reason` 目前只在 skipped 行渲染）→ 建议 P2 补一行「该句节奏未计分」文案映射（含 `reason` 枚举中英映射，顺带解决拷问报告 D 路「reason 直出英文枚举」）；③ P0-4（面板 absolute 定位致滚动后白屏）/P0-5（40101/42901/50003 契约虚设）/P0-6（multipart 解析早于鉴权 + 无 body 上限）待续。
 
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-10
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
 
 
 ## 2026-09-10 唱歌模块 P0 整改（第 1 批：门禁 / 素材误删 / 发音切窗）· 3 op
@@ -170,7 +203,7 @@
 - **踩坑**：① 破坏性分支（`unlink`）之前必须跑完所有豁免判定——"豁免写在归属查询里"看似实现实则对超期文件永不生效；② 同一不变式在两侧各写一遍，必有一处写反（时间轴/正负号类 bug 建议抽公共映射函数，已登记 P2）；③ Fake 空心化掩盖整类缺陷（ISE 假打分器 offset=0 使 `±offset` 等价 → 回归必须构造**非零 offset**）；④ "门禁存在≠门禁生效"：命令语义随 tsconfig 结构变化而失效会形成**永久假绿**，判据是 `--listFiles` 能数出文件；⑤ 改 workflow 必须本地 `yaml.safe_load`（AGENTS.md 硬性要求）。
 - **遗留（下一步）**：P0-3 R1 换气闸门（`has_breath_structure` 整轨判据 + `_first_new_run` 的 `start==0` → 乱唱仍恒 95，**需组长拍板改判据**）；P0-4 面板 `absolute` 定位致滚动后白屏；P0-5 40101/42901/50003 契约虚设（HTTPException 无 envelope handler）；P0-6 multipart 解析早于鉴权 + 无 body 上限；以及 `feat/sing-m3` **推送/开 PR**（否则新门禁覆盖不到历史代码，需有写权限者执行）；本批修复需 `docker compose up -d --build python-api` 才在 demo 环境生效。
 
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-10
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
 
 
 ## 2026-09-10 唱吧收藏后端落地（song_favorites + 迁移 0011 + 收藏/取消端点 + 契约登记）· 4 op
@@ -186,7 +219,7 @@
 - **踩坑**：① **`max-lines` 350 又踩一次**——直接在 `MobileSingView.vue` 加行会 373/350 超限，处置是把歌单行抽成 `MobileSongRow.vue`（净减行数，见安卓日志）；② `pnpm typecheck`（`vue-tsc --noEmit`，不构建 project references）**不检查**测试夹具，而 `pnpm build`（`vue-tsc -b`）会——新增必填字段 `favorited` 后两处夹具（`LivePitchChart.test.ts` / `sing.test.ts`）只有 build 报错，**门禁必须跑 build**（本例即是）；③ 迁移在 SQLite 上跑不通（0002 起 `ALTER` 约束不支持，历史既有事实）——本地验证靠 `test_models` 的 **PG 方言离线渲染**（upgrade/downgrade 全路径编译）+ CI 同款快照对账，不臆造「迁移已实跑」；④ **容器代码 = 构建期快照**：`docker compose restart`/`up -d` 不带 `--build` 不生效；**迁移镜像同样不自动更新**——`run --rm migrate` 用 09-07 的旧镜像直接报 `Can't locate revision identified by '0010'`（是镜像旧，不是 DB 坏），必须 `--build`；⑤ **通用 toast 让排查变贵**：首版失败只有「请重试」，定位靠人工五段探测（前端/代理/路由/容器源码/DB），已改为按 HTTP 状态分流文案（404=后端未重建 / 401=登录过期 / 5xx=确认迁移），并落 5 例测试。
 - **遗留**：① ~~真容器/PG 实跑未做~~ → **已补**（同上端到端验证；本地无容器时仍以 PG 离线渲染 + SQLite 单测兜底）；② 收藏排序/收藏夹分组不做（docs/38 反借鉴清单已列）；③ 收藏态无本地缓存（断网/后端不可用 → 按钮操作失败 toast + 回滚，不做离线队列）；④ 演示/答辩前建议在**重建镜像后**先 `GET /openapi.json` 确认新端点在位再演示（本次教训固化为 BUG 实测踩坑 3）。
 
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-10
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
 
 
 ## 2026-09-10 真机反馈「胡乱唱也有高分」→ 评分口径 v4（乱唱鲁棒性 R1/R2/R3）· 5 op
@@ -202,7 +235,7 @@
 - **复现工具（入库）**：`local/hit_tol_scan.py`（命中率容差扫描）、`local/contour_corr_scan.py`（轮廓相关性验证）、`local/chaos_probe.py`（乱唱诊断）、`local/v4_false_positive_check.py`（误杀检查）——后续调判据前应先跑可分性验证（本轮踩坑 ①）。
 - **遗留**：① 命中率判据对"缓慢匀速滑音式演唱"仍会命中（物理上确实经过每个音，已在 BUG 实测记为已知边界）；② 准唱的命中率实测 58%（判据本身的路径/切分误差）→ 衰减下限取 0.6 已缓解，**SG-14 真机抽检后应复核**；③ 前端"在调音符占比"提示为新增文案，真机观感待验。
 
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-10
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
 
 
 ## 2026-09-10 唱歌 onset 检测评估（P2 遗留项①）→ F0 起音双通道仲裁实施 + BUG-5 回放 Content-Type 修复 · 4 op
@@ -215,7 +248,7 @@
 - **登记（docs）**：新增 `docs/audit/唱歌onset检测评估-频谱起音vsF0起音.md`（评估报告：方法/数据表/三结论/采纳方案/风险控制/已知边界；README 文档索引已登记）；docs/06 §9.4 item7 行更新（双通道仲裁 + `bpm_source` 值域）、§8 音频存储行补 BUG-5 修正；`worklog/BUG实测/录音回放ContentType与内容不符.md` 归档；主线日志本条。
 - **遗留**：① F0 起音参数（跳变 60 cent/桥接 96ms/去抖 120ms）由合成素材标定，**SG-14 真机抽检后应复核**；② 评估素材为合成音色，不含真人滑音/装饰音——真实录音只做了形态核对（无 ground truth）；③ 相位声码器场景（F1 0.26）非真实输入，仅作极端参考。
 
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-10
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
 
 
 ## 2026-09-10 唱歌模块功能测试（真容器全链路）→ 修复 4 个问题 · 5 op
@@ -229,7 +262,7 @@
 - **登记（docs）**：docs/06 §9.4 增「口径 v3 端到端实测与修复」表（BUG-1/2/3/4 → 修复后口径）；docs/10 §3.2 补「世代升级重提取走幂等 upsert + 重试上限注意」、§song_pitch_refs 补 `pitch_ref` 契约含 `onsets_ms`；主线日志本条 + 4 份 BUG 实测。
 - **遗留**：① 用户侧 onset 检测在"柔起音/连唱"下可能检出不足（本轮用相位声码器素材复现过极端情形）→ 建议 P2 评估 F0 起音兜底；② 真机验证（录音/实时音准线/AudioContext）仍待 M3 演示前；③ SG-14 人工抽检（FF 模糊化口径）待真实评审数据。
 
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-10
+—— 执行人：Faust-sudo（AI 代工），2026-09-10
 
 
 ## 2026-09-09 SG-14 抽检一致性评审 P1（FF 模糊化 · 论文 s41598-026-46791-5 借鉴）· 2 op
@@ -242,21 +275,7 @@
 - **登记（docs）**：docs/06 §9.4 人工抽检行扩展（FF 模糊化口径 + review.py/CLI 位置 + 论文引用 + CRITIC/MAIRCA 不引入说明）；本文档本条。
 - **遗留**：真抽检数据（5 首×5 句）由组长组织评审填写 → `local/review_*.json`（gitignore）→ CLI 出报告入答辩材料；P2 探索（选歌 CRITIC-MAIRCA 排序、轻量近似维度补全）待排期，均不动评分公式。
 
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-09
-
-
-## 2026-09-09 实时音准线（跟唱过程可视化 · 组长拍板：前端实时/自写 YIN/移动端+联调页/默认开）· 2 op
-
-- **背景**：`/m/sing` 录音阶段只有计时，用户"唱得准不准"要等上传评分后才知道——无任何过程反馈。组长需求：跟唱中实时看到音准线，随时调整自己的发音。核对现状：`VoiceRecorder` 内部 `getUserMedia` 拿到流后只喂 `MediaRecorder`（流未暴露）；参考旋律逐句 f0s + LRC 时间轴已由 `GET /songs/{id}` 提供（报告态 D3 图同数据源）——只缺录音中的实时检测与渲染。
-- **拍板（组长 2026-09-09）**：检测落点=**前端实时**（同流喂 AnalyserNode，<100ms 延迟、离线可用、零后端改动）；算法=**自写轻量 YIN**（零新依赖，免 docs/06 §3 依赖矩阵登记）；范围=**移动端 `/m/sing` + 联调预览页**（桌面 `/sing` 为 PlaceholderView 占位——生产无桌面跟唱形态；UicSinging 在 `preview/uic/` 属 dev-only 概念稿，按删除清单整目录可删）；开关=**默认开启**（localStorage 记忆 `vv_sing_live_pitch`）。
-- **实现（code）**：`src/lib/yin.ts`（YIN 纯函数：d′ 差分累积 → CMNDF 归一化 → 阈值 0.1 后首个局部谷 → 抛物插值；域 65~800Hz 与后端 pyin 同域；`midiOf/noteNameOf/centOf` 与 `pitch.py` 同口径）+ `src/composables/useLivePitch.ts`（AudioContext+AnalyserNode fftSize 2048 无平滑、60ms 节流、stop() 断连+close、start() 幂等、Web Audio 不可用降级不阻塞录音）+ `src/components/LivePitchChart.vue`（自包含：参考线（蓝，句级 f0s hop 32ms）+ 用户实时轨迹（橙，8s 滚动窗）+ 当前读数「A4 +25 cent」+「实时参考线 · 评分以离线分析为准」标注 + 开关；rAF 仅 enabled&&active 时跑，关闭零开销）；`recorder.ts` 暴露 `liveStream` getter（纯透传，不参与录音逻辑，onstop/cancel/error 置 null）；`useSingPlay` 增 `getLiveStream()`；`MobileSingView` 录音态挂载（1 行组件）、`SingingPreview` 录音态挂载（dev-only 联调页同步覆盖）。
-- **测试（test）**：`yin.test.ts` +8（440/220/700Hz 检出精度、44.1k/48k 一致性、静音/低电平噪声 → null、短窗防御、midi/音名/cent 换算）；`LivePitchChart.test.ts` +2（空态挂载安全——不触 AudioContext 不跑 rAF；开关关闭持久化+再挂载保持）。**修复前必失败证据**：先写时序（自测暴露）——880Hz 超检测域（上限 800）导致次八度假音（检出 439.98），测试改用域内 700Hz；`centOf(466.16, 70)` 语义错（相对 A#4 ≈0），改相对 A4（midi 69）≈+100。
-- **门禁**：前端 lint / typecheck / `test:run` **135 passed**（基线 125 → +10）/ build / 包体积门禁全绿；Python 零改动（无契约影响，OpenAPI 快照不变）；Java 零改动。
-- **踩坑**：① `draw()` 79 语句超 eslint max-statements(60) → 拆 drawGrid/drawRefLine/drawUserTrace 三纯渲染函数；② typecheck TS6133（拆函数残留的 w/h 形参未读）→ 清签名；③ vue-test-utils `trigger('change', {target:{checked:false}})` 不允许改事件 target → 用 `setValue(false)`（真实 element 改 checked 再派发 change）；④ `LivePitchChart.vue` 根元素 `class="m-sing-live"` 由外部传入，scoped style 不影响 → 边距样式放 `mobile-sing.css`。
-- **登记（docs）**：docs/06 §9.4「实时音准线注记」（练习辅助口径：实时线 ≠ 评分线，评分=离线 pyin+DTW；零后端改动零新依赖）；主线日志本条；安卓日志（UI 真形态）。
-- **遗留**：真机验证（Android WebView/iOS Safari AudioContext resume 链路、锁屏断录时 canvas 停更）随 M3 演示前 docs/30 补；实时线无整首对齐 offset（起唱偏晚会整体右移——练习辅助语义，故意不做）；低端机 60ms 检测 + rAF 渲染帧率待真机确认。
-
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-09
+—— 执行人：Faust-sudo（AI 代工），2026-09-09
 
 
 ## 2026-09-09 唱歌评分口径 v3（第二层「算法增强」· 组长拍板 item5~8 推荐项）· 4 op
@@ -270,7 +289,7 @@
 - **踩坑**：① `median_filter_f0` 首版漏「0 帧强制归零」——静音段边缘帧被"窗口内有 ≥2 个有声邻居"拉成音高（测试 `out[14:18]==0` 红）→ 补 `out[arr == 0] = 0.0`；② 真 pyin 端到端用例首版在 `APP_TESTING` 下静默走 `FakePitchExtractor`（恒 440Hz）→ 移调统计被污染、断言 40.0 分红——必须显式 monkeypatch 回真提取器；③ `_weighted_overall` 按 2 位小数四舍五入，测试断言容差 1e-6 → 0.01；④ 前端 `MobileSingView` 报告块 +2 行提示即触发 max-lines 350 门禁（357 超限）→ 提示并入既有 hint 块 + `statusBadge` switch 改 map 压缩（无行为变化，未进灰名单）。
 - **遗留**：SG-14 人工抽检 5 首×5 句 r≥0.7 未跑（v3 口径变化纳入抽检评估口径）；v3 素材真机验证（3 首 demo 与真人演唱）待 M3 演示前；`vocal_ref` 启用真声参考后颤音滤波的"仅用户侧"决策需按抽检复评。
 
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-09
+—— 执行人：Faust-sudo（AI 代工），2026-09-09
 
 
 ## 2026-09-09 唱歌评分口径 v2（第一层「真实性」修正 · 组长拍板 A3/B2/C1）· 4 op
@@ -283,7 +302,7 @@
 - **踩坑**：① 局部 DTW 成本若用"双方各自中位归一化"的序列，会引入两条序列的基准偏移 → DTW 目标与评分目标不一致（对齐后仍 250 cent）；改为**绝对折叠 cent 差**的成本矩阵（句级规模可承受）才正确；② 门槛判"DTW 路径对数"会二次打折，改判"用户窗口有声帧数"；③ `math.ceil` 而非 `round`（30% 门槛 155 帧：round=46 与语义不符）。
 - **登记（docs）**：docs/06 §9.4 增「口径 v2」对照表（v1 缺陷 → v2 做法 + 实测依据）；docs/10 §4.3 `lines[i]` 结构补 `onset_dev_ms`/`cent_dev` 与 `low_frames` 原因；本文档本条。**遗留**：第二层（音域自适应移调/颤音滤波/onset 估 BPM）与第三层（LLM 教练点评/TTS 示范/个性化基准）待排期；SG-14 人工抽检 r≥0.7 仍是可信度硬证据。
 
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-09
+—— 执行人：Faust-sudo（AI 代工），2026-09-09
 
 ## 2026-09-09 唱歌素材物化 + 曲目播种（SG-13/D-G2 · 组长拍板 A+B 方案）· 3 op
 
@@ -295,7 +314,7 @@
 - **踩坑**：① 首次提取全失败——本地裸跑 cwd=`services/python` 而素材在**仓库根** `data/audio`，`APP_AUDIO_DIR` 默认 `./data/audio` 解析错位（A-G7 路径三义性既有登记项）；容器内 `/app/data/audio` 正确，本地验证需显式 `APP_AUDIO_DIR=<仓库根>/data/audio`；② 失败 job 由扫描自动恢复（failed 且 attempts<上限 → 重置 queued），无需手工清库；③ `docker compose up -d --build` 首次 python 镜像下载依赖期间健康检查窗口超时 → 依赖它的 java/web 被跳过（Created 未启动），**再跑一次 `up -d java-api web`** 即恢复（非代码缺陷，登记为部署注意项）。
 - **遗留**：真人清唱素材替换路径已备（组长提供音频 + 歌词后：放 `data/audio/` → 在 `data/seed/songs.json` 追加条目（`vocal_ref_url` 可填独立人声轨）→ Java Seeder 幂等新增 → 提取自动 ready）；`scripts/setup-assets.ps1`（原计划 PowerShell 形态）以 Python 形态落地（跨平台 + 复用 numpy/soundfile）；素材仅 3 首童谣（演示足够，扩展由管理端 CRUD 或追加 seed 条目）。
 
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-09
+—— 执行人：Faust-sudo（AI 代工），2026-09-09
 
 ## 2026-09-09 M3 唱歌 P0 六项全链路落地（D1~D7 组长拍板 · feat/sing-m3 分支 · 未推送）· 12 op
 
@@ -309,7 +328,7 @@
 - **踩坑**：① 计划书 40904/50002 与 origin/main J-08 登记冲突 → 顺延 40905/50003；② 单写方探针是文件级粗粒度守护——jobs.py 合法混读 Java 表与写 Python 表也会命中 `db.execute(update(...))` 模式 → 写形式改 ORM 属性赋值 + 探针清单修正（SongPitchRef 实为 Python 写方，docs/20 §4.1）；③ Java 测试 `.getBytes()` 只作用于最后一个字符串字面量（缺括号）→ 请求体损坏 400「请求体无法解析」（踩坑实录）；④ `sf.read(..., format=)` 非法参数被静默 except 吞掉 → 发音抽样恒空（改 sf.read 无 format）；⑤ 发音抽样后须重算 pron/overall（评分器聚合时 pron 未知）；⑥ SQLite 删空后 rowid 复用（PG IDENTITY 单调）——test 断言只比对引用不比对 revision 字符串；⑦ 移动端样式拆 `mobile-sing.css` 过大文件免责（max-lines 350 门禁）。
 - **遗留登记**：发音「weak 句优先」为 P2 增强（当前前 N 句）；重唱薄弱句（SG-15）M3 弹性未做；人工抽检 5 首×5 句 r≥0.7 排期在 W3（SG-14）；评分信号量观测与 60s 部署预热未跑（M4）；`sing_attempts` 无 (user_id,session_id) 唯一约束（幂等为应用层查重，DB 级守护留 P2）。
 
-—— 执行人：AI 代签（正式署名待组长确认），2026-09-09
+—— 执行人：Faust-sudo（AI 代工），2026-09-09
 ## 2026-09-10 修 main 上的 python-ci：Python 契约快照缺 21 条控制台路由
 
 - **起因**：直推 main 后 CI 报 `Some checks were not successful`——`python-ci / lint · test · alembic` 1 分钟后失败，
