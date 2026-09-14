@@ -61,6 +61,10 @@ vi.mock('@/api/reading', () => ({
   segmentAudioUrl: vi.fn(() => ''),
   loadSegmentAudio: vi.fn(),
   prepareChapter: vi.fn(),
+  // 2026-09-14：`MobileBookCover` 用它把书封相对路径补成可给 `<img src>` 的地址。
+  // 桩件必须镜像真实模块的导出面，否则组件 setup 会抛
+  // `No "bookCoverUrl" export is defined on the "@/api/reading" mock`（本轮实测）。
+  bookCoverUrl: (p: string | null | undefined) => p ?? '',
 }))
 
 const stub = { template: '<div class="stub" />' }

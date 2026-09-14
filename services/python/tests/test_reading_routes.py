@@ -46,6 +46,24 @@ class TestBooks:
         body = resp.json()
         assert body["code"] == 0
         assert body["data"]["items"][0]["title"] == "Demo Book"
+        # 2026-09-14：书架 DTO 必须带 cover_url（值为空时前端回退合成封面，键位不能缺）
+        assert "cover_url" in body["data"]["items"][0]
+
+    def test_list_books_exposes_cover_url(self, client, auth_headers):
+        """有封面的书：`cover_url` 原样透出（前端据此渲染 `<img>`）。"""
+        with get_session_factory()() as session:
+            session.add(
+                Book(
+                    title="Covered Book",
+                    author="Tester",
+                    level="L1",
+                    cover_url="/api/v1/reading/covers/demo.jpg",
+                )
+            )
+            session.commit()
+        resp = client.get("/api/v1/reading/books", headers=auth_headers)
+        row = next(b for b in resp.json()["data"]["items"] if b["title"] == "Covered Book")
+        assert row["cover_url"] == "/api/v1/reading/covers/demo.jpg"
 
     def test_book_detail(self, client, auth_headers, reading_seed):
         resp = client.get(f"/api/v1/reading/books/{reading_seed['book_id']}", headers=auth_headers)
@@ -60,6 +78,51 @@ class TestBooks:
     def test_unauthorized(self, client, reading_seed):
         resp = client.get("/api/v1/reading/books")
         assert resp.status_code == 401
+
+
+class TestBookCover:
+    """书封图端点（2026-09-14 新增）。
+
+    三条口径：① **公开**（`<img src>` 不带 Authorization，故无鉴权）；② 只服务
+    `data/seed/covers/` 白名单文件名（目录穿越/子目录一律 400）；③ 缺图回 envelope 40401
+    （不是框架的 `{"detail": ...}`——错误码契约见 docs/api/error-codes.md）。
+    """
+
+    def test_serve_cover_is_public(self, client, tmp_path, monkeypatch):
+        cover = tmp_path / "demo.jpg"
+        cover.write_bytes(b"\xff\xd8\xff\xe0JFIF-fake")
+        monkeypatch.setattr("app.api.routes.reading.book_cover_dir", lambda: tmp_path)
+
+        resp = client.get("/api/v1/reading/covers/demo.jpg")  # 不带 auth_headers
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "image/jpeg"
+        assert resp.content == b"\xff\xd8\xff\xe0JFIF-fake"
+        assert "max-age" in resp.headers.get("cache-control", "")
+
+    def test_missing_cover_40401(self, client, tmp_path, monkeypatch):
+        monkeypatch.setattr("app.api.routes.reading.book_cover_dir", lambda: tmp_path)
+        resp = client.get("/api/v1/reading/covers/nope.jpg")
+        assert resp.status_code == 404
+        assert resp.json()["code"] == 40401
+
+    @pytest.mark.parametrize("name", ["..", "...", ".hidden.jpg", "sub/dir.jpg", "a" * 80])
+    def test_bad_cover_name_40001(self, client, tmp_path, monkeypatch, name):
+        monkeypatch.setattr("app.api.routes.reading.book_cover_dir", lambda: tmp_path)
+        (tmp_path / "ok.jpg").write_bytes(b"x")
+        resp = client.get(f"/api/v1/reading/covers/{name}")
+        # 含 `/` 的会被路由层挡在 404；其余非法名必须被白名单拒成 40001
+        assert resp.status_code in (400, 404)
+        if resp.status_code == 400:
+            assert resp.json()["code"] == 40001
+
+    def test_book_cover_dir_is_seed_assets(self):
+        """封面目录锚在**仓库根** `data/seed/covers`（不是 cwd 相对）——容器与裸跑同口径。"""
+        from app.core.paths import book_cover_dir, seed_dir
+
+        assert seed_dir().name == "seed"
+        assert seed_dir().parent.name == "data"
+        assert (seed_dir() / "reading_books.json").is_file()
+        assert book_cover_dir() == seed_dir() / "covers"
 
 
 class TestChapter:
