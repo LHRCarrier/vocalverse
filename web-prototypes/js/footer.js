@@ -15,7 +15,7 @@
     '<div class="site-footer__inner">',
     '  <div class="site-footer__block site-footer__brand">',
     '    <span class="site-footer__logo">VocalVerse</span>',
-    '    <p class="site-footer__tagline">AI English Speaking Trainer</p>',
+    '    <p class="site-footer__tagline">Practice &middot; Immerse &middot; Sing &middot; Read</p>',
     '  </div>',
     '  <div class="site-footer__block site-footer__contact">',
     '    <span class="site-footer__heading">Contact</span>',
@@ -31,7 +31,7 @@
     '    <a class="site-footer__link" href="#terms-of-use">Terms of Use</a>',
     '  </nav>',
     '</div>',
-    '<p class="site-footer__copy">&copy; 2026 VocalVerse &middot; AI English Speaking Trainer</p>'
+    '<p class="site-footer__copy">&copy; 2026 VocalVerse &middot; AI English App</p>'
   ].join("");
 
   (document.body || document.documentElement).appendChild(footer);

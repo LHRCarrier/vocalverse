@@ -52,10 +52,16 @@
    8) 滤镜层比激活项外扩 --gooey-field：底布要大于药丸，药丸的边才不会被
       blur(7px) 糊成光晕。外扩量按导航条内边距夹取后写回同名 CSS 变量，
       CSS（药丸内缩量）与 JS（滤镜层外扩量）共用同一个值，详见 syncField()。
-   9) 静止态药丸用 .is-settled 直接落位、不播 0→1 的生长：挂载（含站内跳转
-      到达）时激活项的字会被立刻换成"药丸反色"，若药丸还在从 0 长大，
-      浅色主题下就是白字压白底、深色主题下黑字压黑底，头 200ms 看不清。
-      生长形变只在第一次点击切换时启用（handleClick 摘掉 .is-settled）。
+   9) 药丸不再"原地消失再长大"，而是"滑过去"：.is-settled 常驻（药丸恒为满尺寸），
+      位移与尺寸过渡交给 CSS（.effect 上的 400ms，见 gooey-nav.css 差异 7）。
+      上游的 0→1 生长形变在多页站点里的实际观感是"背景色瞬移 + 原地闪一下"，
+      正是要消掉的僵硬感。
+   10) 站内跳转接力：点击导航时把"出发时的高亮下标"写进 sessionStorage，
+      下一页挂载时先把药丸无过渡地摆到那个下标，再滑到本页高亮项 —— 跨页面
+      也能看到药丸从旧链接滑到新链接（接力期间 .is-arriving 先压住文字反色，
+      到位前再翻色，否则字会与导航底色同色而整段不可见）。
+   11) 滚动跟手 / 尺寸重排期间挂 .no-glide 关掉过渡，避免药丸拖着 400ms 的
+      尾巴追手指；prefers-reduced-motion 下不做接力，直接落位（差异 6）。
 */
 (() => {
   "use strict";
@@ -74,6 +80,42 @@
 
   const ACTIVE = "active";
   const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  /* —— 跨页"接力"的交接棒（差异 10）——
+     只在 sessionStorage 里放一个下标 + 时间戳：新旧页面的导航结构完全一致，
+     同一个下标在两页里对应同一个视觉槽位，所以"上一页从哪出发"就够用了。
+     任何存储异常（file:// 下的隐私模式等）都退化成"直接落位"，不影响可用性。 */
+  const FROM_KEY = "vv-nav-from";
+  const FROM_TTL = 6000;
+
+  const readFrom = () => {
+    try {
+      const raw = window.sessionStorage.getItem(FROM_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || typeof data.index !== "number") return null;
+      if (typeof data.t === "number" && Date.now() - data.t > FROM_TTL) return null;
+      return data.index;
+    } catch (err) {
+      return null;
+    }
+  };
+
+  const writeFrom = (index) => {
+    try {
+      window.sessionStorage.setItem(FROM_KEY, JSON.stringify({ index, t: Date.now() }));
+    } catch (err) {
+      /* 存不了就退化成直接落位 */
+    }
+  };
+
+  const clearFrom = () => {
+    try {
+      window.sessionStorage.removeItem(FROM_KEY);
+    } catch (err) {
+      /* 同上 */
+    }
+  };
 
   /* ===== 上游原样保留的三个数学函数 ===== */
   const noise = (n = 1) => n / 2 - Math.random() * n;
@@ -180,22 +222,12 @@
       };
     };
 
-    /* —— 上游 makeParticles：先撤掉药丸，再逐个投递气泡，落位后重放药丸 —— */
-    const makeParticles = (element) => {
-      element.classList.remove(ACTIVE);
-
-      if (motionQuery.matches) {
-        /* 差异 6：不生成气泡，但药丸仍要在下一帧落位 */
-        requestAnimationFrame(() => {
-          if (!disposed) element.classList.add(ACTIVE);
-        });
-        return;
-      }
-
+    /* —— 上游 makeParticles：先撤掉药丸，再逐个投递气泡，落位后重放药丸 ——
+       本站拆成两半：spawnParticles 只投气泡，药丸的去留由调用方决定
+       （滑动过渡时不收药丸，见差异 9）。 */
+    const spawnParticles = (element) => {
       const d = opts.particleDistances;
       const r = opts.particleR;
-      const bubbleTime = opts.animationTime * 2 + opts.timeVariance;
-      element.style.setProperty("--time", `${bubbleTime}ms`);
 
       for (let i = 0; i < opts.particleCount; i++) {
         const t = opts.animationTime * 2 + noise(opts.timeVariance * 2);
@@ -232,6 +264,28 @@
           }, t);
         }, 30);
       }
+    };
+
+    /* 只放气泡、不动药丸：点击切换时药丸由 CSS 滑过去（差异 9） */
+    const burst = (element) => {
+      if (motionQuery.matches) return;
+      element.style.setProperty("--time", `${opts.animationTime * 2 + opts.timeVariance}ms`);
+      spawnParticles(element);
+    };
+
+    /* 上游语义（药丸收起 → 投气泡 → 重放）：仅用于"导航首次露面补播" */
+    const makeParticles = (element) => {
+      element.classList.remove(ACTIVE);
+
+      if (motionQuery.matches) {
+        /* 差异 6：不生成气泡，但药丸仍要在下一帧落位 */
+        requestAnimationFrame(() => {
+          if (!disposed) element.classList.add(ACTIVE);
+        });
+        return;
+      }
+
+      burst(element);
     };
 
     /* —— 阈值场外扩量 ——
@@ -287,17 +341,31 @@
 
     const reposition = () => updateEffectPosition(entries[activeIndex].li);
 
-    /* —— 上游 handleClick —— */
+    /* 重新对位（重排 / 条子横向滚动时用）：
+       平时关掉过渡瞬时对位 —— 跟手时不能被 400ms 的尾巴拖住；
+       跨页接力期间（.is-arriving）保留过渡 —— 中途改目标只是"平滑改道"，
+       要是这里也瞬时对位，会把正在滑的药丸一把拽到终点，滑动就废了。 */
+    const nudge = () => {
+      if (nav.classList.contains("is-arriving")) {
+        reposition();
+        return;
+      }
+      nav.classList.add("no-glide");
+      reposition();
+      void nav.offsetWidth;
+      nav.classList.remove("no-glide");
+    };
+
+    /* —— 上游 handleClick（本站：药丸滑过去，不再原地消失重长）—— */
     const handleClick = (index) => {
       if (activeIndex === index) return;
 
-      /* 退出"静止态"：从这一次起药丸恢复生长形变（差异 9）。
-         放在 reposition 之前，免得药丸先按满尺寸跳到新位置再消失。 */
-      filter.classList.remove("is-settled");
+      /* 记下"从哪个链接出发"，下一页挂载时接着滑（差异 10） */
+      writeFrom(activeIndex);
 
       activeIndex = index;
       syncActiveLi();
-      reposition();
+      reposition(); /* .effect 上挂着过渡 → 药丸滑到新链接 */
 
       filter.querySelectorAll(".particle").forEach((p) => filter.removeChild(p));
 
@@ -305,7 +373,7 @@
       void text.offsetWidth; /* 强制重排，让颜色过渡能重放 */
       text.classList.add(ACTIVE);
 
-      makeParticles(filter);
+      burst(filter); /* 只放气泡；药丸保持在位，由 CSS 滑过去 */
     };
 
     /* —— 差异 2：初始激活项 —— */
@@ -318,14 +386,45 @@
           : 0;
 
     /* —— 上游 useEffect：落位 + 文字层变色；差异 4：药丸也一起落位 ——
-       静止态直接落位（.is-settled，见 css 说明）：不播 0→1 的生长，
-       否则到达新页面时激活项的字会先变成药丸反色、而药丸还没长出来。 */
+       .is-settled 现在常驻（差异 9）：药丸恒为满尺寸，位移交给 CSS 过渡。
+       差异 10：若是从导航点进来的，先把药丸无过渡地摆到"出发链接"，
+       下一帧再滑到本页高亮项 —— 跨页面也能看到药丸滑过去。 */
     syncField();
     syncActiveLi();
-    reposition();
+
+    const fromIndex = readFrom();
+    clearFrom(); /* 用过与否都清掉，避免后退/刷新时重播 */
+    const glides =
+      !motionQuery.matches &&
+      fromIndex !== null &&
+      fromIndex !== activeIndex &&
+      !!entries[fromIndex];
+
     filter.classList.add("is-settled");
     text.classList.add(ACTIVE);
     filter.classList.add(ACTIVE);
+
+    if (glides) {
+      nav.classList.add("is-arriving");
+      nav.classList.add("no-glide");
+      updateEffectPosition(entries[fromIndex].li); /* 无过渡地落到出发链接 */
+      void nav.offsetWidth;
+      nav.classList.remove("no-glide");
+      requestAnimationFrame(() => {
+        if (disposed) return;
+        reposition(); /* 放开过渡后滑到本页高亮项 */
+        schedule(() => {
+          if (!disposed) nav.classList.remove("is-arriving");
+        }, 300);
+      });
+    } else {
+      /* 首屏落位也关一次过渡：万一浏览器把"插入即带内联几何"算作一次样式变化，
+         药丸会从导航左上角 (0,0,0,0) 滑过来。强制一次重排后位置就已落定。 */
+      nav.classList.add("no-glide");
+      reposition();
+      void nav.offsetWidth;
+      nav.classList.remove("no-glide");
+    }
 
     /* 初始化落位完成后再放开文字换色的过渡（.is-ready）：挂载那一次换色必须
        瞬时完成，否则会先看到"字已变成药丸反色、药丸还没铺到"的中间态。 */
@@ -340,19 +439,26 @@
     if (typeof ResizeObserver === "function") {
       ro = new ResizeObserver(() => {
         syncField();
-        reposition();
+        nudge();
       });
       ro.observe(nav);
     }
 
-    /* —— 窄屏条子可横向滚动（site-nav.css），滚动时效果层跟手 —— */
+    /* —— 窄屏条子可横向滚动（site-nav.css），滚动时效果层跟手 ——
+       跟手期间由 nudge() 关过渡：否则药丸会拖着 400ms 的尾巴追手指。 */
+    let scrollTimer = null;
     if (bar && bar !== nav) {
       let raf = 0;
       on(bar, "scroll", () => {
+        if (scrollTimer) window.clearTimeout(scrollTimer);
+        scrollTimer = window.setTimeout(() => {
+          scrollTimer = null;
+          nav.classList.remove("no-glide");
+        }, 140);
         if (raf) return;
         raf = requestAnimationFrame(() => {
           raf = 0;
-          reposition();
+          nudge();
         });
       }, { passive: true });
     }
@@ -409,7 +515,6 @@
       },
       setActiveIndex(index) {
         if (!Number.isInteger(index) || index < 0 || index >= entries.length) return;
-        filter.classList.remove("is-settled");
         activeIndex = index;
         syncActiveLi();
         reposition();
@@ -423,9 +528,10 @@
         listeners.length = 0;
         if (ro) ro.disconnect();
         if (revealObserver) revealObserver.disconnect();
+        if (scrollTimer) window.clearTimeout(scrollTimer);
         filter.remove();
         text.remove();
-        nav.classList.remove("gooey-nav", "is-ready");
+        nav.classList.remove("gooey-nav", "is-ready", "is-arriving", "no-glide");
         delete nav.dataset.gooeyNav;
         entries.forEach((entry) => entry.li.classList.remove(ACTIVE));
       }

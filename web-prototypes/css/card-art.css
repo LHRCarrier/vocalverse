@@ -1,0 +1,71 @@
+/* ============================================================
+   Card art · 卡片图案（黑白线稿插画系统 .pca）
+   ------------------------------------------------------------
+   为什么单独一个文件：图案规则与版块布局（feature-blocks.css）
+   是两件事；任何一个用到 project-card 的页面（包括 Hero 卡、
+   以后的 index/showcase）都只需要引这一个文件。
+
+   设计约束（与 scroll-expand.css 声明的「黑白版」系统一致）：
+     · 只用 currentColor + color-mix 派生色 + var(--background)，
+       全文件零硬编码颜色 —— 这是图案跟随明暗主题的前提；
+     · 线宽 2.5px 且 vector-effect: non-scaling-stroke，
+       卡片无论缩到半栏还是整屏，线条粗细都稳定在 2.5px；
+     · 字号按 viewBox 用户单位给（卡片约半栏宽 → 0.5 倍缩放），
+       .label 24 单位 ≈ 渲染 12px，.num 104 单位 ≈ 渲染 52px。
+
+   用法：卡片图区里放内联 <svg class="pca" viewBox="…" role="img">
+   + <title>，内部图形只用下面的类；viewBox 宽高比必须等于外层
+   .project-card__image 的 inline aspect-ratio（否则会被裁切）。
+   ============================================================ */
+
+.pca {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--foreground);
+}
+
+/* —— 线条 —— */
+.pca .line,
+.pca .line-soft {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.pca .line { stroke: currentColor; }
+.pca .line-soft { stroke: color-mix(in srgb, currentColor 22%, transparent); }
+
+.pca .dash { stroke-dasharray: 10 12; }
+
+/* —— 填充层级（必须写在线条之后，否则 fill:none 会盖掉填充）—— */
+.pca .fill-7 { fill: color-mix(in srgb, currentColor 7%, transparent); }
+.pca .fill-10 { fill: color-mix(in srgb, currentColor 10%, transparent); }
+.pca .fill-22 { fill: color-mix(in srgb, currentColor 22%, transparent); }
+.pca .ink { fill: currentColor; }
+
+/* —— 底纹点阵 —— */
+.pca .dot { fill: color-mix(in srgb, currentColor 12%, transparent); }
+
+/* —— 文字（mono 小标签 / serif 大数字）—— */
+.pca .label {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  fill: color-mix(in srgb, currentColor 45%, transparent);
+}
+
+/* 实心墨块上的反白文字 */
+.pca .label-inv { fill: var(--background); }
+
+.pca .num {
+  font-family: var(--font-serif);
+  font-size: 104px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  fill: currentColor;
+}

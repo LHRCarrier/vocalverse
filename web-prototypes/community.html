@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VocalVerse — Community</title>
-  <meta name="description" content="Stay motivated with daily check-in, score share cards, and a learning feed that celebrates every win." />
+  <meta name="description" content="Immerse in English: three domains of posts and video &mdash; news, teaching &amp; learning, overseas life &mdash; with likes, comments, support, follows, notifications, live DMs, and a daily check-in." />
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -12,6 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,100..900,0..100&family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/scroll-expand.css?v=3" />
+  <link rel="stylesheet" href="css/feature-blocks.css" />
+  <link rel="stylesheet" href="css/card-art.css" />
   <link rel="stylesheet" href="css/nav-reveal.css" />
   <link rel="stylesheet" href="css/site-nav.css" />
   <link rel="stylesheet" href="css/gooey-nav.css" />
@@ -103,7 +105,7 @@
         data-se-media-zoom="1.35"
         data-se-start-radius="24"
         data-se-end-radius="0"
-        data-se-scroll-distance="1.2"
+        data-se-scroll-distance="0.6"
         data-se-hold-distance="0.35"
         data-se-smoothing="0.1"
         data-se-overlay-scrim="0.45"
@@ -118,7 +120,7 @@
                 <div class="se-overlay-inner">
                   <div class="se-eyebrow">
                     <span class="se-eyebrow-line" aria-hidden="true"></span>
-                    <span class="se-eyebrow-text">Core module · Community</span>
+                    <span class="se-eyebrow-text">Immersion line · English community</span>
                     <span class="se-eyebrow-line" aria-hidden="true"></span>
                   </div>
                   <div class="se-dotline" aria-hidden="true"></div>
@@ -133,18 +135,48 @@
               </header>
               <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 752 / 497">
                 <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23047857'/><stop offset='1' stop-color='%2310B981'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>✅</text></svg>" alt="Daily learning check-in" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                  <svg class="pca" viewBox="0 0 1000 661" role="img" focusable="false">
+                    <title>Daily check-in: a calendar of practice days and a streak counter</title>
+                    <defs>
+                      <pattern id="cm-dots-1" width="26" height="26" patternUnits="userSpaceOnUse">
+                        <circle class="dot" cx="2" cy="2" r="4"/>
+                      </pattern>
+                    </defs>
+                    <rect width="1000" height="661" fill="url(#cm-dots-1)"/>
+                    <rect class="line fill-7" x="120" y="150" width="380" height="340" rx="32"/>
+                    <path class="line-soft" d="M 120 250 H 500"/>
+                    <path class="line" d="M 200 124 V 172"/>
+                    <path class="line" d="M 420 124 V 172"/>
+                    <rect class="ink" x="170" y="290" width="40" height="40" rx="12"/>
+                    <rect class="ink" x="245" y="290" width="40" height="40" rx="12"/>
+                    <rect class="ink" x="320" y="290" width="40" height="40" rx="12"/>
+                    <rect class="ink" x="395" y="290" width="40" height="40" rx="12"/>
+                    <rect class="ink" x="170" y="365" width="40" height="40" rx="12"/>
+                    <rect class="ink" x="245" y="365" width="40" height="40" rx="12"/>
+                    <rect class="fill-22" x="320" y="365" width="40" height="40" rx="12"/>
+                    <rect class="fill-22" x="395" y="365" width="40" height="40" rx="12"/>
+                    <rect class="fill-22" x="170" y="440" width="40" height="40" rx="12"/>
+                    <rect class="fill-22" x="245" y="440" width="40" height="40" rx="12"/>
+                    <rect class="fill-22" x="320" y="440" width="40" height="40" rx="12"/>
+                    <rect class="line-soft dash" x="395" y="440" width="40" height="40" rx="12"/>
+                    <path class="line-soft" d="M 700 200 V 470"/>
+                    <circle class="ink" cx="700" cy="200" r="30"/>
+                    <circle class="ink" cx="700" cy="290" r="30"/>
+                    <circle class="ink" cx="700" cy="380" r="30"/>
+                    <circle class="line-soft dash" cx="700" cy="470" r="30"/>
+                    <text class="label" x="700" y="560" text-anchor="middle">Streak 6 days</text>
+                  </svg>
                 </div>
               </div>
               <div class="flex flex-col gap-2.5 px-1 pb-1">
                 <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  Check in after any practice session to build a steady rhythm.
+                  Finish a session, then check in for the day.
                 </h3>
                 <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Consecutive days are recorded in a calendar view, using positive reinforcement to make learning a habit.
+                  One check-in per practice day is written server-side and surfaces as a card in the feed, so a streak is something you can actually trust.
                 </p>
               </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Consecutive Days · Calendar View</p>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">One per day · feed card</p>
             </article>
           </div>
 
@@ -154,81 +186,66 @@
                 <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
                   <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
                 </span>
-                <span class="text-sm font-medium tracking-tight text-foreground">Score Share Cards</span>
+                <span class="text-sm font-medium tracking-tight text-foreground">Three Domains · Real Feed</span>
               </header>
               <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
                 <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23EA580C'/><stop offset='1' stop-color='%23FDBA74'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>📊</text></svg>" alt="Score share card" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                  <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                    <title>Three domains: domain tabs above a real post feed</title>
+                    <defs>
+                      <pattern id="cm-dots-2" width="26" height="26" patternUnits="userSpaceOnUse">
+                        <circle class="dot" cx="2" cy="2" r="4"/>
+                      </pattern>
+                    </defs>
+                    <rect width="1000" height="750" fill="url(#cm-dots-2)"/>
+                    <rect class="ink" x="110" y="110" width="150" height="44" rx="22"/>
+                    <text class="label label-inv" x="185" y="139" text-anchor="middle">For you</text>
+                    <rect class="line-soft" x="280" y="110" width="150" height="44" rx="22"/>
+                    <text class="label" x="355" y="139" text-anchor="middle">News</text>
+                    <rect class="line-soft" x="450" y="110" width="170" height="44" rx="22"/>
+                    <text class="label" x="535" y="139" text-anchor="middle">Teaching</text>
+                    <rect class="line-soft" x="640" y="110" width="170" height="44" rx="22"/>
+                    <text class="label" x="725" y="139" text-anchor="middle">Overseas</text>
+                    <circle class="line fill-7" cx="150" cy="270" r="28"/>
+                    <rect class="fill-22" x="210" y="238" width="380" height="16" rx="8"/>
+                    <rect class="fill-22" x="210" y="270" width="260" height="16" rx="8"/>
+                    <circle class="line-soft" cx="680" cy="270" r="10"/>
+                    <circle class="line-soft" cx="728" cy="270" r="10"/>
+                    <circle class="line-soft" cx="776" cy="270" r="10"/>
+                    <circle class="line fill-7" cx="150" cy="430" r="28"/>
+                    <rect class="fill-22" x="210" y="398" width="340" height="16" rx="8"/>
+                    <rect class="fill-22" x="210" y="430" width="220" height="16" rx="8"/>
+                    <circle class="line-soft" cx="680" cy="430" r="10"/>
+                    <circle class="line-soft" cx="728" cy="430" r="10"/>
+                    <circle class="line-soft" cx="776" cy="430" r="10"/>
+                    <circle class="line fill-7" cx="150" cy="590" r="28"/>
+                    <rect class="fill-22" x="210" y="558" width="400" height="16" rx="8"/>
+                    <rect class="fill-22" x="210" y="590" width="240" height="16" rx="8"/>
+                    <circle class="line-soft" cx="680" cy="590" r="10"/>
+                    <circle class="line-soft" cx="728" cy="590" r="10"/>
+                    <circle class="line-soft" cx="776" cy="590" r="10"/>
+                  </svg>
                 </div>
               </div>
               <div class="flex flex-col gap-2.5 px-1 pb-1">
                 <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  Automatically generated score share cards.
+                  Three English domains, one feed.
                 </h3>
                 <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  A polished card with total score and dimension details, so every improvement can be seen and celebrated.
+                  News writing, teaching &amp; learning shares, and overseas life sit behind a text tab row, next to a mixed For-you stream; every tab reads a real server-side feed with keyset cursor paging.
                 </p>
               </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Total + Dimension Details</p>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">3 domains + For you · keyset paging</p>
             </article>
           </div>
 
-          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0.12s">
-            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
-              <header class="flex items-center gap-2.5 px-1 pt-2">
-                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
-                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-                </span>
-                <span class="text-sm font-medium tracking-tight text-foreground">Learning Feed</span>
-              </header>
-              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
-                <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%231D4ED8'/><stop offset='1' stop-color='%2393C5FD'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>💬</text></svg>" alt="Learning feed" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
-                </div>
-              </div>
-              <div class="flex flex-col gap-2.5 px-1 pb-1">
-                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  A learning feed for practice completions and breakthroughs.
-                </h3>
-                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Like and comment on peers&rsquo; posts, and share dynamics with score cards to external platforms.
-                </p>
-              </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Feed · Likes · Comments · Share</p>
-            </article>
-          </div>
-
-          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0.18s">
-            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
-              <header class="flex items-center gap-2.5 px-1 pt-2">
-                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
-                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
-                </span>
-                <span class="text-sm font-medium tracking-tight text-foreground">How It Works</span>
-              </header>
-              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
-                <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23047857'/><stop offset='1' stop-color='%2310B981'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>🧭</text></svg>" alt="Three steps to join the community" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
-                </div>
-              </div>
-              <div class="flex flex-col gap-2.5 px-1 pb-1">
-                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  Three steps to join the learning community.
-                </h3>
-                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Complete today&rsquo;s check-in → share your results → interact and get motivated by the community.
-                </p>
-              </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Check-in · Share · Interact</p>
-            </article>
-          </div>
                   </div>
                 </div>
               </div>
             </div>
             <div class="scroll-expand__title">
               <h1 data-split-text>Community</h1>
-              <p class="se-title-sub" data-split-text>A social motivation module built around check-in and sharing: daily check-ins, score cards, and learning feed interactions build a positive atmosphere that makes habits stick.</p>
+              <p class="se-title-sub" data-split-text>The immersion line of VocalVerse: read and write English with people who are learning too &mdash; three domains of posts and video, a real feed, live messages, and a check-in habit that keeps the streak alive.</p>
             </div>
             <div class="scroll-expand__hint">
               <span>Scroll down · View core features</span>
@@ -236,6 +253,234 @@
             </div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ===== 正文：卡片与文字逐段相间（卡在右 → 全宽文字 → 卡在左） ===== -->
+    <section class="fs-section fade-in" aria-labelledby="cm-interact">
+      <div class="fs-duo">
+        <div class="fs-duo__text">
+          <p class="fs-kicker">Interaction</p>
+          <h2 class="fs-title" id="cm-interact">Like, comment, support, share &mdash; then follow and message.</h2>
+          <p class="fs-lead">Every interaction is a real row in the community database rather than a counter drawn on the client.</p>
+          <div class="fs-rows">
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Like</span>
+              <span class="fs-row__value">one per post, toggleable</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Comment</span>
+              <span class="fs-row__value">flat thread, nesting reserved</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Support</span>
+              <span class="fs-row__value">one coin per post, cannot be cancelled</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Share</span>
+              <span class="fs-row__value">post detail or score card</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Follow</span>
+              <span class="fs-row__value">drives the Following timeline</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Notifications</span>
+              <span class="fs-row__value">repeated likes merge per post</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Messages</span>
+              <span class="fs-row__value">SSE push, polling fallback</span>
+            </div>
+          </div>
+        </div>
+        <div class="fs-duo__card">
+          <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+            <header class="flex items-center gap-2.5 px-1 pt-2">
+              <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
+              </span>
+              <span class="text-sm font-medium tracking-tight text-foreground">Interact, Follow &amp; DM</span>
+            </header>
+            <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+              <div class="project-card__image-inner">
+                <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                  <title>Interaction row, follows and live messages</title>
+                  <defs>
+                    <pattern id="cm-dots-3" width="26" height="26" patternUnits="userSpaceOnUse">
+                      <circle class="dot" cx="2" cy="2" r="4"/>
+                    </pattern>
+                  </defs>
+                  <rect width="1000" height="750" fill="url(#cm-dots-3)"/>
+                  <circle class="line fill-7" cx="200" cy="180" r="44"/>
+                  <path class="line" d="M 200 200 V 164 M 184 180 L 200 164 L 216 180"/>
+                  <circle class="line fill-7" cx="400" cy="180" r="44"/>
+                  <path class="line" d="M 378 166 H 422 M 378 180 H 422 M 378 194 H 402"/>
+                  <circle class="line fill-7" cx="600" cy="180" r="44"/>
+                  <circle class="ink" cx="600" cy="180" r="16"/>
+                  <circle class="line fill-7" cx="800" cy="180" r="44"/>
+                  <path class="line" d="M 782 196 L 816 164 M 816 164 H 796 M 816 164 V 184"/>
+                  <rect class="line fill-7" x="140" y="330" width="300" height="110" rx="30"/>
+                  <rect class="fill-22" x="180" y="366" width="200" height="14" rx="7"/>
+                  <rect class="fill-22" x="180" y="398" width="140" height="14" rx="7"/>
+                  <path class="line-soft dash" d="M 452 385 H 520"/>
+                  <rect class="line fill-10" x="560" y="470" width="300" height="110" rx="30"/>
+                  <rect class="fill-22" x="600" y="506" width="200" height="14" rx="7"/>
+                  <rect class="fill-22" x="600" y="538" width="140" height="14" rx="7"/>
+                  <path class="line-soft" d="M 140 690 L 220 690 L 244 656 L 268 714 L 292 674 L 316 690 L 860 690"/>
+                </svg>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2.5 px-1 pb-1">
+              <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                Every interaction is a row, not a counter.
+              </h3>
+              <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                Likes toggle, comments thread under the post, and support is a one-way coin that cannot be taken back.
+              </p>
+            </div>
+            <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Like &middot; comment &middot; support &middot; follow &middot; DM</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="fs-section fade-in" aria-labelledby="cm-feed">
+      <div class="fs-head">
+        <p class="fs-kicker">The feed</p>
+        <h2 class="fs-title" id="cm-feed">Posts and video, in three English domains.</h2>
+        <p class="fs-lead">Rows, not cards &mdash; the same shape the app renders: who posted, which domain it belongs to, and what people did with it.</p>
+      </div>
+      <div class="fs-list">
+        <div class="fs-item">
+          <span class="fs-item__dot">JW</span>
+          <div class="fs-item__main">
+            <p class="fs-item__name">josh_w<span class="fs-item__meta">English News &middot; 2h</span></p>
+            <p class="fs-item__body">Why &ldquo;commute&rdquo; shows up in almost every news lede about cities &mdash; and how it differs from &ldquo;travel&rdquo;.</p>
+            <p class="fs-item__actions">24 likes &middot; 6 comments &middot; 3 support</p>
+          </div>
+          <span class="fs-item__tag">News</span>
+        </div>
+        <div class="fs-item">
+          <span class="fs-item__dot">MT</span>
+          <div class="fs-item__main">
+            <p class="fs-item__name">min_teach<span class="fs-item__meta">Teaching &amp; Learning &middot; 5h</span></p>
+            <p class="fs-item__body">Three ways to explain the present perfect without drawing a timeline.</p>
+            <p class="fs-item__actions">41 likes &middot; 18 comments &middot; 9 support</p>
+          </div>
+          <span class="fs-item__tag">Teaching</span>
+        </div>
+        <div class="fs-item">
+          <span class="fs-item__dot">AL</span>
+          <div class="fs-item__main">
+            <p class="fs-item__name">anna_lives<span class="fs-item__meta">Overseas Life &middot; 1d</span></p>
+            <p class="fs-item__body">Renting in Dublin: what the deposit actually covers, in plain English.</p>
+            <p class="fs-item__actions">12 likes &middot; 4 comments &middot; 2 support</p>
+          </div>
+          <span class="fs-item__tag">Overseas</span>
+        </div>
+        <div class="fs-item">
+          <span class="fs-item__dot">&#10003;</span>
+          <div class="fs-item__main">
+            <p class="fs-item__name">You<span class="fs-item__meta">Daily check-in &middot; today</span></p>
+            <p class="fs-item__body">One check-in per practice day, written server-side and surfaced as a card in the For-you stream.</p>
+            <p class="fs-item__actions">Streak 6 days &middot; 42 sessions</p>
+          </div>
+          <span class="fs-item__tag">Check-in</span>
+        </div>
+      </div>
+      <p class="fs-note">Demo rows &middot; domain tabs are a text row (For you / News / Teaching &amp; Learning / Overseas Life), and each tab pages a real server-side feed with a keyset cursor.</p>
+    </section>
+
+    <section class="fs-section fade-in" aria-labelledby="cm-domains">
+      <div class="fs-duo fs-duo--flip">
+        <div class="fs-duo__text">
+          <p class="fs-kicker">Three domains</p>
+          <h2 class="fs-title" id="cm-domains">One feed, three English worlds.</h2>
+          <div class="fs-rows">
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">For you</span>
+              <span class="fs-row__value">everything, mixed</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">News</span>
+              <span class="fs-row__value">English news writing</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Teaching &amp; Learning</span>
+              <span class="fs-row__value">how-to posts from teachers and learners</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Overseas Life</span>
+              <span class="fs-row__value">study and daily life abroad</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Paging</span>
+              <span class="fs-row__value">keyset cursor, not offsets</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Before publish</span>
+              <span class="fs-row__value">audited first; public posting off by default</span>
+            </div>
+          </div>
+          <p class="fs-note">Word lookup works inside a post, so a reader can go from an unfamiliar phrase to the vocab book without leaving the feed.</p>
+        </div>
+        <div class="fs-duo__card">
+          <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+            <header class="flex items-center gap-2.5 px-1 pt-2">
+              <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+              </span>
+              <span class="text-sm font-medium tracking-tight text-foreground">Posts, Video &amp; Words</span>
+            </header>
+            <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+              <div class="project-card__image-inner">
+                <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                  <title>A post with a video, and the word card it opens</title>
+                  <defs>
+                    <pattern id="cm-dots-4" width="26" height="26" patternUnits="userSpaceOnUse">
+                      <circle class="dot" cx="2" cy="2" r="4"/>
+                    </pattern>
+                  </defs>
+                  <rect width="1000" height="750" fill="url(#cm-dots-4)"/>
+                  <rect class="line fill-7" x="110" y="140" width="460" height="460" rx="32"/>
+                  <circle class="line fill-10" cx="170" cy="205" r="28"/>
+                  <rect class="fill-22" x="216" y="188" width="150" height="14" rx="7"/>
+                  <rect class="fill-22" x="216" y="212" width="96" height="14" rx="7"/>
+                  <rect class="line-soft fill-10" x="150" y="262" width="380" height="180" rx="20"/>
+                  <path class="line" d="M 322 322 L 322 382 L 378 352 Z"/>
+                  <rect class="fill-22" x="150" y="472" width="340" height="14" rx="7"/>
+                  <rect class="fill-22" x="150" y="504" width="250" height="14" rx="7"/>
+                  <circle class="line-soft" cx="170" cy="560" r="10"/>
+                  <circle class="line-soft" cx="214" cy="560" r="10"/>
+                  <circle class="line-soft" cx="258" cy="560" r="10"/>
+                  <path class="line-soft dash" d="M 596 400 H 640"/>
+                  <rect class="line fill-10" x="660" y="300" width="240" height="180" rx="24"/>
+                  <rect class="fill-22" x="700" y="344" width="120" height="18" rx="9"/>
+                  <rect class="fill-22" x="700" y="380" width="80" height="12" rx="6"/>
+                  <rect class="ink" x="700" y="416" width="160" height="36" rx="18"/>
+                  <text class="label label-inv" x="780" y="440" text-anchor="middle">Save</text>
+                </svg>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2.5 px-1 pb-1">
+              <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                Text, images, video &mdash; and a dictionary inside them.
+              </h3>
+              <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                Compose plain text, attach media, open the post detail page, and look up any word in the post without leaving it.
+              </p>
+            </div>
+            <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Media upload &middot; post detail &middot; word lookup</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="fs-section fade-in">
+      <div class="fs-band">
+        <h2 class="fs-band__statement">Support is one coin per post, and it cannot be taken back.</h2>
+        <p class="fs-band__meta">Public posting ships disabled by default and every post is audited before it appears, so the feed stays somewhere a learner can read out loud without surprises.</p>
       </div>
     </section>
 
@@ -253,7 +498,7 @@
                 Let&rsquo;s connect
               </h2>
               <p class="max-w-[29ch] text-[18px] leading-[1.4] tracking-tight text-foreground/65 sm:text-[22px] mb-6">
-                We&rsquo;re always open to discussing new features, creative ideas, or opportunities to shape the future of English speaking practice. Just reach out!
+                We&rsquo;re always open to discussing new features, creative ideas, or opportunities to shape the future of English learning. Just reach out!
               </p>
 
               <div class="mt-2 flex flex-wrap items-center gap-3">
@@ -296,8 +541,8 @@
                 </a>
               </div>
               <div class="flex flex-col items-center gap-1 text-center">
-                <p class="text-[13px] tracking-tight text-foreground/70">2026 &copy; Built with Next.js</p>
-                <p class="text-[12px] tracking-tight text-foreground/45">By React Bits Pro</p>
+                <p class="text-[13px] tracking-tight text-foreground/70">2026 &copy; VocalVerse</p>
+                <p class="text-[12px] tracking-tight text-foreground/45">Practice · Immerse · Sing</p>
               </div>
             </div>
           </div>

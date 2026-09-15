@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VocalVerse — Visual Reports</title>
-  <meta name="description" content="See progress at a glance: score trend charts, an ability radar, and a four-metric board for speaking and singing." />
+  <meta name="description" content="See progress at a glance: score trends from stored attempts, a five-dimension ability radar, and the four-metric board behind the product." />
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -12,6 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,100..900,0..100&family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/scroll-expand.css?v=3" />
+  <link rel="stylesheet" href="css/feature-blocks.css" />
+  <link rel="stylesheet" href="css/card-art.css" />
   <link rel="stylesheet" href="css/nav-reveal.css" />
   <link rel="stylesheet" href="css/site-nav.css" />
   <link rel="stylesheet" href="css/gooey-nav.css" />
@@ -103,7 +105,7 @@
         data-se-media-zoom="1.35"
         data-se-start-radius="24"
         data-se-end-radius="0"
-        data-se-scroll-distance="1.2"
+        data-se-scroll-distance="0.6"
         data-se-hold-distance="0.35"
         data-se-smoothing="0.1"
         data-se-overlay-scrim="0.45"
@@ -118,7 +120,7 @@
                 <div class="se-overlay-inner">
                   <div class="se-eyebrow">
                     <span class="se-eyebrow-line" aria-hidden="true"></span>
-                    <span class="se-eyebrow-text">Core module · Visual reports</span>
+                    <span class="se-eyebrow-text">Measurement line · reports &amp; metrics</span>
                     <span class="se-eyebrow-line" aria-hidden="true"></span>
                   </div>
                   <div class="se-dotline" aria-hidden="true"></div>
@@ -133,43 +135,37 @@
               </header>
               <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 752 / 497">
                 <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23047857'/><stop offset='1' stop-color='%2310B981'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>📈</text></svg>" alt="Score trend chart" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                  <svg class="pca" viewBox="0 0 1000 661" role="img" focusable="false">
+                    <title>Score trends: an upward line across a grid, ending on today</title>
+                    <defs>
+                      <pattern id="st-dots-1" width="26" height="26" patternUnits="userSpaceOnUse">
+                        <circle class="dot" cx="2" cy="2" r="4"/>
+                      </pattern>
+                    </defs>
+                    <rect width="1000" height="661" fill="url(#st-dots-1)"/>
+                    <path class="line-soft dash" d="M 100 220 H 900"/>
+                    <path class="line-soft dash" d="M 100 360 H 900"/>
+                    <path class="line-soft" d="M 100 500 H 900"/>
+                    <path class="line" d="M 100 460 L 200 420 L 300 434 L 400 372 L 500 342 L 600 296 L 700 250 L 800 214 L 900 178"/>
+                    <circle class="ink" cx="200" cy="420" r="8"/>
+                    <circle class="ink" cx="400" cy="372" r="8"/>
+                    <circle class="ink" cx="600" cy="296" r="8"/>
+                    <circle class="ink" cx="800" cy="214" r="8"/>
+                    <circle class="ink" cx="900" cy="178" r="13"/>
+                    <text class="label" x="100" y="150">Last 30 days</text>
+                    <text class="num" x="700" y="140">82</text>
+                  </svg>
                 </div>
               </div>
               <div class="flex flex-col gap-2.5 px-1 pb-1">
                 <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  Score trend charts on a timeline.
+                  Trends built from real attempts.
                 </h3>
                 <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  See how pronunciation, grammar, and fluency evolve over time and spot your progress trajectory.
+                  Pronunciation, fluency, and grammar plotted over the sessions you actually recorded, so improvement is a line rather than a feeling.
                 </p>
               </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Timeline · Dimension Trends</p>
-            </article>
-          </div>
-
-          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0.06s">
-            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
-              <header class="flex items-center gap-2.5 px-1 pt-2">
-                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
-                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
-                </span>
-                <span class="text-sm font-medium tracking-tight text-foreground">Ability Radar</span>
-              </header>
-              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
-                <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23EA580C'/><stop offset='1' stop-color='%23FDBA74'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>🎯</text></svg>" alt="Ability radar chart" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
-                </div>
-              </div>
-              <div class="flex flex-col gap-2.5 px-1 pb-1">
-                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  An ability radar for multi-dimension comparison.
-                </h3>
-                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Pitch, rhythm, pronunciation, grammar, and fluency in one view — strengths and weaknesses at a glance.
-                </p>
-              </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Multi-dimension · Strength Insight</p>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Attempts data · per dimension</p>
             </article>
           </div>
 
@@ -183,45 +179,40 @@
               </header>
               <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
                 <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%231D4ED8'/><stop offset='1' stop-color='%2393C5FD'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>📊</text></svg>" alt="Four-metric board" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                  <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                    <title>The four product metrics, one per quadrant</title>
+                    <defs>
+                      <pattern id="st-dots-2" width="26" height="26" patternUnits="userSpaceOnUse">
+                        <circle class="dot" cx="2" cy="2" r="4"/>
+                      </pattern>
+                    </defs>
+                    <rect width="1000" height="750" fill="url(#st-dots-2)"/>
+                    <rect class="line" x="110" y="120" width="780" height="510" rx="36"/>
+                    <path class="line-soft" d="M 500 120 V 630"/>
+                    <path class="line-soft" d="M 110 375 H 890"/>
+                    <text class="num" x="305" y="290" text-anchor="middle">68</text>
+                    <text class="num" x="695" y="290" text-anchor="middle">54</text>
+                    <text class="num" x="305" y="545" text-anchor="middle">41</text>
+                    <text class="num" x="695" y="545" text-anchor="middle">12</text>
+                    <text class="label" x="305" y="330" text-anchor="middle">Click-through</text>
+                    <text class="label" x="695" y="330" text-anchor="middle">Completion</text>
+                    <text class="label" x="305" y="585" text-anchor="middle">Interaction</text>
+                    <text class="label" x="695" y="585" text-anchor="middle">Bounce</text>
+                  </svg>
                 </div>
               </div>
               <div class="flex flex-col gap-2.5 px-1 pb-1">
                 <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  A four-metric board for overall learning quality.
+                  The four product metrics.
                 </h3>
                 <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Click-through, completion, interaction, and bounce rates evaluate participation at a glance.
+                  Click-through, completion, interaction, and bounce computed from the 15 practice events the client and API emit.
                 </p>
               </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Click · Complete · Interact · Bounce</p>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">15 events · click / complete / interact / bounce</p>
             </article>
           </div>
 
-          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0.18s">
-            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
-              <header class="flex items-center gap-2.5 px-1 pt-2">
-                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
-                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
-                </span>
-                <span class="text-sm font-medium tracking-tight text-foreground">How It Works</span>
-              </header>
-              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
-                <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23047857'/><stop offset='1' stop-color='%2310B981'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>🧭</text></svg>" alt="Three steps to read your data" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
-                </div>
-              </div>
-              <div class="flex flex-col gap-2.5 px-1 pb-1">
-                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  Three steps to read your data.
-                </h3>
-                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Pick a module → review trends and radar → compare changes and adjust your plan.
-                </p>
-              </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Module View · Month-over-Month</p>
-            </article>
-          </div>
                   </div>
                   <a href="report.html"
                     class="focus-ring group inline-flex cursor-pointer items-center gap-2 rounded-xl border border-foreground/8 bg-background px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-foreground/5">
@@ -233,13 +224,229 @@
             </div>
             <div class="scroll-expand__title">
               <h1 data-split-text>Visual Reports</h1>
-              <p class="se-title-sub" data-split-text>A multi-dimensional data visualization module for speaking and singing scores: trend charts, radar charts, and a key metric board make progress visible and review scientific.</p>
+              <p class="se-title-sub" data-split-text>The measurement line of VocalVerse: attempts, singing scores, and community activity become trends, radars, and a four-metric board &mdash; the same numbers the team reviews.</p>
             </div>
             <div class="scroll-expand__hint">
               <span>Scroll down · View core features</span>
               <svg class="se-hint-arrow" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 正文：卡片与文字逐段相间（卡在右 → 全宽文字 → 卡在左） ===== -->
+    <section class="fs-section fade-in" aria-labelledby="st-radar">
+      <div class="fs-duo">
+        <div class="fs-duo__text">
+          <p class="fs-kicker">Ability radar</p>
+          <h2 class="fs-title" id="st-radar">Five dimensions, one shape.</h2>
+          <p class="fs-lead">Speaking and singing land on the same axes, so a strong week of singing is visible next to a weak week of grammar.</p>
+          <div class="fs-viz">
+            <svg class="fs-radar" viewBox="0 0 320 238" role="img" aria-label="Five-dimension ability radar: pronunciation 82, fluency 78, grammar 86, intonation 74, vocabulary 80">
+              <g fill="none" stroke="rgba(127,127,127,0.30)" stroke-width="1">
+                <polygon points="160,95.5 208.6,116.6 189.7,167.9 130.3,167.9 111.4,116.6"/>
+                <polygon points="160,61 238.9,98.9 207.5,180.5 112.5,180.5 81.1,98.9"/>
+                <polygon points="160,40 250.4,82.4 211.6,191.1 108.4,191.1 69.6,82.4"/>
+                <polygon points="160,26.5 266,72.5 219.7,194.3 100.3,194.3 54,72.5"/>
+              </g>
+              <g stroke="rgba(127,127,127,0.22)" stroke-width="1">
+                <path d="M160 126V26.5"/><path d="M160 126 266 72.5"/><path d="M160 126 219.7 194.3"/><path d="M160 126 100.3 194.3"/><path d="M160 126 54 72.5"/>
+              </g>
+              <polygon points="160,52.4 227.8,88.5 215.2,176.6 122.1,179.8 92.4,98.8" fill="rgba(127,127,127,0.26)" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" style="color:var(--foreground)"/>
+              <g fill="currentColor" style="color:var(--foreground)">
+                <circle cx="160" cy="52.4" r="3.4"/><circle cx="227.8" cy="88.5" r="3.4"/><circle cx="215.2" cy="176.6" r="3.4"/><circle cx="122.1" cy="179.8" r="3.4"/><circle cx="92.4" cy="98.8" r="3.4"/>
+              </g>
+            </svg>
+          </div>
+          <div class="fs-rows">
+            <div class="fs-row">
+              <span class="fs-row__label">Pronunciation</span>
+              <span class="fs-bar"><i style="width:82%"></i></span>
+              <span class="fs-row__value">82</span>
+            </div>
+            <div class="fs-row">
+              <span class="fs-row__label">Fluency</span>
+              <span class="fs-bar"><i style="width:78%"></i></span>
+              <span class="fs-row__value">78</span>
+            </div>
+            <div class="fs-row">
+              <span class="fs-row__label">Grammar</span>
+              <span class="fs-bar"><i style="width:86%"></i></span>
+              <span class="fs-row__value">86</span>
+            </div>
+            <div class="fs-row">
+              <span class="fs-row__label">Intonation</span>
+              <span class="fs-bar"><i style="width:74%"></i></span>
+              <span class="fs-row__value">74</span>
+            </div>
+            <div class="fs-row">
+              <span class="fs-row__label">Vocabulary</span>
+              <span class="fs-bar"><i style="width:80%"></i></span>
+              <span class="fs-row__value">80</span>
+            </div>
+          </div>
+          <p class="fs-note">Demo values &middot; every axis is computed from stored attempts, never from a separate quiz.</p>
+        </div>
+        <div class="fs-duo__card">
+          <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+            <header class="flex items-center gap-2.5 px-1 pt-2">
+              <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+              </span>
+              <span class="text-sm font-medium tracking-tight text-foreground">Ability Radar</span>
+            </header>
+            <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+              <div class="project-card__image-inner">
+                <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                  <title>Ability radar: five dimensions on one shape</title>
+                  <defs>
+                    <pattern id="st-dots-3" width="26" height="26" patternUnits="userSpaceOnUse">
+                      <circle class="dot" cx="2" cy="2" r="4"/>
+                    </pattern>
+                  </defs>
+                  <rect width="1000" height="750" fill="url(#st-dots-3)"/>
+                  <polygon class="line-soft" points="500,263 606.4,340.4 565.8,465.6 434.2,465.6 393.6,340.4"/>
+                  <polygon class="line-soft" points="500,221 646.3,327.4 590.5,499.6 409.5,499.6 353.7,327.4"/>
+                  <polygon class="line-soft" points="500,179 686.2,314.5 615.2,533.6 384.8,533.6 313.8,314.5"/>
+                  <polygon class="line-soft" points="500,137 726.1,301.5 639.9,567.5 360.1,567.5 273.9,301.5"/>
+                  <polygon class="line-soft" points="500,95 766,288.5 664.6,601.5 335.4,601.5 234,288.5"/>
+                  <path class="line-soft" d="M 500 375 V 95"/>
+                  <path class="line-soft" d="M 500 375 L 766 288.5"/>
+                  <path class="line-soft" d="M 500 375 L 664.6 601.5"/>
+                  <path class="line-soft" d="M 500 375 L 335.4 601.5"/>
+                  <path class="line-soft" d="M 500 375 L 234 288.5"/>
+                  <polygon class="line fill-10" points="500,145.4 707.5,307.5 641.6,569.8 378.2,542.6 287.2,305.8"/>
+                  <circle class="ink" cx="500" cy="145.4" r="9"/>
+                  <circle class="ink" cx="707.5" cy="307.5" r="9"/>
+                  <circle class="ink" cx="641.6" cy="569.8" r="9"/>
+                  <circle class="ink" cx="378.2" cy="542.6" r="9"/>
+                  <circle class="ink" cx="287.2" cy="305.8" r="9"/>
+                  <text class="label" x="500" y="66" text-anchor="middle">Pron 82</text>
+                  <text class="label" x="866" y="280" text-anchor="middle">Flu 78</text>
+                  <text class="label" x="700" y="666" text-anchor="middle">Gra 86</text>
+                  <text class="label" x="300" y="666" text-anchor="middle">Int 74</text>
+                  <text class="label" x="134" y="280" text-anchor="middle">Voc 80</text>
+                </svg>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2.5 px-1 pb-1">
+              <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                Speaking and singing on the same five axes.
+              </h3>
+              <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                A strong week of singing is visible next to a weak week of grammar, because both write into the same attempt record.
+              </p>
+            </div>
+            <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">5 dimensions &middot; speaking + singing</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="fs-section fade-in" aria-labelledby="st-metrics">
+      <div class="fs-head">
+        <p class="fs-kicker">Product metrics</p>
+        <h2 class="fs-title" id="st-metrics">The four metrics the team reviews.</h2>
+        <p class="fs-lead">Demo values. Each one is defined from the events below &mdash; if an event is missing, the metric cannot be computed at all.</p>
+      </div>
+      <div class="fs-kpis">
+        <div class="fs-kpi">
+          <p class="fs-kpi__value">68%</p>
+          <p class="fs-kpi__label">Click-through</p>
+          <p class="fs-kpi__note">How often a suggested scene, song or chapter is actually opened.</p>
+        </div>
+        <div class="fs-kpi">
+          <p class="fs-kpi__value">54%</p>
+          <p class="fs-kpi__label">Completion</p>
+          <p class="fs-kpi__note">Sessions that reach five turns or two minutes, whichever comes first.</p>
+        </div>
+        <div class="fs-kpi">
+          <p class="fs-kpi__value">41%</p>
+          <p class="fs-kpi__label">Interaction</p>
+          <p class="fs-kpi__note">User-initiated turns over the turns the scene asked for; rescue turns count for neither.</p>
+        </div>
+        <div class="fs-kpi">
+          <p class="fs-kpi__value">12%</p>
+          <p class="fs-kpi__label">Bounce</p>
+          <p class="fs-kpi__note">Sessions that end before the first scored turn.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="fs-section fade-in" aria-labelledby="st-events">
+      <div class="fs-duo fs-duo--flip">
+        <div class="fs-duo__text">
+          <p class="fs-kicker">Instrumentation</p>
+          <h2 class="fs-title" id="st-events">Fifteen events, grouped.</h2>
+          <div class="fs-rows">
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Practice</span>
+              <span class="fs-row__value">page_view &middot; scene_start &middot; recording_start &middot; recording_complete</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Scoring</span>
+              <span class="fs-row__value">score_event &middot; corpus_hit &middot; practice_complete</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Support actions</span>
+              <span class="fs-row__value">fun_action (replay / demo / hint / retry)</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Community</span>
+              <span class="fs-row__value">feed_view &middot; post_open &middot; interact &middot; share</span>
+            </div>
+          </div>
+          <p class="fs-note">The full set is emitted by the client and the API, and the four metrics above are derived from it &mdash; nothing is inferred after the fact.</p>
+        </div>
+        <div class="fs-duo__card">
+          <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+            <header class="flex items-center gap-2.5 px-1 pt-2">
+              <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
+              </span>
+              <span class="text-sm font-medium tracking-tight text-foreground">How It Works</span>
+            </header>
+            <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+              <div class="project-card__image-inner">
+                <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                  <title>Read the trend and the radar, then adjust the plan</title>
+                  <defs>
+                    <pattern id="st-dots-4" width="26" height="26" patternUnits="userSpaceOnUse">
+                      <circle class="dot" cx="2" cy="2" r="4"/>
+                    </pattern>
+                  </defs>
+                  <rect width="1000" height="750" fill="url(#st-dots-4)"/>
+                  <rect class="line fill-7" x="110" y="250" width="220" height="180" rx="24"/>
+                  <rect class="line-soft" x="146" y="300" width="44" height="44" rx="12"/>
+                  <rect class="ink" x="200" y="300" width="44" height="44" rx="12"/>
+                  <rect class="line-soft" x="254" y="300" width="44" height="44" rx="12"/>
+                  <rect class="line fill-7" x="390" y="250" width="220" height="180" rx="24"/>
+                  <path class="line" d="M 420 400 L 460 360 L 500 378 L 540 322 L 580 344"/>
+                  <rect class="line fill-7" x="670" y="250" width="220" height="180" rx="24"/>
+                  <rect class="fill-22" x="710" y="330" width="40" height="70" rx="12"/>
+                  <rect class="ink" x="772" y="292" width="40" height="108" rx="12"/>
+                  <path class="line-soft dash" d="M 342 340 H 378"/>
+                  <path class="line-soft dash" d="M 622 340 H 658"/>
+                  <text class="label" x="220" y="216" text-anchor="middle">01</text>
+                  <text class="label" x="500" y="216" text-anchor="middle">02</text>
+                  <text class="label" x="780" y="216" text-anchor="middle">03</text>
+                  <path class="line-soft dash" d="M 500 450 V 520"/>
+                  <rect class="ink" x="380" y="540" width="240" height="60" rx="30"/>
+                  <text class="label label-inv" x="500" y="577" text-anchor="middle">Adjust the plan</text>
+                </svg>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2.5 px-1 pb-1">
+              <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                Read the trend before you read the number.
+              </h3>
+              <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                Pick a module, read the trend and the radar, compare periods, and only then adjust the plan.
+              </p>
+            </div>
+            <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Module view &middot; period compare</p>
+          </article>
         </div>
       </div>
     </section>
@@ -258,7 +465,7 @@
                 Let&rsquo;s connect
               </h2>
               <p class="max-w-[29ch] text-[18px] leading-[1.4] tracking-tight text-foreground/65 sm:text-[22px] mb-6">
-                We&rsquo;re always open to discussing new features, creative ideas, or opportunities to shape the future of English speaking practice. Just reach out!
+                We&rsquo;re always open to discussing new features, creative ideas, or opportunities to shape the future of English learning. Just reach out!
               </p>
 
               <div class="mt-2 flex flex-wrap items-center gap-3">
@@ -301,8 +508,8 @@
                 </a>
               </div>
               <div class="flex flex-col items-center gap-1 text-center">
-                <p class="text-[13px] tracking-tight text-foreground/70">2026 &copy; Built with Next.js</p>
-                <p class="text-[12px] tracking-tight text-foreground/45">By React Bits Pro</p>
+                <p class="text-[13px] tracking-tight text-foreground/70">2026 &copy; VocalVerse</p>
+                <p class="text-[12px] tracking-tight text-foreground/45">Practice · Immerse · Sing</p>
               </div>
             </div>
           </div>

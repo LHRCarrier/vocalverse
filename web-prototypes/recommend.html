@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VocalVerse — Personalized Learning</title>
-  <meta name="description" content="Start exactly where you are: A1–C1 placement test, a dynamic learner profile, and smart recommendations powered by scikit-learn." />
+  <meta name="description" content="A placement test sets your starting level, every attempt updates a dynamic learner profile, and a scikit-learn recommender turns that profile into the next thing to practise." />
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -12,6 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,100..900,0..100&family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/scroll-expand.css?v=3" />
+  <link rel="stylesheet" href="css/feature-blocks.css" />
+  <link rel="stylesheet" href="css/card-art.css" />
   <link rel="stylesheet" href="css/nav-reveal.css" />
   <link rel="stylesheet" href="css/site-nav.css" />
   <link rel="stylesheet" href="css/gooey-nav.css" />
@@ -103,7 +105,7 @@
         data-se-media-zoom="1.35"
         data-se-start-radius="24"
         data-se-end-radius="0"
-        data-se-scroll-distance="1.2"
+        data-se-scroll-distance="0.6"
         data-se-hold-distance="0.35"
         data-se-smoothing="0.1"
         data-se-overlay-scrim="0.45"
@@ -118,7 +120,7 @@
                 <div class="se-overlay-inner">
                   <div class="se-eyebrow">
                     <span class="se-eyebrow-line" aria-hidden="true"></span>
-                    <span class="se-eyebrow-text">Core module · Personalized learning</span>
+                    <span class="se-eyebrow-text">Learning line · placement &amp; recommendation</span>
                     <span class="se-eyebrow-line" aria-hidden="true"></span>
                   </div>
                   <div class="se-dotline" aria-hidden="true"></div>
@@ -133,18 +135,39 @@
               </header>
               <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 752 / 497">
                 <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23047857'/><stop offset='1' stop-color='%2310B981'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>📝</text></svg>" alt="Placement test" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                  <svg class="pca" viewBox="0 0 1000 661" role="img" focusable="false">
+                    <title>Placement test: five ascending levels with your level marked</title>
+                    <defs>
+                      <pattern id="rc-dots-1" width="26" height="26" patternUnits="userSpaceOnUse">
+                        <circle class="dot" cx="2" cy="2" r="4"/>
+                      </pattern>
+                    </defs>
+                    <rect width="1000" height="661" fill="url(#rc-dots-1)"/>
+                    <path class="line-soft" d="M 100 520 H 900"/>
+                    <rect class="line fill-7" x="120" y="460" width="140" height="60" rx="18"/>
+                    <rect class="line fill-7" x="280" y="420" width="140" height="100" rx="18"/>
+                    <rect class="ink" x="440" y="380" width="140" height="140" rx="18"/>
+                    <rect class="line fill-10" x="600" y="340" width="140" height="180" rx="18"/>
+                    <rect class="line fill-10" x="760" y="300" width="140" height="220" rx="18"/>
+                    <path class="line" d="M 510 356 L 494 330 L 526 330 Z"/>
+                    <text class="label" x="510" y="310" text-anchor="middle">Your level</text>
+                    <text class="label" x="190" y="566" text-anchor="middle">01</text>
+                    <text class="label" x="350" y="566" text-anchor="middle">02</text>
+                    <text class="label" x="510" y="566" text-anchor="middle">03</text>
+                    <text class="label" x="670" y="566" text-anchor="middle">04</text>
+                    <text class="label" x="830" y="566" text-anchor="middle">05</text>
+                  </svg>
                 </div>
               </div>
               <div class="flex flex-col gap-2.5 px-1 pb-1">
                 <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  A placement test covering six levels from A1 to C1.
+                  A placement test that fixes your starting level.
                 </h3>
                 <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Examines vocabulary, grammar, reading, and listening to accurately locate your learning starting point.
+                  A seeded question bank grades vocabulary, grammar, reading, and listening, and the result sets the scene difficulty and content you get.
                 </p>
               </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">A1–C1 · Multi-dimension Assessment</p>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Seeded question bank · level &rarr; content</p>
             </article>
           </div>
 
@@ -158,77 +181,60 @@
               </header>
               <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
                 <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23EA580C'/><stop offset='1' stop-color='%23FDBA74'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>🧬</text></svg>" alt="Learner profile" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                  <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                    <title>Learner profile: an avatar ring beside five tracked signals</title>
+                    <defs>
+                      <pattern id="rc-dots-2" width="26" height="26" patternUnits="userSpaceOnUse">
+                        <circle class="dot" cx="2" cy="2" r="4"/>
+                      </pattern>
+                    </defs>
+                    <rect width="1000" height="750" fill="url(#rc-dots-2)"/>
+                    <circle class="line fill-7" cx="250" cy="375" r="150"/>
+                    <circle class="line-soft" cx="250" cy="375" r="116"/>
+                    <circle class="line" cx="250" cy="330" r="34"/>
+                    <path class="line" d="M 176 456 Q 250 384 324 456"/>
+                    <text class="label" x="450" y="176">Weak phonemes</text>
+                    <text class="label" x="830" y="176" text-anchor="end">72</text>
+                    <rect class="fill-7" x="450" y="190" width="380" height="16" rx="8"/>
+                    <rect class="ink" x="450" y="190" width="274" height="16" rx="8"/>
+                    <text class="label" x="450" y="266">Error words</text>
+                    <text class="label" x="830" y="266" text-anchor="end">58</text>
+                    <rect class="fill-7" x="450" y="280" width="380" height="16" rx="8"/>
+                    <rect class="ink" x="450" y="280" width="220" height="16" rx="8"/>
+                    <text class="label" x="450" y="356">Fluency trend</text>
+                    <text class="label" x="830" y="356" text-anchor="end">66</text>
+                    <rect class="fill-7" x="450" y="370" width="380" height="16" rx="8"/>
+                    <rect class="ink" x="450" y="370" width="251" height="16" rx="8"/>
+                    <text class="label" x="450" y="446">Coverage</text>
+                    <text class="label" x="830" y="446" text-anchor="end">44</text>
+                    <rect class="fill-7" x="450" y="460" width="380" height="16" rx="8"/>
+                    <rect class="ink" x="450" y="460" width="167" height="16" rx="8"/>
+                    <text class="label" x="450" y="536">Feed profile</text>
+                    <text class="label" x="830" y="536" text-anchor="end">80</text>
+                    <rect class="fill-7" x="450" y="550" width="380" height="16" rx="8"/>
+                    <rect class="ink" x="450" y="550" width="304" height="16" rx="8"/>
+                  </svg>
                 </div>
               </div>
               <div class="flex flex-col gap-2.5 px-1 pb-1">
                 <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  A dynamic learner profile built from four scoring dimensions.
+                  A learner profile built from data you already generated.
                 </h3>
                 <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Pronunciation, grammar, fluency, and vocabulary combine into a profile that keeps updating with every practice.
+                  Scoring returns word-level errors and fluency detail, and the profile aggregates weak phonemes, high-frequency error words, and fluency trend into practice suggestions.
                 </p>
               </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">4 Dimensions · Live Update</p>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">M3 · weak phonemes · fluency trend</p>
             </article>
           </div>
 
-          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0.12s">
-            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
-              <header class="flex items-center gap-2.5 px-1 pt-2">
-                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
-                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-                </span>
-                <span class="text-sm font-medium tracking-tight text-foreground">Recommendation Engine</span>
-              </header>
-              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
-                <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%231D4ED8'/><stop offset='1' stop-color='%2393C5FD'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>🤖</text></svg>" alt="Recommendation engine" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
-                </div>
-              </div>
-              <div class="flex flex-col gap-2.5 px-1 pb-1">
-                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  A recommendation engine powered by scikit-learn.
-                </h3>
-                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Combines level, weak dimensions, and practice history to match the right content and songs, across modules.
-                </p>
-              </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">ML Recommender · Cross-module</p>
-            </article>
-          </div>
-
-          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0.18s">
-            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
-              <header class="flex items-center gap-2.5 px-1 pt-2">
-                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
-                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
-                </span>
-                <span class="text-sm font-medium tracking-tight text-foreground">How It Works</span>
-              </header>
-              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
-                <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23047857'/><stop offset='1' stop-color='%2310B981'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>🧭</text></svg>" alt="From test to a personal plan" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
-                </div>
-              </div>
-              <div class="flex flex-col gap-2.5 px-1 pb-1">
-                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  From test to a personal plan.
-                </h3>
-                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Take the test → build your profile → get personalized recommendations → follow your plan and track progress.
-                </p>
-              </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Placement · Profile · Plan</p>
-            </article>
-          </div>
                   </div>
                 </div>
               </div>
             </div>
             <div class="scroll-expand__title">
               <h1 data-split-text>Personalized Learning</h1>
-              <p class="se-title-sub" data-split-text>Based on a placement test and a dynamic learner profile, the recommendation module automatically builds a learning path and content list matched to each learner.</p>
+              <p class="se-title-sub" data-split-text>The learning line of VocalVerse: placement sets the starting point, every attempt updates the learner profile, and a recommender turns that profile into the next scene, song, or chapter.</p>
             </div>
             <div class="scroll-expand__hint">
               <span>Scroll down · View core features</span>
@@ -236,6 +242,219 @@
             </div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ===== 正文：卡片与文字逐段相间（卡在右 → 全宽文字 → 卡在左） ===== -->
+    <section class="fs-section fade-in" aria-labelledby="rc-path">
+      <div class="fs-duo">
+        <div class="fs-duo__text">
+          <p class="fs-kicker">The path</p>
+          <h2 class="fs-title" id="rc-path">From test to a plan.</h2>
+          <p class="fs-lead">Placement decides where you start; everything after that is written by the attempts you leave behind.</p>
+          <div class="fs-steps">
+            <div class="fs-step">
+              <span class="fs-step__no">01</span>
+              <h3 class="fs-step__title">Placement test</h3>
+              <p class="fs-step__desc">A seeded question bank grades vocabulary, grammar, reading, and listening, and fixes your starting level.</p>
+              <p class="fs-step__meta">Seeded question bank</p>
+            </div>
+            <div class="fs-step">
+              <span class="fs-step__no">02</span>
+              <h3 class="fs-step__title">Learner profile</h3>
+              <p class="fs-step__desc">Every scored turn and take updates the profile &mdash; there is no separate test to sit.</p>
+              <p class="fs-step__meta">Updates per attempt</p>
+            </div>
+            <div class="fs-step">
+              <span class="fs-step__no">03</span>
+              <h3 class="fs-step__title">Matched content</h3>
+              <p class="fs-step__desc">Scenes, songs, and reading chapters are picked for your level and your weak dimensions.</p>
+              <p class="fs-step__meta">Cross-module</p>
+            </div>
+            <div class="fs-step">
+              <span class="fs-step__no">04</span>
+              <h3 class="fs-step__title">Report, then adjust</h3>
+              <p class="fs-step__desc">The report shows what moved; the next recommendation follows it.</p>
+              <p class="fs-step__meta">Loop</p>
+            </div>
+          </div>
+        </div>
+        <div class="fs-duo__card">
+          <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+            <header class="flex items-center gap-2.5 px-1 pt-2">
+              <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+              </span>
+              <span class="text-sm font-medium tracking-tight text-foreground">Recommendation Engine</span>
+            </header>
+            <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+              <div class="project-card__image-inner">
+                <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                  <title>Recommendation engine: inputs scored into ranked picks</title>
+                  <defs>
+                    <pattern id="rc-dots-3" width="26" height="26" patternUnits="userSpaceOnUse">
+                      <circle class="dot" cx="2" cy="2" r="4"/>
+                    </pattern>
+                  </defs>
+                  <rect width="1000" height="750" fill="url(#rc-dots-3)"/>
+                  <circle class="line-soft dash" cx="500" cy="375" r="210"/>
+                  <path class="line" d="M 204 240 C 420 240 560 310 796 310"/>
+                  <path class="line-soft" d="M 204 375 C 420 375 560 310 796 310"/>
+                  <path class="line" d="M 204 510 C 420 510 560 440 796 440"/>
+                  <path class="line-soft" d="M 204 375 C 420 375 560 440 796 440"/>
+                  <path class="line-soft" d="M 204 240 C 420 240 560 440 796 440"/>
+                  <circle class="line fill-7" cx="170" cy="240" r="34"/>
+                  <circle class="line fill-7" cx="170" cy="375" r="34"/>
+                  <circle class="line fill-7" cx="170" cy="510" r="34"/>
+                  <circle class="ink" cx="170" cy="240" r="9"/>
+                  <circle class="ink" cx="170" cy="375" r="9"/>
+                  <circle class="ink" cx="170" cy="510" r="9"/>
+                  <circle class="line fill-10" cx="830" cy="310" r="34"/>
+                  <circle class="line fill-10" cx="830" cy="440" r="34"/>
+                  <path class="line" d="M 818 310 L 830 322 L 852 296"/>
+                  <path class="line-soft" d="M 818 440 L 830 452 L 852 426"/>
+                  <text class="label" x="500" y="640" text-anchor="middle">Ranked by level, weak spots and history</text>
+                </svg>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2.5 px-1 pb-1">
+              <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                A recommendation engine powered by scikit-learn.
+              </h3>
+              <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                Level, weak dimensions, and practice history feed the scikit-learn model that picks the next scenes, songs, and chapters.
+              </p>
+            </div>
+            <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">scikit-learn &middot; cross-module</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="fs-section fade-in" aria-labelledby="rc-signals">
+      <div class="fs-head">
+        <p class="fs-kicker">Profile signals</p>
+        <h2 class="fs-title" id="rc-signals">What the profile actually tracks.</h2>
+        <p class="fs-lead">Scoring already returns word-level errors and timing data; the profile is what those numbers look like once they are aggregated over time.</p>
+      </div>
+      <div class="fs-rows">
+        <div class="fs-row">
+          <span class="fs-row__label">Weak phonemes</span>
+          <span class="fs-bar"><i style="width:72%"></i></span>
+          <span class="fs-row__value">from word-level scoring errors</span>
+        </div>
+        <div class="fs-row">
+          <span class="fs-row__label">Frequent error words</span>
+          <span class="fs-bar"><i style="width:58%"></i></span>
+          <span class="fs-row__value">candidates for the vocab book</span>
+        </div>
+        <div class="fs-row">
+          <span class="fs-row__label">Fluency trend</span>
+          <span class="fs-bar"><i style="width:66%"></i></span>
+          <span class="fs-row__value">speech rate and pause ratio over time</span>
+        </div>
+        <div class="fs-row">
+          <span class="fs-row__label">Coverage</span>
+          <span class="fs-bar"><i style="width:44%"></i></span>
+          <span class="fs-row__value">scene language points hit vs missed</span>
+        </div>
+        <div class="fs-row fs-row--plain">
+          <span class="fs-row__label">Community preference</span>
+          <span class="fs-row__value">a separate system that only feeds the community feed</span>
+        </div>
+      </div>
+      <p class="fs-note">Demo values &middot; the profile layer ships with M3; the word-level and timing data it reads is already being written today.</p>
+    </section>
+
+    <section class="fs-section fade-in" aria-labelledby="rc-next">
+      <div class="fs-duo fs-duo--flip">
+        <div class="fs-duo__text">
+          <p class="fs-kicker">Next up</p>
+          <h2 class="fs-title" id="rc-next">Recommendation, across modules.</h2>
+          <p class="fs-lead">Level, weak dimensions, and practice history pick the next item &mdash; whatever module it lives in.</p>
+          <div class="fs-list">
+            <div class="fs-item">
+              <span class="fs-item__dot">01</span>
+              <div class="fs-item__main">
+                <p class="fs-item__body">Scene &middot; Coffee-shop ordering</p>
+                <p class="fs-item__actions">Picked because fluency dipped in the last three sessions</p>
+              </div>
+              <span class="fs-item__tag">Scene &middot; Easy</span>
+            </div>
+            <div class="fs-item">
+              <span class="fs-item__dot">02</span>
+              <div class="fs-item__main">
+                <p class="fs-item__body">Song &middot; Auld Lang Syne</p>
+                <p class="fs-item__actions">Slow tempo, long vowels &mdash; aimed at the phonemes the profile flagged</p>
+              </div>
+              <span class="fs-item__tag">Song &middot; Easy</span>
+            </div>
+            <div class="fs-item">
+              <span class="fs-item__dot">03</span>
+              <div class="fs-item__main">
+                <p class="fs-item__body">Reading &middot; Chapter 3 of a public-domain novel</p>
+                <p class="fs-item__actions">Sized for a 10-minute session, with the flagged words already in the vocab book</p>
+              </div>
+              <span class="fs-item__tag">Reading</span>
+            </div>
+          </div>
+        </div>
+        <div class="fs-duo__card">
+          <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+            <header class="flex items-center gap-2.5 px-1 pt-2">
+              <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
+              </span>
+              <span class="text-sm font-medium tracking-tight text-foreground">How It Works</span>
+            </header>
+            <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+              <div class="project-card__image-inner">
+                <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                  <title>One profile read by every module: scenes, songs and reading</title>
+                  <defs>
+                    <pattern id="rc-dots-4" width="26" height="26" patternUnits="userSpaceOnUse">
+                      <circle class="dot" cx="2" cy="2" r="4"/>
+                    </pattern>
+                  </defs>
+                  <rect width="1000" height="750" fill="url(#rc-dots-4)"/>
+                  <text class="label" x="500" y="86" text-anchor="middle">One profile</text>
+                  <rect class="line fill-10" x="400" y="110" width="200" height="130" rx="24"/>
+                  <rect class="fill-22" x="436" y="150" width="128" height="14" rx="7"/>
+                  <rect class="fill-22" x="436" y="182" width="96" height="14" rx="7"/>
+                  <rect class="fill-22" x="436" y="214" width="64" height="14" rx="7"/>
+                  <path class="line-soft" d="M 500 240 C 500 380 220 380 220 520"/>
+                  <path class="line" d="M 500 240 V 520"/>
+                  <path class="line-soft" d="M 500 240 C 500 380 780 380 780 520"/>
+                  <rect class="line fill-7" x="110" y="520" width="220" height="120" rx="20"/>
+                  <rect class="line fill-10" x="390" y="520" width="220" height="120" rx="20"/>
+                  <rect class="line fill-7" x="670" y="520" width="220" height="120" rx="20"/>
+                  <rect class="fill-22" x="146" y="566" width="148" height="14" rx="7"/>
+                  <rect class="fill-22" x="426" y="566" width="148" height="14" rx="7"/>
+                  <rect class="fill-22" x="706" y="566" width="148" height="14" rx="7"/>
+                  <text class="label" x="220" y="690" text-anchor="middle">Scenes</text>
+                  <text class="label" x="500" y="690" text-anchor="middle">Songs</text>
+                  <text class="label" x="780" y="690" text-anchor="middle">Reading</text>
+                </svg>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2.5 px-1 pb-1">
+              <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                One profile, read by every module.
+              </h3>
+              <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                The same profile ranks scenes, songs and reading chapters, so a weak dimension gets attacked wherever it is cheapest to fix.
+              </p>
+            </div>
+            <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Cross-module</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="fs-section fade-in">
+      <div class="fs-band">
+        <h2 class="fs-band__statement">scikit-learn, not a hand-written rule table.</h2>
+        <p class="fs-band__meta">Level, weak dimensions and practice history feed the recommender; the community feed reads a separate preference profile so the two never fight over one ranking.</p>
       </div>
     </section>
 
@@ -253,7 +472,7 @@
                 Let&rsquo;s connect
               </h2>
               <p class="max-w-[29ch] text-[18px] leading-[1.4] tracking-tight text-foreground/65 sm:text-[22px] mb-6">
-                We&rsquo;re always open to discussing new features, creative ideas, or opportunities to shape the future of English speaking practice. Just reach out!
+                We&rsquo;re always open to discussing new features, creative ideas, or opportunities to shape the future of English learning. Just reach out!
               </p>
 
               <div class="mt-2 flex flex-wrap items-center gap-3">
@@ -296,8 +515,8 @@
                 </a>
               </div>
               <div class="flex flex-col items-center gap-1 text-center">
-                <p class="text-[13px] tracking-tight text-foreground/70">2026 &copy; Built with Next.js</p>
-                <p class="text-[12px] tracking-tight text-foreground/45">By React Bits Pro</p>
+                <p class="text-[13px] tracking-tight text-foreground/70">2026 &copy; VocalVerse</p>
+                <p class="text-[12px] tracking-tight text-foreground/45">Practice · Immerse · Sing</p>
               </div>
             </div>
           </div>
