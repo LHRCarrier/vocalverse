@@ -18,16 +18,54 @@ export const previewRoute: RouteRecordRaw | null = import.meta.env.DEV
         { path: '', redirect: '/preview/home' },
         { path: 'home', component: () => import('@/views/preview/HomePreview.vue') },
         {
-          path: 'admin-dashboard',
-          component: () => import('@/views/preview/AdminDashboardPreview.vue'),
+          path: 'uic-home',
+          component: () => import('@/views/preview/uic/UicHome.vue'),
         },
         {
-          path: 'admin-users',
-          component: () => import('@/views/preview/AdminUsersPreview.vue'),
+          path: 'uic-speaking',
+          component: () => import('@/views/preview/uic/UicSpeaking.vue'),
+        },
+        {
+          path: 'uic-singing',
+          component: () => import('@/views/preview/uic/UicSinging.vue'),
+        },
+        {
+          path: 'agent-lab',
+          component: () => import('@/views/preview/AgentLabPreview.vue'),
+        },
+        {
+          path: 'fluency',
+          component: () => import('@/views/preview/FluencyPreview.vue'),
+        },
+        {
+          path: 'shadow',
+          component: () => import('@/views/preview/ShadowPreview.vue'),
+        },
+        {
+          path: 'community',
+          component: () => import('@/views/preview/CommunityPreview.vue'),
+        },
+        {
+          path: 'singing',
+          component: () => import('@/views/preview/SingingPreview.vue'),
+        },
+        {
+          path: 'community-s3',
+          component: () => import('@/views/preview/CommunityS3Preview.vue'),
+        },
+        {
+          path: 'reading',
+          component: () => import('@/views/preview/ReadingPreview.vue'),
         },
         {
           path: 'lieflat',
           component: () => import('@/views/preview/LieflatPreview.vue'),
+        },
+        {
+          // 管理端控制台联调桥接页（docs/50 §14.4 · AGENTS 工作流程 §3）。
+          // 只探活 + 对照，不 import apps/admin 源码；删除清单见该文件尾注释。
+          path: 'admin-console',
+          component: () => import('@/views/preview/AdminConsolePreview.vue'),
         },
       ],
     }

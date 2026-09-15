@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { micErrorMessage, MIN_RECORD_MS, VoiceRecorder } from '../recorder'
+import { micErrorMessage, MIN_RECORD_MS, RecorderError, VoiceRecorder } from '../recorder'
 
 /** 忠实于规范的 MediaRecorder 假件：对 inactive 的实例再 stop() 必须抛 InvalidStateError。 */
 class FakeMediaRecorder {
@@ -56,8 +56,7 @@ beforeEach(() => {
   })
 })
 
-/** 装配一个录音机 + 记录状态流与上传回调，模拟 PlacementView 的接线方式 */
-function wire() {
+/** 装配一个录音机 + 记录状态流与上传回调，模拟 PlacementView 的接线方式 */function wire() {
   const rec = new VoiceRecorder()
   const states: string[] = []
   const uploads: number[] = []
@@ -214,5 +213,27 @@ describe('micErrorMessage', () => {
   it('未知错误回退到原始 message，再兜底到通用文案', () => {
     expect(micErrorMessage({ name: 'WeirdError', message: 'boom' })).toBe('boom')
     expect(micErrorMessage(null)).toBe('录音启动失败，请重试')
+  })
+})
+
+describe('非安全上下文防护（2026-09-10 组长手机端实测）', () => {
+  it('mediaDevices 不存在（http://局域网 加载）→ 友好提示「安全环境」而非原生 TypeError', async () => {
+    // 模拟手机端 http://192.168.x.x 加载：navigator.mediaDevices 为 undefined
+    Object.defineProperty(globalThis.navigator, 'mediaDevices', {
+      configurable: true,
+      value: undefined,
+    })
+    const rec = new VoiceRecorder()
+    await expect(rec.start()).rejects.toBeInstanceOf(RecorderError)
+    await expect(rec.start()).rejects.toThrow('安全环境')
+  })
+
+  it('supported 在 mediaDevices 缺失时返回 false（供视图隐藏录音按钮/提示）', () => {
+    Object.defineProperty(globalThis.navigator, 'mediaDevices', {
+      configurable: true,
+      value: undefined,
+    })
+    const rec = new VoiceRecorder()
+    expect(rec.supported).toBe(false)
   })
 })

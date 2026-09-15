@@ -4,6 +4,8 @@
 # ============================================================
 # --- # 本地工作文档（协作过程产生的临时/内部文档，不入库）---
 local/
+# --- AI 助手（WorkBuddy）工作区：会话记忆/临时产物，纯本机数据，不入库 ---
+.workbuddy/
 # --- Node / 前端 ---
 node_modules/
 dist/
@@ -40,7 +42,13 @@ services/java/target/
 
 # --- 数据与训练产物（按路径，而非裸后缀） ---
 data/audio/
+# 媒体卷（社区 S3 · docs/47 §4.1）：上传的图片/视频/头像一律不入库。
+# 注意 gitignore 语义：含斜杠的模式锚定仓库根 → `data/media/` 只匹配根目录，
+# 本地裸跑（uvicorn cwd=services/python）会落在 services/python/data/media，需单列。
+data/media/
+services/python/data/
 data/raw/
+data/models/   # HF 模型权重（faster-whisper 等）：红线禁止提交（2026-09-04 复审补，曾未忽略）
 # 注意：必须锚定路径！裸 `models/` 会吞掉 services/python/app/models（schema 模型，必须入库）
 /models/
 services/python/models/
@@ -76,3 +84,9 @@ Thumbs.db
 *.m4a
 # 在豁免区下方重复豁免 fixture 目录，确保优先级
 !**/tests/fixtures/**
+
+# HF 模型下载缓存（构建上下文预下载用；红线禁止提交，2026-09-07）
+services/python/.models-cache/
+
+# --- Java 本地访问日志（2026-09-10 手机联调排障开启） ---
+services/java/logs/

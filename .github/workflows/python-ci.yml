@@ -5,6 +5,18 @@ on:
     paths:
       - "services/python/**"
       - ".github/workflows/python-ci.yml"
+  # 兜底（PR#25 复审，2026-09-09）与 push(main)。
+  # **论断更正（2026-09-14 · PR#34 评审 Q1）**：旧注释写的"本仓 pull_request 触发当前未生效
+  # （PR #24/#25 打开/同步均 0 run）"已被 PR#34 证伪——`pull_request` 事件现在**是生效的**
+  # （PR#34 的 4 个 check 均由它触发并跑在 PR head 上）；当年更可能是没有触及本 workflow `paths`
+  # 的 PR。保留 push(main) 的理由改为**纵深防御**（合入 main 后再验一次），不再是"触发不可靠"。
+  # workflow_dispatch 仍供手动补跑（gh workflow run python-ci）。
+  push:
+    branches: [main]
+    paths:
+      - "services/python/**"
+      - ".github/workflows/python-ci.yml"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,6 +51,15 @@ jobs:
 
       - name: Tests
         run: uv run pytest -m "not gpu" -q
+
+      - name: "Bench: 语音链路分阶段基准（va-09 · Fake 冒烟 + 操作数/时延预算门禁）"
+        run: uv run python ../../scripts/bench/pipeline_bench.py --fake --runs 3 --check-budget
+
+      - name: "Single-Writer 探针（docs/10 §3.1 写方矩阵 / docs/19 P0-7：Python 不得写 Java-owned 表）"
+        run: python ../../scripts/check_single_writer.py
+
+      - name: "功能位/配置开关三处对账（arch-04：docs/06 §17 ↔ config.py / application.yml / README）"
+        run: python ../../scripts/check_feature_flags.py
 
       - name: "Contract: OpenAPI snapshot in sync"
         # 契约真源 = 运行中的后端 /openapi.json；前端快照（apps/web/src/api/specs/）必须与之一致。

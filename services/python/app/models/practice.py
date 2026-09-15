@@ -1,20 +1,20 @@
-"""练习域：sessions / attempts / scores / sing_attempts（均 **Python 写**）。
+"""练习域：sessions / attempts / scores / sing_attempts / song_favorites（均 **Python 写**）。
 
 - ``sessions``：一次练习会话头（对话/唱歌），承载「完成率/互动率」等的会话级事实；
   只存原始事实（turn_count、duration_s），口径判定（5 轮或 2min）在报表层算，口径可重算；
 - ``attempts``：一次录音评分的完整结果（口语）；``scores`` 为其音素级明细；
-- ``sing_attempts``：一次跟唱评分的逐句结果（音准/节奏/发音 + 对齐信息，docs/06 §9.4）。
+- ``sing_attempts``：一次跟唱评分的逐句结果（音准/节奏/发音 + 对齐信息，docs/06 §9.4）；
+- ``song_favorites``：跟唱收藏（用户 × 歌曲，唱吧「收藏」tab 的事实源，2026-09-10）。
 """
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
-    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -66,6 +66,11 @@ class Session(TimestampMixin, Base):
     profile_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("defense_profiles.id", ondelete="SET NULL")
     )
+    # 影子跟读素材引用（local/31 §2.4，迁移 0003）：scenario/song 之外的候选池第三类；
+    # 与 scenario_id/song_id 同语义（SET NULL，内容归档不影响历史）
+    shadow_material_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("shadow_materials.id", ondelete="SET NULL")
+    )
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default=text(f"'{SessionStatus.ACTIVE}'")
     )
@@ -82,10 +87,19 @@ class Session(TimestampMixin, Base):
     assigned_turns: Mapped[int | None] = mapped_column(SmallInteger)
     duration_s: Mapped[int | None] = mapped_column(BigInteger)
     channel: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("'web'"))
+    # 摘要双轨（docs/26 §10.3①，迁移 0004；对照 ai4u agent_conversation.summary*）：
+    # summary=滚动摘要（收尾时=最终总结）；summary_failed_at=最近一次摘要生成失败（成功清空）
+    summary: Mapped[str | None] = mapped_column(Text)
+    summary_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    summary_failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # 打卡卡同步标记（docs/37 §5/C-17，迁移 0009）：/internal/checkin 成功落卡时间；
+    # NULL = 未同步（失败不阻塞收尾，留待补扫/P2 重试）
+    checkin_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
         CheckConstraint(
-            f"kind IN ('{SessionKinds.DIALOG}', '{SessionKinds.SING}', '{SessionKinds.DEFENSE}')",
+            f"kind IN ('{SessionKinds.DIALOG}', '{SessionKinds.SING}', '{SessionKinds.DEFENSE}', "
+            f"'{SessionKinds.SHADOW}')",
             name="kind",
         ),
         CheckConstraint(
@@ -144,7 +158,8 @@ class Attempt(TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(
             f"kind IN ('{AttemptKinds.DIALOG_SPEECH}', '{AttemptKinds.FREE_PRACTICE}', "
-            f"'{AttemptKinds.PLACEMENT_ITEM}', '{AttemptKinds.DEFENSE_ANSWER}')",
+            f"'{AttemptKinds.PLACEMENT_ITEM}', '{AttemptKinds.DEFENSE_ANSWER}', "
+            f"'{AttemptKinds.SHADOW_SPEECH}')",
             name="kind",
         ),
         Index("ix_attempts_user_created", "user_id", "created_at"),
@@ -210,6 +225,14 @@ class SingAttempt(CreatedAtMixin, Base):
     lrc_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("lrc.id", ondelete="SET NULL")
     )
+    # 评分算法世代快照（2026-09-09 唱歌 P0 · D10 可追溯）：scoring_version=评分器版本
+    # （如 'v1'——算法/参数升级后旧分可解释，不作废）；ref_version=所用参考旋律提取世代
+    # （song_pitch_refs.version 快照，替代 lrc.revision 方案——LRC 重写→pitch_refs 重建→
+    # version 变化即表达世代，Java 零改动）
+    scoring_version: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("'v1'")
+    )
+    ref_version: Mapped[str | None] = mapped_column(String(16))
     audio_url: Mapped[str | None] = mapped_column(String(512))
     duration_s: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     overall_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
@@ -224,31 +247,37 @@ class SingAttempt(CreatedAtMixin, Base):
     alignment: Mapped[dict] = mapped_column(jsonb(), nullable=False, server_default=text("'{}'"))
 
     __table_args__ = (
+        # 2026-09-10 · P1-3（迁移 0012）：同一 (user, session) 只允许一行——
+        # 幂等/重试语义的**地基**（service 层"先查后插"在并发双击下会插出两行：
+        # 两份 pyin/DTW 计算 + 重复 attempt 干扰看板；拷问报告 B-F7/C-#3/G-#9）。
+        # 语义：草稿行（分数 NULL）可被**就地重置**重跑，定稿行（有 lines/有分）不再改写。
+        UniqueConstraint("user_id", "session_id", name="uq_sing_attempts_user_session"),
         Index("ix_sing_attempts_user_created", "user_id", "created_at"),
         Index("ix_sing_attempts_song_id", "song_id"),
         Index("ix_sing_attempts_lrc_id", "lrc_id"),
     )
 
 
-class PostLike(CreatedAtMixin, Base):
-    """社区点赞（**Python 写**；docs/06 §9.6 社区最小版「点赞」唯一必须持久化的数据）。
+class SongFavorite(CreatedAtMixin, Base):
+    """跟唱收藏（Python 写；用户 × 歌曲 交互表）。
 
-    - 打卡与只读动态流**不建表**：单日≥1 次口语练习由 sessions 按日派生；
-      跨用户动态流由 sessions/attempts/users JOIN 派生；唯有点赞是多对多；
-    - 自然键 = (liker_id, author_id, practice_date)（一天最多 1 打卡）；
-    - 成绩卡片由前端 canvas 用 session/attempt 数据重生成，不落库。
+    - 2026-09-10 组长需求：唱吧「收藏」tab 必须是**用户自主选择**的结果，而不是难度等
+      启发式过滤；每首歌一个收藏按钮，再点取消（存在=收藏，删除=取消，无软删状态列）；
+    - 唯一键 ``uq_song_favorites_user_song``：同一用户同一首歌只有一行（重复收藏幂等，
+      取消幂等——见 app/sing/favorites.py）；
+    - ``song_id`` FK CASCADE：歌曲行删除（内容下架只置 archived，不删行；真删为管理端
+      例外操作）时收藏随之清理，不留悬空引用；``user_id`` 无 ondelete——users 只禁用不删。
     """
 
-    __tablename__ = "post_likes"
+    __tablename__ = "song_favorites"
 
     id: Mapped[int] = bigint_pk()
-    liker_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
-    author_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
-    practice_date: Mapped[date] = mapped_column(Date, nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    song_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("songs.id", ondelete="CASCADE"), nullable=False
+    )
 
     __table_args__ = (
-        UniqueConstraint(
-            "liker_id", "author_id", "practice_date", name="uq_post_likes_liker_author_date"
-        ),
-        Index("ix_post_likes_author_date", "author_id", "practice_date"),
+        UniqueConstraint("user_id", "song_id", name="uq_song_favorites_user_song"),
+        Index("ix_song_favorites_user_created", "user_id", "created_at"),
     )

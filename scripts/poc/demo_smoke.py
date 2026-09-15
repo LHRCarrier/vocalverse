@@ -24,10 +24,10 @@ os.environ.setdefault("APP_DATABASE_URL", "sqlite+pysqlite:///:memory:")
 SERVICE_ROOT = Path(__file__).resolve().parents[2] / "services" / "python"  # 仓库根/services/python
 sys.path.insert(0, str(SERVICE_ROOT))
 
-from app.db import create_all_for_tests, get_session_factory  # noqa: E402
-from app.db.seed import seed_scenarios  # noqa: E402
-from app.main import app  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
+from app.db import create_all_for_tests, get_session_factory
+from app.db.seed import seed_scenarios
+from app.main import app
+from fastapi.testclient import TestClient
 
 
 def main() -> int:
@@ -55,7 +55,10 @@ def main() -> int:
 
     def turn(action: str, expected: int, with_audio: bool = True) -> list[dict]:
         form = {"action": action, "expected_turn": str(expected)}
-        files = {"audio": ("a.webm", b"fake-audio-bytes", "audio/webm")} if with_audio else None
+        # ≥1KB 假音频：生产 `min_upload_bytes=1024` 下界挡空/近空录音（40002），
+        # 17 字节的 b"fake-audio-bytes" 会被拒（2026-09-03 实测：回 400/40002 → 冒烟红）
+        fake_audio = b"fake-audio-bytes" * 100
+        files = {"audio": ("a.webm", fake_audio, "audio/webm")} if with_audio else None
         resp = client.post(
             f"/api/v1/sessions/{data['id']}/turns", data=form, files=files, headers=headers
         )

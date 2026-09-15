@@ -1,0 +1,617 @@
+/* ============================================================
+   评分报告预览页（report.html）· VocalVerse 原型
+   借鉴「Learning Report / FLUENCY FEATURES」参考图的结构与内容，
+   风格按站点原有画风重制：黑白灰、Geist/Fraunces/Geist Mono、
+   圆角卡片 + hairline 边框、明暗主题自适应（--foreground 派生）。
+   所有图表（雷达/曲线/环形/点阵/条形）均为纯 SVG，单色系。
+   ============================================================ */
+
+/* —— 顶部返回链接 —— */
+.report-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 60%, transparent);
+  text-decoration: none;
+  transition: color 0.25s ease;
+}
+.report-back:hover {
+  color: var(--foreground);
+}
+.report-back svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.report-back:hover svg {
+  transform: translateX(-3px);
+}
+
+/* —— 报头（大标题区）—— */
+.report-kicker {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 45%, transparent);
+}
+.report-title {
+  margin: 0.75rem 0 0;
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 4.6vw, 3.5rem);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+  color: var(--foreground);
+  max-width: 20ch;
+  text-align: left !important; /* 覆盖 split-text 组件强制居中的内联样式 */
+}
+.report-lead {
+  margin: 1.1rem 0 0;
+  max-width: 46ch;
+  font-size: 16px;
+  line-height: 1.7;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--foreground) 65%, transparent);
+}
+.report-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+.report-chips span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 65%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
+}
+
+/* —— 区块头 —— */
+.report-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 2rem;
+  margin: 0 0 1.25rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+.report-subtitle {
+  margin: 0.4rem 0 0;
+  font-family: var(--font-serif);
+  font-size: clamp(1.35rem, 2.4vw, 1.8rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--foreground);
+}
+.report-head-side {
+  margin: 0;
+  max-width: 32ch;
+  font-size: 13px;
+  line-height: 1.65;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--foreground) 60%, transparent);
+}
+
+/* —— 卡片 —— */
+.report-card {
+  border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+  border-radius: 1.25rem;
+  background: var(--background);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 4%, transparent);
+  padding: 1.25rem 1.25rem 1rem;
+}
+.report-card__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--foreground);
+}
+.report-card__desc {
+  margin: 0.35rem 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--foreground) 60%, transparent);
+}
+.report-card__meta {
+  margin: 0.9rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 38%, transparent);
+}
+
+/* —— KPI 卡 —— */
+.report-kpi {
+  border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+  border-radius: 1rem;
+  background: var(--background);
+  padding: 1rem 1.1rem;
+}
+.report-kpi__label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 50%, transparent);
+}
+.report-kpi__value {
+  margin-top: 0.5rem;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+.report-kpi__meta {
+  margin-top: 0.5rem;
+  font-size: 12px;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--foreground) 55%, transparent);
+}
+
+/* —— 停顿时间轴 —— */
+.timeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+}
+.timeline-chip {
+  border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+  border-radius: 8px;
+  padding: 0.34rem 0.7rem;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  white-space: nowrap;
+}
+.timeline-chip--hl {
+  background: color-mix(in srgb, var(--foreground) 11%, transparent);
+  border-color: color-mix(in srgb, var(--foreground) 28%, transparent);
+  font-weight: 500;
+}
+.timeline-note {
+  margin-top: 0.7rem;
+  font-size: 12px;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--foreground) 55%, transparent);
+}
+
+/* —— 转写 / 词段时间码表 —— */
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+  font-size: 13px;
+}
+.report-table th {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: left;
+  color: color-mix(in srgb, var(--foreground) 42%, transparent);
+  padding: 0 0.5rem 0.5rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+.report-table td {
+  padding: 0.5rem 0.5rem 0.5rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--foreground) 78%, transparent);
+}
+.report-table tr.report-row-hl td {
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+  color: var(--foreground);
+  font-weight: 500;
+}
+.report-transcript {
+  margin: 0.4rem 0 0;
+  font-size: 15px;
+  letter-spacing: -0.015em;
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+/* —— 评分面板 —— */
+.report-score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+.report-score__value {
+  font-size: 40px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+.report-score__unit {
+  font-size: 13px;
+  color: color-mix(in srgb, var(--foreground) 50%, transparent);
+}
+.report-score__sub {
+  margin-top: 0.6rem;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--foreground) 58%, transparent);
+}
+.report-note {
+  margin: 1rem 0 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+  font-size: 12px;
+  line-height: 1.75;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--foreground) 58%, transparent);
+}
+.report-note ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+}
+
+/* —— 易错点条 —— */
+.error-row {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 1.2fr) 2fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+.error-row:last-child {
+  border-bottom: 0;
+}
+.error-row__label {
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+}
+.error-row__bar {
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 12%, transparent);
+  overflow: hidden;
+}
+.error-row__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 70%, transparent);
+}
+.error-row__value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: color-mix(in srgb, var(--foreground) 55%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* —— 统计瓦片 —— */
+.stat-tile {
+  border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+  border-radius: 1rem;
+  background: var(--background);
+  padding: 1rem 1.1rem;
+}
+.stat-tile__value {
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+.stat-tile__label {
+  margin-top: 0.5rem;
+  font-size: 12px;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--foreground) 55%, transparent);
+}
+.stat-tile__delta {
+  margin-top: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 45%, transparent);
+}
+
+/* —— 图例 —— */
+.report-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.1rem;
+  margin-top: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 50%, transparent);
+}
+.report-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.report-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--foreground);
+}
+.report-legend i.o65 { opacity: 0.65; }
+.report-legend i.o45 { opacity: 0.45; }
+.report-legend i.o25 { opacity: 0.25; }
+
+/* —— 图表容器 —— */
+.report-chart {
+  margin-top: 0.9rem;
+  width: 100%;
+}
+.report-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ============ 参考图排版精修 ============ */
+
+/* —— 报头 masthead：左眉题 + 右侧元信息（同参考图顶栏）—— */
+.report-masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.report-masthead-meta {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 40%, transparent);
+}
+
+/* —— 标题 + 弧线图双栏（参考图：左侧大标题、右侧 开口→评分→反馈→提升 弧线）—— */
+.report-hero-grid {
+  display: grid;
+  gap: 2rem;
+  align-items: center;
+  margin-top: 1.5rem;
+}
+@media (min-width: 900px) {
+  .report-hero-grid {
+    grid-template-columns: 1.45fr 1fr;
+    gap: 3rem;
+  }
+}
+.report-hero-grid .report-title { margin-top: 0.75rem; }
+.report-arc {
+  display: none;
+}
+@media (min-width: 640px) {
+  .report-arc {
+    display: block;
+  }
+}
+
+/* —— 卡片底部行：左侧说明 + 右侧 ↑↑ 箭头（同参考图卡片）—— */
+.report-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.9rem;
+}
+.report-card__foot .report-card__meta {
+  margin: 0;
+}
+.report-card__arrows {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  color: color-mix(in srgb, var(--foreground) 42%, transparent);
+  white-space: nowrap;
+}
+
+/* —— 统计瓦片：数值行带 → 箭头 + 迷你刻度条（同参考图 —— */
+.stat-tile__value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.stat-tile__value-row .stat-tile__value { margin: 0; }
+.stat-tile__arrow {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: color-mix(in srgb, var(--foreground) 40%, transparent);
+}
+.stat-tile__track {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+  margin-top: 0.55rem;
+}
+.stat-tile__track i {
+  flex: 1;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--foreground) 22%, transparent);
+}
+
+/* ============ 交互增强（悬浮 & 入场） ============ */
+/* 卡片 / 瓦片 / KPI / 芯片：悬浮抬升 + 描边 + 阴影（沿用 project-card 的曲线） */
+@media (prefers-reduced-motion: no-preference) {
+  .report-card,
+  .report-kpi,
+  .stat-tile {
+    transition:
+      transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .report-card:hover,
+  .report-kpi:hover,
+  .stat-tile:hover {
+    transform: translateY(-4px);
+    border-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+    box-shadow: 0 14px 28px -16px color-mix(in srgb, var(--foreground) 22%, transparent);
+  }
+
+  /* 底部箭头 / 瓦片箭头：卡片悬浮时点亮并移动 */
+  .report-card__arrows,
+  .stat-tile__arrow {
+    transition:
+      color 0.35s ease,
+      transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .report-card:hover .report-card__arrows {
+    color: var(--foreground);
+    transform: translateY(-2px);
+  }
+  .stat-tile:hover .stat-tile__arrow {
+    color: var(--foreground);
+    transform: translateX(3px);
+  }
+
+  /* 易错点行：悬浮高亮 */
+  .error-row { transition: background 0.3s ease; }
+  .error-row:hover { background: color-mix(in srgb, var(--foreground) 4%, transparent); }
+
+  /* 停顿芯片：悬浮上浮 */
+  .timeline-chip {
+    transition:
+      transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.35s ease,
+      background 0.35s ease;
+  }
+  .timeline-chip:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--foreground) 26%, transparent);
+    background: color-mix(in srgb, var(--foreground) 8%, transparent);
+  }
+
+  /* 卡片 / 瓦片 / KPI：进入视口后错峰上浮（js-report-anim 由 JS 在允许动效时注入） */
+  .js-report-anim .anim-in {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+      opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+  }
+  .js-report-anim .anim-in.is-inview {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  /* 入场完成后释放过渡：恢复卡片自身的悬浮过渡（translateY/描边/阴影），并清除逐项延迟 */
+  .js-report-anim .anim-in.anim-done {
+    transition:
+      transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* 折线 / 雷达 / 弧线：绘制入场（dash 变量由 JS 按路径长度注入） */
+  .js-report-anim .draw-path,
+  .js-report-anim .draw-poly,
+  .js-report-anim .arc-path {
+    stroke-dasharray: var(--len, 0);
+    stroke-dashoffset: var(--len, 0);
+    transition: stroke-dashoffset 1.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .js-report-anim .is-anim .draw-path,
+  .js-report-anim .is-anim .draw-poly,
+  .js-report-anim .is-anim .arc-path {
+    stroke-dashoffset: 0;
+  }
+
+  /* 环形图：70% 弧线从 0 绘制 */
+  .js-report-anim .draw-arc {
+    stroke-dasharray: 237.5 339.3;
+    stroke-dashoffset: 339.3;
+    transition: stroke-dashoffset 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.2s;
+  }
+  .js-report-anim .is-anim .draw-arc {
+    stroke-dashoffset: 0;
+  }
+
+  /* 图表数据点：悬浮放大 + 气泡（data-tip → <title>） */
+  .chart-dot {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .chart-dot:hover {
+    transform: scale(1.8);
+    cursor: pointer;
+  }
+
+  /* 学习闭环弧线图：节点呼吸 */
+  .arc-node {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: report-node-pulse 2.8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  }
+  @keyframes report-node-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+  }
+}
+
+/* ============================================================
+   补齐 report.html 用到、但 styles.css 编译产物中缺失的网格工具类
+   （styles.css 是静态编译产物、无 Tailwind 构建管线，这里按
+   Tailwind v4 的断点约定手写等价的响应式规则）
+   ============================================================ */
+
+/* 无前缀：任意宽度生效 */
+.grid-cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* sm ≥ 40rem（640px）：图表两两一排 */
+@media (min-width: 40rem) {
+  .sm\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* lg ≥ 64rem（1024px）：主区双栏 / KPI 四列 / 词表与评分双栏 */
+@media (min-width: 64rem) {
+  .lg\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .lg\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .lg\:grid-cols-\[1\.75fr_1fr\] {
+    grid-template-columns: 1.75fr 1fr;
+  }
+  .lg\:gap-7 {
+    gap: 1.75rem;
+  }
+}

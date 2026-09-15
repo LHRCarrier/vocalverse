@@ -11,7 +11,8 @@
 | `vv-learning-report.html` | 报告模式 | R09 骨架 × PORCELAIN | 数据故事仪表盘：4 图（雷达 / F2 / F4 / L15）+ 右栏 6 KPI 卡 |
 
 > 两份交付各自锁定一种色彩系统（PORCELAIN，`color-presets.js` 正本），未新增色值。
-> 全部为演示数据（与 `AdminDashboardPreview.vue` 的演示值同源），接入真实接口后替换数据即可。
+> 全部为演示数据（原与 `AdminDashboardPreview.vue` 的演示值同源；**该页属已废弃的旧管理端，已随 `/admin` 路由删除**）。
+> 管理端的真实图表实现见独立 SPA `apps/admin/src/components/charts/**`（docs/50 §12）。
 
 ## 选型审计记录（SKILL 自检 10 / 12 / 13）
 

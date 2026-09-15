@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VocalVerse — Design Showcase</title>
+  <meta name="description" content="Phone-frame showcase of the VocalVerse interface system: app screens, form controls, and overlay states, all rendered inside device frames." />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,100..900,0..100&family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/nav-reveal.css" />
+  <link rel="stylesheet" href="css/site-nav.css" />
+  <link rel="stylesheet" href="css/gooey-nav.css" />
+  <link rel="stylesheet" href="css/footer.css" />
+  <link rel="stylesheet" href="css/aero-shards.css" />
+  <script>document.documentElement.classList.add((localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")));</script>
+  <style>
+    /* ============================================================
+       Showcase 页面专属样式 —— 全部走站点既有设计令牌
+       （--background / --foreground / --font-mono / --font-serif），
+       不引入任何页外色值，保证与其余页面同一套视觉语言。
+       ============================================================ */
+
+    /* 大标题：遮罩上移揭示。
+       不用 data-split-text —— 那套是给居中 hero 标题写的（会强制 text-align:center），
+       与本页左对齐版式冲突；改用纯 CSS 遮罩，复用站点既有 fade-in / is-inview 触发，
+       结果与动画时长都确定，不依赖 GSAP 的 ScrollTrigger 时序。 */
+    .uc-titlewrap { overflow: hidden; }
+    .uc-titlewrap.fade-in,
+    .uc-titlewrap.fade-in.is-inview { transform: none; } /* 位移交给内层标题，只保留淡入 */
+    .uc-title {
+      display: block;
+      transform: translateY(105%);
+      transition: transform 1.15s cubic-bezier(.22, 1, .36, 1);
+      will-change: transform;
+    }
+    .uc-titlewrap.is-inview .uc-title { transform: none; }
+
+    /* 区块编号：与各页 ix-eyebrow 的「编号徽章化」同一路数 */
+    .uc-eyebrow {
+      display: inline-block;
+      padding: .25rem .6rem;
+      border: 1px solid color-mix(in srgb, var(--foreground) 14%, transparent);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--foreground) 5%, transparent);
+      font-family: var(--font-mono);
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: color-mix(in srgb, var(--foreground) 55%, transparent);
+    }
+
+    /* 规格胶囊：页头那排元信息 */
+    .uc-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      height: 2rem;
+      padding: 0 .9rem;
+      border-radius: 9999px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+      background: color-mix(in srgb, var(--foreground) 3%, transparent);
+      font-family: var(--font-mono);
+      font-size: .75rem;
+      color: color-mix(in srgb, var(--foreground) 62%, transparent);
+      white-space: nowrap;
+    }
+    .uc-chip b { color: var(--foreground); font-weight: 700; }
+
+    /* 展示块序号 */
+    .uc-idx {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 9999px;
+      background: var(--foreground);
+      color: var(--background);
+      font-family: var(--font-mono);
+      font-size: .8rem;
+      font-weight: 700;
+    }
+
+    /* 源码路径小标签 */
+    .uc-path {
+      display: inline-block;
+      padding: .38rem .7rem;
+      border-radius: .6rem;
+      background: color-mix(in srgb, var(--foreground) 5%, transparent);
+      font-family: var(--font-mono);
+      font-size: .74rem;
+      color: color-mix(in srgb, var(--foreground) 60%, transparent);
+      transition: background-color .3s, color .3s;
+    }
+    .uc-path:hover { background: color-mix(in srgb, var(--foreground) 9%, transparent); color: var(--foreground); }
+
+    /* 展示块之间的分隔：走留白，不画线 */
+    .uc-block + .uc-block { margin-top: 4.5rem; }
+    @media (min-width: 1024px) {
+      .uc-block + .uc-block { margin-top: 6rem; }
+    }
+    /* 锚点跳转时给固定导航留出余量 */
+    [data-uc-section] { scroll-margin-top: 7rem; }
+
+    /* ============================================================
+       左侧区块索引轨（固定）：竖向进度 + 当前区块高亮 + 点击跳转
+       ============================================================ */
+    .uc-rail {
+      position: fixed;
+      left: 2.25rem;
+      top: 50%;
+      z-index: 40;
+      transform: translateY(-50%);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .55s cubic-bezier(.22, 1, .36, 1);
+    }
+    .uc-rail.is-visible { opacity: 1; pointer-events: auto; }
+
+    .uc-rail ul {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    /* 轨道线 + 进度填充：线宽 1px 且居中于圆点（点 7px → 中心 3.5px）*/
+    .uc-rail__line {
+      position: absolute;
+      left: 3px;
+      top: .15rem;
+      bottom: .15rem;
+      width: 1px;
+      border-radius: 1px;
+      overflow: hidden;
+      background: color-mix(in srgb, var(--foreground) 12%, transparent);
+    }
+    .uc-rail__fill {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: color-mix(in srgb, var(--foreground) 42%, transparent);
+      transform: scaleY(0);
+      transform-origin: top;
+      will-change: transform;
+    }
+
+    .uc-rail__dot {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      text-decoration: none;
+    }
+    .uc-rail__dot::before {
+      content: "";
+      flex: none;
+      width: 7px;
+      height: 7px;
+      border-radius: 9999px;
+      background: var(--background);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 26%, transparent);
+      transition: background-color .35s ease, box-shadow .35s ease, transform .35s cubic-bezier(.22, 1, .36, 1);
+    }
+    .uc-rail__dot.is-active::before {
+      background: var(--foreground);
+      box-shadow: 0 0 0 1px var(--foreground);
+      transform: scale(1.3);
+    }
+    .uc-rail__label {
+      font-family: var(--font-mono);
+      font-size: .7rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      color: color-mix(in srgb, var(--foreground) 45%, transparent);
+      opacity: 0;
+      transform: translateX(-5px);
+      transition: opacity .35s ease, transform .35s cubic-bezier(.22, 1, .36, 1), color .35s ease;
+    }
+    .uc-rail:hover .uc-rail__label,
+    .uc-rail__dot.is-active .uc-rail__label,
+    .uc-rail__dot:focus-visible .uc-rail__label {
+      opacity: 1;
+      transform: none;
+    }
+    .uc-rail__dot.is-active .uc-rail__label { color: var(--foreground); }
+
+    /* ============================================================
+       手机框：活体机身（iframe 装真页面，非贴图）
+       几何与 React 版 Iphone 组件一致：
+         433×882 机身 / 屏幕 21.25,19.25 + 389.5×843.5 / 圆角 55.75
+       机身＝黑边框（#0A0A0A，即浅色主题的 --foreground）：浅色页面上要一眼
+       读成「一台手机」，机身就必须是深色 —— 一排浅灰机身浮在白底上，读出来
+       的只是「几个浅色方块」。两个主题共用同一台黑机身，只有高光描边跟着换：
+         浅色页面 → 黑机身高对比，高光边只做抛光细节；
+         深色页面 → 机身与页面同色，这道高光边就是唯一能勾出轮廓的线。
+       ============================================================ */
+    :root {
+      --uc-ip-body: #0A0A0A;
+      --uc-ip-island: #262626;
+      /* 镜头：比灵动岛亮一档，黑边框上才有那一点"摄像头" */
+      --uc-ip-lens: #404040;
+      /* 机身高光边：黑机身内侧一道浅色抛光边 */
+      --uc-ip-edge: color-mix(in srgb, #FFFFFF 30%, transparent);
+    }
+    html.dark {
+      /* 深色页面：高光边改用前景色的三成，机身轮廓才不会融进黑底 */
+      --uc-ip-edge: color-mix(in srgb, var(--foreground) 34%, transparent);
+    }
+
+    .uc-phones {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 3rem 2rem;
+      align-items: start;
+    }
+    @media (max-width: 1023px) {
+      .uc-phones { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 639px) {
+      .uc-phones { grid-template-columns: 1fr; gap: 3.5rem; }
+    }
+
+    /* 入场：整组进入视口时，三台机依次浮起 */
+    .uc-phone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      opacity: 0;
+      transform: translateY(44px) scale(.96);
+      filter: blur(8px);
+      transition:
+        opacity .95s cubic-bezier(.22, 1, .36, 1),
+        transform .95s cubic-bezier(.22, 1, .36, 1),
+        filter .95s cubic-bezier(.22, 1, .36, 1);
+      transition-delay: calc(var(--uc-i, 0) * 110ms);
+    }
+    .uc-phones.is-inview .uc-phone { opacity: 1; transform: none; filter: blur(0); }
+
+    .uc-phone__body {
+      position: relative;
+      width: 100%;
+      max-width: 268px;
+      aspect-ratio: 433 / 882;
+      perspective: 1400px;
+    }
+    .uc-phone__tilt {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      transform: rotateX(var(--uc-rx, 0deg)) rotateY(var(--uc-ry, 0deg)) translateY(var(--uc-ty, 0px));
+      filter: drop-shadow(0 10px 24px rgb(0 0 0 / 0.1));
+      transition: transform .7s cubic-bezier(.22, 1, .36, 1), filter .7s cubic-bezier(.22, 1, .36, 1);
+      will-change: transform;
+    }
+    /* 悬停：整机抬起 + 阴影加深；倾角由 JS 按指针位置给 */
+    .uc-phone__body:hover .uc-phone__tilt {
+      --uc-ty: -12px;
+      filter: drop-shadow(0 34px 58px rgb(0 0 0 / 0.26));
+    }
+
+    .uc-phone__screen {
+      position: absolute;
+      z-index: 0;
+      overflow: hidden;
+      left: 4.9076%;    /* 21.25 / 433 */
+      top: 2.1826%;     /* 19.25 / 882 */
+      width: 89.9538%;  /* 389.5 / 433 */
+      height: 95.6349%; /* 843.5 / 882 */
+      border-radius: 14.3132% / 6.6094%;
+      background: var(--background);
+    }
+    .uc-phone__screen iframe {
+      display: block;
+      width: 390px;
+      height: 844px;
+      border: 0;
+      transform-origin: top left;
+      /* scale() 由 JS 按屏幕区实际宽度算，严格等比，页面按设计视口排版 */
+    }
+    /* 玻璃反光：hover 时一道斜向高光扫过屏幕 */
+    .uc-phone__glare {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background: linear-gradient(105deg, transparent 36%, rgb(255 255 255 / 0.26) 48%, transparent 60%);
+      transform: translateX(-130%);
+    }
+    .uc-phone__body:hover .uc-phone__glare {
+      transform: translateX(130%);
+      transition: transform 1.15s cubic-bezier(.22, 1, .36, 1);
+    }
+
+    .uc-phone__frame { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; }
+    .uc-phone__frame .f-body { fill: var(--uc-ip-body); }
+    .uc-phone__frame .f-island { fill: var(--uc-ip-island); }
+    .uc-phone__frame .f-lens { fill: var(--uc-ip-lens); }
+
+    /* 机身高光边：套一个与机身同形同位的圆角矩形边框。
+       位置/圆角都按机身路径反推（外壳路径 x 从 2 到 430、四角半径 73）：
+         left/right = 2/433 = 0.4619%
+         border-radius 水平 = 73/428 = 17.06%，垂直 = 73/882 = 8.28%
+       边框画在 border-box 内侧，因此不会被裁切，四边粗细一致。
+       深色页面上机身与页面同色，这道边就是唯一的轮廓线。 */
+    .uc-phone__edge {
+      position: absolute;
+      z-index: 3;
+      left: 0.4619%;
+      right: 0.4619%;
+      top: 0;
+      bottom: 0;
+      border: 1.5px solid var(--uc-ip-edge);
+      border-radius: 17.06% / 8.28%;
+      pointer-events: none;
+    }
+
+    /* 说明文字：走站点令牌，深浅主题都跟着变
+       （原来烤在 PNG 里是固定浅色，深色主题下会突兀地亮一块）*/
+    .uc-phone__cap { margin-top: 1.75rem; text-align: center; max-width: 32ch; }
+    .uc-phone__idx {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.4rem;
+      height: 1.4rem;
+      border-radius: 9999px;
+      background: var(--foreground);
+      color: var(--background);
+      font-family: var(--font-mono);
+      font-size: .7rem;
+      font-weight: 700;
+      margin-right: .5rem;
+      vertical-align: 1px;
+      transition: transform .45s cubic-bezier(.22, 1, .36, 1);
+    }
+    .uc-phone:hover .uc-phone__idx { transform: scale(1.15); }
+    .uc-phone__cap h4 {
+      display: inline;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: -.01em;
+      color: var(--foreground);
+    }
+    .uc-phone__cap p {
+      margin-top: .45rem;
+      font-size: .8125rem;
+      line-height: 1.6;
+      color: color-mix(in srgb, var(--foreground) 60%, transparent);
+    }
+
+    /* 「查看整张 PNG」按钮 */
+    .uc-sheet {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      height: 2.25rem;
+      padding: 0 .95rem;
+      border-radius: 9999px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+      background: color-mix(in srgb, var(--foreground) 4%, transparent);
+      font-family: var(--font-mono);
+      font-size: .73rem;
+      letter-spacing: .04em;
+      color: color-mix(in srgb, var(--foreground) 70%, transparent);
+      cursor: pointer;
+      transition: background-color .3s ease, border-color .3s ease, color .3s ease, transform .3s cubic-bezier(.22, 1, .36, 1);
+    }
+    .uc-sheet:hover {
+      background: color-mix(in srgb, var(--foreground) 8%, transparent);
+      border-color: color-mix(in srgb, var(--foreground) 20%, transparent);
+      color: var(--foreground);
+      transform: translateY(-1px);
+    }
+    .uc-sheet svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ============================================================
+       图片放大浮层：浅色遮罩 + 白卡舞台 + 幽灵胶囊按钮
+       ============================================================ */
+    .uc-lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5rem 4.5rem;
+    }
+    .uc-lightbox__scrim {
+      position: absolute;
+      inset: 0;
+      background: color-mix(in srgb, var(--background) 74%, transparent);
+      -webkit-backdrop-filter: blur(18px) saturate(1.1);
+      backdrop-filter: blur(18px) saturate(1.1);
+      opacity: 0;
+      transition: opacity .34s ease;
+    }
+    .uc-lightbox.is-open .uc-lightbox__scrim { opacity: 1; }
+
+    .uc-lightbox__stage {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: .55rem;
+      margin: 0;
+      max-width: min(1180px, 100%);
+      padding: .5rem;
+      border-radius: 2rem;
+      background: var(--background);
+      border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+      box-shadow: 0 50px 110px -40px rgb(0 0 0 / 0.5);
+      opacity: 0;
+      transform: scale(.94) translateY(14px);
+      transition: opacity .34s ease, transform .48s cubic-bezier(.22, 1, .36, 1);
+    }
+    .uc-lightbox.is-open .uc-lightbox__stage { opacity: 1; transform: none; }
+    .uc-lightbox__img {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: calc(100vh - 13rem);
+      object-fit: contain;
+      border-radius: 1.6rem;
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 6%, transparent);
+    }
+    .uc-lightbox__cap {
+      padding: 0 .4rem .4rem;
+      font-family: var(--font-mono);
+      font-size: .74rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: color-mix(in srgb, var(--foreground) 55%, transparent);
+    }
+
+    .uc-lightbox__close,
+    .uc-lightbox__nav {
+      position: absolute;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.75rem;
+      height: 2.75rem;
+      border-radius: 9999px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+      background: color-mix(in srgb, var(--background) 86%, transparent);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+      color: var(--foreground);
+      cursor: pointer;
+      transition: background-color .3s ease, border-color .3s ease, transform .3s cubic-bezier(.22, 1, .36, 1);
+    }
+    .uc-lightbox__close svg,
+    .uc-lightbox__nav svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .uc-lightbox__close:hover,
+    .uc-lightbox__nav:hover { border-color: color-mix(in srgb, var(--foreground) 26%, transparent); }
+    .uc-lightbox__close { top: 2.25rem; right: 2.5rem; }
+    .uc-lightbox__close:hover { transform: rotate(90deg); }
+    .uc-lightbox__nav--prev { left: 2.5rem; top: 50%; margin-top: -1.375rem; }
+    .uc-lightbox__nav--next { right: 2.5rem; top: 50%; margin-top: -1.375rem; }
+    .uc-lightbox__nav--prev:hover { transform: translateX(-3px); }
+    .uc-lightbox__nav--next:hover { transform: translateX(3px); }
+
+    /* 浮层打开时锁住页面滚动 */
+    html.uc-locked { overflow: hidden; }
+
+    /* 窄视口：隐藏索引轨（会压住内容），浮层边距收紧 */
+    @media (max-width: 1180px) {
+      .uc-rail { display: none; }
+    }
+    @media (max-width: 900px) {
+      .uc-lightbox { padding: 4.5rem 1rem; }
+      .uc-lightbox__close { top: 1rem; right: 1rem; }
+      .uc-lightbox__nav { display: none; }
+    }
+
+    /* 减弱动效：只做显隐，不做位移/缩放/倾斜/反光 */
+    @media (prefers-reduced-motion: reduce) {
+      .uc-phone { transform: none; filter: none; }
+      .uc-phone__body:hover .uc-phone__tilt { --uc-ty: 0px; }
+      .uc-phone__glare { display: none; }
+      .uc-lightbox__stage { transform: none; }
+      .uc-lightbox__close:hover { transform: none; }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-background font-sans text-foreground antialiased">
+  <div class="site-frame site-frame--top" aria-hidden="true"></div>
+  <div class="site-frame site-frame--left" aria-hidden="true"></div>
+  <div class="site-frame site-frame--right" aria-hidden="true"></div>
+  <svg class="site-corner site-corner--top-left" width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M5.50871e-06 0C-0.00788227 37.3001 8.99616 50.0116 50 50H5.50871e-06V0Z" fill="currentColor"/>
+  </svg>
+  <svg class="site-corner site-corner--top-right" width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M5.50871e-06 0C-0.00788227 37.3001 8.99616 50.0116 50 50H5.50871e-06V0Z" fill="currentColor"/>
+  </svg>
+  <a href="#main-content" class="skip-to-content">Skip to main content</a>
+
+  <div class="nav-reveal-zone" data-nav-reveal-zone aria-hidden="true"></div>
+  <nav aria-label="Primary" class="site-nav fixed left-1/2 top-6 z-50 -translate-x-1/2">
+    <div class="site-nav__bar flex items-center gap-1 rounded-full bg-background p-1.5 shadow-sm border border-foreground/8">
+      <ul class="site-nav__list relative flex items-center gap-1" data-nav-list>
+        <span aria-hidden="true" class="nav-pill" data-nav-pill hidden></span>
+        <li class="relative">
+          <a href="index.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Home</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="practice.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Practice</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="sing.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Sing</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="recommend.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Recommend</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="stats.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Stats</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="community.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Community</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="about.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">About</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="showcase.html" aria-current="page" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground">Showcase</span>
+          </a>
+        </li>
+      </ul>
+      <button type="button" data-theme-toggle aria-label="Toggle theme" aria-pressed="false"
+        class="focus-ring relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-background ring-1 ring-foreground/8 transition-colors">
+        <span aria-hidden="true" class="relative h-4 w-4">
+          <svg class="theme-icon sun-icon absolute inset-0 h-4 w-4 text-foreground -rotate-90 scale-0 opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+          </svg>
+          <svg class="theme-icon moon-icon absolute inset-0 h-4 w-4 text-foreground rotate-90 scale-0 opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+          </svg>
+        </span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- 区块索引轨：滚动进度 + 当前区块高亮，点击跳转（Lenis 平滑滚动由 js/main.js 接管）-->
+  <nav class="uc-rail" data-uc-rail aria-label="Showcase sections">
+    <ul>
+      <span class="uc-rail__line" aria-hidden="true"><span class="uc-rail__fill" data-uc-fill></span></span>
+      <li><a class="uc-rail__dot" href="#uc-1" data-uc-dot="uc-1"><span class="uc-rail__label">App</span></a></li>
+      <li><a class="uc-rail__dot" href="#uc-2" data-uc-dot="uc-2"><span class="uc-rail__label">Controls</span></a></li>
+      <li><a class="uc-rail__dot" href="#uc-3" data-uc-dot="uc-3"><span class="uc-rail__label">Overlays</span></a></li>
+    </ul>
+  </nav>
+
+  <main id="main-content" class="flex flex-1 flex-col">
+
+    <!-- 页头 -->
+    <section class="mx-auto w-full max-w-312 px-6 pt-40 sm:px-10 sm:pt-56">
+      <div class="fade-in">
+        <span class="uc-eyebrow">Design system · Phone-frame showcase</span>
+        <div class="uc-titlewrap fade-in mt-5">
+          <h1 class="uc-title font-serif text-[2.5rem] font-medium leading-[1.05] tracking-tight text-foreground sm:text-[3.5rem] lg:text-[3.75rem]">
+            Showcase
+          </h1>
+        </div>
+      </div>
+      <p class="fade-in mt-6 max-w-[62ch] text-[17px] leading-[1.7] tracking-tight text-foreground/65" style="transition-delay: .1s">
+        Every screen of VocalVerse, presented inside a device frame. The frame geometry is fixed —
+        433×882 body, 389.5×843.5 screen area, 55.75 corner radius — and the screens inside are live
+        pages rendered at 390×844, not flattened mock-ups.
+      </p>
+      <div class="fade-in mt-8 flex flex-wrap items-center gap-2.5" style="transition-delay: .18s">
+        <span class="uc-chip">Output <b>2998×2178</b> (2x)</span>
+        <span class="uc-chip"><b>3</b> sets · <b>9</b> devices</span>
+        <span class="uc-chip">Tokens <b>design-tokens.md</b></span>
+      </div>
+    </section>
+
+    <!-- 展示块 -->
+    <section class="mx-auto w-full max-w-312 px-6 pt-20 pb-24 sm:px-10 sm:pt-28 sm:pb-32">
+
+      <article class="uc-block" id="uc-1" data-uc-section>
+        <header class="fade-in flex items-start gap-3.5">
+          <span class="uc-idx">1</span>
+          <div>
+            <h2 class="font-serif text-[1.75rem] font-medium leading-[1.15] tracking-tight text-foreground sm:text-[2rem]">
+              App · three core screens
+            </h2>
+            <p class="mt-3 max-w-[70ch] text-[15px] leading-[1.75] tracking-tight text-foreground/65">
+              Today's home (floating tab bar · streak badge · stat card · full-width segmented control ·
+              dotted-timeline task cards), scene conversation (chat bubbles · language-point chips ·
+              record button), and the singing report (deep-purple score card · four-dimension stat row ·
+              line-by-line scoring).
+            </p>
+          </div>
+        </header>
+        <div class="uc-phones mt-12" data-uc-phones data-group="uc-1" aria-label="App screens shown in device frames"></div>
+        <div class="fade-in mt-8 flex flex-wrap items-center gap-2.5">
+          <button type="button" class="uc-sheet focus-ring" data-uc-zoom data-uc-src="assets/app-screens-iphone.png" data-uc-caption="01 · App · three core screens">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M15 21h6v-6M9 21H3v-6"/></svg>
+            View full sheet
+          </button>
+          <span class="uc-path">assets/app-screens-iphone.png</span>
+          <span class="uc-path">assets/app-screens/home.html</span>
+          <span class="uc-path">assets/app-screens/speaking.html</span>
+          <span class="uc-path">assets/app-screens/report.html</span>
+        </div>
+      </article>
+
+      <article class="uc-block" id="uc-2" data-uc-section>
+        <header class="fade-in flex items-start gap-3.5">
+          <span class="uc-idx">2</span>
+          <div>
+            <h2 class="font-serif text-[1.75rem] font-medium leading-[1.15] tracking-tight text-foreground sm:text-[2rem]">
+              Forms &amp; controls
+            </h2>
+            <p class="mt-3 max-w-[70ch] text-[15px] leading-[1.75] tracking-tight text-foreground/65">
+              Pill inputs across four states (default · filled · focused · disabled), the full button
+              matrix (hover · pressed · disabled · loading · focus, plus secondary on paper and on card,
+              ghost on dark, and the danger variant), and the segmented control with icon buttons —
+              56px tall, 16px label, 24px icon, tooltip on every icon-only button.
+            </p>
+          </div>
+        </header>
+        <div class="uc-phones mt-12" data-uc-phones data-group="uc-2" aria-label="Form controls shown in device frames"></div>
+        <div class="fade-in mt-8 flex flex-wrap items-center gap-2.5">
+          <button type="button" class="uc-sheet focus-ring" data-uc-zoom data-uc-src="assets/feature-forms-controls.png" data-uc-caption="02 · Forms &amp; controls">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M15 21h6v-6M9 21H3v-6"/></svg>
+            View full sheet
+          </button>
+          <span class="uc-path">assets/feature-forms-controls.png</span>
+          <span class="uc-path">assets/feature-screens/s1-inputs.html</span>
+          <span class="uc-path">assets/feature-screens/s2-buttons.html</span>
+          <span class="uc-path">assets/feature-screens/s3-controls.html</span>
+        </div>
+      </article>
+
+      <article class="uc-block" id="uc-3" data-uc-section>
+        <header class="fade-in flex items-start gap-3.5">
+          <span class="uc-idx">3</span>
+          <div>
+            <h2 class="font-serif text-[1.75rem] font-medium leading-[1.15] tracking-tight text-foreground sm:text-[2rem]">
+              Overlays &amp; states
+            </h2>
+            <p class="mt-3 max-w-[70ch] text-[15px] leading-[1.75] tracking-tight text-foreground/65">
+              Image cards with hover-revealed actions, the near-black lightbox that dims everything behind
+              it, and a three-layer composition — empty state underneath, light scrim in the middle, white
+              r-24 dialog on top, with the toast floating above all of it. Click any sheet to open the same
+              pattern full-size.
+            </p>
+          </div>
+        </header>
+        <div class="uc-phones mt-12" data-uc-phones data-group="uc-3" aria-label="Overlays and states shown in device frames"></div>
+        <div class="fade-in mt-8 flex flex-wrap items-center gap-2.5">
+          <button type="button" class="uc-sheet focus-ring" data-uc-zoom data-uc-src="assets/feature-overlays-states.png" data-uc-caption="03 · Overlays &amp; states">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M15 21h6v-6M9 21H3v-6"/></svg>
+            View full sheet
+          </button>
+          <span class="uc-path">assets/feature-overlays-states.png</span>
+          <span class="uc-path">assets/feature-screens/s4-imagecard.html</span>
+          <span class="uc-path">assets/feature-screens/s5-lightbox.html</span>
+          <span class="uc-path">assets/feature-screens/s6-dialog.html</span>
+        </div>
+      </article>
+
+    </section>
+
+    <!-- 页脚说明 -->
+    <section class="mx-auto w-full max-w-312 px-6 pb-24 sm:px-10">
+      <div class="fade-in rounded-4xl border border-foreground/8 bg-background p-1.5 shadow-sm">
+        <div class="rounded-[1.6rem] p-7 sm:p-9">
+          <span class="uc-eyebrow">Files &amp; sources</span>
+          <div class="mt-6 grid gap-7 sm:grid-cols-2">
+            <div>
+              <h3 class="text-[15px] font-semibold tracking-tight text-foreground">Rendered sheets</h3>
+              <p class="mt-2 text-[14px] leading-[1.7] tracking-tight text-foreground/65">
+                The three PNGs above live in <code>assets/</code>. Drop them into the design-system
+                repository's <code>assets/</code> folder and the README's absolute image URLs resolve.
+              </p>
+            </div>
+            <div>
+              <h3 class="text-[15px] font-semibold tracking-tight text-foreground">Per-screen sources</h3>
+              <p class="mt-2 text-[14px] leading-[1.7] tracking-tight text-foreground/65">
+                <code>assets/feature-screens/</code> holds six single-file 390×844 pages plus the
+                generator that composes the three-up sheets. Open any of them directly in a browser.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="h-12 sm:h-16"></div>
+  </main>
+
+  <script src="js/vendor/lenis.min.js"></script>
+  <script src="js/theme.js" defer></script>
+  <script src="js/gooey-nav.js" defer></script>
+  <script src="js/nav.js" defer></script>
+  <script src="js/animations.js" defer></script>
+  <script src="js/nav-reveal.js" defer></script>
+  <script src="js/main.js" defer></script>
+  <script src="js/footer.js" defer></script>
+  <script src="js/showcase-interactions.js" defer></script>
+  <script type="module" src="js/aero-shards-init.js"></script>
+</body>
+</html>

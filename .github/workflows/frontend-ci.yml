@@ -5,6 +5,20 @@ on:
     paths:
       - "apps/web/**"
       - ".github/workflows/frontend-ci.yml"
+  # 手动补跑（2026-09-07 评审处置）与 push(main) 兜底（2026-09-10 补）。
+  # **论断更正（2026-09-14 · PR#34 评审 Q1）**：旧注释写的"本仓 pull_request 触发当前未生效 /
+  # PR 分支推送 0 run"已被 PR#34 实证**证伪**——该 PR 的 4 个 check 全部由 `pull_request` 事件
+  # 在 PR head（314ad7d）上真实跑过（frontend 34544126394 / java 34544126422 /
+  # python 34544126416 / secret-scan 34544126454）。更可能的解释是：2026-09-07 之后那段时间
+  # 没有触及本 workflow `paths` 的 PR。
+  # 保留 push(main) 的理由改为**纵深防御**（同一份代码在 PR 与合入 main 后各验一次；冗余但可接受），
+  # 不再是"PR 触发不可靠"——后人不要据此以为 PR 触发是坏的。
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - ".github/workflows/frontend-ci.yml"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -47,6 +61,10 @@ jobs:
         run: pnpm lint
 
       - name: Typecheck
+        # 2026-09-10 修正（唱歌模块审计 E-1）：`package.json` 的 typecheck 曾是
+        # `vue-tsc --noEmit`（根 tsconfig 为 solution 配置 files:[]+references）→ **0 文件被检查**、
+        # 恒绿；已改为 `-p tsconfig.app.json && -p tsconfig.node.json`。
+        # 本步因此首次成为**真实**类型门禁：若它突然红，先查是否是历史类型错被暴露（不要改回空操作）。
         run: pnpm typecheck
 
       - name: Test
@@ -54,3 +72,6 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: "Bundle 门禁（fe-09：preview 树零体积 / p5 不进入口块 / echarts 零残留）"
+        run: node scripts/check-bundle.mjs

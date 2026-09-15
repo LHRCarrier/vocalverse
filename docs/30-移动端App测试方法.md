@@ -1,0 +1,175 @@
+# 30 · 移动端 App 测试方法（VocalVerse 手机壳）
+
+> 对象：`apps/mobile`（Capacitor 8 远程 URL 型壳，2026-09-04 交付）+ `apps/web` 移动端真形态页面（`/m/home` `/m/chat/:sceneId` `/m/free-chat` `/m/report`）。
+> 依据：docs/06 §6 测试策略、docs/27 §8 真机实测表、docs/singing/22-轴线E Q6 八约束、AGENTS.md（门禁/联调页/红线）。
+> 核心思想（与 docs/29 §4.2 MobileGym 调研一致）：**功能测试尽量读结构化状态断言（URL/接口响应/DOM 数据），避免截图目测**；视觉验收用「原型基线并排比对」。
+
+---
+
+## 1. 测试分层总览
+
+| 层 | 测什么 | 谁执行/自动化度 | 入口 |
+|---|---|---|---|
+| L0 静态与单测 | lint/typecheck/vitest、Python/Java CI | 全自动（PR 门禁） | `apps/web` 四连绿等 |
+| L1 Web 功能联调 | 登录/首页/对话/报告（Web = App 内容真源） | 全自动可 + 手工 | 浏览器 / Playwright 冒烟 |
+| L2 壳专项 | APK 构建、配置烘焙、安装、清网访问、权限 | 半自动（脚本 + 手工） | gradlew / adb |
+| L3 真机/模拟器 | 八约束、蓝牙麦、录音链路、手感 | 手工（必须真人过） | docs/27 §8 实测表 |
+| L4 体验与兼容 | 机型/内核矩阵、弱网、横竖屏、字体 | 手工 | 本表 §6 |
+| L5 商店预检 | 名称/图标/权限文案/隐私/合规 | 手工 + 文档 | §7 |
+
+**优先级原则**：App 是壳、内容是 Web → **L1 通过覆盖了功能正确性的 ~90%**；L2/L3 只盯「WebView 环境差异」；任何版本变更先跑 L0/L1，再 L2/L3。
+
+---
+
+## 2. 测试环境准备（手机形态 = 打包进壳，2026-09-10 起）
+
+> 2026-09-10 起手机壳改为**打包形态**（方案 B，详见 `apps/mobile/README.md`）：页面由 Capacitor 以
+> **`https://localhost`** 提供（安全上下文 → 录音 getUserMedia 可用，无需装 CA），
+> API 用**构建期基址**打进包（`VITE_PYTHON_BASE`/`VITE_JAVA_BASE`），经后端 CORS + 混合内容放行直连本机。
+
+```powershell
+# ① 后端（dev 栈：postgres/redis 容器 + python:8000 + java:8080 本地；python 绑 0.0.0.0 供手机可达）
+pwsh -File scripts/dev-up.ps1 start        # status / stop 同款
+# ② 防火墙放行手机（端口级；需管理员 PowerShell，幂等）
+pwsh -File scripts/firewall-phone.ps1
+# ③ 重打手机包（每次改完 web 执行；IP 变了也必须重建——API 基址构建期写死）
+pwsh -File scripts/build-phone.ps1                  # 局域网直连（默认 IP 192.168.0.104）
+pwsh -File scripts/build-phone.ps1 -Ip localhost    # adb 隧道（手机被客户端隔离时，见下）
+# ④ 装包
+adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+演示账号：`demoadult` / `demoteen` / `demosenior`，密码 `demo123456`（M2 seed）。
+
+> ⚠️ **手机「Failed to fetch」排查顺序（2026-09-10 三连坑沉淀）**：
+> ① 先看后端有没有手机 IP——`services/java/logs/access_log.*.log`（java，已开 Tomcat accesslog）+
+> `local/dev-logs/python-8000.out.log`（python）：
+> - **没有** = 网络/防火墙：先 `firewall-phone.ps1`；再查本机 IP 是否变了（变了 `build-phone.ps1 -Ip 新IP`）；
+>   手机→网关通、手机→本机不通、本机→手机通 = 路由器/热点**客户端隔离** → `adb reverse` 隧道绕行：
+>   `adb reverse tcp:8080 tcp:8080; adb reverse tcp:8000 tcp:8000` + `build-phone.ps1 -Ip localhost`；
+> - **有但 405/拦** = CORS（后端已配；改白名单源再重启）；
+> - **有且 401 / 「bad credentials」** = 账号密码/参数（如账号 demoadult、密码 demo123456）。
+> ② 手机 WebView 网络诊断：`adb forward tcp:9223 localabstract:webview_devtools_remote_<pid>` →
+> 桌面 Chrome `chrome://inspect`（或 CDP），看 Network 失败原因（比 logcat 可靠：App 捕获错误不打 console）。
+> ③ 后端日志文件：python `local/dev-logs/python-8000*.log`；java `services/java/logs/access_log.*.log`。
+> ④ 排查脚本：`scripts/phone-reconnect.ps1`（无线调试端口轮换/`offline` 残留/息屏打盹三坑一键重连 + 补 `adb reverse` + 隧道自检；**端口会随息屏/重开变化，别手抄旧端口**）。
+
+> ⚠️ **「手机上看不到最新改动 / 还是演示数据」排查顺序（2026-09-10 实测返工沉淀）**：
+> **第一原则：方案 B 打包壳内嵌的是「打包那一刻的 web 产物快照」**（`apps/mobile/android/app/src/main/assets/public/`），
+> dev server 的 HMR **对壳内 bundle 完全无效**——改完 `apps/web` 必须重建 + 重装，否则手机上永远是旧界面。
+>
+> 1. **现象判定**：界面内容/文案与源码不符（如私信 tab 仍显示 `data/messages-demo` 的 Kai/Momo/Teacher Lee/BBC —— 该文件已随私信真实化删除）。
+> 2. **先验 bundle 而不是猜代码**（10 秒定位）：
+>    ```powershell
+>    $b = "apps/mobile/android/app/src/main/assets/public"
+>    Get-ChildItem "$b/assets" -Filter "*.js" | Select-Object Name, LastWriteTime   # 时间戳=上次打包时刻
+>    Select-String -Path "$b/assets/*.js" -Pattern "Kai|messages-demo" -List        # 命中=旧包含已删演示数据
+>    Select-String -Path "$b/assets/index-*.js" -Pattern "<本机局域网IP>" -List      # 确认壳内 API 基址
+>    ```
+>    **有命中 = 旧包，不是代码问题**，直接重建（第 3 步）；**无命中仍不符** = WebView 缓存 → `adb shell am force-stop com.vocalverse.app` 重开，仍不行再 `gradlew clean` 重建。
+> 3. **重建 + 重装**：`pwsh -File scripts/build-phone.ps1 -Ip <本机当前局域网IP>` → `adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`。
+> 4. **换网络/换环境必带 `-Ip`**：脚本默认 `192.168.0.104` 是历史网络；本机 IP 变了（`Get-NetIPAddress -AddressFamily IPv4` 看 WLAN 那条）而没带 `-Ip`，
+>    壳内 API 基址会指向**不可达旧地址**——现象是「接口全失败，且后端 access log 看不到任何请求」（与①「没有请求」同族，但根因在 APK 不在网络）。
+> 5. **顺手核对链路的完整性**：`scripts/dev-up.ps1 status`（三端 True）→ 防火墙含 `VocalVerse port 8000/8080` → `adb devices` 有设备（无则 `phone-reconnect.ps1`）→ App 起来后后端 access log 出现手机请求。
+>
+> 推论（写进日常习惯）：**任何 `apps/web` 改动要上手机验证，都必须「重建壳 + 重装」两步**，不是刷新页面；反之若只想快速看交互，走 §4 桌面浏览器（`http://<IP>:5173/m/...` 或 8088 容器）。
+
+---
+
+## 3. L0 · 自动化门禁（每次改代码后必跑）
+
+```powershell
+# 前端（apps/web）
+pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
+# Python / Java（未触及则跳过；触及按 CI 同款）
+# services/python: uv run ruff check . && uv run ruff format --check . && uv run pytest -q
+# services/java:  mvnw -B verify
+# 契约：改后端契约须 pnpm gen:api 后 git diff 为空（快照零 diff）
+```
+
+全绿后才允许进入 L1 手工/半自动。
+
+## 4. L1 · Web 功能联调（浏览器即 App 内容）
+
+> 桌面浏览器打开 `http://<局域网IP>:8088/m/home`（480px 居中容器模拟手机宽度）；或 DevTools 设备模式切 390×844。
+
+| # | 用例 | 步骤 | 期望 |
+|---|---|---|---|
+| W1 | 登录 | `/login` → demoadult/demo123456 → 登 | 进入 `/m/home`（社区主页），问候含「成年中级」 |
+| W2 | 社区主页（2026-09-05 组长拍板换版） | `/m/home` | 顶部「社区」+ 问候；「今日练习」CTA → `/m/chat`；下方打卡动态流（演示帧 5 条：类型/标题/分数/徽章/点赞）；底部 Tab 栏为 uic 新样式 |
+| W3 | 对话开场（2026-09-05 改开始流程） | `/m/chat` | 先出现「先选一个场景开始」空态（不自动开题）；选场景 → AI 开场气泡（不自动播）+ 底部**播放钮** → 点播放 → 播开场白 → 按钮变录音钮；8s 无录音出现救援提示卡 |
+| W4 | 录音太短 | 点录 <1s 即停 | 提示「录音太短（x.x s）」，**不推进回合** |
+| W5 | 完整回合 | 录 ~3s 停止 | SSE：字幕流 + 音频队列播放 + 覆盖度 +2 chips；回合数 +1 |
+| W6 | 收尾 | 打满 N 轮（或超时收尾） | session_end → 跳 `/m/report?reportId=…`，真实报告渲染（coverage/建议） |
+| W7 | 报告演示帧 | `/m/report`（无 reportId） | 深紫卡 92.4 + 四维 93/91/88/100% + 逐句 95/88/81，与 `app-report.png` 一致 |
+| W8 | token 过期 | 停留 15min 后操作 | 静默 refresh 或回登录页；不出现裸 401 页 |
+| W9 | 服务不可达 | `docker compose stop web python-api` | 页面给可操作错误提示（ApiError 文案），不白屏 |
+| W10 | PWA | 手机 Chrome 菜单「添加到主屏幕」 | 图标/名称正确，standalone 全屏 |
+| W11 | 口语入口（2026-09-05 晚改版） | Tab 口语 / 中央 + → `/m/chat` | 直达场景对话（默认场景开场白）；底栏功能行「自由对话」「场景选择」可点 |
+| W12 | 自由对话（2026-09-05） | `/m/free-chat` | 打字「Hi」→ 流式回复 + TTS 播报 + 喇叭可重听；点麦克风说话 → 用户转写气泡 → 回复；底部功能行：场景对话（切 `/m/chat`）/场景选择（弹层选场景 → 直达 `/m/chat/:id`） |
+
+**结构化断言辅助**（推荐）：F12 Console 执行
+`document.querySelectorAll('.u-task').length` / `document.body.innerText` 核对渲染，替代目测。
+
+## 5. L2 · 壳专项（半自动）
+
+| # | 用例 | 步骤 | 期望 |
+|---|---|---|---|
+| A1 | APK 构建 | `pwsh -File scripts/build-phone.ps1` | BUILD SUCCESSFUL；产物 ≈4.6MB（含 web 产物） |
+| A2 | 配置烘焙 | `Get-Content apps/mobile/android/app/src/main/assets/capacitor.config.json` | `webDir=../web/dist` + `androidScheme=https` + `allowMixedContent=true`（打包壳**无** `server.url`） |
+| A3 | 安装启动 | `adb install -r …/*.apk; am start -n com.vocalverse.app/.MainActivity` | WebView 加载首页（`https://localhost`），无 `ERR_*` |
+| A4 | 明文化/混合内容 | 打包壳页面 `https://localhost` 调 `http://<IP>:8000` | 能加载（`allowMixedContent` + `network_security_config` cleartext 生效；生产应改 HTTPS 同源） |
+| A5 | 权限 | 首次点录音 | 弹麦克风授权；拒绝后中文引导（八约束 #6） |
+| A6 | 卸载重装 | `adb uninstall` + 重装 | 正常；旧会话/缓存清理 |
+| A7 | 版本更新 | `pwsh -File scripts/build-phone.ps1`（IP 变了 `-Ip 新IP`；隔离走 `-Ip localhost`+adb reverse） | 新配置生效（API 基址构建期写死，换网必须重建，否则 App 打旧地址） |
+| A8 | **改完 web 是否真的上机**（2026-09-10 新增） | ① 重建 + `adb install -r`；② 核验壳内 bundle：`Select-String -Path "apps/mobile/android/app/src/main/assets/public/assets/*.js" -Pattern "<刚删除的演示文件名/旧文案>" -List` | **零命中**（旧资产/旧文案已被新构建覆盖）；命中即「看的是旧包」，回 §2 排查顺序第 2~3 步 |
+| A9 | 缓存兜底 | `adb shell am force-stop com.vocalverse.app` 后重开（必要时 `gradlew clean` 重建） | 界面与当前源码一致；不再出现已删除的演示数据 |
+
+## 6. L3/L4 · 真机与体验（手工 · 按 docs/27 §8 实测表）
+
+| # | 项 | 设备 | 通过标准 |
+|---|---|---|---|
+| B1 | 手势内开麦 | iOS+And | 点击录音同步 start；无「权限不弹/失败」 |
+| B2 | HTTPS/安全上下文 | iOS+And | 生产 HTTPS；明文仅演示环境（已标注） |
+| B3 | AudioContext resume | iOS | 拿到流即 resume，无静音流 |
+| B4 | 增益不可调 | iOS | 「请靠近麦克风」提示存在；不做增益 UI |
+| B5 | 切后台/锁屏断录音 | iOS+And | 已采 chunks 保存 +「已截断」提示（当前实现走向：不静默丢） |
+| B6 | 权限拒绝引导 | And（国产 ROM 从严） | 中文引导 + 设置入口指引 |
+| B7 | 自动播放受限 | iOS（静音键/专注模式） | 手势后 play；NotAllowed 有兜底 |
+| B8 | 安装入口 | And（Chrome）/ iOS | 安卓：安装弹窗；iOS：「添加到主屏幕」引导文案 |
+| **B9** | **蓝牙耳麦录音**（专项） | iOS+And 各 ≥1 | 跟读/对话录到音频且评分链路可用；不达标 → 走 docs/27 §11 回退（有线/就近），记录型号 |
+| B10 | 长录音/连续会话 | 中端机 | 无内存崩溃；上传播放正常 |
+| B11 | 内存/热重启 | 反复进出 30 次 | 无泄漏崩溃（结合 `adb shell dumpsys meminfo` 抽查） |
+| B12 | 内核版本矩阵 | 华为/小米/OPPO/vivo 各 ≥1、iOS ≥2 台 | 关键路径（W1-W6）全过；差异记录到实测表 |
+
+## 7. L5 · 商店预检（Android 首发）
+
+- [ ] 应用名/图标：`com.vocalverse.app`，图标「V」；名称说明与壳一致
+- [ ] 权限声明：RECORD_AUDIO（麦克风，口语练习用）；POST_NOTIFICATIONS 后续推送时补
+- [ ] 隐私政策/使用条款：Terms Feed 生成 + Notion 自有 URL（docs/27 §9 清单）
+- [ ] 未成年人口径 + AI 生成内容备案评估（docs/27 §9 清单）
+- [ ] 测试账号说明留给体验审核；不采集真实用户数据（docs/06 §9.7）
+- [ ] **纯套壳风险**：Google Play 4.2 / iOS 4.2 最低功能 —— 优先国内安卓渠道；原生价值点（推送/崩溃上报）为 P1 攻坚项（docs/27 §11）
+
+## 8. 回归与交付判定（DoD）
+
+| 检查 | 命令/动作 | 通过条件 |
+|---|---|---|
+| 门禁 | §3 全量 | 全绿；契约快照零 diff |
+| 关键路径 | W1-W6（真机或模拟器） | 100% 通过 |
+| 八约束 | §6 B1-B12 | 全打点 + 豁免项注明理由（真实证据、不假绿） |
+| 视觉基线 | 三页截图 vs 原型 PNG 并排 | 逐项一致；差异记录 |
+| 工作记录 | worklog/安卓开发日志.md 置顶 + 署名 | 有记录（执行人：组长） |
+| 回退 | 壳整体删除或 Web 回退 | 删除清单（apps/mobile/README.md）可执行 |
+
+## 9. 已知缺口（登记，勿当作通过）
+
+1. **麦克风→评分闭环**：模拟器 `-no-audio` 无法测；**必须真机** B9 专项；
+2. Release 签名包未做（目前仅 debug）；
+3. iOS 平台未构建（无 Mac）；iOS 约束（B1-B8）暂以 WebView=WKWebView 视角手工推理 + 真机补测；
+4. E2E 自动化（Playwright/CDP 冒烟脚本）为 P2 沉淀项，当前零散脚本在 `local/cdp-*.mjs`；
+5. 统计/打卡/分数为原型演示帧，功能数据 M3 接入后按「值替换、视觉不动」原则做，并回归 W2/W7。
+
+---
+
+*文档依据：docs/27 §8 实测表、docs/29 §4.2（确定性断言理念）、docs/22 轴线E Q6；执行人：组长。*

@@ -31,6 +31,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # 模型预下载（docs/06 §8 / 审计 R-11：镜像内置 whisper-small，容器运行期零联网；
+      # HF_HUB_DISABLE_XET=1 规避 xet 401，POC 备注；GHA 网络可直连 HF）
+      - name: Fetch whisper model (pre-download into build context)
+        if: matrix.image == 'vocalverse-python-api'
+        run: |
+          python3 -m pip install --quiet "huggingface_hub>=0.23"
+          HF_HUB_DISABLE_XET=1 python3 - <<'EOF'
+          from huggingface_hub import snapshot_download
+          import os
+          dest = "services/python/.models-cache/huggingface"
+          os.makedirs(dest, exist_ok=True)
+          snapshot_download("Systran/faster-whisper-small", local_dir=dest)
+          print("model cached into", dest)
+          EOF
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:

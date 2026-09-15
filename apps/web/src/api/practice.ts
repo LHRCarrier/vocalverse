@@ -25,6 +25,37 @@ export interface SessionCreated {
   assigned_turns?: number | null
 }
 
+/** R-13 会话恢复：断线/刷新后据此重建对话 UI 与轮次（服务端权威） */
+export interface RestoredMessage {
+  seq: number
+  role: 'system' | 'user' | 'assistant'
+  content: string
+  audio_url?: string | null
+  origin?: string | null
+  action?: string | null
+  /** B4 词级时间轴：用户消息 meta 持久化的 ASR 词时间戳（点播自己录音/听读对轴） */
+  words?: Array<{ word: string; start: number; end: number; [key: string]: unknown }> | null
+  created_at?: string | null
+}
+
+export interface SessionRestore {
+  id: number
+  kind: string
+  status: 'active' | 'completed' | 'abandoned'
+  assigned_turns?: number | null
+  state: string
+  current_turn: number
+  next_seq: number
+  next_expected_turn: number
+  report_id?: number | null
+  messages: RestoredMessage[]
+}
+
+export async function fetchSessionRestore(sessionId: number): Promise<SessionRestore> {
+  const resp = await request<SessionRestore>(`/api/v1/sessions/${sessionId}`)
+  return resp.data
+}
+
 export interface ReportPayload {
   id: number
   computed_at?: string
@@ -49,6 +80,27 @@ export interface DefenseProfileView {
 export async function fetchScenarios(): Promise<ScenarioItem[]> {
   const resp = await request<ScenarioItem[]>('/api/v1/scenarios')
   return resp.data
+}
+
+/** 自由对话消息（客户端携带的滚动历史，MVP 无状态，docs/14 §12） */
+export interface FreeChatMsg {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+/** 自由对话回合：multipart（audio / text / history JSON）→ SSE 子集事件（docs/14 §12） */
+export function streamFreeChat(
+  form: FormData,
+  onEvent: (e: SseStreamEvent) => void,
+  onError: (err: unknown) => void,
+  signal?: AbortSignal,
+): void {
+  openSseFetch(
+    '/api/v1/free-chat/turn',
+    { method: 'POST', body: form, headers: authHeaders() },
+    { onEvent, onError, onClose: () => undefined },
+    signal,
+  )
 }
 
 export async function createSession(payload: {
@@ -100,10 +152,11 @@ export async function createDefenseProfile(payload: Record<string, unknown>) {
   return resp.data
 }
 
-export async function tts(text: string): Promise<Blob> {
+export async function tts(text: string, rate = '+0%'): Promise<Blob> {
   const form = new FormData()
   form.append('text', text)
   form.append('voice', 'en-US-JennyNeural')
+  form.append('rate', rate)
   const resp = await request<{ audio_bytes: string; length: number }>('/api/v1/tts', {
     method: 'POST',
     body: form,

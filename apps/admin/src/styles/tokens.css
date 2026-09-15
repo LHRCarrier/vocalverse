@@ -1,0 +1,99 @@
+/**
+ * 三层 token 的 CSS 变量层（docs/50 §11.2）。
+ * primitive `--vv-*` 从产品 `u-*` 继承；semantic `--c-*` 是界面唯一允许引用的一层。
+ */
+
+:root {
+  /* ── 1 · primitive（继承产品纸墨；禁止在组件里直接用） ───────────────── */
+  --vv-ink: #1c1c1a;
+  --vv-ink-hover: #333330;
+  --vv-sub: #6a6963;
+  /* ⚠️ 对比度修正（2026-09-10 · UI 拷问 P1-4 实测）：
+     原值 #6f6f6a / #a6a6a0 在纸底 #f5f4f1 上分别为 4.09 / 2.45，**不达 WCAG AA 正文 4.5:1**。
+     #6a6963 = 4.79（达标）；#a6a6a0 保留为**仅用于纯装饰**的极弱层级（如分隔线旁注），
+     任何"用户需要读到"的文字一律不得用它。 */
+  --vv-weak: #a6a6a0;
+  --vv-paper: #f5f4f1;
+  --vv-paper-grid: #eae8e3;
+  --vv-card: #ffffff;
+  --vv-track: #eceae5;
+  --vv-track-hover: #e2e0da;
+  --vv-accent: #2f6bff;
+  --vv-accent-soft: #e8edff;
+  --vv-success: #16a34a;
+  --vv-success-soft: #dcfce7;
+  --vv-warn: #b45309;
+  --vv-warn-soft: #fff4d6;
+  --vv-error: #dc2626;
+  --vv-error-soft: #fee2e2;
+  --vv-r-card: 16px;
+  --vv-r-ctl: 8px;
+  --vv-r-pill: 999px;
+  --vv-shadow-1: 0 2px 8px rgba(28, 28, 26, 0.08);
+  --vv-shadow-2: 0 8px 24px rgba(28, 28, 26, 0.06);
+  --vv-font: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+  --vv-font-mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, 'Courier New', monospace;
+  --vv-t-press: 60ms;
+  --vv-t-micro: 150ms;
+  --vv-t-std: 220ms;
+  --vv-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ── 2 · semantic（界面只准用这一层） ────────────────────────────────── */
+  --c-bg: var(--vv-paper);
+  --c-surface: var(--vv-card);
+  --c-surface-sunken: var(--vv-paper-grid);
+  --c-border: var(--vv-track);
+  --c-border-strong: var(--vv-track-hover);
+  --c-text: var(--vv-ink);
+  --c-text-2: var(--vv-sub);
+  --c-text-3: var(--vv-weak);
+  --c-primary: var(--vv-accent);
+  --c-primary-soft: var(--vv-accent-soft);
+  /* 链接/正文强调色与按钮主色分开：白字压在 #2f6bff 上对比度不足，
+     而 #2f6bff 作为**文字**压在纸底上只有 4.09（不达 4.5）。
+     #1f56e0：白底 6.06:1 / 纸底 5.51:1，作为文字与链接达标；#2f6bff 继续用于**色块**。 */
+  --c-link: #1f56e0;
+  --c-ok: var(--vv-success);
+  --c-ok-soft: var(--vv-success-soft);
+  /* 徽标前景色单独定：直接拿 #16a34a 压在 #dcfce7 上只有 3.00:1（不达 4.5），
+     徽标是正文级字号，必须达标 → 前景压深到 #14532d。danger/info 同理。 */
+  --c-ok-ink: #14532d;
+  --c-warn: var(--vv-warn);
+  --c-warn-soft: var(--vv-warn-soft);
+  --c-warn-ink: #7c2d12;
+  --c-danger: var(--vv-error);
+  --c-danger-soft: var(--vv-error-soft);
+  --c-danger-ink: #991b1b;
+  --c-info-ink: #1e40af;
+  --c-shadow-1: var(--vv-shadow-1);
+  --c-shadow-2: var(--vv-shadow-2);
+  /* 焦点环：原 `0 0 0 3px #e8edff` 在白底上对比度 **1.17:1**（等于隐形）。
+     改为实心描边 + 偏移，任何底色上都可见（键盘可达性硬要求）。 */
+  --c-focus-color: #2f6bff;
+
+  /* ── 尺寸 ──────────────────────────────────────────────────────────── */
+  --layout-sider: 232px;
+  --layout-sider-collapsed: 64px;
+  --layout-header: 56px;
+  --layout-content-max: 1440px;
+
+  /* ── 3 · component ────────────────────────────────────────────────── */
+  --c-card-radius: var(--vv-r-card);
+  /* 图表卡沿用 lieflat Mono 的 24px：图表卡是"插画卡"，与 UI 控件卡有意区分（docs/50 §12.1） */
+  --c-chart-card-radius: 24px;
+  --c-ctl-radius: var(--vv-r-ctl);
+}
+
+/* 图表卡必须画在 Mono 的纸底上，而不是纯白 ——
+   Mono 的契约是"卡片无边框无阴影，靠留白分卡"，卡底 = 页面底（SKILL §2/§3）。
+   画在白卡上会让 Mono 的 PAPER 元素直接失效：F2/F3/F8/F15 的**空心点、光晕、中位线**
+   用的都是 PAPER 色（basics-gallery 实测），在白底上会变成一圈"脏灰斑"。
+   分层规则（写死，docs/50 §11.2）：
+   ① 图表卡不与 UI 卡同排；② 图表区整体包在 .mono-surface 里；
+   ③ 图表卡间距 ≥32px、靠留白分卡，不加阴影；④ UI 卡阴影只用 --c-shadow-2 一档。 */
+.mono-surface {
+  --c-surface: #f0efeb;
+  background: #f0efeb;
+  padding: 20px;
+  border-radius: var(--vv-r-card);
+}

@@ -7,21 +7,26 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.audio.base import get_asr_client, get_scorer_client
+from app.audio.fluency import compute_fluency_features
 from app.audio.upload import validate_audio_bytes
 from app.core.auth import get_current_user_id
 from app.core.config import get_settings
-from app.core.ratelimit import consume
+from app.core.ratelimit import consume_all
 from app.core.response import ok
 from app.db import get_session_factory
 from app.models import Attempt, Placement, PlacementQuestion
 from app.models.base import AttemptKinds, Levels
 
 router = APIRouter(prefix="/api/v1/placement", tags=["placement"])
+
+logger = logging.getLogger(__name__)
 
 QA_REF = "The candidate's answer should be short and coherent."
 
@@ -74,15 +79,20 @@ async def score_item(
         min_bytes=settings.min_upload_bytes,
         max_bytes=settings.max_upload_bytes,
     )
-    await consume("asr", settings.asr_rate_per_hour, user_id)
-    await consume("ise", settings.ise_rate_per_hour, user_id)
+    # P1-13：两桶**一起扣**（任一超限则全量回滚）——逐桶顺序扣会在 ISE 超限时白扣 ASR
+    await consume_all(
+        [("asr", settings.asr_rate_per_hour), ("ise", settings.ise_rate_per_hour)], user_id
+    )
     db = get_session_factory()()
     try:
         q = db.get(PlacementQuestion, item_id)
         if q is None or q.status != "published":
             raise HTTPException(status_code=404, detail="question not found")
         asr = get_asr_client()
-        text = (await asr.transcribe(data)).text
+        asr_res = await asr.transcribe(data)
+        text = asr_res.text
+        # 流利度时间戳特征（docs/06 §9.3 辅助口径；与对话链路同源）
+        fluency = compute_fluency_features(asr_res.words or [], float(asr_res.duration or 0.0))
         scorer = get_scorer_client()
         try:
             score = await scorer.score(data, q.prompt)
@@ -96,6 +106,8 @@ async def score_item(
             flu_score=_dec(score.fluency) if score else None,
             gram_score=_dec(score.grammar) if score else None,
             overall_score=_dec(score.overall) if score else None,
+            wpm=_dec(fluency["wpm"]) if fluency else None,
+            details={"fluency": fluency},
             error={} if score else {"reason": "score_unavailable"},
         )
         db.add(attempt)
@@ -108,6 +120,7 @@ async def score_item(
                 "pron": float(score.pronunciation) if score else None,
                 "flu": float(score.fluency) if score else None,
                 "gram": float(score.grammar) if score else None,
+                "wpm": float(attempt.wpm) if attempt.wpm is not None else None,
             }
         )
     finally:
@@ -169,21 +182,18 @@ async def finalize(body: FinalizeIn, user_id: int = Depends(get_current_user_id)
 
 
 async def _callback_level(user_id: int, level: str) -> None:
-    """委托 Java 更新 user_profiles.level（Java 是唯一写者；内部 service-token）。"""
-    import httpx
+    """委托 Java 更新 user_profiles.cefr_level（Java 是唯一写者；内部 service-token）。
 
-    from app.core.config import get_settings
+    P0-6 修复（2026-09-06，docs/21 §4）：键名 camelCase（userId）+ raise_for_status + 告警日志
+    ——旧实现发 ``user_id``（Java DTO 反序列化 null → 400）且 httpx 默认不抛 4xx、外层静默吞，
+    链路 100% 断零告警。失败仍不阻塞 finalize（降级口径不变，由 placements 校对源兜底）。
+    """
+    from app.core.internal_client import post_internal
 
-    settings = get_settings()
     try:
-        async with httpx.AsyncClient(timeout=3) as client:
-            await client.post(
-                f"{settings.java_base_url}/internal/level",
-                json={"user_id": user_id, "level": level},
-                headers={"Authorization": f"Bearer {settings.service_token}"},
-            )
-    except Exception:  # Java 未就绪/网络异常：静默（M2 演示不阻塞）
-        return
+        post_internal("/internal/level", {"userId": user_id, "level": level})
+    except Exception as exc:  # Java 未就绪/网络异常：降级（不阻塞 finalize），但必须留痕
+        logger.warning("internal /internal/level 回写失败 userId=%s: %s", user_id, exc)
 
 
 def _dec(v):

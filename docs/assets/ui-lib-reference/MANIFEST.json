@@ -1,0 +1,386 @@
+[
+  {
+    "file": "svg/tabler/home.svg",
+    "set": "tabler",
+    "icon": "home",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/microphone.svg",
+    "set": "tabler",
+    "icon": "microphone",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/music.svg",
+    "set": "tabler",
+    "icon": "music",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/chart-bar.svg",
+    "set": "tabler",
+    "icon": "chart-bar",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/user.svg",
+    "set": "tabler",
+    "icon": "user",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/plus.svg",
+    "set": "tabler",
+    "icon": "plus",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/flame.svg",
+    "set": "tabler",
+    "icon": "flame",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/star.svg",
+    "set": "tabler",
+    "icon": "star",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/check.svg",
+    "set": "tabler",
+    "icon": "check",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/chevron-left.svg",
+    "set": "tabler",
+    "icon": "chevron-left",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/chevron-right.svg",
+    "set": "tabler",
+    "icon": "chevron-right",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/calendar.svg",
+    "set": "tabler",
+    "icon": "calendar",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/search.svg",
+    "set": "tabler",
+    "icon": "search",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/settings.svg",
+    "set": "tabler",
+    "icon": "settings",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/logout.svg",
+    "set": "tabler",
+    "icon": "logout",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/headphones.svg",
+    "set": "tabler",
+    "icon": "headphones",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/trophy.svg",
+    "set": "tabler",
+    "icon": "trophy",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/target.svg",
+    "set": "tabler",
+    "icon": "target",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/book.svg",
+    "set": "tabler",
+    "icon": "book",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/message-circle.svg",
+    "set": "tabler",
+    "icon": "message-circle",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/star-filled.svg",
+    "set": "tabler",
+    "icon": "star-filled",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/trophy-filled.svg",
+    "set": "tabler",
+    "icon": "trophy-filled",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/flame-filled.svg",
+    "set": "tabler",
+    "icon": "flame-filled",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/heart-filled.svg",
+    "set": "tabler",
+    "icon": "heart-filled",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/tabler/check-filled.svg",
+    "set": "tabler",
+    "icon": "check-filled",
+    "license": "MIT",
+    "licenseFile": "licenses/tabler-LICENSE",
+    "source": "https://icon-sets.iconify.design/tabler/"
+  },
+  {
+    "file": "svg/ph/wave-sine.svg",
+    "set": "ph",
+    "icon": "wave-sine",
+    "license": "MIT",
+    "licenseFile": "licenses/phosphor-LICENSE",
+    "source": "https://icon-sets.iconify.design/ph/"
+  },
+  {
+    "file": "svg/ph/wave-sine-fill.svg",
+    "set": "ph",
+    "icon": "wave-sine-fill",
+    "license": "MIT",
+    "licenseFile": "licenses/phosphor-LICENSE",
+    "source": "https://icon-sets.iconify.design/ph/"
+  },
+  {
+    "file": "svg/ph/wave-sine-duotone.svg",
+    "set": "ph",
+    "icon": "wave-sine-duotone",
+    "license": "MIT",
+    "licenseFile": "licenses/phosphor-LICENSE",
+    "source": "https://icon-sets.iconify.design/ph/"
+  },
+  {
+    "file": "svg/ph/microphone-fill.svg",
+    "set": "ph",
+    "icon": "microphone-fill",
+    "license": "MIT",
+    "licenseFile": "licenses/phosphor-LICENSE",
+    "source": "https://icon-sets.iconify.design/ph/"
+  },
+  {
+    "file": "svg/ph/microphone-duotone.svg",
+    "set": "ph",
+    "icon": "microphone-duotone",
+    "license": "MIT",
+    "licenseFile": "licenses/phosphor-LICENSE",
+    "source": "https://icon-sets.iconify.design/ph/"
+  },
+  {
+    "file": "svg/ph/music-notes-fill.svg",
+    "set": "ph",
+    "icon": "music-notes-fill",
+    "license": "MIT",
+    "licenseFile": "licenses/phosphor-LICENSE",
+    "source": "https://icon-sets.iconify.design/ph/"
+  },
+  {
+    "file": "svg/ph/chart-line-fill.svg",
+    "set": "ph",
+    "icon": "chart-line-fill",
+    "license": "MIT",
+    "licenseFile": "licenses/phosphor-LICENSE",
+    "source": "https://icon-sets.iconify.design/ph/"
+  },
+  {
+    "file": "svg/ph/headphones-fill.svg",
+    "set": "ph",
+    "icon": "headphones-fill",
+    "license": "MIT",
+    "licenseFile": "licenses/phosphor-LICENSE",
+    "source": "https://icon-sets.iconify.design/ph/"
+  },
+  {
+    "file": "svg/ph/radio-fill.svg",
+    "set": "ph",
+    "icon": "radio-fill",
+    "license": "MIT",
+    "licenseFile": "licenses/phosphor-LICENSE",
+    "source": "https://icon-sets.iconify.design/ph/"
+  },
+  {
+    "file": "svg/ph/star-fill.svg",
+    "set": "ph",
+    "icon": "star-fill",
+    "license": "MIT",
+    "licenseFile": "licenses/phosphor-LICENSE",
+    "source": "https://icon-sets.iconify.design/ph/"
+  },
+  {
+    "file": "svg/ph/trophy-fill.svg",
+    "set": "ph",
+    "icon": "trophy-fill",
+    "license": "MIT",
+    "licenseFile": "licenses/phosphor-LICENSE",
+    "source": "https://icon-sets.iconify.design/ph/"
+  },
+  {
+    "file": "svg/ph/flame-fill.svg",
+    "set": "ph",
+    "icon": "flame-fill",
+    "license": "MIT",
+    "licenseFile": "licenses/phosphor-LICENSE",
+    "source": "https://icon-sets.iconify.design/ph/"
+  },
+  {
+    "file": "svg/lucide/mic.svg",
+    "set": "lucide",
+    "icon": "mic",
+    "license": "ISC",
+    "licenseFile": "licenses/lucide-LICENSE",
+    "source": "https://icon-sets.iconify.design/lucide/"
+  },
+  {
+    "file": "svg/lucide/music.svg",
+    "set": "lucide",
+    "icon": "music",
+    "license": "ISC",
+    "licenseFile": "licenses/lucide-LICENSE",
+    "source": "https://icon-sets.iconify.design/lucide/"
+  },
+  {
+    "file": "svg/lucide/star.svg",
+    "set": "lucide",
+    "icon": "star",
+    "license": "ISC",
+    "licenseFile": "licenses/lucide-LICENSE",
+    "source": "https://icon-sets.iconify.design/lucide/"
+  },
+  {
+    "file": "svg/lucide/check.svg",
+    "set": "lucide",
+    "icon": "check",
+    "license": "ISC",
+    "licenseFile": "licenses/lucide-LICENSE",
+    "source": "https://icon-sets.iconify.design/lucide/"
+  },
+  {
+    "file": "svg/lucide/chevron-left.svg",
+    "set": "lucide",
+    "icon": "chevron-left",
+    "license": "ISC",
+    "licenseFile": "licenses/lucide-LICENSE",
+    "source": "https://icon-sets.iconify.design/lucide/"
+  },
+  {
+    "file": "svg/lucide/flame.svg",
+    "set": "lucide",
+    "icon": "flame",
+    "license": "ISC",
+    "licenseFile": "licenses/lucide-LICENSE",
+    "source": "https://icon-sets.iconify.design/lucide/"
+  },
+  {
+    "file": "svg/lucide/user.svg",
+    "set": "lucide",
+    "icon": "user",
+    "license": "ISC",
+    "licenseFile": "licenses/lucide-LICENSE",
+    "source": "https://icon-sets.iconify.design/lucide/"
+  },
+  {
+    "file": "svg/lucide/plus.svg",
+    "set": "lucide",
+    "icon": "plus",
+    "license": "ISC",
+    "licenseFile": "licenses/lucide-LICENSE",
+    "source": "https://icon-sets.iconify.design/lucide/"
+  },
+  {
+    "file": "svg/lucide/headphones.svg",
+    "set": "lucide",
+    "icon": "headphones",
+    "license": "ISC",
+    "licenseFile": "licenses/lucide-LICENSE",
+    "source": "https://icon-sets.iconify.design/lucide/"
+  },
+  {
+    "file": "svg/lucide/calendar.svg",
+    "set": "lucide",
+    "icon": "calendar",
+    "license": "ISC",
+    "licenseFile": "licenses/lucide-LICENSE",
+    "source": "https://icon-sets.iconify.design/lucide/"
+  },
+  {
+    "file": "svg/lucide/settings.svg",
+    "set": "lucide",
+    "icon": "settings",
+    "license": "ISC",
+    "licenseFile": "licenses/lucide-LICENSE",
+    "source": "https://icon-sets.iconify.design/lucide/"
+  }
+]

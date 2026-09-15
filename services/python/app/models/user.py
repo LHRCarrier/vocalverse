@@ -105,6 +105,9 @@ class UserProfile(TimestampMixin, Base):
     voice_type: Mapped[str | None] = mapped_column(String(32))  # 3 音色预设 key
     preferred_difficulty: Mapped[int | None] = mapped_column(SmallInteger)
     avatar_url: Mapped[str | None] = mapped_column(String(512))
+    # 社区展示字段（docs/37 §3.1：Java 写；handle=@ 展示名唯一、tint=头像色板）
+    handle: Mapped[str | None] = mapped_column(String(32))
+    tint: Mapped[str | None] = mapped_column(String(16))
     # 档位来源审计（docs/11 Q-B07）：placement=入学测试委托写入，manual=管理员改档；
     # cefr_level_at 用于对账（Python 读档前发现最新 completed placement 更新则重试委托）
     cefr_level_source: Mapped[str] = mapped_column(
@@ -125,6 +128,15 @@ class UserProfile(TimestampMixin, Base):
         CheckConstraint("voice_rate IN ('slow', 'normal', 'fast')", name="voice_rate"),
         CheckConstraint("preferred_difficulty BETWEEN 1 AND 4", name="preferred_difficulty"),
         CheckConstraint("cefr_level_source IN ('placement', 'manual')", name="cefr_level_source"),
+        # @handle 大小写不敏感唯一（迁移 0011 · docs/47 §3.2）：此前只在注释里写「唯一」，
+        # 实际无任何约束（docs/48 B17）。部分索引：handle 可为 NULL（未设置展示名）。
+        Index(
+            "uq_user_profiles_handle_lower",
+            func.lower(handle),
+            unique=True,
+            postgresql_where=text("handle IS NOT NULL"),
+            sqlite_where=text("handle IS NOT NULL"),
+        ),
     )
 
 

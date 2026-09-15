@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VocalVerse — AI Oral Practice</title>
+  <meta name="description" content="Practice real English conversations with AI roleplay across 8+ scenes, scored in real time on pronunciation, grammar, and fluency." />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,100..900,0..100&family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/scroll-expand.css?v=3" />
+  <link rel="stylesheet" href="css/nav-reveal.css" />
+  <link rel="stylesheet" href="css/site-nav.css" />
+  <link rel="stylesheet" href="css/gooey-nav.css" />
+  <link rel="stylesheet" href="css/footer.css" />
+  <link rel="stylesheet" href="css/aero-shards.css" />
+  <script>document.documentElement.classList.add((localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")));</script>
+</head>
+<body class="min-h-screen bg-background font-sans text-foreground antialiased">
+  <div class="site-frame site-frame--top" aria-hidden="true"></div>
+  <div class="site-frame site-frame--left" aria-hidden="true"></div>
+  <div class="site-frame site-frame--right" aria-hidden="true"></div>
+  <svg class="site-corner site-corner--top-left" width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M5.50871e-06 0C-0.00788227 37.3001 8.99616 50.0116 50 50H5.50871e-06V0Z" fill="currentColor"/>
+  </svg>
+  <svg class="site-corner site-corner--top-right" width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M5.50871e-06 0C-0.00788227 37.3001 8.99616 50.0116 50 50H5.50871e-06V0Z" fill="currentColor"/>
+  </svg>
+  <a href="#main-content" class="skip-to-content">Skip to main content</a>
+
+  <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-225 overflow-hidden">
+    <div class="absolute inset-0 opacity-50 md:opacity-100">
+      <div class="absolute inset-0 h-full w-full grayscale" data-shader data-flow-speed="0,0.1" data-iterations="10" data-brightness="3"></div>
+    </div>
+  </div>
+
+  <div class="nav-reveal-zone" data-nav-reveal-zone aria-hidden="true"></div>
+  <nav aria-label="Primary" class="site-nav fixed left-1/2 top-6 z-50 -translate-x-1/2">
+    <div class="site-nav__bar flex items-center gap-1 rounded-full bg-background p-1.5 shadow-sm border border-foreground/8">
+      <ul class="site-nav__list relative flex items-center gap-1" data-nav-list>
+        <span aria-hidden="true" class="nav-pill" data-nav-pill hidden></span>
+        <li class="relative">
+          <a href="index.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Home</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="practice.html" aria-current="page" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground">Practice</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="sing.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Sing</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="recommend.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Recommend</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="stats.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Stats</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="community.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Community</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="about.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">About</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="showcase.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Showcase</span>
+          </a>
+        </li>
+      </ul>
+      <button type="button" data-theme-toggle aria-label="Toggle theme" aria-pressed="false"
+        class="focus-ring relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-background ring-1 ring-foreground/8 transition-colors">
+        <span aria-hidden="true" class="relative h-4 w-4">
+          <svg class="theme-icon sun-icon absolute inset-0 h-4 w-4 text-foreground -rotate-90 scale-0 opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+          </svg>
+          <svg class="theme-icon moon-icon absolute inset-0 h-4 w-4 text-foreground rotate-90 scale-0 opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+          </svg>
+        </span>
+      </button>
+    </div>
+  </nav>
+
+  <main id="main-content" class="flex flex-1 flex-col">
+    <section class="scrollexpand" aria-label="AI Oral Practice core features">
+      <div class="js-scroll-expand scroll-expand"
+        data-se-media-zoom="1.35"
+        data-se-start-radius="24"
+        data-se-end-radius="0"
+        data-se-scroll-distance="1.2"
+        data-se-hold-distance="0.35"
+        data-se-smoothing="0.1"
+        data-se-overlay-scrim="0.45"
+        data-se-card-shift="56"
+        data-se-use-window-scroll="true">
+        <div class="scroll-expand__track">
+          <div class="scroll-expand__stage">
+            <div class="scroll-expand__frame">
+              <!-- .scroll-expand__media 由 scroll-expand.js 依据 data-se-media-* 注入 -->
+              <div class="scroll-expand__scrim"></div>
+              <div class="scroll-expand__overlay">
+                <div class="se-overlay-inner">
+                  <div class="se-eyebrow">
+                    <span class="se-eyebrow-line" aria-hidden="true"></span>
+                    <span class="se-eyebrow-text">Core module · AI oral practice</span>
+                    <span class="se-eyebrow-line" aria-hidden="true"></span>
+                  </div>
+                  <div class="se-dotline" aria-hidden="true"></div>
+                  <div class="se-projects columns-1 gap-6 md:columns-2 md:gap-7">
+          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0s">
+            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+              <header class="flex items-center gap-2.5 px-1 pt-2">
+                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
+                </span>
+                <span class="text-sm font-medium tracking-tight text-foreground">Scene Roleplay Agent</span>
+              </header>
+              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 752 / 497">
+                <div class="project-card__image-inner">
+                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23047857'/><stop offset='1' stop-color='%2310B981'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>🤖</text></svg>" alt="AI roleplay conversation agent" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                </div>
+              </div>
+              <div class="flex flex-col gap-2.5 px-1 pb-1">
+                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                  Role-play conversations in coffee shops, airports, business meetings, hospitals, and more.
+                </h3>
+                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                  8+ everyday scenes, each graded Easy, Medium, or Hard, covering ordering, travel, medical, and business needs.
+                </p>
+              </div>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">8+ Scenes · 3 Difficulty Levels</p>
+            </article>
+          </div>
+
+          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0.06s">
+            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+              <header class="flex items-center gap-2.5 px-1 pt-2">
+                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                </span>
+                <span class="text-sm font-medium tracking-tight text-foreground">ASR Transcription</span>
+              </header>
+              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+                <div class="project-card__image-inner">
+                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23EA580C'/><stop offset='1' stop-color='%23FDBA74'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>🎙️</text></svg>" alt="Speech recognition and transcription" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                </div>
+              </div>
+              <div class="flex flex-col gap-2.5 px-1 pb-1">
+                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                  Speech recognition and transcription.
+                </h3>
+                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                  Your recording is transcribed by ASR in real time, with the audio timeline as the source of truth and subtitles as a guide.
+                </p>
+              </div>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Real-time · Up to 15s per Turn</p>
+            </article>
+          </div>
+
+          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0.12s">
+            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+              <header class="flex items-center gap-2.5 px-1 pt-2">
+                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                </span>
+                <span class="text-sm font-medium tracking-tight text-foreground">3D Speaking Score</span>
+              </header>
+              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+                <div class="project-card__image-inner">
+                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%231D4ED8'/><stop offset='1' stop-color='%2393C5FD'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>📊</text></svg>" alt="Three-dimension speaking score" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                </div>
+              </div>
+              <div class="flex flex-col gap-2.5 px-1 pb-1">
+                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                  Scored on pronunciation, grammar, and fluency in real time.
+                </h3>
+                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                  Coach notes and language-point coverage analysis pinpoint exactly where to improve next.
+                </p>
+              </div>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Pronunciation · Grammar · Fluency</p>
+            </article>
+          </div>
+
+          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0.18s">
+            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+              <header class="flex items-center gap-2.5 px-1 pt-2">
+                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
+                </span>
+                <span class="text-sm font-medium tracking-tight text-foreground">How It Works</span>
+              </header>
+              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+                <div class="project-card__image-inner">
+                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23047857'/><stop offset='1' stop-color='%2310B981'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>🧭</text></svg>" alt="Four steps to complete one session" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                </div>
+              </div>
+              <div class="flex flex-col gap-2.5 px-1 pb-1">
+                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                  Four steps to complete one session.
+                </h3>
+                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                  Choose a scene → converse with the AI character → check your real-time score → review and move to the next round.
+                </p>
+              </div>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">~8 Rounds · SSE Streaming</p>
+            </article>
+          </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="scroll-expand__title">
+              <h1 data-split-text>AI Oral Practice</h1>
+              <p class="se-title-sub" data-split-text>Based on LLM-driven scene roleplay and speech recognition, the core speaking module turns &ldquo;can read but can&rsquo;t speak&rdquo; into real, low-pressure conversation practice.</p>
+            </div>
+            <div class="scroll-expand__hint">
+              <span>Scroll down · View core features</span>
+              <svg class="se-hint-arrow" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mx-auto my-12 w-full max-w-275 px-6 sm:my-20 sm:px-10">
+      <div class="fade-in relative w-full overflow-hidden rounded-4xl border border-foreground/8 bg-background p-1.5 shadow-sm">
+        <div class="relative w-full overflow-hidden rounded-[1.6rem]">
+          <div aria-hidden="true" class="pointer-events-none absolute inset-0 opacity-45 dark:opacity-25"
+            style="-webkit-mask-image: radial-gradient(ellipse 90% 110% at 50% 50%, rgba(0,0,0,1) 0%, rgba(0,0,0,0.92) 40%, rgba(0,0,0,0.7) 70%, rgba(0,0,0,0.4) 90%, rgba(0,0,0,0.15) 100%); mask-image: radial-gradient(ellipse 90% 110% at 50% 50%, rgba(0,0,0,1) 0%, rgba(0,0,0,0.92) 40%, rgba(0,0,0,0.7) 70%, rgba(0,0,0,0.4) 90%, rgba(0,0,0,0.15) 100%);">
+            <div class="absolute inset-0 h-full w-full grayscale" data-shader data-scale="3" data-brightness="3"></div>
+          </div>
+
+          <div class="relative grid gap-8 p-6 sm:gap-10 sm:p-7 md:grid-cols-[1.2fr_1fr] md:items-stretch md:gap-6 md:p-6">
+            <div class="flex flex-col gap-5">
+              <h2 class="font-serif text-[2.25rem] font-medium leading-[1.05] tracking-tight text-foreground sm:text-[2.75rem] lg:text-[3.25rem]">
+                Let&rsquo;s connect
+              </h2>
+              <p class="max-w-[29ch] text-[18px] leading-[1.4] tracking-tight text-foreground/65 sm:text-[22px] mb-6">
+                We&rsquo;re always open to discussing new features, creative ideas, or opportunities to shape the future of English speaking practice. Just reach out!
+              </p>
+
+              <div class="mt-2 flex flex-wrap items-center gap-3">
+                <button type="button" data-contact-button data-email="hello@example.com" aria-label="Show email"
+                  class="contact-btn focus-ring relative inline-flex h-11 cursor-pointer items-center justify-center bg-foreground px-5 text-sm font-medium text-background transition-[max-width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
+                  <span class="relative inline-flex items-center">
+                    <span data-contact-state="closed" class="contact-label inline-flex items-center gap-2 whitespace-nowrap">
+                      <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                      <span>Contact</span>
+                    </span>
+                    <span data-contact-state="open" class="contact-label inline-flex items-center gap-2 whitespace-nowrap">
+                      <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                      <span class="tabular-nums">hello@example.com</span>
+                    </span>
+                    <span data-contact-state="copied" class="contact-label inline-flex items-center gap-2 whitespace-nowrap">
+                      <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="tabular-nums">hello@example.com</span>
+                    </span>
+                  </span>
+                </button>
+
+                <a href="index.html"
+                  class="border border-foreground/5 focus-ring group inline-flex cursor-pointer items-center gap-2 rounded-xl bg-background px-5 py-2.5 text-sm font-medium text-foreground shadow-md/2 transition-colors">
+                  See features
+                  <svg class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </a>
+              </div>
+            </div>
+
+            <div class="border-foreground/8 flex flex-col items-center justify-center gap-6 rounded-[1.1rem] border bg-background p-6 sm:p-8">
+              <div class="flex items-center gap-3 opacity-75">
+                <a href="mailto:hello@example.com" aria-label="Email" class="border-foreground/8 hover:border-foreground/15 focus-ring inline-flex h-11 w-11 items-center justify-center rounded-xl border bg-background text-foreground/70 transition-colors hover:text-foreground">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                </a>
+                <a href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" class="border-foreground/8 hover:border-foreground/15 focus-ring inline-flex h-11 w-11 items-center justify-center rounded-xl border bg-background text-foreground/70 transition-colors hover:text-foreground">
+                  <img src="assets/linkedin.svg" alt="" width="14" height="14" aria-hidden="true" class="max-h-[14px] max-w-[14px] object-contain dark:invert" />
+                </a>
+                <a href="https://x.com" target="_blank" rel="noopener noreferrer" aria-label="X" class="border-foreground/8 hover:border-foreground/15 focus-ring inline-flex h-11 w-11 items-center justify-center rounded-xl border bg-background text-foreground/70 transition-colors hover:text-foreground">
+                  <img src="assets/x.svg" alt="" width="14" height="14" aria-hidden="true" class="max-h-[14px] max-w-[14px] object-contain dark:invert" />
+                </a>
+              </div>
+              <div class="flex flex-col items-center gap-1 text-center">
+                <p class="text-[13px] tracking-tight text-foreground/70">2026 &copy; Built with Next.js</p>
+                <p class="text-[12px] tracking-tight text-foreground/45">By React Bits Pro</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="h-12 sm:h-16"></div>
+  </main>
+
+  <script src="js/vendor/lenis.min.js"></script>
+  <script src="js/theme.js" defer></script>
+  <script src="js/gooey-nav.js" defer></script>
+  <script src="js/nav.js" defer></script>
+  <script src="js/animations.js" defer></script>
+  <script src="js/contact.js" defer></script>
+  <script src="js/shader-flow.js" defer></script>
+  <script src="js/scroll-expand.js?v=3" defer></script>
+  <script src="js/nav-reveal.js" defer></script>
+  <script src="js/main.js" defer></script>
+  <script src="js/vendor/gsap.min.js" defer></script>
+  <script src="js/vendor/ScrollTrigger.min.js" defer></script>
+  <script src="js/vendor/SplitText.min.js" defer></script>
+  <script src="js/split-text.js" defer></script>
+  <script src="js/footer.js" defer></script>
+  <script type="module" src="js/aero-shards-init.js"></script>
+</body>
+</html>

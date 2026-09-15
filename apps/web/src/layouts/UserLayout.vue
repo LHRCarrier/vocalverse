@@ -24,7 +24,8 @@ function login() {
 }
 
 async function logout() {
-  auth.clear()
+  // 服务端吊销该用户全部 refresh token + 清本地（2026-09-07；原 clear() 只清本地）
+  await auth.logout()
   router.push('/login')
 }
 </script>

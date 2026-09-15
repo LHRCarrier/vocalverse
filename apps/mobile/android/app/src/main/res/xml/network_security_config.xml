@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  2026-09-10 方案 B（打包进壳）：Web 页面由 Capacitor 以 https://localhost 服务（安全上下文 →
+  getUserMedia/MediaRecorder 可用），而 API 打到 http://192.168.0.104:8000/8080（本机后端）。
+  https 页面向 http 后端发请求属「混合内容/明文」，需：
+    1) WebView 层 allowMixedContent（capacitor.config.json android.allowMixedContent=true）；
+    2) Android 网络层放行明文 —— 本文件 cleartextTrafficPermitted=true。
+  仅信任 system CA（Capacitor 自带 localhost 证书，无需用户 CA）；
+  原方案 A 的「信任用户 CA」已移除（生产发布前同样应收起 cleartext）。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -9,9 +9,18 @@ import { useRoute, useRouter } from 'vue-router'
 import { NButton, NCard, NProgress, NTag } from 'naive-ui'
 
 import { track } from '@/api/events'
-import { createSession, fetchScenarios, streamTurn, tts, type ScenarioItem } from '@/api/practice'
+import { loadAudioBlob } from '@/api/client'
+import {
+  createSession,
+  fetchScenarios,
+  fetchSessionRestore,
+  streamTurn,
+  tts,
+  type ScenarioItem,
+} from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
+import { useBlobAudio } from '@/composables/useBlobAudio'
 import { useP5Wave } from '@/composables/useP5Wave'
 import { useTurnTimers } from '@/composables/useTurnTimers'
 
@@ -51,6 +60,8 @@ useP5Wave(waveRef, { height: 110 })
 
 const DIFFICULTY_LABEL: Record<number, string> = { 1: 'L1', 2: 'L2', 3: 'L3', 4: 'L4' }
 
+const { createUrl, revokeUrl, releaseAll } = useBlobAudio()
+
 onMounted(async () => {
   await boot()
 })
@@ -59,9 +70,16 @@ onUnmounted(() => {
   abort.abort()
   audioQueue.forEach((a) => a.pause())
   clearAll()
+  releaseAll()
 })
 
 async function boot() {
+  // R-13 断线重连：URL 带 ?session=<id>（刷新/重开页面）→ 恢复而非新建
+  const resumeId = Number(route.query.session)
+  if (Number.isInteger(resumeId) && resumeId > 0) {
+    await resume(resumeId)
+    return
+  }
   try {
     const scenes = await fetchScenarios()
     const sceneId = Number(route.params.sceneId)
@@ -77,7 +95,7 @@ async function boot() {
     })
     sessionId.value = session.id
     assignedTurns.value = session.assigned_turns ?? 8
-    await track('scene_start', { sceneId: scenario.value.id, payload: { session_id: session.id } })
+    await track('scene_start', { sceneId: scenario.value.id, payload: { session_id: session.id }, beacon: true })
     // 开场
     if (scenario.value.opening_line) {
       bubbles.value.push({ role: 'assistant', text: scenario.value.opening_line })
@@ -85,6 +103,37 @@ async function boot() {
     }
     phase.value = 'ready'
     armRescueTimer()
+  } catch (e) {
+    errorMsg.value = (e as Error).message
+    phase.value = 'done'
+  }
+}
+
+/** R-13 断线重连（GET /sessions/{id}）：重建消息/轮次；已完成会话直接跳报告页 */
+async function resume(restoreId: number) {
+  try {
+    const r = await fetchSessionRestore(restoreId)
+    if (r.status === 'completed' && r.report_id) {
+      router.push(`/report/${r.report_id}`)
+      return
+    }
+    sessionId.value = r.id
+    assignedTurns.value = r.assigned_turns ?? 8
+    currentTurn.value = r.next_expected_turn
+    bubbles.value = r.messages
+      .filter((m) => m.role !== 'system' && m.content)
+      .map((m) => ({ role: m.role as Bubble['role'], text: m.content }))
+    errorMsg.value = null
+    phase.value = 'ready'
+    armRescueTimer()
+    // 标题/语料依赖场景信息：按 URL sceneId 查找（恢复 URL 保留原场景，失败不阻断对话继续）
+    try {
+      const scenes = await fetchScenarios()
+      const sceneId = Number(route.params.sceneId)
+      scenario.value = scenes.find((s) => s.id === sceneId) ?? scenes[0] ?? null
+    } catch {
+      scenario.value = null
+    }
   } catch (e) {
     errorMsg.value = (e as Error).message
     phase.value = 'done'
@@ -112,22 +161,50 @@ function firstCorpusPhrase(): string | null {
 async function playTts(text: string) {
   try {
     const blob = await tts(text)
-    const url = URL.createObjectURL(blob)
+    const url = createUrl(blob)
     const audio = new Audio(url)
-    audio.onended = () => URL.revokeObjectURL(url)
+    audio.onended = () => revokeUrl(url)
     await audio.play()
   } catch {
     /* 无声字幕继续 */
   }
 }
 
-function playChunk(url: string) {
-  const audio = new Audio(url)
-  audioQueue.push(audio)
-  audio.onended = () => {
-    audioQueue.shift()?.play().catch(() => undefined)
-  }
-  if (audioQueue.length === 1) audio.play().catch(() => undefined)
+function playChunk(url: string, duration?: number | null) {
+  // 2026-09-07：原生 <audio> 不带 Bearer（GET /api/v1/audio 强制鉴权）→ 401；改带 token 拉 blob 再播
+  void loadAudioBlob(url)
+    .then((blob) => {
+      if (!blob.size) throw new Error('empty audio')
+      const objectUrl = createUrl(blob)
+      const audio = new Audio(objectUrl)
+      audioQueue.push(audio)
+      let advanced = false
+      const advance = () => {
+        if (advanced) return
+        advanced = true
+        revokeUrl(objectUrl)
+        audioQueue.shift()?.play().catch(() => undefined)
+      }
+      audio.onended = advance
+      // 兜底：ended 不触发时按时长定时推进（docs/44 P1-C；同 playTts 口径）
+      audio.addEventListener(
+        'loadedmetadata',
+        () => {
+          const ms =
+            Number.isFinite(audio.duration) && audio.duration > 0
+              ? audio.duration * 1000
+              : duration && duration > 0
+                ? duration * 1000
+                : 0
+          if (ms > 0) setTimeout(advance, Math.min(ms + 400, 15000))
+        },
+        { once: true },
+      )
+      if (audioQueue.length === 1) audio.play().catch(() => undefined)
+    })
+    .catch((err) => {
+      console.warn('[practice] audio_chunk fetch failed:', err)
+    })
 }
 
 async function startRecording() {
@@ -201,7 +278,7 @@ function onSseEvent(e: SseStreamEvent) {
       last.text += e.text
       break
     case 'audio_chunk':
-      playChunk(e.url)
+      playChunk(e.url, e.duration)
       break
     case 'meta_block':
       last.coach = e.coach_note ?? null
@@ -219,14 +296,15 @@ function onSseEvent(e: SseStreamEvent) {
     case 'turn_end':
       scoreStatus.value = e.score_status === 'ok' ? scoreStatus.value : e.score_status
       last.scoreStatus = e.score_status
-      currentTurn.value += 1
+      // R-13：权威轮次纠偏（服务端回带 expected_turn）
+      currentTurn.value = e.expected_turn ?? currentTurn.value + 1
       phase.value = 'ready'
       armRescueTimer()
       break
     case 'session_end':
       phase.value = 'done'
       hintText.value = e.summary ?? '完成！'
-      void track('practice_complete', { sceneId: scenario.value?.id, payload: { report_id: e.report_id } })
+      void track('practice_complete', { sceneId: scenario.value?.id, payload: { report_id: e.report_id }, beacon: true })
       setTimeout(() => {
         if (e.report_id) router.push(`/report/${e.report_id}`)
       }, 1200)

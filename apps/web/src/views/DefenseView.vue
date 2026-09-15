@@ -18,8 +18,10 @@ import {
 } from '@/api/practice'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { VoiceRecorder, MIN_RECORD_MS, micErrorMessage } from '@/audio/recorder'
+import { useBlobAudio } from '@/composables/useBlobAudio'
 
 const router = useRouter()
+const { createUrl, revokeUrl, releaseAll } = useBlobAudio()
 
 const form = ref({
   title: '基于大模型的 AI 口语训练平台设计与实现',
@@ -44,6 +46,8 @@ const hitInfo = ref('')
 const coach = ref<string | null>(null)
 const error = ref<string | null>(null)
 let pollTimer: ReturnType<typeof setInterval> | null = null
+let abort = new AbortController()
+let reportTimer: ReturnType<typeof setTimeout> | null = null
 
 const recorder = new VoiceRecorder()
 recorder.onStateChange = (s) => {
@@ -60,6 +64,9 @@ recorder.onStop = (blob, _mime, durationMs) => {
 
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
+  if (reportTimer) clearTimeout(reportTimer)
+  abort.abort()
+  releaseAll()
 })
 
 async function submit() {
@@ -104,10 +111,11 @@ function pollStatus(id: number) {
 
 async function startSession() {
   if (!profileId.value) return
+  abort = new AbortController()
   const session = await createSession({ kind: 'defense', profile_id: profileId.value })
   sessionId.value = session.id
   stage.value = 'session'
-  await track('scene_start', { targetType: 'defense', targetId: profileId.value })
+  await track('scene_start', { targetType: 'defense', targetId: profileId.value, beacon: true })
   await sendServe('start')
 }
 
@@ -118,7 +126,7 @@ async function sendServe(action: 'start' | 'next') {
   formData.append('expected_turn', String(questionIndex.value))
   streamTurn(sessionId.value!, formData, onSseEvent, (e) => {
     error.value = (e as Error).message
-  })
+  }, abort.signal)
 }
 
 function onSseEvent(e: SseStreamEvent) {
@@ -129,10 +137,19 @@ function onSseEvent(e: SseStreamEvent) {
         answerLevel.value = null
         hitInfo.value = ''
         coach.value = null
-        void tts(e.question).then((blob) => new Audio(URL.createObjectURL(blob)).play()).catch(() => undefined)
+        void tts(e.question)
+          .then((blob) => {
+            const url = createUrl(blob)
+            const audio = new Audio(url)
+            audio.onended = () => revokeUrl(url)
+            void audio.play()
+          })
+          .catch(() => undefined)
       }
       break
     case 'turn_end':
+      // R-13：权威轮次纠偏（answer() 的乐观 +1 以服务端回带为准）
+      questionIndex.value = e.expected_turn != null ? e.expected_turn : questionIndex.value
       break
     case 'meta_block':
       answerLevel.value = e.level ?? null
@@ -141,7 +158,8 @@ function onSseEvent(e: SseStreamEvent) {
       break
     case 'session_end':
       error.value = e.summary ?? '答辩完成！'
-      setTimeout(() => {
+      reportTimer = setTimeout(() => {
+        reportTimer = null
         if (e.report_id) router.push(`/report/${e.report_id}`)
       }, 1200)
       break
@@ -185,7 +203,7 @@ async function answer(blob: Blob) {
   questionIndex.value += 1
   streamTurn(sessionId.value!, formData, onSseEvent, (e) => {
     error.value = (e as Error).message
-  })
+  }, abort.signal)
 }
 
 async function nextQuestion() {

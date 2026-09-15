@@ -1,0 +1,355 @@
+/*
+ * UIC 概念原型 · 共享设计令牌与组件样式（v2）
+ * 来源：.trae/skills/ui-concept-design/tokens/design-tokens.md（唯一来源，禁止自造取值）
+ * v2 修订（对照参考帧返工）：尺度整体放大 / 纸面次级按钮=白底描边变体 / 图标块=实色深底白图标 /
+ * 深色卡 badge=chip / 新增 pop-green 插画色 / 点线时间轴。
+ * 只被 views/preview/uic/ 下的 3 个概念页引用；生产构建随预览子树整枝剔除。
+ */
+:root {
+  /* §1 色彩 */
+  --uic-paper: #f5f4f1;
+  --uic-paper-grid: #eae8e3;
+  --uic-card: #ffffff;
+  --uic-ink: #1c1c1a;
+  --uic-ink-pressed: #000000;
+  --uic-ink-hover: #333330;
+  --uic-sub: #6f6f6a;
+  --uic-weak: #a6a6a0;
+  --uic-track: #eceae5;
+  --uic-track-hover: #e2e0da;
+  --uic-accent: #2f6bff;
+  --uic-star: #ffc83d;
+  --uic-pop-green: #a8e05f;
+  --uic-pop-green-soft: #c6ef8d;
+  --uic-success: #16a34a;
+  --uic-error: #dc2626;
+  --uic-divider: #efede8;
+
+  /* 有色深色卡片 */
+  --uic-dark-navy: #232044;
+  --uic-dark-purple: #3a2440;
+  --uic-dark-green: #1e2b26;
+  --uic-dark-teal: #16303a;
+  --uic-dark-badge-bg: #4c3a6e;
+  --uic-dark-badge-text: #b9a8ff;
+
+  /* §2 圆角 */
+  --uic-r-card: 24px;
+  --uic-r-inner: 18px;
+  --uic-r-pill: 999px;
+  --uic-r-chip: 12px;
+
+  /* §5 阴影：唯一一档，可省略 */
+  --uic-shadow-card: 0 8px 24px rgba(28, 28, 26, 0.06);
+  --uic-shadow-float: 0 2px 8px rgba(28, 28, 26, 0.08);
+
+  /* §3 排版：双字体栈（西文 Segoe UI / 中文 Microsoft YaHei UI） */
+  --uic-font:
+    'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+}
+
+/* ============ 基础 ============ */
+.uic-scope {
+  font-family: var(--uic-font);
+  color: var(--uic-ink);
+  background: var(--uic-paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+.uic-page {
+  min-height: 100vh;
+  padding: 56px 40px;
+  box-sizing: border-box;
+}
+
+/* ============ 按钮（全部胶囊；禁止彩色渐变） ============ */
+.uic-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 32px;
+  border: none;
+  border-radius: var(--uic-r-pill);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out;
+}
+
+.uic-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* Primary：ink 实心，白字（ref-profile-card-stats "Send offer"） */
+.uic-btn--primary {
+  background: var(--uic-ink);
+  color: #fff;
+}
+
+.uic-btn--primary:hover {
+  background: var(--uic-ink-hover);
+}
+
+.uic-btn--primary:active {
+  background: var(--uic-ink-pressed);
+}
+
+/* Secondary A · 纸面上：白底 + 1.5px ink 描边（ref-landing-hero-light "View Leaderboard"） */
+.uic-btn--outline {
+  background: var(--uic-card);
+  color: var(--uic-ink);
+  border: 1.5px solid rgba(28, 28, 26, 0.85);
+}
+
+.uic-btn--outline:hover {
+  background: #fafaf8;
+  border-color: rgba(28, 28, 26, 0.6);
+}
+
+.uic-btn--outline:active {
+  background: var(--uic-track);
+  border-color: var(--uic-ink);
+}
+
+/* Secondary B · 白卡上：track 灰底（ref-profile-card-stats "Message"） */
+.uic-btn--secondary {
+  background: var(--uic-track);
+  color: var(--uic-ink);
+}
+
+.uic-btn--secondary:hover {
+  background: var(--uic-track-hover);
+}
+
+.uic-btn--secondary:active {
+  background: #d8d6d0;
+}
+
+/* Ghost：1.5px 白 60% 描边，透明底（ref-image-card-overlay "Buy now"，仅深色/图片上） */
+.uic-btn--ghost {
+  background: transparent;
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+}
+
+.uic-btn--ghost:hover {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* 危险：白底 error 红字（不是红底！）hover 才浅红底 */
+.uic-btn--danger {
+  background: var(--uic-card);
+  color: var(--uic-error);
+}
+
+.uic-btn--danger:hover {
+  background: #fef2f2;
+}
+
+/* ============ 分段控件（ref-segmented-pill · 高 56px） ============ */
+.uic-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 56px;
+  padding: 4px;
+  background: var(--uic-track);
+  border-radius: var(--uic-r-pill);
+}
+
+.uic-segment__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 24px;
+  border: none;
+  border-radius: var(--uic-r-pill);
+  background: transparent;
+  color: var(--uic-sub);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease-out,
+    color 150ms ease-out,
+    box-shadow 150ms ease-out;
+}
+
+.uic-segment__item :deep(svg),
+.uic-segment__item svg {
+  width: 24px;
+  height: 24px;
+}
+
+.uic-segment__item:hover {
+  color: var(--uic-ink);
+}
+
+/* 选中 = 白胶囊浮起（微阴影），底变 card + 字变 ink */
+.uic-segment__item--active {
+  background: var(--uic-card);
+  color: var(--uic-ink);
+  box-shadow: var(--uic-shadow-float);
+}
+
+/* ============ 卡片（ref-card-light-timeline） ============ */
+.uic-card {
+  background: var(--uic-card);
+  border-radius: var(--uic-r-card);
+  box-shadow: var(--uic-shadow-card);
+}
+
+/* 卡片内嵌图片/缩略图 */
+.uic-card__media {
+  border-radius: var(--uic-r-inner);
+  overflow: hidden;
+}
+
+/* 图标块：品牌色/深色实底 + 白色线性图标 r-14（Burrito Bowl 深棕块）
+   —— 禁止浅 tint 底 + 彩图标（v1 用错了，参考帧是实底） */
+.uic-icon-block {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  flex: none;
+  color: #fff;
+}
+
+.uic-icon-block svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* ============ 标签胶囊 Badge（浅色卡 = pill；深色卡 = chip） ============ */
+.uic-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 12px;
+  border-radius: var(--uic-r-pill);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 深色卡上的 badge：12px 圆角 chip + 同色系提亮 */
+.uic-badge--chip {
+  border-radius: var(--uic-r-chip);
+}
+
+.uic-badge--new {
+  background: #e8edff;
+  color: var(--uic-accent);
+}
+
+.uic-badge--success {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.uic-badge--star {
+  background: #fff4d6;
+  color: #b45309;
+}
+
+.uic-badge--error {
+  background: #fee2e2;
+  color: var(--uic-error);
+}
+
+.uic-badge--neutral {
+  background: var(--uic-track);
+  color: var(--uic-sub);
+}
+
+/* ============ 统计行（ref-profile-card-stats · 数字 32px+） ============ */
+.uic-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.uic-stat__label {
+  font-size: 13px;
+  color: var(--uic-weak);
+}
+
+.uic-stat__value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--uic-ink);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.uic-stat__value--accent {
+  color: var(--uic-accent);
+}
+
+/* ============ 深色展示卡（每屏最多 1 张；禁止纯黑/灰系） ============ */
+.uic-dark-card {
+  border-radius: var(--uic-r-card);
+  color: #fff;
+}
+
+/* ============ 文字层级（§3 · 大尺度） ============ */
+.uic-display {
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 1.12;
+  color: var(--uic-ink);
+  letter-spacing: -1px;
+}
+
+.uic-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--uic-ink);
+}
+
+.uic-body {
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--uic-sub);
+}
+
+.uic-caption {
+  font-size: 13px;
+  color: var(--uic-weak);
+}
+
+/* ============ 点线时间轴（ref-card-light-timeline） ============ */
+.uic-dotline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--uic-weak);
+}
+
+.uic-dotline__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--uic-accent);
+  flex: none;
+}
+
+.uic-dotline__line {
+  flex: 1;
+  border-top: 1.5px dashed var(--uic-paper-grid);
+}

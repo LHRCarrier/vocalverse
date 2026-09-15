@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Java 日志控制台编码固定 UTF-8（Windows 中文终端默认 936 码页 + JDK18+ stdout.encoding 跟随平台，
+  会输出 GBK 字节导致中文乱码——docs/06 §11 同款踩坑的根治方案：logback 层面声明 charset，
+  不依赖 jvmArguments/终端码页；pattern 与 application.yml 的 logging.pattern.console 保持一致）。
+-->
+<configuration>
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:-}] %logger{36} - %msg%n</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+</configuration>

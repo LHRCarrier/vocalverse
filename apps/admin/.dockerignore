@@ -1,0 +1,7 @@
+# 管理端控制台构建上下文排除项（docs/50 §13.1）
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log

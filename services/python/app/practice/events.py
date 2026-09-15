@@ -1,15 +1,20 @@
 """SSE 回合事件协议（docs/14 §3.3 定格；前端手写同名类型，不进 gen:api）。
 
 事件边界语法：`\n\n` 分隔、单事件单 `data:` 行（JSON 序列化后无换行）。
-心跳：服务端每 ≤30s 推 `: ping` 注释行（本节不做，由路由层实现）。
+心跳（R-18，2026-09-07 落地）：服务端每 ≤30s 推 `: ping` 注释行（docs/14 §3.3 /
+审计 R-18：此前注释行协议已登记但**路由层零实现**，客户端也无 idle 超时）。
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any, Literal
 
 import pydantic
+
+# 心跳注释行（协议：以 ':' 开头，前端解析器忽略但会重置 idle 计时）
+PING_LINE = ": ping\n\n"
 
 
 class TurnStart(pydantic.BaseModel):
@@ -17,6 +22,14 @@ class TurnStart(pydantic.BaseModel):
     turn_index: int
     reference_text: str | None = None
     question: str | None = None  # defense：本轮到 AI 提问
+
+
+class UserTranscript(pydantic.BaseModel):
+    """用户 ASR 转写回显（2026-09-08 新增：前端把用户说的话作为聊天气泡展示）。"""
+
+    type: Literal["user_transcript"] = "user_transcript"
+    turn_index: int
+    text: str
 
 
 class TextDelta(pydantic.BaseModel):
@@ -27,6 +40,9 @@ class TextDelta(pydantic.BaseModel):
 class AudioChunk(pydantic.BaseModel):
     type: Literal["audio_chunk"] = "audio_chunk"
     url: str
+    #: 单句音频时长估算（秒，服务端 MP3 帧头估算，docs/44 P1-C / vtts-04）。
+    #: None=不可估算或旧端兼容——sse_payload 用 exclude_none，字段缺失时前端安全忽略。
+    duration: float | None = None
 
 
 class MetaBlock(pydantic.BaseModel):
@@ -36,6 +52,8 @@ class MetaBlock(pydantic.BaseModel):
     corpus_hits: list[dict[str, Any]] = pydantic.Field(default_factory=list)
     difficulty_delta: int = 0
     conclude: bool = False
+    content: dict | None = None  # ③ 语义子分：内容相关度 {score,note}（LLM 判定，不进总分）
+    vocab: dict | None = None  # ③ 语义子分：词汇多样性 {score,note}（LLM 判定，不进总分）
     level: str | None = None  # defense：作答等级 green/yellow/red
     hits: dict | None = None  # defense：要点命中 {hits: [...], total: n}
 
@@ -58,6 +76,13 @@ class TurnEnd(pydantic.BaseModel):
     type: Literal["turn_end"] = "turn_end"
     turn_index: int
     score_status: Literal["ok", "pending", "unavailable"] = "ok"
+    #: R-13 / va-arch-09：服务端权威轮次（本回合完成后 state.current_turn）——
+    #: 客户端下轮提交的 expected_turn；断线/刷新后的乐观计数以此纠偏（根治 40903「重来」）
+    expected_turn: int | None = None
+    #: B4 词级时间轴（2026-09-09）：用户 utterance 的 ASR 词时间戳快照
+    #: [{word, start, end, ...}]（秒）——前端逐词高亮/回放对轴（exclude_none 语义：
+    #: 无词（降级/轻回合）时字段缺省，旧端安全忽略）
+    words: list[dict[str, Any]] | None = None
 
 
 class SessionEnd(pydantic.BaseModel):
@@ -68,10 +93,54 @@ class SessionEnd(pydantic.BaseModel):
 
 
 StreamEvent = (
-    TurnStart | TextDelta | AudioChunk | MetaBlock | ScoreDelta | StreamError | TurnEnd | SessionEnd
+    TurnStart
+    | UserTranscript
+    | TextDelta
+    | AudioChunk
+    | MetaBlock
+    | ScoreDelta
+    | StreamError
+    | TurnEnd
+    | SessionEnd
 )
 
 
 def sse_payload(event: StreamEvent) -> str:
     """序列化为 SSE data 行（事件为单行 JSON，无换行）。"""
     return f"data: {json.dumps(event.model_dump(exclude_none=True), ensure_ascii=False)}\n\n"
+
+
+async def heartbeat_stream(inner, interval_s: float, serialize=sse_payload):
+    """给异步事件生成器加心跳（R-18 / 审计 R-18）：静默 ≥ interval_s 时推 `: ping` 注释行。
+
+    **关键设计（健壮性）**：决不用 `asyncio.wait_for(anext(...))` —— 超时会取消生成器
+    内部正在等待的 LLM/ASR 协程（CancelledError 属 BaseException，直接杀死整个流）。
+    改用 `asyncio.wait(FIRST_COMPLETED)` 竞争：
+    - 事件先到 → 取消本轮 sleep、透传事件（顺序不变）；
+    - sleep 先到（静默）→ **不取消** 仍挂起的 anext 任务（复用），只 yield 心跳行；
+    生成器结束到（StopAsyncIteration）→ 正常返回。
+    """
+    if interval_s <= 0:
+        # 「关闭心跳」语义（配置注释 0=关闭）：透传内部流，避免 sleep(0) 忙循环 PING 行
+        # （2026-09-07 评审复现：0.063s 产出 1363 行 `: ping`，见 PR#30）。
+        async for event in inner:
+            yield serialize(event)
+        return
+    it = inner.__aiter__()
+    next_task: asyncio.Task | None = None
+    while True:
+        if next_task is None or next_task.done():
+            next_task = asyncio.ensure_future(it.__anext__())
+        sleep = asyncio.ensure_future(asyncio.sleep(interval_s))
+        done, _ = await asyncio.wait({next_task, sleep}, return_when=asyncio.FIRST_COMPLETED)
+        if next_task in done:
+            sleep.cancel()
+            try:
+                event = next_task.result()
+            except StopAsyncIteration:
+                return
+            next_task = None
+            yield serialize(event)
+        else:
+            sleep.cancel()
+            yield PING_LINE

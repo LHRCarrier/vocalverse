@@ -8,6 +8,19 @@ on:
       # 契约快照/生成文件变更也重新对账（ContractSnapshotTest，docs/06 §7）
       - "apps/web/src/api/specs/java-openapi.json"
       - "apps/web/src/api/generated/java-api.d.ts"
+  # 手动补跑（2026-09-07 评审处置）与 push(main) 兜底（2026-09-10 补）。
+  # **论断更正（2026-09-14 · PR#34 评审 Q1）**：旧注释写的"本仓 pull_request 触发当前未生效"与
+  # "java-ci/frontend-ci 自 2026-09-07 起再无自动运行"已被 PR#34 实证**证伪**——该 PR 的 4 个 check
+  # 全部由 `pull_request` 事件在 PR head（314ad7d）上真实跑过（java 34544126422 等，见 PR#34 评论）。
+  # 保留 push(main) 的理由改为**纵深防御**（合入 main 后再验一次），不再是"PR 触发不可靠"。
+  push:
+    branches: [main]
+    paths:
+      - "services/java/**"
+      - ".github/workflows/java-ci.yml"
+      - "apps/web/src/api/specs/java-openapi.json"
+      - "apps/web/src/api/generated/java-api.d.ts"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -30,7 +43,19 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Gate — JPQL 不得出现 PG 无类型参数（真 PG 实测缺陷族，H2 测不出）
+        # 2026-09-10：`(:p is null or …)`（时间戳）与 `concat('%', :q, '%')` 里的裸参数
+        # 会让 PostgreSQL 在 Parse 阶段拒绝整条 SQL（could not determine data type of parameter /
+        # function lower(bytea) does not exist），而 H2 全绿 —— 实测 publish-events / audit-logs / users
+        # 三个端点清空筛选即 500。此门禁把这一类钉死在提交前。
+        working-directory: .
+        run: python3 scripts/check_pg_typed_params.py
+
       - name: Verify (spotless:check + tests)
+        # J-07（2026-09-08）：@Tag("integration")（真 PG Testcontainers）由 surefire
+        # excludedGroups 默认排除——本 job 即 CI 单测档；本地必跑集成：
+        #   cd services/java && mvn verify -Pintegration
+        # （需 Docker + uv；schema 迁移走 services/python alembic upgrade head）
         run: mvn -B -ntp verify -DskipITs
         env:
           MAVEN_OPTS: -Xmx1024m

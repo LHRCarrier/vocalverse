@@ -1,0 +1,11 @@
+{
+  "appId": "com.vocalverse.app",
+  "appName": "VocalVerse",
+  "webDir": "../web/dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

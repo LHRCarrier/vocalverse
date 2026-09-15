@@ -141,6 +141,15 @@ class PitchRefStatus:
     INVALID = "invalid"
 
 
+class PitchJobStatus:
+    """参考旋律提取任务状态（pitch_extract_jobs，2026-09-09 唱歌 P0 D2/D6）。"""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
 class PlacementQuestionKind:
     READ = "read"
     QA = "qa"
@@ -155,6 +164,7 @@ class SessionKinds:
     DIALOG = "dialog"
     SING = "sing"
     DEFENSE = "defense"  # 答辩会话（docs/14 §6.1，2026-09 拍板）
+    SHADOW = "shadow"  # 影子跟读会话（local/31 §2.4，2026-09-02 设计）
 
 
 class SessionStatus:
@@ -174,6 +184,23 @@ class AttemptKinds:
     FREE_PRACTICE = "free_practice"
     PLACEMENT_ITEM = "placement_item"
     DEFENSE_ANSWER = "defense_answer"  # 答辩作答（docs/14 §6.1，2026-09 拍板）
+    SHADOW_SPEECH = "shadow_speech"  # 影子跟读录音（local/31 §2.4，2026-09-02 设计）
+
+
+class DifficultySources:
+    """素材难度来源（local/28 §4；local/31 §2.2）。推荐侧只看 diff_level/diff_score，不区分来源。"""
+
+    EXPERT = "expert"  # 专家规则先验（样本 <30）
+    BLEND = "blend"  # 先验+行为标定混合（30 ≤ n < 100）
+    CALIBRATED = "calibrated"  # 行为主导（n ≥ 100，κ→1）
+
+
+class MasteryStatus:
+    """句级/场景级掌握度状态（local/29 §5.1）。"""
+
+    NOT_MASTERED = "not_mastered"
+    IN_PROGRESS = "in_progress"
+    MASTERED = "mastered"
 
 
 class EventTypes:
@@ -192,6 +219,18 @@ class EventTypes:
     PRACTICE_COMPLETE = "practice_complete"
     FUN_ACTION = "fun_action"
     CORPUS_HIT = "corpus_hit"  # 语言点覆盖度命中（docs/14 §6.3，2026-09 拍板）
+    FREE_CHAT_OPEN = "free_chat_open"  # 自由对话进页（docs/14 §12.3，2026-09-05）
+    FREE_CHAT_TURN = "free_chat_turn"  # 自由对话每回合（payload audio: bool；docs/14 §12.3）
+    FREE_CHAT_SWITCH = "free_chat_switch"  # 功能行切场景（payload to: scene；docs/14 §12.3）
+    FREE_CHAT_RESET = "free_chat_reset"  # 自由对话功能行：新对话（docs/14 §12.3）
+    FREE_CHAT_RATE = "free_chat_rate"  # 自由对话功能行：语速切换（payload rate；docs/14 §12.3）
+    # 读书域（docs/45 §9 · docs/46 B-15：新增事件须四处同步——本常量 + analytics CHECK
+    # + 迁移扩 CHECK + 前端 EventName 联合 + docs/06 §9.1 登记）
+    WORD_LOOKUP = "word_lookup"  # 点词查义（payload word: str）
+    VOCAB_ADD = "vocab_add"  # 加入生词本（payload word: str, book_id: int）
+    ANNOTATION_ADD = "annotation_add"  # 划词批注（payload kind: str）
+    TTS_PLAY = "tts_play"  # 听书播放（payload chapter_id: int, sentence_idx: int）
+    TTS_PREPARE = "tts_prepare"  # 整章预合成（payload chapter_id: int, total: int）
 
 
 class TicketStatuses:

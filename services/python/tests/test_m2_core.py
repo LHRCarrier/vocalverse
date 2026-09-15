@@ -51,6 +51,26 @@ def test_extract_meta_ok():
     assert result.coach_note == "Nice!"
 
 
+def test_extract_meta_semantic_subscores():
+    """③ 语义子分：content/vocab 解析 + 非 dict 防御（模型裸数字不崩、不伪造）。"""
+    meta = render_meta(
+        {"score": 90, "errors": []},
+        "Nice!",
+        [],
+        0,
+        False,
+        content={"score": 88, "note": "On-topic."},
+        vocab={"score": 84, "note": "Good variety."},
+    )
+    result = extract_meta("Hello. " + meta)
+    assert result.content == {"score": 88, "note": "On-topic."}
+    assert result.vocab == {"score": 84, "note": "Good variety."}
+    # 防御：裸数字/字符串 meta 项 → properties 返回 None（不崩、不伪造）
+    m2 = extract_meta("a [-META-]" + '{"content": 77, "vocab": "88", "conclude": false}')
+    assert m2.ok
+    assert m2.content is None and m2.vocab is None
+
+
 def test_extract_meta_missing_degrade():
     result = extract_meta("Just a plain reply without meta.")
     assert result.ok is False and result.reply == "Just a plain reply without meta."
@@ -83,8 +103,8 @@ async def test_state_ttl():
     state = SessionState(session_id=7, kind="dialog")
     await store.put(state)
     assert (await store.get(7)) is not None
-    # 手动过期
-    store._data[7] = (state, time.time() - 1)
+    # 手动过期：P0-1 门面化后测试环境强制内存后端（get_redis→None），内部实现为 _impl
+    store._impl._data[7] = (state, time.time() - 1)
     assert (await store.get(7)) is None
 
 
@@ -236,6 +256,77 @@ def test_turn_stale_expected_turn_rejected(client, auth_headers):
     assert resp.status_code == 409
 
 
+def test_fluency_features_flow_into_attempt_and_report(client, auth_headers):
+    """集成：对话回合（Fake ASR 词级时间戳）→ attempts.wpm/details.fluency → 报告透出。
+
+    修复前 wpm 列从未写入（attempts.wpm 恒 NULL），流利度时间戳特征无处呈现。
+    Fake 词表含 1.05s 停顿：wpm=145.83 / pause_count=1 / long_pause_count=1。
+    """
+    from app.db import get_session_factory
+    from app.models import Attempt, Scenario
+    from sqlalchemy import select
+
+    db = get_session_factory()()
+    scenario = Scenario(
+        title="流利度特征测试",
+        scene_type="cafe",
+        difficulty=1,
+        system_prompt="You are Bella, a friendly barista.",
+        opening_line="Hi there!",
+        target_corpus="I'd like a coffee, please.|请给我来杯咖啡",
+        interest_tags=[],
+        status="published",
+    )
+    db.add(scenario)
+    db.commit()
+    sid = scenario.id
+    db.close()
+
+    resp = client.post(
+        "/api/v1/sessions", json={"kind": "dialog", "scenario_id": sid}, headers=auth_headers
+    )
+    session_id = resp.json()["data"]["id"]
+    resp = client.post(
+        f"/api/v1/sessions/{session_id}/turns",
+        data={"action": "normal"},
+        files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    # ③ 语义子分经 Fake META（stream_rich render_meta content/vocab）透出到 SSE
+    assert '"content": {"score": 88' in resp.text
+    assert '"vocab": {"score": 84' in resp.text
+
+    db = get_session_factory()()
+    try:
+        attempt = db.execute(select(Attempt).where(Attempt.session_id == session_id)).scalar_one()
+        assert attempt.wpm is not None
+        assert float(attempt.wpm) == 145.83
+        features = (attempt.details or {}).get("fluency")
+        assert features["word_count"] == 7
+        assert features["pause_count"] == 1
+        assert features["long_pause_count"] == 1
+        assert features["max_pause_s"] == 1.05
+    finally:
+        db.close()
+
+    resp = client.post(f"/api/v1/sessions/{session_id}/complete", headers=auth_headers)
+    assert resp.status_code == 200
+    report_id = resp.json()["data"]["report_id"]
+    resp = client.get(f"/api/v1/reports/{report_id}", headers=auth_headers)
+    assert resp.status_code == 200
+    attempts = resp.json()["data"]["metrics"]["attempts"]
+    assert attempts[0]["wpm"] == 145.83
+    assert attempts[0]["fluency_features"]["pause_count"] == 1
+    assert attempts[0]["fluency_features"]["wpm"] == 145.83
+    # ③ 报告语义子分聚合（Fake META：content 88 / vocab 84，1 轮）
+    semantic = resp.json()["data"]["metrics"]["semantic"]
+    assert semantic == {
+        "content": {"score": 88.0, "turns": 1},
+        "vocab": {"score": 84.0, "turns": 1},
+    }
+
+
 def test_defense_profile_lifecycle(client, auth_headers):
     resp = client.post(
         "/api/v1/defense/profiles",
@@ -294,6 +385,69 @@ def test_save_audio_and_ownership(client, auth_headers):
     assert resp.status_code == 403
 
 
+def test_published_song_asset_survives_ttl(client, auth_headers, settings):
+    """平台素材（已发布歌曲参考旋律）不受 24h 惰性过期约束，且**不得被物理删除**。
+
+    2026-09-10 BUG 回归（**修复前必失败**：旧实现「TTL+unlink」在素材豁免之前，
+    超 24h 的参考旋律会被点一次「听参考旋律」直接删除 → demo 曲库不可逆损坏）。
+    依据：docs/06 §8（音频存储与清理）、docs/21 §2.1 op11。
+    """
+    import os
+    import time
+    from pathlib import Path
+
+    from app.db import get_session_factory
+    from app.models import Song
+    from app.models.base import ContentStatus, PitchRefStatus
+
+    db = get_session_factory()()
+    try:
+        db.add(
+            Song(
+                title="TTL Probe",
+                level=1,
+                audio_url="/data/audio/song_ttl_probe.wav",
+                status=ContentStatus.PUBLISHED,
+                pitch_ref_status=PitchRefStatus.READY,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    asset = Path(settings.audio_dir) / "song_ttl_probe.wav"
+    asset.parent.mkdir(parents=True, exist_ok=True)
+    asset.write_bytes(b"RIFF\x24\x00\x00\x00WAVEfmt ")  # 有效 wav 头（回放不解码内容）
+    expired = time.time() - (settings.audio_ttl_hours + 1) * 3600
+    os.utime(asset, (expired, expired))
+
+    resp = client.get("/api/v1/audio/song_ttl_probe.wav", headers=auth_headers)
+    assert resp.status_code == 200, resp.text  # 修复前：410 audio expired
+    assert asset.exists(), "平台素材被惰性清理删除（修复前行为）"
+
+
+def test_user_recording_still_expires_after_ttl(client, auth_headers, settings):
+    """用户录音的 24h 保留期不因上面的分流而失效（隐私口径回归护栏）。
+
+    素材豁免只对「已发布歌曲引用的文件」生效；普通录音超 TTL 仍应删除并 410（docs/06 §9.7）。
+    """
+    import time
+    from pathlib import Path
+
+    rec = Path(settings.audio_dir) / "deadbeef00.mp3"
+    rec.parent.mkdir(parents=True, exist_ok=True)
+    rec.write_bytes(b"ID3\x03\x00\x00\x00")
+    expired = time.time() - (settings.audio_ttl_hours + 1) * 3600
+    import os
+
+    os.utime(rec, (expired, expired))
+
+    resp = client.get("/api/v1/audio/deadbeef00.mp3", headers=auth_headers)
+    assert resp.status_code == 410
+    assert resp.json()["code"] == 41001
+    assert not rec.exists(), "超期用户录音应被惰性清理"
+
+
 # ---------------------------------------------------------------------------
 # 埋点：幂等去重
 # ---------------------------------------------------------------------------
@@ -316,14 +470,14 @@ def test_events_unknown_type_ignored(client, auth_headers):
     assert r.status_code == 200 and r.json()["data"]["dedup"] is True
 
 
-def test_event_types_all_10_insertable(client, auth_headers):
-    """docs/06 §9.1：10 类事件逐类可落库（防常量/CHECK 漂移）。"""
+def test_event_types_all_20_insertable(client, auth_headers):
+    """docs/06 §9.1：20 类事件逐类可落库（防常量/CHECK 漂移；15 类既有 + 读书域 5 类）。"""
     import time
 
     from app.models.base import EventTypes
 
     allowed = {v for k, v in vars(EventTypes).items() if k.isupper() and not k.startswith("__")}
-    assert len(allowed) == 10, f"事件类应有 10 个：{allowed}"
+    assert len(allowed) == 20, f"事件类应有 20 个：{allowed}"
     now = int(time.time())
     for i, name in enumerate(sorted(allowed)):
         r = client.post(
@@ -354,6 +508,39 @@ def test_event_types_all_10_insertable(client, auth_headers):
 # ---------------------------------------------------------------------------
 # 限流：LLM 桶 429
 # ---------------------------------------------------------------------------
+def _make_dialog_session(client, auth_headers) -> int:
+    """建已发布场景 + 建会话，返回 session_id（与 test_full_dialog_turn_sse_flow 同款）。
+
+    归属校验（P0-3，2026-09-07）先于输入校验/限流：测试须用真实存在的会话，
+    否则会先撞 404/40401 而非被测分支。
+    """
+    from app.db import get_session_factory
+    from app.models import Scenario
+
+    db = get_session_factory()()
+    try:
+        scenario = Scenario(
+            title="回合守卫测试场景",
+            scene_type="cafe",
+            difficulty=1,
+            system_prompt="You are Bella, a friendly barista.",
+            opening_line="Hi there!",
+            target_corpus="I'd like a coffee, please.|请给我来杯咖啡",
+            interest_tags=[],
+            status="published",
+        )
+        db.add(scenario)
+        db.commit()
+        sid = scenario.id
+    finally:
+        db.close()
+    resp = client.post(
+        "/api/v1/sessions", json={"kind": "dialog", "scenario_id": sid}, headers=auth_headers
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()["data"]["id"]
+
+
 def test_rate_limit_429(client, auth_headers, monkeypatch):
     import app.core.ratelimit as rl
 
@@ -361,14 +548,60 @@ def test_rate_limit_429(client, auth_headers, monkeypatch):
         raise __import__("fastapi").HTTPException(status_code=429, detail="rate limited (llm)")
 
     monkeypatch.setattr(rl, "_redis_consume", fake_consume)
+    session_id = _make_dialog_session(client, auth_headers)
     resp = client.post(
-        "/api/v1/sessions/1/turns",
+        f"/api/v1/sessions/{session_id}/turns",
         data={"action": "normal"},
         files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
         headers=auth_headers,
     )
-    # 会话预检先于限流？依赖顺序先跑 → 429
+    # 顺序：归属 ✓ → 状态预检 ✓ → 音频校验 ✓ → 限流 → 429
     assert resp.status_code == 429
+
+
+def test_turn_rate_limit_buckets_by_action(client, auth_headers, monkeypatch):
+    """2026-09-07 评审：分桶按 action **实际消耗**扣（此前无差别扣 asr+ise+llm 三桶——
+    hint/demo/abandon 零管线消耗也扣，会误耗尽用户配额）。修复前 hint/abandon 断言失败。
+    """
+    import app.core.ratelimit as rl
+
+    buckets: list[str] = []
+
+    async def fake_consume(bucket, limit, user_id):
+        buckets.append(bucket)
+        return 0, 60
+
+    monkeypatch.setattr(rl, "_redis_consume", fake_consume)
+
+    def turn(session_id: int, action: str, audio: bool):
+        kwargs: dict = {"data": {"action": action}, "headers": auth_headers}
+        if audio:
+            kwargs["files"] = {"audio": ("a.webm", FAKE_AUDIO, "audio/webm")}
+        resp = client.post(f"/api/v1/sessions/{session_id}/turns", **kwargs)
+        assert resp.status_code == 200, resp.text
+
+    # normal（音频回合）：ASR + ISE + LLM 三桶各 1
+    sid = _make_dialog_session(client, auth_headers)
+    turn(sid, "normal", audio=True)
+    assert buckets == ["asr", "ise", "llm"], buckets
+
+    # start：无转写/评分，仅 LLM 首句
+    buckets.clear()
+    sid = _make_dialog_session(client, auth_headers)
+    turn(sid, "start", audio=False)
+    assert buckets == ["llm"], buckets
+
+    # hint（无音频轻分支）：零管线消耗 → 零扣
+    buckets.clear()
+    sid = _make_dialog_session(client, auth_headers)
+    turn(sid, "hint", audio=False)
+    assert buckets == [], buckets
+
+    # abandon（收尾）：仅 LLM 摘要
+    buckets.clear()
+    sid = _make_dialog_session(client, auth_headers)
+    turn(sid, "abandon", audio=False)
+    assert buckets == ["llm"], buckets
 
 
 # ---------------------------------------------------------------------------
@@ -399,9 +632,13 @@ def test_placement_size_guard_lets_normal_audio_through(client, auth_headers):
 
 
 def test_turn_rejects_empty_audio(client, auth_headers):
-    """对话回合同样挡空录音：否则会推进 current_turn 且不可重来。"""
+    """对话回合同样挡空录音：否则会推进 current_turn 且不可重来。
+
+    （P0-3 后顺序：归属校验 → 音频下界守卫 → 状态预检，故须用真实会话验证 40002。）
+    """
+    session_id = _make_dialog_session(client, auth_headers)
     resp = client.post(
-        "/api/v1/sessions/999999/turns",
+        f"/api/v1/sessions/{session_id}/turns",
         data={"action": "normal"},
         files={"audio": ("a.webm", b"\x1aE\xdf\xa3", "audio/webm")},
         headers=auth_headers,
@@ -410,12 +647,16 @@ def test_turn_rejects_empty_audio(client, auth_headers):
     assert resp.json()["code"] == 40002
 
 
-def test_stub_pipeline_endpoints_keep_no_lower_bound(client):
-    """/asr /score 是无状态管线端点，不消耗可耗尽资源 → 保持 min_bytes=0 的历史行为。"""
+def test_stub_pipeline_endpoints_keep_no_lower_bound(client, auth_headers):
+    """/asr /score 是无状态管线端点，不消耗可耗尽资源 → 保持 min_bytes=0 的历史行为。
+
+    （docs/19 P0-4 起需鉴权——auth_headers 直通；下界行为不变。）
+    """
     resp = client.post(
         "/api/v1/asr",
         files={"audio": ("tiny.wav", b"RIFF__tiny__", "audio/wav")},
         data={"language": "en"},
+        headers=auth_headers,
     )
     assert resp.status_code == 200, resp.text
     assert resp.json()["code"] == 0

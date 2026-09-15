@@ -74,7 +74,10 @@ class Event(CreatedAtMixin, Base):
         CheckConstraint(
             "event_type IN ('page_view', 'scene_start', 'recording_start', "
             "'recording_complete', 'score_event', 'recommend_impression', "
-            "'recommend_click', 'practice_complete', 'fun_action', 'corpus_hit')",
+            "'recommend_click', 'practice_complete', 'fun_action', 'corpus_hit', "
+            "'free_chat_open', 'free_chat_turn', 'free_chat_switch', "
+            "'free_chat_reset', 'free_chat_rate', 'word_lookup', 'vocab_add', "
+            "'annotation_add', 'tts_play', 'tts_prepare')",
             name="event_type",
         ),
         CheckConstraint(

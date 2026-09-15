@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import type { RouteRecordRaw } from 'vue-router'
 
+import { track } from '@/api/events'
 import { previewRoute } from './preview'
 
 /**
@@ -9,11 +10,115 @@ import { previewRoute } from './preview'
  * 懒加载：图表/动效等重依赖在各自的页面 chunk 里（按页动态 import），不进首屏。
  */
 const routes: RouteRecordRaw[] = [
+  /* ---- 移动端真形态（App 主界面 · 原型 ui-concept-design/app）---- */
+  {
+    path: '/m/home',
+    component: () => import('@/views/mobile/MobileHomeView.vue'),
+    meta: { title: '今日学习', requiresAuth: true },
+  },
+  {
+    path: '/m/free-chat',
+    component: () => import('@/views/mobile/MobileFreeChatView.vue'),
+    meta: { title: '自由对话', requiresAuth: true },
+  },
+  {
+    path: '/m/chat/:sceneId?',
+    component: () => import('@/views/mobile/MobileSpeakingView.vue'),
+    meta: { title: '场景对话', requiresAuth: true },
+  },
+  {
+    path: '/m/report',
+    component: () => import('@/views/mobile/MobileReportView.vue'),
+    meta: { title: '评分报告', requiresAuth: true },
+  },
+  {
+    path: '/m/sing',
+    component: () => import('@/views/mobile/MobileSingView.vue'),
+    meta: { title: '唱吧', requiresAuth: true },
+  },
+  {
+    path: '/m/learn',
+    component: () => import('@/views/mobile/MobileLearnView.vue'),
+    meta: { title: '学习', requiresAuth: true },
+  },
+  {
+    path: '/m/learn/:module',
+    component: () => import('@/views/mobile/MobileLearnModuleView.vue'),
+    meta: { title: '学习模块', requiresAuth: true },
+  },
+  {
+    path: '/m/notifications',
+    component: () => import('@/views/mobile/MobileNotificationsView.vue'),
+    meta: { title: '通知', requiresAuth: true },
+  },
+  {
+    path: '/m/messages',
+    component: () => import('@/views/mobile/MobileMessagesView.vue'),
+    meta: { title: '私信', requiresAuth: true },
+  },
+  {
+    path: '/m/messages/:id',
+    component: () => import('@/views/mobile/MobileChatView.vue'),
+    meta: { title: '私信', requiresAuth: true },
+  },
+  {
+    path: '/m/search',
+    component: () => import('@/views/mobile/MobileSearchView.vue'),
+    meta: { title: '搜索', requiresAuth: true },
+  },
+  {
+    path: '/m/compose',
+    component: () => import('@/views/mobile/MobileComposeView.vue'),
+    meta: { title: '发帖', requiresAuth: true },
+  },
+  /* ---- 社区 S3（docs/47 §5.1）：帖子详情 / 我的资料；均沉浸页（无底栏） ---- */
+  {
+    path: '/m/post/:postId',
+    component: () => import('@/views/mobile/MobilePostDetailView.vue'),
+    meta: { title: '内容', requiresAuth: true },
+  },
+  {
+    path: '/m/me/profile',
+    component: () => import('@/views/mobile/MobileProfileView.vue'),
+    meta: { title: '我的资料', requiresAuth: true },
+  },
+  {
+    path: '/m/me/posts',
+    component: () => import('@/views/mobile/MobileMyPostsView.vue'),
+    meta: { title: '我的发帖', requiresAuth: true },
+  },
+  {
+    path: '/m/notes',
+    component: () => import('@/views/mobile/MobileNotesView.vue'),
+    meta: { title: '笔记', requiresAuth: true },
+  },
+  /* ---- 读书域（docs/45 · 书架/书详情/阅读器/生词本；阅读器沉浸无底栏） ---- */
+  {
+    path: '/m/bookshelf',
+    component: () => import('@/views/mobile/MobileBookshelfView.vue'),
+    meta: { title: '书房', requiresAuth: true },
+  },
+  {
+    path: '/m/books/:bookId',
+    component: () => import('@/views/mobile/MobileBookDetailView.vue'),
+    meta: { title: '书籍详情', requiresAuth: true },
+  },
+  {
+    path: '/m/reader/:chapterId',
+    component: () => import('@/views/mobile/MobileReaderView.vue'),
+    meta: { title: '阅读', requiresAuth: true },
+  },
+  {
+    path: '/m/vocab',
+    component: () => import('@/views/mobile/MobileVocabView.vue'),
+    meta: { title: '生词本', requiresAuth: true },
+  },
+
   {
     path: '/',
     component: () => import('@/layouts/UserLayout.vue'),
     children: [
-      { path: '', redirect: '/demo' },
+      { path: '', redirect: '/m/home' },
       {
         path: 'demo',
         component: () => import('@/views/DemoView.vue'),
@@ -75,43 +180,10 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/LoginView.vue'),
     meta: { title: '登录' },
   },
-  {
-    path: '/admin',
-    component: () => import('@/layouts/AdminLayout.vue'),
-    redirect: '/admin/users',
-    children: [
-      {
-        path: 'users',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: { title: '用户管理' },
-        meta: { title: '用户管理' },
-      },
-      {
-        path: 'scenes',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: { title: '场景库' },
-        meta: { title: '场景库' },
-      },
-      {
-        path: 'songs',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: { title: '歌曲库' },
-        meta: { title: '歌曲库' },
-      },
-      {
-        path: 'tickets',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: { title: '工单' },
-        meta: { title: '工单' },
-      },
-      {
-        path: 'dashboard',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: { title: '评价看板' },
-        meta: { title: '评价看板' },
-      },
-    ],
-  },
+  // ⚠️ 旧管理端路由（`/admin` + AdminLayout + 5 个 PlaceholderView 子路由）已**删除**，
+  // 不再保留兼容壳：旧管理端已废弃，管理端唯一形态是独立控制台 `apps/admin`（入口 `/console/`）。
+  // 设计依据 docs/50 §2（ADR 修订申请 1）、docs/51 §1.3 C-1/C-9。删除 `/admin` 后该路径落到
+  // 底部 catch-all；如仍需旧书签可用，应在网关层把 `/admin` 302 到 `/console/`（部署侧处理，不在本路由表）。
 ]
 
 // 前端预览画廊：仅 DEV 注入（router/preview.ts 内 import.meta.env.DEV 三元，生产构建整支剔除）；
@@ -136,6 +208,12 @@ router.afterEach((to) => {
   document.title = to.meta.title
     ? `${String(to.meta.title)} · VocalVerse 声语界`
     : 'VocalVerse 声语界'
+  // 登录页专属 body 背景：mobile-uic.css 全局把 body 钉为移动端灰底（#edece8 !important），
+  // 退出登录（SPA 导航）后 body 残留该背景会让登录卡配色错位——用 .is-login 类切回纸白底（2026-09-06）。
+  document.body.classList.toggle('is-login', to.path === '/login')
+  // 页面曝光埋点（docs/06 §9.1 fe-06）：fire-and-forget，非关键路径不阻塞导航；
+  // 重复上报由后端 client_event_id 幂等去重兜底。
+  void track('page_view', { page: to.path })
 })
 
 export default router

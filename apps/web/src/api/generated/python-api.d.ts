@@ -28,7 +28,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Readyz */
+        /**
+         * Readyz
+         * @description 就绪探测：真实探 PG（SELECT 1）与 Redis（PING）；Redis 非必需时降级为 degraded。
+         */
         get: operations["readyz_readyz_get"];
         put?: never;
         post?: never;
@@ -143,6 +146,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Session Restore
+         * @description 会话恢复（R-13 / docs/21 §3.1 目标态）：刷新/断线后前端据此重建 UI 与轮次。
+         *
+         *     返回运行态（state/current_turn/next_seq）+ 最近消息快照；运行态缺失（StateStore
+         *     TTL 过期/进程重启）时以 scenario_messages 权威历史重建（state.py 注释口径：
+         *     「权威历史永远在 scenario_messages」）。归属校验同 /turns：不拥有 → 40401。
+         */
+        get: operations["get_session_restore_api_v1_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}/turns": {
         parameters: {
             query?: never;
@@ -199,6 +226,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audio/tts/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Tts Audio
+         * @description AI TTS 输出流（tts/ 前缀，独立路由；双段路径无法与 /audio/{name} 单段参数兼容）。
+         *
+         *     2026-09-07（用户实测 403）：流式多句音频只有首句落库（attempt/message 引用），
+         *     其余 chunk 无归属引用 → get_audio 归属校验 403。TTS 为会话内生成物（非隐私录音），
+         *     登录 + 未过期即放行；用户录音仍由 /audio/{name} 严格归属。
+         */
+        get: operations["get_tts_audio_api_v1_audio_tts__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audio/{name}": {
         parameters: {
             query?: never;
@@ -210,6 +261,148 @@ export interface paths {
         get: operations["get_audio_api_v1_audio__name__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/songs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Songs
+         * @description 已发布歌曲列表（读侧；写侧归 Java 管理端，Python 只读——docs/10 §3）。
+         *
+         *     ``favorited`` = 当前用户是否已收藏（收藏 tab 的唯一依据，2026-09-10）。
+         */
+        get: operations["list_songs_api_v1_songs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/songs/{song_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Song Detail
+         * @description 歌曲详情：逐句 LRC + 参考旋律 f0s（D3 双序列图数据源；就绪门禁由前端提示）。
+         */
+        get: operations["get_song_detail_api_v1_songs__song_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/songs/{song_id}/favorite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Add Song Favorite
+         * @description 收藏歌曲（幂等：重复收藏仍返回 favorited=true；歌曲不存在/未发布 → 40401）。
+         */
+        put: operations["add_song_favorite_api_v1_songs__song_id__favorite_put"];
+        post?: never;
+        /**
+         * Remove Song Favorite
+         * @description 取消收藏（幂等：未收藏时调用同样返回 favorited=false）。
+         */
+        delete: operations["remove_song_favorite_api_v1_songs__song_id__favorite_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Song Audio
+         * @description 整首跟唱音频上传 → 异步评分任务（20MB/180s；校验后扣桶，失败不扣）。
+         */
+        post: operations["upload_song_audio_api_v1_sessions__session_id__audio_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sing/attempts/{attempt_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Attempt Status */
+        get: operations["attempt_status_api_v1_sing_attempts__attempt_id__status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sing/attempts/{attempt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Attempt Result */
+        get: operations["attempt_result_api_v1_sing_attempts__attempt_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/free-chat/turn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Free Chat Turn
+         * @description 单轮自由对话：audio / text 至少其一（都空 → 422，流外预检）。
+         *
+         *     流内事件序（音频轮）：user_transcript → text_delta* → turn_end；打字轮：text_delta* → turn_end。
+         */
+        post: operations["free_chat_turn_api_v1_free_chat_turn_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -345,6 +538,778 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recommendations
+         * @description 推荐列表。type=scene 返回场景，type=shadow 返回影子跟读；limit 覆盖默认条数。
+         */
+        get: operations["recommendations_api_v1_recommendations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Books */
+        get: operations["list_books_api_v1_reading_books_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/books/{book_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Book Detail */
+        get: operations["book_detail_api_v1_reading_books__book_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/covers/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Book Cover
+         * @description 书封图（**公开**端点，无鉴权）。
+         *
+         *     为什么公开：书封是**非隐私的公版内容资产**，且 `<img src>` 不会带 Authorization 头 ——
+         *     若加鉴权，前端只能退回 fetch+blob（多一层内存与生命周期负担）。风险面被三重收窄：
+         *     只读、只服务 `data/seed/covers/` 白名单文件名、目录穿越由 `_SAFE_COVER_NAME` 挡掉。
+         *
+         *     资产位置：`data/seed/covers/`（随仓库分发，`.gitignore` 已豁免 `data/seed/**`）——
+         *     与 `books` 同属"内容域静态资产"，与用户上传的 `data/media/`（私有卷）刻意分开。
+         */
+        get: operations["book_cover_api_v1_reading_covers__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/chapters/{chapter_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chapter Detail */
+        get: operations["chapter_detail_api_v1_reading_chapters__chapter_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lookup */
+        post: operations["lookup_api_v1_reading_lookup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/vocab": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Vocab */
+        get: operations["list_vocab_api_v1_reading_vocab_get"];
+        put?: never;
+        /** Add Vocab */
+        post: operations["add_vocab_api_v1_reading_vocab_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/vocab/{vocab_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Vocab */
+        delete: operations["delete_vocab_api_v1_reading_vocab__vocab_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Vocab */
+        patch: operations["patch_vocab_api_v1_reading_vocab__vocab_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/reading/annotations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Annotations */
+        get: operations["list_annotations_api_v1_reading_annotations_get"];
+        put?: never;
+        /** Create Annotation */
+        post: operations["create_annotation_api_v1_reading_annotations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/annotations/{annotation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Annotation */
+        delete: operations["delete_annotation_api_v1_reading_annotations__annotation_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Annotation */
+        patch: operations["patch_annotation_api_v1_reading_annotations__annotation_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/reading/progress/{book_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Progress */
+        get: operations["get_progress_api_v1_reading_progress__book_id__get"];
+        /** Put Progress */
+        put: operations["put_progress_api_v1_reading_progress__book_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/voices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Voices */
+        get: operations["list_voices_api_v1_reading_voices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/chapters/{chapter_id}/tts/segment/{sentence_idx}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tts Segment */
+        get: operations["tts_segment_api_v1_reading_chapters__chapter_id__tts_segment__sentence_idx__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/tts/word/{word}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tts Word */
+        get: operations["tts_word_api_v1_reading_tts_word__word__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/chapters/{chapter_id}/tts/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tts Prepare */
+        post: operations["tts_prepare_api_v1_reading_chapters__chapter_id__tts_prepare_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading/tts/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tts Task Snapshot */
+        get: operations["tts_task_snapshot_api_v1_reading_tts_tasks__task_id__get"];
+        put?: never;
+        post?: never;
+        /** Tts Task Cancel */
+        delete: operations["tts_task_cancel_api_v1_reading_tts_tasks__task_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Mine
+         * @description 我的上传列表（配额排查/管理用；只读本人 ready 行）。
+         */
+        get: operations["list_mine_api_v1_media_get"];
+        put?: never;
+        /** Upload */
+        post: operations["upload_api_v1_media_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/media/{public_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download
+         * @description 二进制读取（匿名可用；``status='deleted'`` → 40403）。Range 由 FileResponse 处理。
+         */
+        get: operations["download_api_v1_media__public_id__get"];
+        put?: never;
+        post?: never;
+        /** Remove */
+        delete: operations["remove_api_v1_media__public_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/ops/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Overview
+         * @description 版本 / uptime / 依赖 / 并发额度 / 采集自监控（docs/50 §10.3 第一行）。
+         */
+        get: operations["overview_api_v1_console_ops_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/ops/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Services
+         * @description 依赖明细 —— 与 ``/readyz`` **同一函数**（docs/50 §9.4，口径必然一致）。
+         */
+        get: operations["services_api_v1_console_ops_services_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/ops/concurrency": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Concurrency */
+        get: operations["concurrency_api_v1_console_ops_concurrency_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/ops/metrics/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Metrics Catalog
+         * @description 可用指标目录（名称/单位/**口径**）—— 分位指标必须如实标注其定义来源。
+         */
+        get: operations["metrics_catalog_api_v1_console_ops_metrics_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/ops/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Metrics
+         * @description 时间窗 + step 聚合查询（docs/50 §8.5）。
+         *
+         *     两道闸门：**点数** ``(to-from)/step ≤ 5000``（超限 46007 + ``data.suggestedStep``）、
+         *     **成本** 单请求最多 ``MAX_METRICS_PER_REQUEST`` 个指标且总扫描行数 ≤ ``MAX_ROWS_FETCH``。
+         */
+        get: operations["metrics_api_v1_console_ops_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/ops/alerts/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Rules */
+        get: operations["list_rules_api_v1_console_ops_alerts_rules_get"];
+        put?: never;
+        /** Create Rule */
+        post: operations["create_rule_api_v1_console_ops_alerts_rules_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/ops/alerts/rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Rule
+         * @description **不实现硬删除**（docs/50 §5.3.12 + 迁移 0013：FK 改 ``RESTRICT``，历史事件须活过规则）。
+         *
+         *     返回 46010（"该状态下不允许的动作"）并指向停用姿势；控制台前端按此渲染"停用"按钮。
+         */
+        delete: operations["delete_rule_api_v1_console_ops_alerts_rules__rule_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Patch Rule
+         * @description 改阈值/窗口/冷却/严重级/启停（``enabled=false`` 即"停用"，替代删除）。
+         */
+        patch: operations["patch_rule_api_v1_console_ops_alerts_rules__rule_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/console/ops/alerts/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Events */
+        get: operations["list_events_api_v1_console_ops_alerts_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/ops/alerts/events/{event_id}/ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ack Event
+         * @description 认领（firing → acknowledged）；``acked_by`` 存管理员**用户名快照**（跨服务不加 FK）。
+         *
+         *     **无请求体是刻意的**，不是漏写：``ops_alert_events`` 只有 ``resolved_note`` 一列备注
+         *     （确认语义是"我看到了"，处置说明属于 resolve，docs/50 §5.3.12）。
+         *     旧控制台会随手带 ``{note}`` —— 若静默忽略，调用方会以为备注存下了而实际丢了
+         *     （"无痕写成功"正是本仓库反复踩的类型），故此处**显式拒绝非空请求体**并指路 resolve。
+         *     空体/``{}`` 一律放行（幂等调用不应因为多一个空对象就 422）。
+         */
+        post: operations["ack_event_api_v1_console_ops_alerts_events__event_id__ack_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/ops/alerts/events/{event_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve Event
+         * @description 处置完成（→ resolved）。**恢复不自动**：只有人点这一下才会 resolve（docs/50 §6.3）。
+         */
+        post: operations["resolve_event_api_v1_console_ops_alerts_events__event_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/ops/traces/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trace Stats
+         * @description 调用量 / 错误率 / p95 / token + **随时间趋势** + 按模型/状态分解（趋势与调优数据源）。
+         *
+         *     新增块（既有字段**一个没动**，控制台已按老形状消费）：
+         *
+         *     - ``trend``：按 **UTC 日**分桶、覆盖整个窗口、**缺失日补 0**（图要连续才读得出趋势）；
+         *       每日 ``duration_ms_p95`` 由该日 ``llm.duration_ms`` 直方图**合并后插值**得到，
+         *       该日无直方图样本时为 ``null``（不写 0 —— 0 会被读成"当天飞快"，是假信号）；
+         *     - ``by_model``：按主模型聚合，``trace_count`` 降序（同名次按 model 字典序，保证稳定）；
+         *       ``model IS NULL`` 归入 ``"(unknown)"``；
+         *     - ``by_status``：``ok|error|aborted|incomplete`` **四条恒在**（计数为 0 也返回），
+         *       控制台的图例因此不会随数据抖动。
+         *
+         *     **成本**：全部在**一次** ``asyncio.to_thread`` 里用一个会话跑 **4 条 SQL**
+         *     （状态聚合 / 日×状态聚合 / 模型聚合 / 直方图行），不是一次往返 —— 是 4 次
+         *     SQL 往返但只占 1 次线程与连接借还；相比改前的 4 条（count / count≠ok / sum / 直方图）
+         *     **净增 0**。直方图行有硬预算 ``MAX_HISTOGRAM_ROWS``：超预算则整段 p95 置 ``null``
+         *     并在 ``trend_meta.p95_available=false`` 说明，绝不拿部分直方图算一个错的 p95。
+         */
+        get: operations["trace_stats_api_v1_console_ops_traces_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/ops/traces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Traces */
+        get: operations["list_traces_api_v1_console_ops_traces_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/ops/traces/{trace_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trace Detail
+         * @description trace + span 树（一次 ``(trace_id, seq)`` 取全树，内存组树；硬上限 500 span）。
+         */
+        get: operations["trace_detail_api_v1_console_ops_traces__trace_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/ops/traces/{trace_id}/contents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trace Contents
+         * @description 内容流（**独立权限码** ``ops:trace:content:read``）。
+         *
+         *     未捕获时返回 ``data.captured=false``（而非空表 —— 让界面能区分"没采"与"采了但为空"）。
+         *     **每次读取都审计**：``admin_audit_logs`` 是 Java 写方，Python 侧只能 best-effort ——
+         *     本实现同时落 ``llm_traces.attrs.content_reads``（环形，最近 10 条）与一条带 admin id 的日志。
+         */
+        get: operations["trace_contents_api_v1_console_ops_traces__trace_id__contents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/ops/maintenance/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Purge
+         * @description 清理过期数据（docs/50 §9.3：trace 30 天 / 内容 72h / 指标 7 天）。
+         */
+        post: operations["purge_api_v1_console_ops_maintenance_purge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/library/books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Books */
+        get: operations["list_books_api_v1_console_library_books_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/library/books/{book_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Book
+         * @description 上/下架（``{status: draft|published|archived}``）；已经是目标状态 → 幂等返回。
+         */
+        post: operations["publish_book_api_v1_console_library_books__book_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/library/books/{book_id}/chapters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Chapters */
+        get: operations["list_chapters_api_v1_console_library_books__book_id__chapters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/library/chapters/{chapter_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Chapter
+         * @description 章节上/下架。下架后**必须**在阅读路径真的不可见（见 reading/service.py 的过滤谓词）。
+         */
+        post: operations["publish_chapter_api_v1_console_library_chapters__chapter_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/library/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Media */
+        get: operations["list_media_api_v1_console_library_media_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/library/media/{public_id}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hide Media
+         * @description 隐藏 / 恢复。
+         *
+         *     - ``hidden=true``：``ready → hidden``（行保留，可恢复）；已 ``deleted`` 的行不动
+         *       —— 用户自删是用户意志，管理员"恢复"不应让用户已删内容复活；
+         *     - ``hidden=false``：``hidden → ready``；``deleted`` 同样不动。
+         */
+        post: operations["hide_media_api_v1_console_library_media__public_id__hide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -367,6 +1332,99 @@ export interface components {
             segments?: {
                 [key: string]: unknown;
             }[];
+            /** Words */
+            words?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Duration
+             * @default 0
+             */
+            duration: number;
+            /**
+             * No Speech
+             * @default false
+             */
+            no_speech: boolean;
+        };
+        /** AnnotationView */
+        AnnotationView: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Start Offset */
+            start_offset: number;
+            /** End Offset */
+            end_offset: number;
+            /** Content Version */
+            content_version: number;
+            /** Sentence Idx */
+            sentence_idx?: number | null;
+            /** Text Snippet */
+            text_snippet?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /**
+         * AttemptResult
+         * @description 跟唱评分结果（`GET /api/v1/sing/attempts/{id}`；done 后可取）。
+         *
+         *     `overall` **允许为 null**：v4/v5 覆盖率 <40% 不给综合分（docs/06 §9.4 口径 v4 · R3）。
+         */
+        AttemptResult: {
+            /** Id */
+            id: number;
+            /** Song Id */
+            song_id: number;
+            /** Audio Url */
+            audio_url?: string | null;
+            /** Duration S */
+            duration_s?: number | null;
+            /** Overall */
+            overall?: number | null;
+            /** Pitch */
+            pitch?: number | null;
+            /** Rhythm */
+            rhythm?: number | null;
+            /** Pron */
+            pron?: number | null;
+            /** Is Complete */
+            is_complete: boolean;
+            /** Expected Lines */
+            expected_lines: number;
+            /** Scoring Version */
+            scoring_version: string;
+            /** Ref Version */
+            ref_version?: string | null;
+            /** Lines */
+            lines: components["schemas"]["ScoreLine"][];
+            alignment: components["schemas"]["SingAlignment"];
+            /** Created At */
+            created_at?: string | null;
+        };
+        /**
+         * AttemptStatus
+         * @description 任务状态（queued→processing→done|failed；轮询端点）。
+         *
+         *     `code` 仅失败态回带（50003 算法失败 / 50002 任务态丢失，docs/api/error-codes.md）。
+         */
+        AttemptStatus: {
+            /** Attempt Id */
+            attempt_id: number;
+            /** Status */
+            status: string;
+            progress: components["schemas"]["TaskProgress"];
+            /** Error */
+            error?: string | null;
+            /** Code */
+            code?: number | null;
         };
         /** Body_asr_api_v1_asr_post */
         Body_asr_api_v1_asr_post: {
@@ -377,6 +1435,18 @@ export interface components {
              * @default en
              */
             language: string;
+        };
+        /** Body_free_chat_turn_api_v1_free_chat_turn_post */
+        Body_free_chat_turn_api_v1_free_chat_turn_post: {
+            /** Audio */
+            audio?: string | null;
+            /** Text */
+            text?: string | null;
+            /**
+             * History
+             * @default []
+             */
+            history: string;
         };
         /** Body_llm_chat_api_v1_llm_chat_post */
         Body_llm_chat_api_v1_llm_chat_post: {
@@ -422,6 +1492,116 @@ export interface components {
              */
             rate: string;
         };
+        /** Body_tts_prepare_api_v1_reading_chapters__chapter_id__tts_prepare_post */
+        Body_tts_prepare_api_v1_reading_chapters__chapter_id__tts_prepare_post: {
+            /**
+             * Voice
+             * @default en-US-JennyNeural
+             */
+            voice: string;
+            /**
+             * Rate
+             * @default +0%
+             */
+            rate: string;
+        };
+        /** Body_upload_api_v1_media_post */
+        Body_upload_api_v1_media_post: {
+            /** File */
+            file: string;
+            /**
+             * Kind
+             * @default image
+             */
+            kind: string;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Duration S */
+            duration_s?: number | null;
+        };
+        /** Body_upload_song_audio_api_v1_sessions__session_id__audio_post */
+        Body_upload_song_audio_api_v1_sessions__session_id__audio_post: {
+            /** Audio */
+            audio: string;
+        };
+        /** BookDetailView */
+        BookDetailView: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Author */
+            author: string;
+            /** Description */
+            description?: string | null;
+            /** Level */
+            level: string;
+            /** Cover Color */
+            cover_color?: string | null;
+            /** Cover Emoji */
+            cover_emoji?: string | null;
+            /** Cover Url */
+            cover_url?: string | null;
+            /** Word Count */
+            word_count: number;
+            /** Chapter Count */
+            chapter_count: number;
+            progress?: components["schemas"]["ProgressView"] | null;
+            /**
+             * Chapters
+             * @default []
+             */
+            chapters: components["schemas"]["ChapterMetaView"][];
+        };
+        /** ChapterMetaView */
+        ChapterMetaView: {
+            /** Id */
+            id: number;
+            /** Chapter No */
+            chapter_no: number;
+            /** Title */
+            title: string;
+            /** Word Count */
+            word_count: number;
+            /** Char Count */
+            char_count: number;
+            /**
+             * Current
+             * @default false
+             */
+            current: boolean;
+        };
+        /** ChapterView */
+        ChapterView: {
+            /** Id */
+            id: number;
+            /** Book Id */
+            book_id: number;
+            /** Chapter No */
+            chapter_no: number;
+            /** Title */
+            title: string;
+            /** Content Version */
+            content_version: number;
+            /** Content */
+            content: string;
+            /**
+             * Paragraphs
+             * @default []
+             */
+            paragraphs: string[];
+            /**
+             * Sentences
+             * @default []
+             */
+            sentences: components["schemas"]["SentenceView"][];
+            /** Word Count */
+            word_count: number;
+            /** Char Count */
+            char_count: number;
+        };
         /**
          * ChatResult
          * @description LLM 场景扮演单轮回复。M2 多轮/流式扩展时更新契约（docs/06 §8）。
@@ -444,6 +1624,20 @@ export interface components {
             message: string;
             data?: components["schemas"]["ASRResult"] | null;
         };
+        /** Envelope[AnnotationView] */
+        Envelope_AnnotationView_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["AnnotationView"] | null;
+        };
         /** Envelope[Any] */
         Envelope_Any_: {
             /**
@@ -459,6 +1653,62 @@ export interface components {
             /** Data */
             data?: unknown;
         };
+        /** Envelope[AttemptResult] */
+        Envelope_AttemptResult_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["AttemptResult"] | null;
+        };
+        /** Envelope[AttemptStatus] */
+        Envelope_AttemptStatus_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["AttemptStatus"] | null;
+        };
+        /** Envelope[BookDetailView] */
+        Envelope_BookDetailView_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["BookDetailView"] | null;
+        };
+        /** Envelope[ChapterView] */
+        Envelope_ChapterView_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["ChapterView"] | null;
+        };
         /** Envelope[ChatResult] */
         Envelope_ChatResult_: {
             /**
@@ -472,6 +1722,76 @@ export interface components {
              */
             message: string;
             data?: components["schemas"]["ChatResult"] | null;
+        };
+        /** Envelope[FavoriteState] */
+        Envelope_FavoriteState_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["FavoriteState"] | null;
+        };
+        /** Envelope[LookupResultView] */
+        Envelope_LookupResultView_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["LookupResultView"] | null;
+        };
+        /** Envelope[MediaView] */
+        Envelope_MediaView_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["MediaView"] | null;
+        };
+        /** Envelope[PagedItems] */
+        Envelope_PagedItems_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["PagedItems"] | null;
+        };
+        /** Envelope[ProgressView] */
+        Envelope_ProgressView_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["ProgressView"] | null;
         };
         /** Envelope[ScoreResult] */
         Envelope_ScoreResult_: {
@@ -487,6 +1807,34 @@ export interface components {
             message: string;
             data?: components["schemas"]["ScoreResult"] | null;
         };
+        /** Envelope[SongDetail] */
+        Envelope_SongDetail_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["SongDetail"] | null;
+        };
+        /** Envelope[SubmitAck] */
+        Envelope_SubmitAck_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["SubmitAck"] | null;
+        };
         /** Envelope[TTSResult] */
         Envelope_TTSResult_: {
             /**
@@ -500,6 +1848,130 @@ export interface components {
              */
             message: string;
             data?: components["schemas"]["TTSResult"] | null;
+        };
+        /** Envelope[VocabAddView] */
+        Envelope_VocabAddView_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["VocabAddView"] | null;
+        };
+        /** Envelope[VocabView] */
+        Envelope_VocabView_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["VocabView"] | null;
+        };
+        /** Envelope[dict] */
+        Envelope_dict_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            /** Data */
+            data?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[dict[str, Any]] */
+        Envelope_dict_str__Any__: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            /** Data */
+            data?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[dict[str, bool]] */
+        Envelope_dict_str__bool__: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            /** Data */
+            data?: {
+                [key: string]: boolean;
+            } | null;
+        };
+        /** Envelope[list] */
+        Envelope_list_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            /** Data */
+            data?: unknown[] | null;
+        };
+        /** Envelope[list[SongSummary]] */
+        Envelope_list_SongSummary__: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            /** Data */
+            data?: components["schemas"]["SongSummary"][] | null;
+        };
+        /** Envelope[list[VoiceView]] */
+        Envelope_list_VoiceView__: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            /** Data */
+            data?: components["schemas"]["VoiceView"][] | null;
         };
         /** EventIn */
         EventIn: {
@@ -525,6 +1997,16 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * FavoriteState
+         * @description 收藏切换结果（PUT=收藏 / DELETE=取消，均幂等；docs/21 §3.6）。
+         */
+        FavoriteState: {
+            /** Song Id */
+            song_id: number;
+            /** Favorited */
+            favorited: boolean;
+        };
         /** FinalizeIn */
         FinalizeIn: {
             /** Attempts */
@@ -534,6 +2016,82 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** LookupResultView */
+        LookupResultView: {
+            /** Word */
+            word: string;
+            /** Matched */
+            matched: string;
+            /** Phonetic */
+            phonetic?: string | null;
+            /** Translation */
+            translation?: string | null;
+            /** Definition */
+            definition?: string | null;
+            /** Pos */
+            pos?: string | null;
+            /** Exchange */
+            exchange?: {
+                [key: string]: unknown;
+            } | null;
+            /** Frequency */
+            frequency?: number | null;
+            /**
+             * In Vocab
+             * @default false
+             */
+            in_vocab: boolean;
+            /** Vocab Id */
+            vocab_id?: number | null;
+        };
+        /** MediaView */
+        MediaView: {
+            /** Id */
+            id: string;
+            /** Url */
+            url: string;
+            /** Kind */
+            kind: string;
+            /** Mimetype */
+            mimeType: string;
+            /** Size */
+            size: number;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Durations */
+            durationS?: number | null;
+        };
+        /** PagedItems */
+        PagedItems: {
+            /**
+             * Items
+             * @default []
+             */
+            items: unknown[];
+            /** Next Cursor */
+            next_cursor?: unknown;
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+        };
+        /**
+         * PitchRef
+         * @description 逐句参考旋律（song_pitch_refs.pitch_ref；docs/10 §4.3 · pyin-v2）。
+         */
+        PitchRef: {
+            /** F0S */
+            f0s?: number[];
+            /** Notes */
+            notes?: (string | null)[];
+            /** Midi */
+            midi?: (number | null)[];
+            /** Onsets Ms */
+            onsets_ms?: number[] | null;
         };
         /** ProfileIn */
         ProfileIn: {
@@ -558,6 +2116,62 @@ export interface components {
              */
             emphasis: string;
         };
+        /** ProgressView */
+        ProgressView: {
+            /** Chapter Id */
+            chapter_id: number;
+            /** Char Offset */
+            char_offset: number;
+            /** Content Version */
+            content_version: number;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /**
+         * ScoreLine
+         * @description 逐句评分（sing_attempts.lines[i]；结构契约 docs/10 §4.3）。
+         */
+        ScoreLine: {
+            /** Seq */
+            seq: number;
+            /** Start Ms */
+            start_ms: number;
+            /** End Ms */
+            end_ms?: number | null;
+            /** Pitch Score */
+            pitch_score?: number | null;
+            /** Rhythm Score */
+            rhythm_score?: number | null;
+            /** Pron Score */
+            pron_score?: number | null;
+            /**
+             * Synced
+             * @default true
+             */
+            synced: boolean;
+            /**
+             * Skipped
+             * @default false
+             */
+            skipped: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Ref Seq */
+            ref_seq?: number | null;
+            /**
+             * No Ref
+             * @default false
+             */
+            no_ref: boolean;
+            /** Onset Dev Ms */
+            onset_dev_ms?: number | null;
+            /** Note Hit Rate */
+            note_hit_rate?: number | null;
+            /** User F0 */
+            user_f0?: number[][];
+            /** Cent Dev */
+            cent_dev?: number[];
+        };
         /** ScoreResult */
         ScoreResult: {
             /** Overall */
@@ -575,6 +2189,19 @@ export interface components {
                 [key: string]: unknown;
             }[];
         };
+        /** SentenceView */
+        SentenceView: {
+            /** Idx */
+            idx: number;
+            /** Text */
+            text: string;
+            /** Para Idx */
+            para_idx: number;
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+        };
         /** SessionCreate */
         SessionCreate: {
             /** Kind */
@@ -587,6 +2214,149 @@ export interface components {
             difficulty?: number | null;
             /** Turn Limit */
             turn_limit?: number | null;
+            /** Shadow Material Id */
+            shadow_material_id?: number | null;
+            /** Song Id */
+            song_id?: number | null;
+        };
+        /**
+         * SingAlignment
+         * @description 整首对齐与口径留痕（docs/10 §4.3 alignment 扩展；口径 v3/v4/v5）。
+         *
+         *     `extra="allow"`：口径升级新增的诊断键**必须透传**——响应模型只做类型标注，不做过滤。
+         */
+        SingAlignment: {
+            /** Bpm Ratio */
+            bpm_ratio?: number | null;
+            /** Bpm User */
+            bpm_user?: number | null;
+            /** Bpm Ref */
+            bpm_ref?: number | null;
+            /** Bpm Source */
+            bpm_source?: ("onset-f0" | "onset-flux" | "onset-arbitrated" | "duration") | null;
+            /** Offset Ms */
+            offset_ms?: number | null;
+            /** Time Warp Stretch */
+            time_warp_stretch?: number | null;
+            /** Windows Ms */
+            windows_ms?: number[][] | null;
+            /** Method */
+            method?: string | null;
+            /** Version */
+            version?: string | null;
+            /** Transpose Semitones */
+            transpose_semitones?: number | null;
+            /** Range Hint */
+            range_hint?: string | null;
+            /** Medfilt Kernel */
+            medfilt_kernel?: number | null;
+            /** Ref Coverage */
+            ref_coverage?: number | null;
+            /** Pitch Weight */
+            pitch_weight?: number | null;
+            /** Pitch Reliability */
+            pitch_reliability?: ("full" | "reduced" | "low") | null;
+            /** Weight Note */
+            weight_note?: string | null;
+            /** Note Hit Rate */
+            note_hit_rate?: number | null;
+            /** User Coverage */
+            user_coverage?: number | null;
+            /** Coverage Conf */
+            coverage_conf?: number | null;
+            /** Coverage Note */
+            coverage_note?: string | null;
+            /** Breath Structure */
+            breath_structure?: boolean | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * SongDetail
+         * @description `GET /api/v1/songs/{id}`：列表字段 + 逐句数据。
+         */
+        SongDetail: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Artist */
+            artist?: string | null;
+            /** Level */
+            level: number;
+            /** Duration S */
+            duration_s?: number | null;
+            /** Bpm */
+            bpm?: number | null;
+            /** Musical Key */
+            musical_key?: string | null;
+            /** Cover Url */
+            cover_url?: string | null;
+            /** Audio Url */
+            audio_url?: string | null;
+            /** Pitch Ref Status */
+            pitch_ref_status: string;
+            /** Expected Lines */
+            expected_lines: number;
+            /** Favorited */
+            favorited: boolean;
+            /** Lines */
+            lines: components["schemas"]["SongLine"][];
+        };
+        /**
+         * SongLine
+         * @description 歌曲详情的逐句 LRC + 参考旋律（D3 双序列图数据源）。
+         */
+        SongLine: {
+            /** Seq */
+            seq: number;
+            /** Start Ms */
+            start_ms: number;
+            /** End Ms */
+            end_ms?: number | null;
+            /** Text */
+            text?: string | null;
+            pitch_ref: components["schemas"]["PitchRef"];
+        };
+        /**
+         * SongSummary
+         * @description 选歌列表条目（`GET /api/v1/songs`）。
+         */
+        SongSummary: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Artist */
+            artist?: string | null;
+            /** Level */
+            level: number;
+            /** Duration S */
+            duration_s?: number | null;
+            /** Bpm */
+            bpm?: number | null;
+            /** Musical Key */
+            musical_key?: string | null;
+            /** Cover Url */
+            cover_url?: string | null;
+            /** Audio Url */
+            audio_url?: string | null;
+            /** Pitch Ref Status */
+            pitch_ref_status: string;
+            /** Expected Lines */
+            expected_lines: number;
+            /** Favorited */
+            favorited: boolean;
+        };
+        /**
+         * SubmitAck
+         * @description 整首上传受理回执（`POST /api/v1/sessions/{id}/audio`）。
+         */
+        SubmitAck: {
+            /** Attempt Id */
+            attempt_id: number;
+            /** Status */
+            status: string;
         };
         /**
          * TTSResult
@@ -597,6 +2367,22 @@ export interface components {
             audio_bytes: string;
             /** Length */
             length: number;
+        };
+        /**
+         * TaskProgress
+         * @description 任务进度（轮询展示用）。
+         */
+        TaskProgress: {
+            /**
+             * Done Lines
+             * @default 0
+             */
+            done_lines: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -610,6 +2396,53 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VocabAddView */
+        VocabAddView: {
+            /** Added */
+            added: boolean;
+            vocab: components["schemas"]["VocabView"];
+        };
+        /** VocabView */
+        VocabView: {
+            /** Id */
+            id: number;
+            /** Word */
+            word: string;
+            /** Status */
+            status: string;
+            /** Scene */
+            scene: string;
+            /** Book Id */
+            book_id?: number | null;
+            /** Chapter Id */
+            chapter_id?: number | null;
+            /** Context Snippet */
+            context_snippet?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Phonetic */
+            phonetic?: string | null;
+            /** Translation */
+            translation?: string | null;
+            /** Frequency */
+            frequency?: number | null;
+        };
+        /** VoiceView */
+        VoiceView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Engine */
+            engine: string;
+            /**
+             * Langs
+             * @default []
+             */
+            langs: string[];
         };
     };
     responses: never;
@@ -665,7 +2498,10 @@ export interface operations {
     asr_api_v1_asr_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -698,7 +2534,10 @@ export interface operations {
     score_api_v1_score_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -731,7 +2570,10 @@ export interface operations {
     tts_api_v1_tts_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -764,7 +2606,10 @@ export interface operations {
     llm_chat_api_v1_llm_chat_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -841,6 +2686,40 @@ export interface operations {
                 "application/json": components["schemas"]["SessionCreate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_restore_api_v1_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -968,6 +2847,40 @@ export interface operations {
             };
         };
     };
+    get_tts_audio_api_v1_audio_tts__name__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_audio_api_v1_audio__name__get: {
         parameters: {
             query?: never;
@@ -981,6 +2894,282 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_songs_api_v1_songs_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_list_SongSummary__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_song_detail_api_v1_songs__song_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                song_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_SongDetail_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_song_favorite_api_v1_songs__song_id__favorite_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                song_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_FavoriteState_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_song_favorite_api_v1_songs__song_id__favorite_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                song_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_FavoriteState_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_song_audio_api_v1_sessions__session_id__audio_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_song_audio_api_v1_sessions__session_id__audio_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_SubmitAck_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attempt_status_api_v1_sing_attempts__attempt_id__status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                attempt_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_AttemptStatus_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attempt_result_api_v1_sing_attempts__attempt_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                attempt_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_AttemptResult_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    free_chat_turn_api_v1_free_chat_turn_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_free_chat_turn_api_v1_free_chat_turn_post"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -1269,6 +3458,1751 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recommendations_api_v1_recommendations_get: {
+        parameters: {
+            query?: {
+                type?: string;
+                limit?: number | null;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_books_api_v1_reading_books_get: {
+        parameters: {
+            query?: {
+                cursor?: number | null;
+                level?: string | null;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_PagedItems_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    book_detail_api_v1_reading_books__book_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                book_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_BookDetailView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    book_cover_api_v1_reading_covers__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 封面图文件（image/*） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chapter_detail_api_v1_reading_chapters__chapter_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                chapter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_ChapterView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lookup_api_v1_reading_lookup_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_LookupResultView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_vocab_api_v1_reading_vocab_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                /** @description keyset: <created_at>|<id> */
+                cursor?: string | null;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_PagedItems_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_vocab_api_v1_reading_vocab_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_VocabAddView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_vocab_api_v1_reading_vocab__vocab_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                vocab_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_str__bool__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_vocab_api_v1_reading_vocab__vocab_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                vocab_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_VocabView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_annotations_api_v1_reading_annotations_get: {
+        parameters: {
+            query: {
+                chapter_id: number;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_PagedItems_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_annotation_api_v1_reading_annotations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_AnnotationView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_annotation_api_v1_reading_annotations__annotation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                annotation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_str__bool__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_annotation_api_v1_reading_annotations__annotation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                annotation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_AnnotationView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_progress_api_v1_reading_progress__book_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                book_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_ProgressView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_progress_api_v1_reading_progress__book_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                book_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_ProgressView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_voices_api_v1_reading_voices_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_list_VoiceView__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tts_segment_api_v1_reading_chapters__chapter_id__tts_segment__sentence_idx__get: {
+        parameters: {
+            query?: {
+                voice?: string;
+                rate?: string;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                chapter_id: number;
+                sentence_idx: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tts_word_api_v1_reading_tts_word__word__get: {
+        parameters: {
+            query?: {
+                voice?: string;
+                rate?: string;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                word: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tts_prepare_api_v1_reading_chapters__chapter_id__tts_prepare_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                chapter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["Body_tts_prepare_api_v1_reading_chapters__chapter_id__tts_prepare_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tts_task_snapshot_api_v1_reading_tts_tasks__task_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_str__Any__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tts_task_cancel_api_v1_reading_tts_tasks__task_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_str__bool__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_mine_api_v1_media_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_str__Any__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_api_v1_media_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_api_v1_media_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_MediaView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_api_v1_media__public_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                public_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_api_v1_media__public_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                public_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_str__bool__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    overview_api_v1_console_ops_overview_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    services_api_v1_console_ops_services_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    concurrency_api_v1_console_ops_concurrency_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    metrics_catalog_api_v1_console_ops_metrics_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_list_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    metrics_api_v1_console_ops_metrics_get: {
+        parameters: {
+            query?: {
+                metric?: string[];
+                from?: string | null;
+                to?: string | null;
+                step?: number;
+                labels_key?: string | null;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_rules_api_v1_console_ops_alerts_rules_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_rule_api_v1_console_ops_alerts_rules_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_rule_api_v1_console_ops_alerts_rules__rule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                rule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_rule_api_v1_console_ops_alerts_rules__rule_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                rule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_events_api_v1_console_ops_alerts_events_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                severity?: string | null;
+                rule_code?: string | null;
+                from?: string | null;
+                to?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ack_event_api_v1_console_ops_alerts_events__event_id__ack_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                event_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                } | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_event_api_v1_console_ops_alerts_events__event_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                event_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trace_stats_api_v1_console_ops_traces_stats_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                to?: string | null;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_traces_api_v1_console_ops_traces_get: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+                status?: string | null;
+                model?: string | null;
+                session_id?: string | null;
+                from?: string | null;
+                to?: string | null;
+                min_duration_ms?: number | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trace_detail_api_v1_console_ops_traces__trace_id__get: {
+        parameters: {
+            query?: {
+                span_limit?: number;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                trace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trace_contents_api_v1_console_ops_traces__trace_id__contents_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                trace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_api_v1_console_ops_maintenance_purge_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_books_api_v1_console_library_books_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                status?: string | null;
+                level?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_book_api_v1_console_library_books__book_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                book_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_chapters_api_v1_console_library_books__book_id__chapters_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                book_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_chapter_api_v1_console_library_chapters__chapter_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                chapter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_media_api_v1_console_library_media_get: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+                status?: string | null;
+                owner_id?: number | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hide_media_api_v1_console_library_media__public_id__hide_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                public_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
                 };
             };
             /** @description Validation Error */

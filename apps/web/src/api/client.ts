@@ -32,8 +32,9 @@ export interface Envelope<T> {
   data: T
 }
 
-const PYTHON_BASE = import.meta.env.VITE_PYTHON_BASE ?? ''
-const JAVA_BASE = import.meta.env.VITE_JAVA_BASE ?? '/manage'
+/** 构建期基址（打包壳用绝对值；dev 默认空=相对走 Vite 代理） */
+export const PYTHON_BASE = import.meta.env.VITE_PYTHON_BASE ?? ''
+export const JAVA_BASE = import.meta.env.VITE_JAVA_BASE ?? '/manage'
 
 /** 全局访问令牌（由 auth store 写入；request 自动携带）。 */
 let authToken: string | null = null
@@ -60,18 +61,87 @@ export function authHeaders(): HeadersInit {
   return authToken ? { Authorization: `Bearer ${authToken}` } : {}
 }
 
-export async function request<T>(path: string, init?: RequestInit, base = PYTHON_BASE): Promise<Envelope<T>> {
+/**
+ * 401 静默续期钩子（auth store 注册；docs/18 F3：不出现裸 401 页）。
+ * 注入而非 import 规避 client→store 循环依赖；刷新失败返回 false → 原错误继续抛。
+ */
+let authRefresher: (() => Promise<boolean>) | null = null
+let refreshing = false // 防重入：/auth/refresh 自身 401 时不再触发递归
+
+export function setAuthRefresher(refresher: (() => Promise<boolean>) | null): void {
+  authRefresher = refresher
+}
+
+async function fetchOnce<T>(path: string, init: RequestInit | undefined, base: string): Promise<Envelope<T>> {
   const headers = { ...(init?.headers ?? {}), ...authHeaders() }
   const resp = await fetch(`${base}${path}`, { ...init, headers })
-  const body = (await resp.json()) as Envelope<T>
+  let body: Envelope<T>
+  try {
+    body = (await resp.json()) as Envelope<T>
+  } catch {
+    // 后端不可达（代理返回空体 5xx 等）：给可操作提示，而不是「Unexpected end of JSON input」
+    // /manage 前缀或 JAVA_BASE 基址 → Java（登录/管理端），否则 Python（语音/LLM）
+    const callsJava = base === JAVA_BASE || path.startsWith('/manage')
+    const who = callsJava ? 'Java（登录/管理端）' : 'Python（语音/LLM）'
+    throw new ApiError(
+      -1,
+      `${who}服务不可达（HTTP ${resp.status}，${base}${path}）——请确认对应后端已启动`,
+      resp.status,
+    )
+  }
   if (!resp.ok || body.code !== 0) {
     throw new ApiError(body.code ?? -1, body.message ?? `HTTP ${resp.status}`, resp.status)
   }
   return body
 }
 
+export async function request<T>(path: string, init?: RequestInit, base = PYTHON_BASE): Promise<Envelope<T>> {
+  try {
+    return await fetchOnce<T>(path, init, base)
+  } catch (e) {
+    // 会话中途 access token 过期（TTL 1h）：静默 refresh 一次后重试（2026-09-05 修「场景弹层假无数据」）
+    if (e instanceof ApiError && e.httpStatus === 401 && authRefresher && !refreshing) {
+      refreshing = true
+      try {
+        const ok = await authRefresher()
+        if (ok) return await fetchOnce<T>(path, init, base)
+      } finally {
+        refreshing = false
+      }
+    }
+    throw e
+  }
+}
+
 export function readyz() {
   return request<{ status: string; app_env: string; asr: string; tts: string }>('/readyz')
+}
+
+/**
+ * 音频二进制拉取（GET /api/v1/audio/{name} 为原始 mp3 流，非 envelope）。
+ * 2026-09-07 修复「回合音频不自动播」：原生 <audio> 无法携带 Authorization（docs/06 §11
+ * Bearer 强制）→ 401 静默失败；统一改「带 token fetch → objectURL」blob 播放管道。
+ * 401 会话续期与 request 同款（authRefresher 单飞）。
+ */
+export async function loadAudioBlob(path: string): Promise<Blob> {
+  const fetchBlob = async (): Promise<Blob> => {
+    const resp = await fetch(`${PYTHON_BASE}${path}`, { headers: authHeaders() })
+    if (!resp.ok) throw new ApiError(-1, `audio fetch failed: HTTP ${resp.status}`, resp.status)
+    return await resp.blob()
+  }
+  try {
+    return await fetchBlob()
+  } catch (e) {
+    if (e instanceof ApiError && e.httpStatus === 401 && authRefresher && !refreshing) {
+      refreshing = true
+      try {
+        if (await authRefresher()) return await fetchBlob()
+      } finally {
+        refreshing = false
+      }
+    }
+    throw e
+  }
 }
 
 export function pingJava() {

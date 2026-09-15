@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UI Concept Design · App Home</title>
+<!--
+  Mobile App 示例 ① 今日学习主页
+  组件：底部浮动 Tab 栏（pill）、问候头部、打卡徽章、统计卡、全宽分段控件、任务列表卡（点线时间轴）。
+  全部取值来自上游设计系统 ui-concept-design 的 tokens/design-tokens.md
+  （该 skill 仓未随本归档收录，取值已在下文 :root 内固化）；图标内联 SVG（Lucide 风格 1.5px）。
+-->
+<style>
+  :root {
+    --paper:#F5F4F1; --card:#FFFFFF; --ink:#1C1C1A; --ink-hover:#333330;
+    --sub:#6F6F6A; --weak:#A6A6A0; --track:#ECEAE5; --track-hover:#E2E0DA;
+    --accent:#2F6BFF; --star:#FFC83D; --pop-green:#A8E05F;
+    --r-card:24px; --r-pill:999px; --r-chip:12px;
+    --shadow-card:0 8px 24px rgba(28,28,26,.06);
+    --shadow-float:0 2px 8px rgba(28,28,26,.08);
+    --font:'Segoe UI','Microsoft YaHei UI','Microsoft YaHei',sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { background:#EDECE8; }
+  body { font-family:var(--font); color:var(--ink); -webkit-font-smoothing:antialiased; }
+
+  /* 手机容器：390px 屏，外面一圈深一点的展示底 */
+  .phone { width:390px; margin:0 auto; min-height:844px; background:var(--paper); position:relative; overflow:hidden; box-shadow:0 0 0 1px rgba(28,28,26,.04); }
+
+  .content { padding:24px 20px 120px; }
+
+  /* 问候头部 */
+  .head { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+  .head h1 { font-size:26px; font-weight:700; letter-spacing:-.5px; }
+  .head p { font-size:14px; color:var(--sub); margin-top:4px; }
+  .avatar { width:44px; height:44px; border-radius:14px; background:var(--ink);
+    color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; }
+  .streak { display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 14px;
+    border-radius:var(--r-pill); background:#FFF4D6; color:#B45309; font-size:13px; font-weight:600;
+    margin-bottom:20px; }
+
+  /* 统计卡 */
+  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; padding:24px;
+    background:var(--card); border-radius:var(--r-card); box-shadow:var(--shadow-card); margin-bottom:24px; }
+  .stat-label { font-size:12px; color:var(--weak); }
+  .stat-value { font-size:26px; font-weight:700; margin-top:2px; }
+  .stat-value.accent { color:var(--accent); }
+
+  /* 全宽分段控件 */
+  .segment { display:flex; align-items:center; gap:4px; height:52px; padding:4px;
+    background:var(--track); border-radius:var(--r-pill); margin-bottom:24px; }
+  .segment button { flex:1; display:flex; align-items:center; justify-content:center; gap:8px; height:44px;
+    border:none; border-radius:var(--r-pill); background:transparent; color:var(--sub);
+    font:600 15px var(--font); cursor:pointer;
+    transition:background-color 150ms ease-out, color 150ms ease-out, box-shadow 150ms ease-out; }
+  .segment button.active { background:var(--card); color:var(--ink); box-shadow:var(--shadow-float); }
+
+  /* 任务列表卡 */
+  .section-title { font-size:17px; font-weight:700; margin-bottom:14px; }
+  .task { display:flex; align-items:center; gap:16px; padding:16px 20px;
+    background:var(--card); border-radius:var(--r-card); box-shadow:var(--shadow-card); }
+  .icon-block { width:48px; height:48px; border-radius:14px; flex:none;
+    display:flex; align-items:center; justify-content:center; color:#fff; }
+  .task-main { flex:1; min-width:0; }
+  .task-title { font-size:15px; font-weight:700; }
+  .task-sub { font-size:12px; color:var(--weak); margin-top:2px; }
+  .task-value { font-size:20px; font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums; }
+  .dotline { display:flex; align-items:center; gap:8px; margin:8px 0 8px 32px; }
+  .dotline .dot { width:7px; height:7px; border-radius:50%; background:var(--accent); }
+  .dotline .line { flex:1; border-top:1.5px dashed #E0DED8; }
+
+  /* 底部浮动 Tab 栏：白卡 pill，居中大主按钮 */
+  .tabbar { position:absolute; left:16px; right:16px; bottom:20px; display:flex; align-items:center;
+    justify-content:space-around; height:72px; padding:0 8px;
+    background:var(--card); border-radius:28px; box-shadow:0 12px 32px rgba(28,28,26,.12); }
+  .tab { display:flex; flex-direction:column; align-items:center; gap:3px; width:56px;
+    border:none; background:transparent; cursor:pointer; color:var(--weak); font:600 11px var(--font); }
+  .tab svg { width:22px; height:22px; }
+  .tab.active { color:var(--ink); }
+  .tabbar .main { width:56px; height:56px; border-radius:19px; background:var(--ink); color:#fff;
+    border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    margin-top:-22px; box-shadow:0 8px 20px rgba(28,28,26,.25); }
+</style>
+
+<!-- ============================================================
+     展示用副本：内容与 ui-concept-design/examples/app/<同名文件> 一致，
+     仅追加下面这层「机身适配」，让它能正确塞进 433×882 的机身框：
+       · .phone 锁死 844 高度 —— 否则内容变高会把 absolute 的底部控件顶出屏幕；
+       · 顶部留 70px —— 灵动岛侵入屏幕区 47.75px，不留就会被盖住标题。
+     规则值取自 tokens/design-tokens.md 的 8px 网格。
+     ============================================================ -->
+<style>
+  html, body { height: 844px; overflow: hidden; }
+  .phone { height: 844px; min-height: 844px; overflow: hidden; }
+  .content { padding-top: 70px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="content">
+    <!-- 问候 + 头像 -->
+    <header class="head">
+      <div>
+        <h1>Good afternoon, LHR</h1>
+        <p>One scene today keeps your 7-day streak.</p>
+      </div>
+      <div class="avatar">L</div>
+    </header>
+
+    <div class="streak">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 3.5c1 2.5 4.5 4 4.5 8.5a4.5 4.5 0 0 1-9 0c0-1.8.8-3 1.7-4.2.4 1 .9 1.6 1.8 2.2-.3-2.2.2-4.6 1-6.5z"/></svg>
+      Streak 12 days
+    </div>
+
+    <!-- 统计卡 -->
+    <section class="stats">
+      <div><div class="stat-label">Rounds</div><div class="stat-value">38</div></div>
+      <div><div class="stat-label">Avg score</div><div class="stat-value accent">86.4</div></div>
+      <div><div class="stat-label">Goal</div><div class="stat-value">5/7</div></div>
+    </section>
+
+    <!-- 全宽分段控件 -->
+    <div class="segment" id="seg">
+      <button class="active" onclick="pick(this)">All</button>
+      <button onclick="pick(this)">Speaking</button>
+      <button onclick="pick(this)">Singing</button>
+    </div>
+
+    <!-- 任务列表（点线时间轴） -->
+    <div class="section-title">Today's sessions</div>
+    <div class="task">
+      <span class="icon-block" style="background:#3A2440">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5 9h11v5a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5z"/><path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16"/></svg>
+      </span>
+      <div class="task-main">
+        <div class="task-title">Coffee Shop</div>
+        <div class="task-sub">Today 9:30 · 8 rounds · 3m12s</div>
+      </div>
+      <span class="task-value">86.4</span>
+    </div>
+    <div class="dotline"><span class="dot"></span><span class="line"></span></div>
+    <div class="task">
+      <span class="icon-block" style="background:#232044">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>
+      </span>
+      <div class="task-main">
+        <div class="task-title">Perfect Night</div>
+        <div class="task-sub">Yesterday · 2 takes · pitch 88</div>
+      </div>
+      <span class="task-value">88.1</span>
+    </div>
+    <div class="dotline"><span class="dot"></span><span class="line"></span></div>
+    <div class="task">
+      <span class="icon-block" style="background:#16303A">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M4 13h16"/></svg>
+      </span>
+      <div class="task-main">
+        <div class="task-title">Job Interview</div>
+        <div class="task-sub">Sep 12 · 6 rounds</div>
+      </div>
+      <span class="task-value">79.8</span>
+    </div>
+  </div>
+
+  <!-- 底部浮动 Tab 栏 -->
+  <nav class="tabbar">
+    <button class="tab active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 20V4M4 20h16"/><path d="M8 16v-5M12 16V7M16 16v-3"/></svg>
+      Home
+    </button>
+    <button class="tab" onclick="toast('Mic is ready')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      Speaking
+    </button>
+    <button class="main" onclick="toast('New session started')">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 4.5v9M7.5 9h9"/></svg>
+    </button>
+    <button class="tab" onclick="toast('Song library')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>
+      Songs
+    </button>
+    <button class="tab" onclick="toast('Profile')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+      Me
+    </button>
+  </nav>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" style="position:fixed;top:24px;left:50%;transform:translateX(-50%) translateY(-8px);display:flex;align-items:center;gap:10px;height:44px;padding:0 20px;border-radius:16px;background:var(--card);box-shadow:var(--shadow-card);font-size:14px;opacity:0;transition:opacity 200ms ease-out,transform 200ms ease-out;pointer-events:none;z-index:9;">
+    <span style="width:8px;height:8px;border-radius:50%;background:var(--accent)"></span><span id="toastText"></span>
+  </div>
+</div>
+
+<script>
+  function pick(btn){ document.querySelectorAll('#seg button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
+  let tt; function toast(msg){ const t=document.getElementById('toast'); if(!t) return;
+    document.getElementById('toastText').textContent=msg; t.style.opacity=1; t.style.transform='translateX(-50%) translateY(0)';
+    clearTimeout(tt); tt=setTimeout(()=>{ t.style.opacity=0; t.style.transform='translateX(-50%) translateY(-8px)'; },2500); }
+</script>
+</body>
+</html>
+

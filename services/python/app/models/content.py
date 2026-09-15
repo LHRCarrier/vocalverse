@@ -9,11 +9,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    DateTime,
     ForeignKey,
     Index,
     Numeric,
@@ -30,6 +32,7 @@ from .base import (
     ContentStatus,
     CreatedAtMixin,
     MessageRoles,
+    PitchJobStatus,
     PitchRefStatus,
     TimestampMixin,
     bigint_pk,
@@ -161,9 +164,14 @@ class Song(TimestampMixin, Base):
     )
     # 参考旋律就绪状态（docs/11 Q-B11）：LRC 重写→song_pitch_refs 级联清→离线重提取期间
     # 跟唱请求见 status!='ready' 返回「生成中/缺词」，不静默算分；由 Python 离线任务翻转
+    # （2026-09-09 唱歌 P0 D2 拍板：songs 属 Java 独占写，Python 经 /internal/song/{id}/pitch-status
+    # 内部 REST 委托 Java 翻转，本列只作读侧门禁）
     pitch_ref_status: Mapped[str] = mapped_column(
         String(24), nullable=False, server_default=text(f"'{PitchRefStatus.MISSING}'")
     )
+    # 独立参考人声轨（2026-09-09 唱歌 P0 D1 拍板）：无语义/有则优先音频提取输入
+    # （pyin 输入「vocal_ref 有→用它；无→audio_url」两级回退）；Java SongUpsert 可选字段
+    vocal_ref_url: Mapped[str | None] = mapped_column(String(512))
 
     __table_args__ = (
         CheckConstraint("level BETWEEN 1 AND 4", name="level"),
@@ -241,6 +249,57 @@ class SongPitchRef(CreatedAtMixin, Base):
     __table_args__ = (UniqueConstraint("lrc_id", name="uq_song_pitch_refs_lrc_id"),)
 
 
+class PitchExtractJob(CreatedAtMixin, Base):
+    """参考旋律提取任务（Python 独有 · 事实源；2026-09-09 唱歌 P0 D2/D6 拍板）。
+
+    - 与 songs.pitch_ref_status（读侧门禁，Java 写）解耦：本表承载 queued/running/done/failed
+      全生命周期与重试，是「该歌参考旋律是否就绪」的权威事实源；
+    - revision：LRC 世代（"lrc={lrc_id}" 或含时间戳），LRC 整首重写 → 旧行级联删除 →
+      自动重建新任务（lrc_id FK CASCADE）；
+    - 唯一部分索引 UNIQUE(lrc_id) WHERE status IN ('queued','running')：
+      同一 LRC 世代只允许一个进行中任务（防启动扫描与手动触发并发建任务）；
+    - payload：提取参数/错误信息/耗时快照（JSONB）。
+    """
+
+    __tablename__ = "pitch_extract_jobs"
+
+    id: Mapped[int] = bigint_pk()
+    song_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("songs.id", ondelete="RESTRICT"), nullable=False
+    )
+    lrc_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("lrc.id", ondelete="CASCADE"), nullable=False
+    )
+    revision: Mapped[str] = mapped_column(String(64), nullable=False)  # LRC 世代 ID
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text(f"'{PitchJobStatus.QUEUED}'")
+    )
+    payload: Mapped[dict] = mapped_column(jsonb(), nullable=False, server_default=text("'{}'"))
+    attempts: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("0"))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint(
+            f"status IN ('{PitchJobStatus.QUEUED}', '{PitchJobStatus.RUNNING}', "
+            f"'{PitchJobStatus.DONE}', '{PitchJobStatus.FAILED}')",
+            name="status",
+        ),
+        # 同一 LRC 世代只允许一个进行中任务（PG/SQLite 双方言部分唯一索引）
+        Index(
+            "uq_pitch_extract_jobs_lrc_active",
+            "lrc_id",
+            unique=True,
+            sqlite_where=text(f"status IN ('{PitchJobStatus.QUEUED}', '{PitchJobStatus.RUNNING}')"),
+            postgresql_where=text(
+                f"status IN ('{PitchJobStatus.QUEUED}', '{PitchJobStatus.RUNNING}')"
+            ),
+        ),
+        Index("ix_pitch_extract_jobs_status", "status"),
+        Index("ix_pitch_extract_jobs_song_id", "song_id"),
+    )
+
+
 class ListeningMaterial(TimestampMixin, Base):
     """听力素材（Java 写；docs/06 §9.6「1 个听力素材示例」，推荐候选池第三类）。
 
@@ -310,4 +369,45 @@ class PlacementQuestion(TimestampMixin, Base):
             name="status",
         ),
         Index("ix_placement_questions_revision", "exam_revision"),
+    )
+
+
+class ShadowMaterial(TimestampMixin, Base):
+    """影子跟读素材内容库（**Java 写**；local/26 §6 / local/31 §2.4，2026-09-02 设计）。
+
+    - 与 scenarios 并列的候选池第二类；难度先验由 Python 侧 material_difficulty 产出；
+    - level：内容方初评 1-4（与 scenarios.difficulty 同语义，仅作难度兜底 FALLBACK_LEVEL）；
+    - wpm：原声语速（流利度难度特征）；audio：示范音频（慢速由 TTS/变速派生，不另存大文件）；
+    - source 版权红线同 songs（docs/06 §9.7：商用音乐/音频严禁入库）；
+    - 人工标注审计（local/32 A-3.3）建议列，随 0003 评估（pending_review 走 material_difficulty）。
+    """
+
+    __tablename__ = "shadow_materials"
+
+    id: Mapped[int] = bigint_pk()
+    title: Mapped[str] = mapped_column(String(128), nullable=False)
+    level: Mapped[int] = mapped_column(SmallInteger, nullable=False)  # 内容方初评 1-4
+    text_content: Mapped[str] = mapped_column(Text, nullable=False)  # 跟读文本（逐句，供特征/字幕）
+    audio_url: Mapped[str] = mapped_column(String(512), nullable=False)
+    wpm: Mapped[int | None] = mapped_column(SmallInteger)  # 原声语速（词/分）
+    duration_s: Mapped[int | None] = mapped_column(BigInteger)
+    interest_tags: Mapped[dict] = mapped_column(
+        jsonb(), nullable=False, server_default=text("'[]'")
+    )
+    source: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default=text("'public_domain'")
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text(f"'{ContentStatus.DRAFT}'")
+    )
+
+    __table_args__ = (
+        CheckConstraint("level BETWEEN 1 AND 4", name="level"),
+        CheckConstraint("source IN ('public_domain', 'original', 'demo_only')", name="source"),
+        CheckConstraint(
+            f"status IN ('{ContentStatus.DRAFT}', '{ContentStatus.PUBLISHED}', "
+            f"'{ContentStatus.ARCHIVED}')",
+            name="status",
+        ),
+        Index("ix_shadow_materials_status_level", "status", "level"),
     )

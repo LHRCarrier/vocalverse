@@ -1,0 +1,260 @@
+package com.vocalverse.auth.controller;
+
+import com.vocalverse.common.dto.Envelope;
+import com.vocalverse.config.JwtService;
+import com.vocalverse.user.RefreshTokenEntity;
+import com.vocalverse.user.RefreshTokenRepository;
+import com.vocalverse.user.UserEntity;
+import com.vocalverse.user.UserProfileEntity;
+import com.vocalverse.user.UserProfileRepository;
+import com.vocalverse.user.UserRepository;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+
+/**
+ * 认证最小集（docs/18 §3-J1）：注册 / 登录 / 刷新 / 我的。用户表 Alembic 真源，JPA 纯映射。 路径不带 /manage：网关（nginx/Vite）剥离
+ * /manage 前缀后命中（与 PingController /api/v1 同语义， docs/06 §2.1 注记 3；2026-09-01 修复曾误加前缀：网关路径 /auth/login
+ * 无匹配 → 403）。
+ */
+@RestController
+@RequestMapping("/auth")
+public class AuthController {
+
+  public record RegisterRequest(
+      @NotBlank @Size(max = 64) String username,
+      @Size(max = 254) String email,
+      @NotBlank @Size(min = 8, max = 72) String password,
+      @NotBlank @Size(max = 64) String nickname,
+      @Size(max = 16) String ageGroup) {}
+
+  public record LoginRequest(@NotBlank String username, @NotBlank String password) {}
+
+  public record ForgotRequest(@NotBlank @Size(max = 64) String username) {}
+
+  public record RefreshRequest(@NotBlank String refreshToken) {}
+
+  public record TokenResponse(
+      String accessToken, String refreshToken, long expiresIn, long userId) {}
+
+  /**
+   * 当前用户视图。{@code avatarUrl}/{@code handle} 为 2026-09-09 新增（社区 S3 · docs/47 §4.2）：
+   * 前端账户抽屉/资料页要显示真实头像；写入走 {@code PATCH /api/v1/users/me}（不新增重复 GET）。
+   */
+  public record MeView(
+      Long userId,
+      String username,
+      String nickname,
+      String level,
+      String handle,
+      String avatarUrl) {}
+
+  private static final long REFRESH_TTL_SECONDS = 30L * 24 * 3600;
+
+  private final UserRepository users;
+  private final UserProfileRepository profiles;
+  private final RefreshTokenRepository refreshTokens;
+  private final PasswordEncoder passwordEncoder;
+  private final JwtService jwt;
+  private final com.vocalverse.ticket.TicketRepository tickets;
+
+  public AuthController(
+      UserRepository users,
+      UserProfileRepository profiles,
+      RefreshTokenRepository refreshTokens,
+      PasswordEncoder passwordEncoder,
+      JwtService jwt,
+      com.vocalverse.ticket.TicketRepository tickets) {
+    this.users = users;
+    this.profiles = profiles;
+    this.refreshTokens = refreshTokens;
+    this.passwordEncoder = passwordEncoder;
+    this.jwt = jwt;
+    this.tickets = tickets;
+  }
+
+  @PostMapping("/register")
+  public Envelope<TokenResponse> register(
+      @Valid @RequestBody RegisterRequest body, HttpServletRequest request) {
+    if (users.findByUsernameIgnoreCase(body.username()).isPresent()) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "username taken");
+    }
+    Instant now = Instant.now();
+    UserEntity user = new UserEntity();
+    user.setUsername(body.username());
+    user.setEmail(body.email());
+    user.setPasswordHash(passwordEncoder.encode(body.password()));
+    user.setNickname(body.nickname());
+    user.setRole("user");
+    user.setStatus("active");
+    user.setCreatedAt(now);
+    user.setUpdatedAt(now);
+    user = users.save(user);
+
+    UserProfileEntity profile = new UserProfileEntity();
+    profile.setUserId(user.getId());
+    profile.setAgeGroup(
+        body.ageGroup() == null || body.ageGroup().isBlank() ? "adult" : body.ageGroup());
+    profile.setCefrLevel("L1");
+    profile.setInterestTags("[]"); // 列 NOT NULL（PG 由 server_default 兜底，Java 侧显式）
+    profile.setVoiceRate("normal");
+    profile.setCefrLevelSource("manual");
+    profile.setCreatedAt(now);
+    profile.setUpdatedAt(now);
+    profiles.save(profile);
+
+    return Envelope.ok(issue(user.getId(), user.getRole(), request));
+  }
+
+  @PostMapping("/login")
+  public Envelope<TokenResponse> login(
+      @Valid @RequestBody LoginRequest body, HttpServletRequest request) {
+    UserEntity user =
+        users
+            .findByUsernameIgnoreCase(body.username())
+            .orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "bad credentials"));
+    if (!"active".equals(user.getStatus())
+        || !passwordEncoder.matches(body.password(), user.getPasswordHash())) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "bad credentials");
+    }
+    return Envelope.ok(issue(user.getId(), user.getRole(), request));
+  }
+
+  @PostMapping("/refresh")
+  public Envelope<TokenResponse> refresh(
+      @Valid @RequestBody RefreshRequest body, HttpServletRequest request) {
+    String hash = sha256(body.refreshToken());
+    RefreshTokenEntity token =
+        refreshTokens
+            .findByTokenHash(hash)
+            .orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid refresh"));
+    if (token.getRevokedAt() != null || token.getExpiresAt().isBefore(Instant.now())) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "refresh expired");
+    }
+    token.setRevokedAt(Instant.now()); // rotation：旧行吊销
+    refreshTokens.save(token);
+    String role =
+        users
+            .findById(token.getUserId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no such user"))
+            .getRole();
+    return Envelope.ok(issue(token.getUserId(), role, request));
+  }
+
+  /**
+   * 登出（docs/18 §3-J1 · 2026-09-07 补安全短板）：吊销该用户全部未撤销的 refresh token。原「退出登录」 仅前端清 localStorage，30
+   * 天滑动窗口内旧 token 仍可续命；吊销后 /auth/refresh 立即 401。 需合法 access token（SecurityConfig 公开白名单仅
+   * login/register/refresh/forgot）。
+   */
+  @PostMapping("/logout")
+  public Envelope<Void> logout(
+      @org.springframework.web.bind.annotation.RequestAttribute("userId") Long userId) {
+    Instant now = Instant.now();
+    List<RefreshTokenEntity> tokens = refreshTokens.findByUserIdAndRevokedAtIsNull(userId);
+    tokens.forEach(t -> t.setRevokedAt(now));
+    refreshTokens.saveAll(tokens);
+    return Envelope.<Void>ok(null);
+  }
+
+  /**
+   * 忘记密码（2026-09-06 · 演示环境无邮件/短信通道）：用户提交申请 → 落一条 feedback 工单 给管理端处理（tickets 写方 = Java，见 docs/06
+   * §9.6）。防枚举：用户名存在与否返回同一响应。
+   */
+  @PostMapping("/forgot")
+  public Envelope<String> forgot(@Valid @RequestBody ForgotRequest body) {
+    users
+        .findByUsernameIgnoreCase(body.username())
+        .ifPresent(
+            u -> {
+              Instant now = Instant.now();
+              com.vocalverse.ticket.TicketEntity t = new com.vocalverse.ticket.TicketEntity();
+              t.setUserId(u.getId());
+              t.setKind("feedback");
+              t.setTargetType("none");
+              t.setTitle("密码重置申请");
+              t.setContent("账号 " + body.username() + " 申请密码重置（演示环境无邮件通道，请管理员手动处理）");
+              t.setStatus("open");
+              t.setCreatedAt(now);
+              t.setUpdatedAt(now);
+              tickets.save(t);
+            });
+    return Envelope.ok("已收到申请：管理员将尽快处理（演示环境无邮件通道，请留意管理员工单）");
+  }
+
+  @GetMapping("/me")
+  public Envelope<MeView> me(
+      @org.springframework.web.bind.annotation.RequestAttribute("userId") Long userId) {
+    UserEntity user =
+        users
+            .findById(userId)
+            .orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no such user"));
+    UserProfileEntity profile = profiles.findByUserId(userId).orElse(null);
+    String level = profile == null ? "L1" : profile.getCefrLevel();
+    return Envelope.ok(
+        new MeView(
+            user.getId(),
+            user.getUsername(),
+            user.getNickname(),
+            level,
+            profile == null ? null : profile.getHandle(),
+            profile == null ? null : profile.getAvatarUrl()));
+  }
+
+  private TokenResponse issue(Long userId, String role, HttpServletRequest request) {
+    String access = jwt.generateAccessToken(userId, role);
+    String refresh =
+        buildRefreshToken(jwt.generateAccessToken(userId, role), System.currentTimeMillis());
+    RefreshTokenEntity entity = new RefreshTokenEntity();
+    entity.setUserId(userId);
+    entity.setTokenHash(sha256(refresh));
+    entity.setExpiresAt(Instant.now().plusSeconds(REFRESH_TTL_SECONDS));
+    entity.setUserAgent(request.getHeader("User-Agent"));
+    entity.setIp(request.getRemoteAddr());
+    refreshTokens.save(entity);
+    return new TokenResponse(access, refresh, 3600, userId);
+  }
+
+  /**
+   * refresh token 构造（2026-09-10 热修复 · 手机实测复现 40904「数据冲突」）：
+   *
+   * <p>根因：`jwt.generateAccessToken` 仅含 {sub, role, iat, exp}（秒级精度、无随机字段），同一秒内 两次调用产出相同令牌；旧实现
+   * refresh = token + "-" + 毫秒 —— 同毫秒双登录/双刷新（WebView 双请求、双击登录）即产出相同字符串 → SHA-256 相同 → 撞
+   * `uq_refresh_tokens_token_hash` 唯一键 → DataIntegrityViolation → 40904。新增 UUID 随机因子保证唯一（refresh
+   * 为不透明串， 仅存哈希，格式变更零兼容影响）；抽为 package-private 纯静态便于确定性回归测试。
+   */
+  static String buildRefreshToken(String jwtToken, long nowMillis) {
+    return jwtToken + "-" + nowMillis + "-" + UUID.randomUUID();
+  }
+
+  static String sha256(String raw) {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
+      StringBuilder sb = new StringBuilder(hash.length * 2);
+      for (byte b : hash) {
+        sb.append(String.format("%02x", b));
+      }
+      return sb.toString();
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+}
