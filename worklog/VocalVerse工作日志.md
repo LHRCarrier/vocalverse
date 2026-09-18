@@ -3,6 +3,29 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-16 唱吧「参考旋律未就绪」排查：`data/audio` 素材文件被删 + 失败任务不自动重建 · 1 op
+
+- **现象**：`/m/sing` 三首歌全「未就绪」，顶栏「参考旋律生成中或缺失（暂时不能跟唱）」；Python 日志每 60s 一条 `pitch extract job failed beyond attempts song=1/2/3 (attempts=3)`。
+- **根因链（本机实测）**：① `data/audio/` 下三首 `song_*.wav` **已不存在**（只剩 `cache/tts` 预热缓存），目录 mtime **2026-09-15 15:38:53**；② 三个 `pitch_extract_jobs` 全部 `failed / attempts=3`，payload 错误快照一致为 `音频文件不可达（audio=/data/audio/song_*.wav）`，`failed_at` = **2026-09-15T07:49:52Z（北京时间 15:49）**，即昨日「合并远端 + 对齐工作树 + 重启」那段；③ 失败任务按 P1-12 规则判定 `RETRY_SKIP`（世代未变 `lrc-m6/10/14` + `extractor_version=pyin-v2` 已达上限）→ **扫描器不再重建**，于是 `songs.pitch_ref_status` 永久停在 `missing`，页面一直「生成中或缺失」。**素材是 gitignored 重建产物（不入库），被移除后无任何自愈路径**——这正是"文件没了"表现为"参考旋律丢失"的原因。
+- **删除来源（如实说明，未能唯一归因）**：应用侧自删路径已排除——`GET /audio/{name}` 的 24h 惰性清理在 2026-09-10 修复后**先做平台素材豁免**（`_is_published_song_asset`，`practice.py`）再判 TTL，且豁免命中的是已发布歌曲；代码内亦无遍历 `audio_dir` 的后台清扫。最可能是昨日「对齐工作树 / 清理未跟踪文件」那一步连带删了忽略目录（`data/audio` 在 `.gitignore` 第 44 行，`git clean -x` 一类操作会一并清除），但本机 shell 历史无留痕，无法坐实。
+- **恢复（两条命令，已验证）**：① `cd services/python && uv run python ../../scripts/setup-assets.py` → 三首 wav 确定性重建（1,307,168 / 873,224 / 869,696 B，与 09-14 记录逐字节一致；`data/seed/songs.json` 仅 CRLF 行尾差异，已 `git checkout` 还原）；② `update pitch_extract_jobs set status='queued', attempts=0, finished_at=null;` —— **必须手工重置**：素材回来≠任务会自动重试（同上）→ 60s 内扫描器抢到 queued 任务，pyin 提取 3/3 `done`。
+- **验证（经前端实际链路）**：`GET /api/v1/songs` → 三首 `pitch_ref_status=ready`；`GET /api/v1/audio/song_twinkle.wav` → **200 / audio/wav / 1,307,168 B**；提取任务全 `done`。
+- **踩坑/备忘**：① 重建素材后若不同步冲掉失败任务的 `attempts`，扫描器按设计**不会**自愈（`RETRY_SKIP` 是防无限重建的护栏）——排障时别只看文件是否恢复；② `setup-assets.py` 在 Windows 上写文件会把 `\n` 落成 CRLF，会让入库的 `data/seed/songs.json` 显示为已修改（内容一致）——直接 `git checkout` 还原行尾即可，勿误 commit；③ 本机 `.env` 注入（`APP_AUDIO_DIR` 等）只在进程环境里生效，**不会**被 pydantic 的 `env_file` 写回 `os.environ`，所以 conftest 的 `setdefault` 隔离照常生效——但"shell 里 export 过 APP_AUDIO_DIR 再跑 pytest"仍会删真素材（09-14 已登记的同一条陷阱）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-16
+
+## 2026-09-16 局域网/手机登录 403 修复：CORS 白名单硬编码旧 IP → 追加源改走 env · 1 op
+
+- **现象**：方式 B 裸跑下用局域网 IP 打开页面登录，红字「Java（登录/管理端）服务不可达（HTTP 403，/manage/auth/login）」——**措辞误导**：Java 实际在跑，403 是 Spring Security 的 CORS 层拒的（「Invalid CORS request」，空体响应），前端 `apps/web/src/api/client.ts` 对空体响应统一展示成「服务不可达」。
+- **根因**：`SecurityConfig.corsConfigurationSource` 的白名单硬编码了 `192.168.0.104`（2026-09-10 的旧网卡 IP）+ localhost 系；本机 IP 随网络环境变化（DHCP，当前 `26.134.181.175` 等），页面源不在白名单 → 403。
+- **实证（修复前）**：同一 `POST /auth/login`，`Origin: http://localhost:5173` → **400**（进控制器）；`Origin: http://26.134.181.175:5173` → **403**。修复后同 Origin → 400，经 Vite 代理 `demoadult` 登录 → `code:0` 拿 token；`/readyz` database/redis 全 ok。
+- **修复（沿用控制台侧既有模式，不硬编码）**：控制台本来就有 `VOICEVERSE_CONSOLE_CORS_ORIGINS` 追加源机制（`.env` 注释里记过同款 403 坑）；App 端照搬：`SecurityConfig` 新增构造参数 `vocalverse.cors-extra-origins`（逗号分隔追加进白名单）、`application.yml` 登记 `${VOICEVERSE_CORS_EXTRA_ORIGINS:}`、根 `.env` 追加当前局域网 IP 系列。**换网络只改 .env 一行，不改代码**。
+- **同日二连：开 HTTPS 后**又**一次 403（协议也参与匹配）**：为手机录音开 HTTPS（安全上下文）后，页面源由 `http://…:5173` 变为 `https://…:5173`，浏览器 Origin 随之换协议 → 白名单只登记了 `http://` → **再次 403**。实证：`Origin: https://localhost:5173` → **403**、`Origin: http://localhost:5173` → **400**（对照）。修复：`.env` 追加源补齐 **http/https 两套**（localhost / 127.0.0.1 / 各网卡 IP × 5173/8088）。**结论：CORS 白名单按「协议 + 主机 + 端口」精确匹配——换协议与换 IP 等价**，手机换到 HTTPS 访问时别忘了这一步。验证：两个 https 源 → 400（进业务层）；带 `Origin: https://localhost:5173` 经 HTTPS 代理登录 → `code:0`（token 已发）；`/readyz` 经 HTTPS 代理 → db/redis 全 ok。配套：mkcert 生成 `local/certs/dev-*.pem`（SAN 含 `10.133.34.29` 等，gitignored），前端以 `VITE_HTTPS_CERT/VITE_HTTPS_KEY` 起 HTTPS，手机装 `rootCA.crt` 即信任。
+- **本机启动备忘（方式 B 裸跑四端）**：Docker Desktop 装在 `C:\Users\ROG\AppData\Local\Programs\DockerDesktop\`（不在默认 Program Files 路径）；mvn 用 IntelliJ 内置 `C:\Program Files\JetBrains\IntelliJ IDEA 2025.1\plugins\maven\lib\maven3\bin\mvn.cmd`（系统 PATH 无 mvn）；pnpm 走 `corepack pnpm`；Python 8000 被系统保留 → 照旧 `--port 8001` + `PY_API_TARGET`。
+- **产出**：`services/java/.../SecurityConfig.java`、`services/java/src/main/resources/application.yml`、根 `.env`（不入库）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-16
+
 ## 2026-09-14 记录纪律 · 署名更正：AI 代工一律署 LHRCarrier（不是分支 owner）· 1 op
 
 - **组长指正**：本轮 AI 代工的产出被署成了 `Faust-sudo`（worklog 署名 70 处 + `git` 提交作者），**两处都错**——把「分支 owner / PR 作者」当成了执行人。**AI 代工的署名应是下指令并认领的人**（AGENTS.md §工作流程 1：署名以认领人为准）。
