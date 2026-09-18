@@ -318,13 +318,11 @@ body.menu-open { overflow: hidden; } /* 移动菜单打开时锁定滚动 */
 .icon-btn svg { width: 19px; height: 19px; }
 .icon-btn--send svg { width: 21px; height: 21px; }
 
-/* —— 功能全览 v3（原"今日练习启动器"的位置）——
-   结构：head（streak + Continue 两条真实入口）→ kicker → 5 个模块 tile。
-   每个 tile = 实色图标块 + 名称 + 一句说明，整块是一个 <a>，点哪儿都能进。
-   为什么是 5 列一行：卡片固定 790px（.prompt），5 列每列 ~142px，刚好放得下
-   图标块 + 两行说明；hero 是 100svh + overflow:hidden，卡片一旦折成两行就会
-   被裁掉，所以模块列表必须一行铺开。
-   想改回"分段 + 推荐 + chips"见 starter-rollback/（restore-v2.ps1）。 */
+/* —— 今日练习启动器 v2（原 AI 输入框的位置）——
+   结构：head（streak + Continue）→ Speaking/Singing 分段 → 面板（一条个性化推荐
+   + Also try 备选 chips）。全部入口都是 <a>，file:// 双击即可用；Speaking/Singing
+   的面板切换由页尾一小段行内脚本渐进增强，无脚本时退化为普通链接。
+   想改回输入框形态见 starter-rollback/（restore.ps1），想回到 v1 静态版见 index.html.rec-v1。 */
 .starter {
   display: flex;
   flex-direction: column;
@@ -368,8 +366,71 @@ body.menu-open { overflow: hidden; } /* 移动菜单打开时锁定滚动 */
 }
 .starter__resume:hover { color: var(--ink); border-bottom-color: currentColor; }
 
-/* 小节标签：由 v2 的"Also try"复用而来，现在是全览的抬头 */
-.starter__also {
+/* 场景 chips */
+.starter__scenes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.starter__chip,
+.starter__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 15px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  color: var(--ink);
+  font-size: 13.5px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.18s ease, transform 0.18s var(--ease), border-color 0.18s ease;
+}
+.starter__chip:hover { background: #f1f1ef; transform: translateY(-1px); }
+.starter__more {
+  padding-inline: 6px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.starter__more:hover { color: var(--ink); }
+
+/* 面板：Speaking / Singing 各一块，互斥显示 */
+.starter__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.starter__panel[hidden] { display: none; } /* 必须写：flex 会盖掉 hidden 的 UA display:none */
+
+/* 推荐块：卡片里唯一的"主行动区" */
+.starter__rec {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.62); /* 玻璃卡里再垫一层，把推荐与 chips 分开 */
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+.starter__rec-icon {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.starter__rec-icon svg { width: 21px; height: 21px; }
+.starter__rec-main { flex: 1 1 auto; min-width: 0; }
+.starter__rec-kicker {
   margin: 0;
   font-size: 11px;
   font-weight: 500;
@@ -377,58 +438,90 @@ body.menu-open { overflow: hidden; } /* 移动菜单打开时锁定滚动 */
   text-transform: uppercase;
   color: var(--muted);
 }
-
-/* —— 5 个模块一行铺开 ——
-   刻意不给 tile 底色：卡片本身已经是玻璃面，再套 5 个小方块就成了
-   "盒子里套盒子"；只靠留白分组，悬停时才浮出底色（设计系统：用留白分组）。 */
-.starter__grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.starter__tile {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  height: 100%;
-  padding: 12px 11px 13px;
-  border-radius: 14px;
-  text-decoration: none;
-  transition: background 0.18s ease, transform 0.18s var(--ease);
-}
-.starter__tile:hover { background: rgba(255, 255, 255, 0.72); transform: translateY(-2px); }
-/* 图标块：实色底 + 白色线性图标。5 个模块是平级的，所以统一用一个颜色
-   （卡片的黑），不做五色 —— 这套系统彩色只留 accent 蓝与 star 黄。 */
-.starter__tile-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 13px;
-  background: #141414;
-  color: #fff;
-}
-.starter__tile-icon svg { width: 19px; height: 19px; }
-.starter__tile-title {
-  font-size: 14.5px;
+.starter__rec-title {
+  margin: 2px 0 0;
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--ink);
 }
-.starter__tile-desc {
-  font-size: 11.5px;
-  line-height: 1.42;
+.starter__rec-why {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
   color: var(--muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* 备选行：label + chips + 尾部链接同一行 */
+.starter__quick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.starter__also {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* 模式分段（照搬设计系统 .segment 的造型）：放在推荐内容之上 */
+.starter__modes {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.055);
+}
+.starter__mode {
+  padding: 7px 18px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.starter__mode:hover { color: var(--ink); }
+/* 选中态：默认停在 Speaking（与 App Home 的分段一致）。
+   有脚本时是真正的 tab 切换（JS 同步 .is-active 与 aria-selected）；
+   无脚本时它们只是普通链接，各自跳到 practice.html / sing.html。 */
+.starter__mode.is-active {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.starter__cta {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 8px;
+  height: 46px;
+  padding: 0 20px;
+  border-radius: 12px;
+  background: #141414;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.18s ease, transform 0.18s var(--ease);
+}
+.starter__cta:hover { background: #000; transform: translateY(-1px); }
+
+/* 键盘可达性：首页原本没有焦点样式，给新控件补上 */
+.starter a:focus-visible {
+  outline: 2px solid #141414;
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+.starter__cta:focus-visible { border-radius: 12px; }
 
 /* —— 页面加载入场动画 —— */
 @keyframes rise {
@@ -539,33 +632,31 @@ body.menu-open { overflow: hidden; } /* 移动菜单打开时锁定滚动 */
   .icon-btn { width: 38px; height: 38px; }
   .icon-btn--bare { width: 32px; }
   .icon-btn--send { width: 42px; height: 42px; border-radius: 11px; }
-  /* 功能全览：5 列折成 3 列（2 行），并收掉说明与抬头 ——
-     窄屏卡片只有 ~560px 宽，带说明会折成 3 行把 hero 顶破。 */
+  /* 启动器：推荐块竖排、CTA 整行，chips 单行横滑（避免继续长高） */
   .starter { gap: 10px; }
   .starter__head { gap: 8px; }
   .starter__streak { font-size: 11.5px; padding: 0 12px; }
-  .starter__also { display: none; }
-  .starter__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
-  .starter__tile { padding: 10px 9px 11px; gap: 7px; }
-  .starter__tile-icon { width: 36px; height: 36px; border-radius: 12px; }
-  .starter__tile-icon svg { width: 17px; height: 17px; }
-  .starter__tile-desc { display: none; }
+  .starter__chip { padding: 8px 13px; font-size: 13px; }
+  .starter__modes { display: inline-flex; } /* 保持左对齐、不占满整行 */
+  .starter__rec { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px; }
+  .starter__rec-icon { width: 40px; height: 40px; border-radius: 12px; }
+  .starter__cta { width: 100%; justify-content: center; }
+  .starter__also { display: none; } /* 窄屏省掉 label */
+  .starter__quick {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .starter__quick::-webkit-scrollbar { display: none; }
+  .starter__scenes { flex-wrap: nowrap; }
 }
 
-/* —— 短视口（≤800px 高）：收掉抬头与说明文字 ——
-   hero 是 100svh + overflow:hidden，卡片一长高就被裁；矮屏优先保"图标 + 名称"。
-   （≥801px 高时 5 列只有一行，高度够用，说明文字照常显示。） */
+/* —— 短视口（≤800px 高）：优先保推荐块与 CTA，避免被 hero 裁掉 —— */
 @media (max-height: 800px) {
   .starter { gap: 10px; }
-  .starter__also { display: none; }
-  .starter__tile { padding: 10px 9px 11px; gap: 7px; }
-  .starter__tile-desc { display: none; }
-}
-
-/* —— 窄视口（≤720px 宽）：5 列每列不足 120px，两行说明会被挤成三行 ——
-   同样只留"图标 + 名称"，卡片高度不随宽度变高。 */
-@media (max-width: 720px) {
-  .starter__tile-desc { display: none; }
+  .starter__quick { display: none; }
+  .starter__rec { padding: 10px 12px; }
 }
 
 /* —— 横屏手机 —— */
@@ -640,14 +731,11 @@ body.menu-open { overflow: hidden; } /* 移动菜单打开时锁定滚动 */
           Practice real conversations with AI roleplay, sing your way to better pronunciation,<br class="brk" />
           and watch every session turn into visible progress.
         </p>
-        <!-- 功能全览（v3）：把这张卡从"今天练哪个场景"改成"整个 App 能做什么"。
-             头部保留 streak 与 Continue 两条真实入口；下面 5 个模块一行铺开，
-             每块 = 实色图标块 + 名称 + 一句说明，整块可点（全部是普通 <a>，
-             file:// 双击即可用，不需要脚本）。
-             高 DPI 下 5 列每列约 142px，正好放两行说明；窄屏与短视口的降级
-             见上方 @media 块。想改回"分段 + 推荐 + chips"见
-             starter-rollback/（restore-v2.ps1）。 -->
-        <div class="prompt starter rise" style="--i:16">
+        <!-- 今日练习启动器（v2）：个性化推荐为主 + Speaking/Singing 真切换。
+             无脚本时两个 tab 退化为普通链接（practice.html / sing.html），
+             Speaking 面板仍完整可读；整张卡只有推荐块里那一颗黑色主 CTA。
+             （streak / Continue / 推荐理由里的数字是静态演示值，与原型其它屏同类。） -->
+        <div class="prompt starter rise" style="--i:16" data-starter>
           <div class="starter__head">
             <a class="starter__streak" href="stats.html">
               <span class="starter__dot" aria-hidden="true"></span>
@@ -656,55 +744,57 @@ body.menu-open { overflow: hidden; } /* 移动菜单打开时锁定滚动 */
             <a class="starter__resume" href="practice.html">Continue: Coffee Shop · 3m12s <span aria-hidden="true">→</span></a>
           </div>
 
-          <p class="starter__also">Everything in VocalVerse</p>
+          <div class="starter__modes" role="tablist" aria-label="Practice mode">
+            <a class="starter__mode is-active" id="starter-tab-speaking" role="tab" aria-selected="true"
+               aria-controls="starter-panel-speaking" href="practice.html" data-starter-tab="speaking">Speaking</a>
+            <a class="starter__mode" id="starter-tab-singing" role="tab" aria-selected="false"
+               aria-controls="starter-panel-singing" href="sing.html" data-starter-tab="singing">Singing</a>
+          </div>
 
-          <ul class="starter__grid">
-            <li>
-              <a class="starter__tile" href="practice.html">
-                <span class="starter__tile-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2a2.9 2.9 0 0 0-2.9 2.9v6a2.9 2.9 0 0 0 5.8 0v-6A2.9 2.9 0 0 0 12 3.2z"/><path d="M18.4 11.4v.7a6.4 6.4 0 0 1-12.8 0v-.7"/><path d="M12 18.5v2.3"/></svg>
-                </span>
-                <span class="starter__tile-title">Practice</span>
-                <span class="starter__tile-desc">Roleplay 8 scenes, scored every turn</span>
-              </a>
-            </li>
-            <li>
-              <a class="starter__tile" href="sing.html">
-                <span class="starter__tile-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>
-                </span>
-                <span class="starter__tile-title">Sing</span>
-                <span class="starter__tile-desc">Sing along, scored line by line</span>
-              </a>
-            </li>
-            <li>
-              <a class="starter__tile" href="recommend.html">
-                <span class="starter__tile-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.4 13.7 8.3 18.6 10 13.7 11.7 12 16.6 10.3 11.7 5.4 10 10.3 8.3z"/><path d="M18.6 15.2v3.4M20.3 16.9h-3.4"/></svg>
-                </span>
-                <span class="starter__tile-title">Recommend</span>
-                <span class="starter__tile-desc">Picks built from your weak spots</span>
-              </a>
-            </li>
-            <li>
-              <a class="starter__tile" href="stats.html">
-                <span class="starter__tile-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5v15.2a1.8 1.8 0 0 0 1.8 1.8h15.2"/><path d="m7.2 15.4 3.6-4.2 3 3 4.9-5.6"/></svg>
-                </span>
-                <span class="starter__tile-title">Stats</span>
-                <span class="starter__tile-desc">Five-axis radar and your trends</span>
-              </a>
-            </li>
-            <li>
-              <a class="starter__tile" href="community.html">
-                <span class="starter__tile-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15.6 20.6v-1.8a3.7 3.7 0 0 0-3.7-3.7H6.3a3.7 3.7 0 0 0-3.7 3.7v1.8"/><circle cx="9.1" cy="7.6" r="3.7"/><path d="M21.4 20.6v-1.8a3.7 3.7 0 0 0-2.8-3.6"/><path d="M15.6 3.9a3.7 3.7 0 0 1 0 7.2"/></svg>
-                </span>
-                <span class="starter__tile-title">Community</span>
-                <span class="starter__tile-desc">Posts and video, three domains</span>
-              </a>
-            </li>
-          </ul>
+          <div class="starter__panel" id="starter-panel-speaking" role="tabpanel" aria-labelledby="starter-tab-speaking">
+            <div class="starter__rec">
+              <span class="starter__rec-icon" style="background:#3A2440" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5 9h11v5a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5z"/><path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16"/></svg>
+              </span>
+              <div class="starter__rec-main">
+                <p class="starter__rec-kicker">Recommended for you</p>
+                <p class="starter__rec-title">Job interview</p>
+                <p class="starter__rec-why">Fluency dipped across your last three sessions · 6 rounds, about 4 minutes</p>
+              </div>
+              <a class="starter__cta" href="practice.html" data-scene="job-interview">Start this scene <span aria-hidden="true">→</span></a>
+            </div>
+            <div class="starter__quick">
+              <span class="starter__also">Also try</span>
+              <ul class="starter__scenes">
+                <li><a class="starter__chip" href="practice.html" data-scene="airport-check-in">Airport check-in</a></li>
+                <li><a class="starter__chip" href="practice.html" data-scene="see-a-doctor">See a doctor</a></li>
+                <li><a class="starter__chip" href="practice.html" data-scene="coffee-shop">Coffee shop</a></li>
+                <li><a class="starter__more" href="practice.html">All scenes <span aria-hidden="true">→</span></a></li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="starter__panel" id="starter-panel-singing" role="tabpanel" aria-labelledby="starter-tab-singing" hidden>
+            <div class="starter__rec">
+              <span class="starter__rec-icon" style="background:#232044" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>
+              </span>
+              <div class="starter__rec-main">
+                <p class="starter__rec-kicker">Recommended for you</p>
+                <p class="starter__rec-title">Auld Lang Syne</p>
+                <p class="starter__rec-why">Slow tempo, long vowels — targets the phonemes your profile flagged · 6 lines, under 2 minutes</p>
+              </div>
+              <a class="starter__cta" href="sing.html">Sing this song <span aria-hidden="true">→</span></a>
+            </div>
+            <div class="starter__quick">
+              <span class="starter__also">Also try</span>
+              <ul class="starter__scenes">
+                <li><a class="starter__chip" href="sing.html">Perfect Night</a></li>
+                <li><a class="starter__chip" href="sing.html">Yesterday Once More</a></li>
+                <li><a class="starter__more" href="sing.html">Song library <span aria-hidden="true">→</span></a></li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -751,6 +841,37 @@ body.menu-open { overflow: hidden; } /* 移动菜单打开时锁定滚动 */
 
   window.addEventListener('resize', function () {
     if (window.innerWidth > 900 && isOpen()) setMenu(false);
+  });
+})();
+</script>
+<script>
+/* 首页启动器：Speaking / Singing 面板切换（渐进增强）。
+   无脚本时两个 tab 仍是普通链接（practice.html / sing.html），Speaking 面板默认可见。 */
+(function () {
+  'use strict';
+  var root = document.querySelector('.starter[data-starter]');
+  if (!root) return;
+  var tabs = Array.prototype.slice.call(root.querySelectorAll('[data-starter-tab]'));
+  var panels = {
+    speaking: root.querySelector('#starter-panel-speaking'),
+    singing: root.querySelector('#starter-panel-singing')
+  };
+  function select(mode) {
+    tabs.forEach(function (tab) {
+      var on = tab.getAttribute('data-starter-tab') === mode;
+      tab.classList.toggle('is-active', on);
+      tab.setAttribute('aria-selected', String(on));
+    });
+    Object.keys(panels).forEach(function (key) {
+      if (panels[key]) panels[key].hidden = key !== mode;
+    });
+  }
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function (e) {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; /* 保留新标签页打开 */
+      e.preventDefault();
+      select(tab.getAttribute('data-starter-tab'));
+    });
   });
 })();
 </script>
