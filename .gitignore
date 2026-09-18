@@ -6,6 +6,10 @@
 local/
 # --- AI 助手（WorkBuddy）工作区：会话记忆/临时产物，纯本机数据，不入库 ---
 .workbuddy/
+# --- AI 助手（Trae）工作区：计划草稿/会话产物，纯本机数据，不入库（2026-09-18 补） ---
+.trae/
+# --- 本机包管理器缓存（pnpm store/corepack：约 2.7 万文件 / 294MB，勿入库；2026-09-18 补） ---
+.cache/
 # --- Node / 前端 ---
 node_modules/
 dist/
