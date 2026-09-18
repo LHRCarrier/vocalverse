@@ -16,7 +16,9 @@ import { COMMUNITY_TABS } from '@/api/community'
 import MobileCommentsSheet from '@/components/mobile/MobileCommentsSheet.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobilePostCard from '@/components/mobile/MobilePostCard.vue'
+import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { shareDemoLink } from '@/composables/share'
 import { useCommunityStore } from '@/stores/community'
 import { useUiStore } from '@/stores/ui'
@@ -27,6 +29,10 @@ import type { CommunityPostView } from '@/types/community'
 const router = useRouter()
 const ui = useUiStore()
 const community = useCommunityStore()
+
+/** 骨架屏防抖：<300ms 完成的请求不闪骨架（docs/31 硬规则 3；实测原实现仅显示 18ms）
+ *  pending=请求中（渲染不可见占位，先占高度防 CLS），visible=>300ms 才真正显示 */
+const { visible: skelVisible, pending: skelPending } = useDelayedLoading(computed(() => community.loading))
 
 const tabs = COMMUNITY_TABS
 const activeTab = ref<string | null>(null)
@@ -123,20 +129,17 @@ function tintGradient(tint: string | null | undefined): string {
         </button>
       </nav>
 
-      <!-- 加载态：骨架卡（docs/31 硬规则 3：>300ms 才出现） -->
-      <section v-if="community.loading" class="u-comm-skel" aria-label="动态加载中" aria-busy="true">
-        <div v-for="i in 3" :key="i" class="u-comm-skel__card">
-          <span class="u-comm-skel__ava" />
-          <span class="u-comm-skel__lines">
-            <span class="u-comm-skel__line" style="width: 52%" />
-            <span class="u-comm-skel__line" style="width: 78%" />
-          </span>
-          <span class="u-comm-skel__media" />
-        </div>
-      </section>
+      <!-- 加载态：骨架卡（docs/31 硬规则 3：>300ms 才出现；防抖见 useDelayedLoading） -->
+      <MobileSkeleton
+        v-if="skelPending"
+        :class="{ 'is-pending': !skelVisible }"
+        variant="feed"
+        :count="3"
+        label="动态加载中"
+      />
 
-      <!-- 空态：当前领域无内容 -->
-      <div v-else-if="visibleFeed.length === 0" class="u-comm-empty" role="status">
+      <!-- 空态：当前领域无内容（加载中不判空，避免首屏闪空态） -->
+      <div v-else-if="!community.loading && visibleFeed.length === 0" class="u-comm-empty" role="status">
         <span class="u-comm-empty__icon"><MobileIcon name="info" :size="28" /></span>
         <p class="u-comm-empty__title">{{ community.error ? '加载失败' : '该领域暂无内容' }}</p>
         <p class="u-comm-empty__sub">{{ community.error || '换个领域看看，或稍后再来～' }}</p>

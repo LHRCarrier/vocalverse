@@ -16,6 +16,7 @@ import { shareDemoLink } from '@/composables/share'
 import { useSingPlay } from '@/composables/sing'
 import { useReferenceAudio } from '@/composables/useReferenceAudio'
 import { useUiStore } from '@/stores/ui'
+import { hapticTap } from '@/utils/haptic'
 
 import type { SongSummary } from '@/api/sing'
 
@@ -105,6 +106,7 @@ async function openSong(songId: number) {
 
 /** 收藏按钮：点一下收藏，再点一次取消（乐观更新 + 失败回滚，见 useSingPlay.toggleFavorite） */
 async function toggleFav(song: SongSummary) {
+  hapticTap('light') // 语义动作触觉（安卓支持；其余平台静默）
   const r = await play.toggleFavorite(song.id)
   if (r === null) ui.showToast(play.favoriteError.value ?? '收藏操作失败，请重试')
   else ui.showToast(r ? '已收藏，可在「收藏」里找到' : '已取消收藏')

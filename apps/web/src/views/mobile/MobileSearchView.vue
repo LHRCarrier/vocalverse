@@ -8,7 +8,9 @@ import { computed, onMounted, ref } from 'vue'
 
 import { fetchFollowRecommendations } from '@/api/community'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
+import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import '@/styles/mobile-uic.css'
 
 /**
@@ -35,6 +37,11 @@ const HOT = ['#Shadowing', '#EnglishLearning', '#BonfireNight']
 
 /** 真实用户源（推荐关注候选 = 全库用户分页，排除自己） */
 const users = ref<{ name: string; handle: string; tint: string }[]>([])
+const usersLoading = ref(true)
+
+/** 用户 tab 骨架防抖（docs/31 硬规则 3）：原实现拉取期间静默空 */
+const { visible: usersSkelVisible } = useDelayedLoading(usersLoading)
+
 onMounted(async () => {
   try {
     const recs = await fetchFollowRecommendations()
@@ -45,6 +52,8 @@ onMounted(async () => {
     }))
   } catch {
     users.value = [] // 拉取失败：用户 tab 走空态，不阻塞其余搜索分类
+  } finally {
+    usersLoading.value = false
   }
 })
 const tutorials = [
@@ -144,13 +153,16 @@ function pick(k: string) {
           </template>
           <!-- 用户结果 -->
           <template v-else-if="activeTab === '用户'">
-            <div v-for="u in foundUsers" :key="u.handle" class="u-search__row">
-              <span class="u-search__ava" :style="{ background: u.tint }">{{ u.name.slice(0, 1) }}</span>
-              <span class="u-search__body">
-                <span class="u-search__title">{{ u.name }}</span>
-                <span class="u-search__sub">{{ u.handle }}</span>
-              </span>
-            </div>
+            <MobileSkeleton v-if="usersSkelVisible" variant="lines" :count="3" label="用户加载中" />
+            <template v-else>
+              <div v-for="u in foundUsers" :key="u.handle" class="u-search__row">
+                <span class="u-search__ava" :style="{ background: u.tint }">{{ u.name.slice(0, 1) }}</span>
+                <span class="u-search__body">
+                  <span class="u-search__title">{{ u.name }}</span>
+                  <span class="u-search__sub">{{ u.handle }}</span>
+                </span>
+              </div>
+            </template>
           </template>
           <!-- 教程结果 -->
           <template v-else>

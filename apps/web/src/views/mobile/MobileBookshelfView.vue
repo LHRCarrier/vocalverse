@@ -7,8 +7,10 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import MobileBookCover from '@/components/mobile/MobileBookCover.vue'
+import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { fetchBooks } from '@/api/reading'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import '@/styles/mobile-uic.css'
 import '@/styles/reader-uic.css'
 
@@ -18,6 +20,9 @@ const router = useRouter()
 const books = ref<ReadingBook[]>([])
 const loading = ref(true)
 const error = ref('')
+
+/** 骨架防抖（docs/31 硬规则 3）：<300ms 完成不闪骨架；pending 先占位防 CLS */
+const { visible: skelVisible, pending: skelPending } = useDelayedLoading(loading)
 
 async function load() {
   loading.value = true
@@ -47,19 +52,21 @@ function pct(progress: { char_offset: number; content_version: number } | null |
   <div class="u-phone">
     <MobileTopBar title="书房" back @back="router.push('/m/learn')" />
     <div class="u-bs">
-      <section v-if="loading" class="u-comm-skel" aria-label="加载中" aria-busy="true">
-        <div v-for="i in 4" :key="i" class="u-comm-skel__card">
-          <span class="u-comm-skel__media" />
-        </div>
-      </section>
+      <MobileSkeleton
+        v-if="skelPending"
+        :class="{ 'is-pending': !skelVisible }"
+        variant="media"
+        :count="4"
+        label="加载中"
+      />
 
-      <div v-else-if="error" class="u-comm-empty" role="status">
+      <div v-else-if="!loading && error" class="u-comm-empty" role="status">
         <span class="u-comm-empty__title">加载失败</span>
         <p class="u-comm-empty__sub">{{ error }}</p>
         <button class="u-comm-empty__btn" type="button" @click="load">刷新看看</button>
       </div>
 
-      <div v-else-if="books.length === 0" class="u-comm-empty" role="status">
+      <div v-else-if="!loading && books.length === 0" class="u-comm-empty" role="status">
         <span class="u-comm-empty__title">书架还空着</span>
         <p class="u-comm-empty__sub">在下方书架挑一本英文小说开始浸润阅读～</p>
       </div>

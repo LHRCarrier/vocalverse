@@ -17,7 +17,9 @@ import { useUiStore } from '@/stores/ui'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
+import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import '@/styles/mobile-uic.css'
 
 const route = useRoute()
@@ -48,6 +50,9 @@ interface ReportMetrics {
 const report = ref<ReportPayload | null>(null)
 const loaded = ref<'idle' | 'loading' | 'ok' | 'error'>('idle')
 const error = ref<string | null>(null)
+
+/** 报告加载骨架防抖（docs/31 硬规则 3）：原实现 loading 期直接回退演示帧，易与真实数据混淆 */
+const { visible: skelVisible } = useDelayedLoading(computed(() => loaded.value === 'loading'))
 
 onMounted(async () => {
   const id = Number(route.query.reportId)
@@ -118,7 +123,9 @@ const demoLines = [
       </template>
     </MobileTopBar>
 
-    <div class="u-content u-content--free">
+    <MobileSkeleton v-if="skelVisible" variant="lines" :count="5" label="报告加载中" />
+
+    <div v-else class="u-content u-content--free">
       <p class="u-head__sub" style="margin: 0 0 16px">
         {{ report ? `会话 #${route.query.reportId}` : 'Perfect Night · LE SSERAFIM · 12-16 20:15' }}
       </p>

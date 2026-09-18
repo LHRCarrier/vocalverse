@@ -58,6 +58,13 @@
   --u-scrim: rgba(20, 20, 18, 0.92);
   --u-z-lightbox: 80;
   --u-avatar-fallback: #37546e;
+
+  /* ---- 动效（docs/31 §2 时长分层 60 / 120-150 / 200-240；与 styles/tokens.ts 的 motion 同步） ---- */
+  --u-dur-tap: 60ms;
+  --u-dur-quick: 120ms;
+  --u-dur-base: 200ms;
+  --u-dur-slide: 240ms;
+  --u-ease-out: cubic-bezier(0.2, 0, 0, 1);
 }
 
 /* 系统深色模式下，表单控件（file input / select）会走 UA 深色皮肤，与纸面白卡冲突。
@@ -70,6 +77,117 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* ============================================================
+ * 交互反馈基建（2026-09-18 · docs/31 规则 3/4）
+ * 1) 关闭系统点击高亮：默认半透明蓝框会与自定义 press 反馈叠加，视觉最脏
+ * 2) .u-press：统一按压反馈工具类（60ms scale，transform only）
+ * 3) html[data-motion]：由 composables/useMotionTier 写入的三级降级开关
+ *    high=完整 / low=缩短并去掉位移 / off=只变色（reduced-motion 或手动覆盖）
+ * ============================================================ */
+html {
+  -webkit-tap-highlight-color: transparent; /* 继承属性；桌面浏览器忽略 */
+}
+
+.u-press {
+  transition: transform var(--u-dur-tap) var(--u-ease-out), background-color var(--u-dur-quick) ease-out;
+}
+
+.u-press:active {
+  transform: scale(0.97);
+}
+
+/* 骨架"不可见占位"：请求进行中但未到 300ms 时先占住高度（visibility 不影响布局），
+ * 内容到达时不会把下方元素顶下去 —— 实测消除首屏 CLS 0.66 的跳变 */
+.u-comm-skel.is-pending {
+  visibility: hidden;
+}
+
+/* 低端机：只保留更短的过渡，去掉位移带来的合成开销 */
+html[data-motion='low'] .u-press,
+html[data-motion='low'] .u-btn,
+html[data-motion='low'] .u-tab,
+html[data-motion='low'] .u-x-tab,
+html[data-motion='low'] .u-chip,
+html[data-motion='low'] .u-comm-item__tap {
+  transition-duration: 90ms;
+}
+
+/* 关闭动效（reduced-motion / 手动 off）：按压只变色，不做缩放 */
+html[data-motion='off'] .u-phone :active,
+html[data-motion='off'] .u-sheet :active,
+html[data-motion='off'] .u-tabbar :active,
+html[data-motion='off'] .u-drawer :active {
+  transform: none;
+}
+
+html[data-motion='off'] .u-comm-skel__card,
+html[data-motion='off'] .u-rec .arc,
+html[data-motion='off'] .u-rec .ring,
+html[data-motion='off'] .u-spin {
+  animation: none;
+}
+
+/* ---- 页面级转场（2026-09-18；docs/31 §2：200ms，只动 transform/opacity） ----
+ * 仅 /m/* 生效（App.vue 的 pageAnimated 判定）。leave 期旧页脱离文档流但**不锁高**
+ * （只给 top/left/right，不给 bottom），避免旧页与新页高度差造成的挤压变形。 */
+.m-page-wrap {
+  position: relative;
+}
+
+.m-page-forward-enter-active,
+.m-page-forward-leave-active,
+.m-page-back-enter-active,
+.m-page-back-leave-active {
+  transition:
+    opacity var(--u-dur-base) var(--u-ease-out),
+    transform var(--u-dur-base) var(--u-ease-out);
+}
+
+.m-page-forward-leave-active,
+.m-page-back-leave-active {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none; /* 旧页在退场期不接收点击，避免误触到已离开的页面 */
+}
+
+.m-page-forward-enter-from {
+  opacity: 0;
+  transform: translateX(16px);
+}
+
+.m-page-forward-leave-to {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+.m-page-back-enter-from {
+  opacity: 0;
+  transform: translateX(-16px);
+}
+
+.m-page-back-leave-to {
+  opacity: 0;
+  transform: translateX(10px);
+}
+
+/* 低端机：去位移，只保留淡入淡出 */
+html[data-motion='low'] .m-page-forward-enter-from,
+html[data-motion='low'] .m-page-forward-leave-to,
+html[data-motion='low'] .m-page-back-enter-from,
+html[data-motion='low'] .m-page-back-leave-to {
+  transform: none;
+}
+
+/* 关闭动效：转场不产生任何过渡（Vue 侧时长解析为 0，直接完成） */
+html[data-motion='off'] .m-page-forward-enter-active,
+html[data-motion='off'] .m-page-forward-leave-active,
+html[data-motion='off'] .m-page-back-enter-active,
+html[data-motion='off'] .m-page-back-leave-active {
+  transition: none;
 }
 
 html,
@@ -380,6 +498,11 @@ body.is-login {
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
+  transition: transform var(--u-dur-tap) var(--u-ease-out), background-color var(--u-dur-quick) ease-out;
+}
+
+.u-chip:active {
+  transform: scale(0.97);
 }
 
 .u-chip svg {
@@ -1248,7 +1371,11 @@ body.is-login {
   color: var(--u-sub);
   cursor: pointer;
   white-space: nowrap;
-  transition: color 150ms ease-out;
+  transition: color 150ms ease-out, transform var(--u-dur-tap) var(--u-ease-out);
+}
+
+.u-x-tab:active {
+  transform: scale(0.97);
 }
 
 .u-x-tab.active {
@@ -1432,6 +1559,19 @@ body.is-login {
 }
 
 /* 互动行（评论 / 点赞 / 投币 / 分享 · X 式） */
+/* 整卡可点区（MobilePostCard 的 __tap，此前 CSS 中零规则 → 点击无任何反馈）：
+ * 大面积用更小缩放幅度（0.985），避免"整块抖动"；禁选中防滑动手势误选文字 */
+.u-comm-item__tap {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform var(--u-dur-tap) var(--u-ease-out);
+}
+
+.u-comm-item__tap:active {
+  transform: scale(0.985);
+}
+
 .u-comm-item__foot {
   display: flex;
   align-items: center;
@@ -2114,7 +2254,11 @@ body.is-login {
   cursor: pointer;
   color: var(--u-sub);
   text-decoration: none;
-  transition: color 150ms ease-out;
+  transition: color 150ms ease-out, transform var(--u-dur-tap) var(--u-ease-out);
+}
+
+.u-tab:active {
+  transform: scale(0.97);
 }
 
 .u-tab svg {

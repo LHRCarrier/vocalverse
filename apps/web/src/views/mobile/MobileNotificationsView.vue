@@ -27,7 +27,9 @@ import {
   unfollowUser,
 } from '@/api/community'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
+import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { useMessagesStore } from '@/stores/messages'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
@@ -140,6 +142,9 @@ const followList = ref<FollowSummary[]>([])
 const recommendations = ref<FollowRecommend[]>([])
 const followingFeed = ref<CommunityPostView[]>([])
 const followsLoading = ref(false)
+
+/** 关注 tab 骨架防抖（docs/31 硬规则 3）：原实现加载期整块不渲染 → 空跳 */
+const { visible: followsSkelVisible } = useDelayedLoading(followsLoading)
 
 async function loadFollows() {
   followsLoading.value = true
@@ -287,7 +292,8 @@ const hasFollows = computed(() => followList.value.length > 0)
 
     <!-- Tab 3 · 关注（推荐关注管理 + 关注流） -->
     <div v-else class="u-msg">
-      <template v-if="!followsLoading">
+      <MobileSkeleton v-if="followsSkelVisible" variant="lines" :count="3" label="关注加载中" />
+      <template v-else>
         <section v-if="recommendations.length" class="u-notif__recs" aria-label="推荐关注">
           <h3 class="u-notif__recs-title">推荐关注</h3>
           <div

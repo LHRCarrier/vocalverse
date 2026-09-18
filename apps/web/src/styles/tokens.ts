@@ -27,6 +27,18 @@ export const tokens = {
     pill: '999px',
   },
   spacing: [4, 8, 12, 16, 24, 32],
+  /**
+   * 动效（docs/31 §2 时长分层：60 / 120-150 / 200-240ms，只动 transform/opacity/box-shadow）。
+   * 运行时真源是移动端样式表 `mobile-uic.css` 的 `--u-dur-*` / `--u-ease-out`（CSS 变量可直接降级覆盖），
+   * 这里保留同值常量供需要 JS 计算的场景引用，两处必须同步改。
+   */
+  motion: {
+    tap: 60,
+    quick: 120,
+    base: 200,
+    slide: 240,
+    easeOut: 'cubic-bezier(0.2,0,0,1)',
+  },
   /** Nunito 为可选外网字体（演示机器断网时回退系统栈，不阻塞） */
   fontFamily:
     "'Nunito', ui-rounded, system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif",

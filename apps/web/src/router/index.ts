@@ -194,6 +194,16 @@ routes.push({ path: '/:pathMatch(.*)*', redirect: '/demo' })
 const router = createRouter({
   history: createWebHistory(),
   routes,
+  /**
+   * 切页滚动复位（2026-09-18 补，此前全仓无声明）：转场期间若保留上一页的滚动位置，
+   * 新页会从半截开始显示，观感像"跳页"。阅读器是沉浸页且自带滚动容器（见 useMobileBack 注释），
+   * 窗口不滚动 → 返回 false 不做处理。
+   */
+  scrollBehavior(to, _from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.path.startsWith('/m/reader')) return false
+    return { top: 0 }
+  },
 })
 
 // 登录守卫：requiresAuth 路由无 token → 登录页（docs/18 §3-F3；token 恢复见 stores/auth）

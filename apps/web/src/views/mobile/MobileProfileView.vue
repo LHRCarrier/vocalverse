@@ -18,8 +18,10 @@ import { useRouter } from 'vue-router'
 import MobileAvatar from '@/components/mobile/MobileAvatar.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileMediaPicker from '@/components/mobile/MobileMediaPicker.vue'
+import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { patchMe } from '@/api/users'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { useMobileBack } from '@/composables/useMobileBack'
 import { useAuthStore } from '@/stores/auth'
 import { useCommunityStore } from '@/stores/community'
@@ -41,16 +43,24 @@ const avatarSel = ref<MediaAssetView[]>([])
 const pickerOpen = ref(false)
 const saving = ref(false)
 const errorText = ref('')
+const loading = ref(true)
+
+/** 资料加载骨架防抖（docs/31 硬规则 3）：原实现拉取期间表单显示空值 */
+const { visible: skelVisible } = useDelayedLoading(loading)
 
 const canSave = computed(
   () => nickname.value.trim().length > 0 && !saving.value,
 )
 
 onMounted(async () => {
-  await auth.fetchMe()
-  nickname.value = auth.me?.nickname ?? ''
-  handle.value = auth.me?.handle ?? ''
-  avatarUrl.value = auth.me?.avatarUrl ?? null
+  try {
+    await auth.fetchMe()
+    nickname.value = auth.me?.nickname ?? ''
+    handle.value = auth.me?.handle ?? ''
+    avatarUrl.value = auth.me?.avatarUrl ?? null
+  } finally {
+    loading.value = false
+  }
 })
 
 function onAvatarSelected(list: MediaAssetView[]) {
@@ -90,46 +100,51 @@ async function save() {
     <MobileTopBar title="我的资料" back @back="goBack" />
 
     <main class="u-pf__body">
-      <!-- 头像 -->
-      <section class="u-pf__avatar-row">
-        <MobileAvatar
-          :src="avatarUrl"
-          :name="nickname || auth.me?.nickname"
-          :tint="auth.me?.tint"
-          size="lg"
-        />
-        <button class="u-btn u-btn--secondary" type="button" @click="pickerOpen = true">
-          <MobileIcon name="plus" :size="16" />更换头像
+      <!-- 资料加载骨架（防抖，docs/31 硬规则 3） -->
+      <MobileSkeleton v-if="skelVisible" variant="lines" :count="3" label="资料加载中" />
+
+      <template v-else>
+        <!-- 头像 -->
+        <section class="u-pf__avatar-row">
+          <MobileAvatar
+            :src="avatarUrl"
+            :name="nickname || auth.me?.nickname"
+            :tint="auth.me?.tint"
+            size="lg"
+          />
+          <button class="u-btn u-btn--secondary" type="button" @click="pickerOpen = true">
+            <MobileIcon name="plus" :size="16" />更换头像
+          </button>
+        </section>
+
+        <!-- 昵称 -->
+        <label class="u-pf__field">
+          <span class="u-pf__label">昵称</span>
+          <input v-model="nickname" class="u-pf__input" type="text" maxlength="64" placeholder="你的昵称">
+        </label>
+
+        <!-- @handle -->
+        <label class="u-pf__field">
+          <span class="u-pf__label">@handle</span>
+          <input v-model="handle" class="u-pf__input" type="text" maxlength="32" placeholder="英文/数字，社区展示用">
+        </label>
+        <p class="u-note">@handle 全局唯一（大小写不敏感），改过之后别人看到的就是新名字。</p>
+
+        <p v-if="errorText" class="u-pf__err" role="status" aria-live="polite">{{ errorText }}</p>
+
+        <div class="u-pf__actions">
+          <button class="u-btn u-btn--primary u-btn--block" type="button" :disabled="!canSave" @click="save">
+            {{ saving ? '保存中…' : '保存' }}
+          </button>
+        </div>
+
+        <!-- 我的发帖入口（2026-09-09 组长实测补：发完帖没有「我的」通道回看） -->
+        <button class="u-pf__link" type="button" @click="router.push('/m/me/posts')">
+          <MobileIcon name="hash" :size="18" />
+          <span>我的发帖</span>
+          <MobileIcon name="chevron" :size="16" class="u-pf__link-go" />
         </button>
-      </section>
-
-      <!-- 昵称 -->
-      <label class="u-pf__field">
-        <span class="u-pf__label">昵称</span>
-        <input v-model="nickname" class="u-pf__input" type="text" maxlength="64" placeholder="你的昵称">
-      </label>
-
-      <!-- @handle -->
-      <label class="u-pf__field">
-        <span class="u-pf__label">@handle</span>
-        <input v-model="handle" class="u-pf__input" type="text" maxlength="32" placeholder="英文/数字，社区展示用">
-      </label>
-      <p class="u-note">@handle 全局唯一（大小写不敏感），改过之后别人看到的就是新名字。</p>
-
-      <p v-if="errorText" class="u-pf__err" role="status" aria-live="polite">{{ errorText }}</p>
-
-      <div class="u-pf__actions">
-        <button class="u-btn u-btn--primary u-btn--block" type="button" :disabled="!canSave" @click="save">
-          {{ saving ? '保存中…' : '保存' }}
-        </button>
-      </div>
-
-      <!-- 我的发帖入口（2026-09-09 组长实测补：发完帖没有「我的」通道回看） -->
-      <button class="u-pf__link" type="button" @click="router.push('/m/me/posts')">
-        <MobileIcon name="hash" :size="18" />
-        <span>我的发帖</span>
-        <MobileIcon name="chevron" :size="16" class="u-pf__link-go" />
-      </button>
+      </template>
     </main>
 
     <MobileMediaPicker
