@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VocalVerse — English Song Singing</title>
+  <meta name="description" content="Sing an English song from start to finish and get per-line scoring on pitch, rhythm, and pronunciation, aligned against the reference melody." />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,100..900,0..100&family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/scroll-expand.css?v=3" />
+  <link rel="stylesheet" href="css/feature-blocks.css" />
+  <link rel="stylesheet" href="css/card-art.css" />
+  <link rel="stylesheet" href="css/nav-reveal.css" />
+  <link rel="stylesheet" href="css/site-nav.css" />
+  <link rel="stylesheet" href="css/gooey-nav.css" />
+  <link rel="stylesheet" href="css/footer.css" />
+  <link rel="stylesheet" href="css/aero-shards.css" />
+<link rel="stylesheet" href="css/gradual-blur.css" />
+  <link rel="stylesheet" href="css/dot-field.css" />
+  <link rel="stylesheet" href="css/magic-bento.css" />
+  <script>document.documentElement.classList.add((localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")));</script>
+</head>
+<body class="min-h-screen bg-background font-sans text-foreground antialiased">
+  <div class="site-frame site-frame--top" aria-hidden="true"></div>
+  <div class="site-frame site-frame--left" aria-hidden="true"></div>
+  <div class="site-frame site-frame--right" aria-hidden="true"></div>
+  <svg class="site-corner site-corner--top-left" width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M5.50871e-06 0C-0.00788227 37.3001 8.99616 50.0116 50 50H5.50871e-06V0Z" fill="currentColor"/>
+  </svg>
+  <svg class="site-corner site-corner--top-right" width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M5.50871e-06 0C-0.00788227 37.3001 8.99616 50.0116 50 50H5.50871e-06V0Z" fill="currentColor"/>
+  </svg>
+  <a href="#main-content" class="skip-to-content">Skip to main content</a>
+
+  <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-225 overflow-hidden">
+    <div class="absolute inset-0 opacity-50 md:opacity-100">
+      <div class="absolute inset-0 h-full w-full grayscale" data-shader data-flow-speed="0,0.1" data-iterations="10" data-brightness="3"></div>
+    </div>
+  </div>
+
+  <div class="nav-reveal-zone" data-nav-reveal-zone aria-hidden="true"></div>
+  <nav aria-label="Primary" class="site-nav fixed left-1/2 top-6 z-50 -translate-x-1/2">
+    <div class="site-nav__bar flex items-center gap-1 rounded-full bg-background p-1.5 shadow-sm border border-foreground/8">
+      <ul class="site-nav__list relative flex items-center gap-1" data-nav-list>
+        <span aria-hidden="true" class="nav-pill" data-nav-pill hidden></span>
+        <li class="relative">
+          <a href="index.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Home</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="practice.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Practice</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="sing.html" aria-current="page" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground">Sing</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="recommend.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Recommend</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="stats.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Stats</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="community.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Community</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="about.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">About</span>
+          </a>
+        </li>
+        <li class="relative">
+          <a href="showcase.html" class="focus-ring relative inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-300">
+            <span class="relative z-10 text-foreground/60 hover:text-foreground">Showcase</span>
+          </a>
+        </li>
+      </ul>
+      <button type="button" data-theme-toggle aria-label="Toggle theme" aria-pressed="false"
+        class="focus-ring relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-background ring-1 ring-foreground/8 transition-colors">
+        <span aria-hidden="true" class="relative h-4 w-4">
+          <svg class="theme-icon sun-icon absolute inset-0 h-4 w-4 text-foreground -rotate-90 scale-0 opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+          </svg>
+          <svg class="theme-icon moon-icon absolute inset-0 h-4 w-4 text-foreground rotate-90 scale-0 opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+          </svg>
+        </span>
+      </button>
+    </div>
+  </nav>
+
+  <main id="main-content" class="flex flex-1 flex-col">
+    <section class="scrollexpand" aria-label="English Song Singing core features">
+      <div class="js-scroll-expand scroll-expand"
+        data-se-media-zoom="1.35"
+        data-se-start-radius="24"
+        data-se-end-radius="0"
+        data-se-scroll-distance="0.6"
+        data-se-hold-distance="0.35"
+        data-se-smoothing="0.1"
+        data-se-overlay-scrim="0.45"
+        data-se-card-shift="56"
+        data-se-use-window-scroll="true">
+        <div class="scroll-expand__track">
+          <div class="scroll-expand__stage">
+            <div class="scroll-expand__frame">
+              <!-- .scroll-expand__media 由 scroll-expand.js 依据 data-se-media-* 注入 -->
+              <div class="scroll-expand__scrim"></div>
+              <div class="scroll-expand__overlay">
+                <div class="se-overlay-inner">
+                  <div class="se-eyebrow">
+                    <span class="se-eyebrow-line" aria-hidden="true"></span>
+                    <span class="se-eyebrow-text">Singing line · follow-along scoring</span>
+                    <span class="se-eyebrow-line" aria-hidden="true"></span>
+                  </div>
+                  <div class="se-dotline" aria-hidden="true"></div>
+                  <div class="se-projects columns-1 gap-6 md:columns-2 md:gap-7">
+          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0s">
+            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+              <header class="flex items-center gap-2.5 px-1 pt-2">
+                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
+                </span>
+                <span class="text-sm font-medium tracking-tight text-foreground">Song Library</span>
+              </header>
+              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 752 / 497">
+                <div class="project-card__image-inner">
+                  <svg class="pca" viewBox="0 0 1000 661" role="img" focusable="false">
+                    <title>Song library: a vinyl record beside three annotated tracks</title>
+                    <defs>
+                      <pattern id="sg-dots-1" width="26" height="26" patternUnits="userSpaceOnUse">
+                        <circle class="dot" cx="2" cy="2" r="4"/>
+                      </pattern>
+                    </defs>
+                    <rect width="1000" height="661" fill="url(#sg-dots-1)"/>
+                    <circle class="line fill-7" cx="250" cy="330" r="150"/>
+                    <circle class="line-soft" cx="250" cy="330" r="112"/>
+                    <circle class="line" cx="250" cy="330" r="46"/>
+                    <circle class="ink" cx="250" cy="330" r="11"/>
+                    <circle class="line-soft" cx="470" cy="180" r="17"/>
+                    <rect class="fill-22" x="510" y="172" width="240" height="16" rx="8"/>
+                    <rect class="fill-22" x="770" y="172" width="70" height="16" rx="8"/>
+                    <text class="label" x="880" y="188">120</text>
+                    <circle class="line-soft" cx="470" cy="330" r="17"/>
+                    <rect class="fill-22" x="510" y="322" width="200" height="16" rx="8"/>
+                    <rect class="fill-22" x="730" y="322" width="70" height="16" rx="8"/>
+                    <text class="label" x="880" y="338">92</text>
+                    <circle class="line-soft" cx="470" cy="480" r="17"/>
+                    <rect class="fill-22" x="510" y="472" width="260" height="16" rx="8"/>
+                    <rect class="fill-22" x="790" y="472" width="70" height="16" rx="8"/>
+                    <text class="label" x="880" y="488">76</text>
+                  </svg>
+                </div>
+              </div>
+              <div class="flex flex-col gap-2.5 px-1 pb-1">
+                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                  An English song library worth singing through.
+                </h3>
+                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                  Public-domain and original tracks only &mdash; commercial music never enters the library &mdash; each annotated with BPM, duration, and LRC timings.
+                </p>
+              </div>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">BPM &amp; duration · LRC timings</p>
+            </article>
+          </div>
+
+          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0.12s">
+            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+              <header class="flex items-center gap-2.5 px-1 pt-2">
+                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                </span>
+                <span class="text-sm font-medium tracking-tight text-foreground">Per-line Score</span>
+              </header>
+              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+                <div class="project-card__image-inner">
+                  <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                    <title>Per-line score: a reference melody and a sung melody, marked line by line</title>
+                    <defs>
+                      <pattern id="sg-dots-2" width="26" height="26" patternUnits="userSpaceOnUse">
+                        <circle class="dot" cx="2" cy="2" r="4"/>
+                      </pattern>
+                    </defs>
+                    <rect width="1000" height="750" fill="url(#sg-dots-2)"/>
+                    <path class="line-soft dash" d="M 80 240 H 920"/>
+                    <path class="line-soft" d="M 80 560 H 920"/>
+                    <path class="line-soft dash" d="M 100 330 Q 200 230 300 330 Q 400 430 500 330 Q 600 230 700 330 Q 800 430 900 330"/>
+                    <path class="line" d="M 100 360 Q 200 270 300 350 Q 400 400 500 380 Q 600 260 700 300 Q 800 420 900 390"/>
+                    <path class="line-soft dash" d="M 300 362 V 548"/>
+                    <path class="line-soft dash" d="M 500 392 V 548"/>
+                    <path class="line-soft dash" d="M 700 312 V 548"/>
+                    <circle class="ink" cx="300" cy="350" r="8"/>
+                    <circle class="ink" cx="500" cy="380" r="8"/>
+                    <circle class="ink" cx="700" cy="300" r="8"/>
+                    <circle class="ink" cx="900" cy="390" r="13"/>
+                    <text class="label" x="300" y="600" text-anchor="middle">88</text>
+                    <text class="label" x="500" y="600" text-anchor="middle">74</text>
+                    <text class="label" x="700" y="600" text-anchor="middle">91</text>
+                    <text class="label" x="900" y="600" text-anchor="middle">63</text>
+                  </svg>
+                </div>
+              </div>
+              <div class="flex flex-col gap-2.5 px-1 pb-1">
+                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                  Every line is scored independently on pitch, rhythm, and pronunciation.
+                </h3>
+                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                  Reference pitch is extracted offline, your take is aligned with dynamic time warping, and the song score is 0.5&times;pitch + 0.2&times;rhythm + 0.3&times;pronunciation.
+                </p>
+              </div>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Pitch · Rhythm · Pronunciation</p>
+            </article>
+          </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="scroll-expand__title">
+              <h1 data-split-text>English Song Singing</h1>
+              <p class="se-title-sub" data-split-text data-split-delay="12" data-split-duration="1">The singing line of VocalVerse: sing a full track once, get per-line scores on pitch, rhythm, and pronunciation, and use high-intensity shadowing to make your speaking clearer. Rolling out with M3.</p>
+            </div>
+            <div class="scroll-expand__hint">
+              <span>Scroll down · View core features</span>
+              <svg class="se-hint-arrow" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 正文：卡片与文字逐段相间（卡在右 → 全宽文字 → 卡在左） ===== -->
+    <section class="fs-section fade-in" aria-labelledby="sg-lines">
+      <div class="fs-duo">
+        <div class="fs-duo__text">
+          <p class="fs-kicker">Line by line</p>
+          <h2 class="fs-title" id="sg-lines">Every line gets its own score.</h2>
+          <p class="fs-lead">LRC timings decide where a line starts and ends, so pitch, rhythm, and pronunciation can be judged one line at a time instead of over the whole take.</p>
+          <div class="fs-rows">
+            <div class="fs-row">
+              <span class="fs-row__label">Pitch</span>
+              <span class="fs-bar"><i style="width:50%"></i></span>
+              <span class="fs-row__value">50% of the song score</span>
+            </div>
+            <div class="fs-row">
+              <span class="fs-row__label">Rhythm</span>
+              <span class="fs-bar"><i style="width:20%"></i></span>
+              <span class="fs-row__value">20%</span>
+            </div>
+            <div class="fs-row">
+              <span class="fs-row__label">Pronunciation</span>
+              <span class="fs-bar"><i style="width:30%"></i></span>
+              <span class="fs-row__value">30%</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Alignment</span>
+              <span class="fs-row__value">dynamic time warping against the reference melody</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Cleanup</span>
+              <span class="fs-row__value">audio kept 24 hours, then deleted</span>
+            </div>
+          </div>
+        </div>
+        <div class="fs-duo__card">
+          <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+            <header class="flex items-center gap-2.5 px-1 pt-2">
+              <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+              </span>
+              <span class="text-sm font-medium tracking-tight text-foreground">LRC Lyrics Sync</span>
+            </header>
+            <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+              <div class="project-card__image-inner">
+                <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                  <title>Lyrics sync: five timed lyric lines with the current line playing</title>
+                  <defs>
+                    <pattern id="sg-dots-3" width="26" height="26" patternUnits="userSpaceOnUse">
+                      <circle class="dot" cx="2" cy="2" r="4"/>
+                    </pattern>
+                  </defs>
+                  <rect width="1000" height="750" fill="url(#sg-dots-3)"/>
+                  <path class="line-soft" d="M 100 150 V 590"/>
+                  <circle class="ink" cx="100" cy="363" r="11"/>
+                  <rect class="fill-22" x="160" y="170" width="340" height="26" rx="13"/>
+                  <rect class="fill-22" x="160" y="260" width="420" height="26" rx="13"/>
+                  <rect class="ink" x="160" y="350" width="460" height="26" rx="13"/>
+                  <rect class="fill-22" x="160" y="440" width="400" height="26" rx="13"/>
+                  <rect class="fill-22" x="160" y="530" width="320" height="26" rx="13"/>
+                  <rect class="ink" x="700" y="356" width="9" height="16" rx="4"/>
+                  <rect class="ink" x="717" y="346" width="9" height="26" rx="4"/>
+                  <rect class="ink" x="734" y="358" width="9" height="14" rx="4"/>
+                  <text class="label" x="880" y="189" text-anchor="end">0:12</text>
+                  <text class="label" x="880" y="279" text-anchor="end">0:19</text>
+                  <text class="label" x="880" y="369" text-anchor="end">0:27</text>
+                  <text class="label" x="880" y="459" text-anchor="end">0:35</text>
+                  <text class="label" x="880" y="549" text-anchor="end">0:43</text>
+                </svg>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2.5 px-1 pb-1">
+              <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                Lyrics advance line by line while you sing.
+              </h3>
+              <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                LRC timings drive the highlight, so you always know which phrase is coming and can put your attention on its pronunciation and rhythm.
+              </p>
+            </div>
+            <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Line highlight &middot; LRC timing</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="fs-section fade-in" aria-labelledby="sg-score">
+      <div class="fs-head">
+        <p class="fs-kicker">Per-line result</p>
+        <h2 class="fs-title" id="sg-score">Four lines, four scores.</h2>
+        <p class="fs-lead">Demo lines from a public-domain song &mdash; the library accepts public-domain or original tracks only.</p>
+      </div>
+      <div class="fs-list">
+        <div class="fs-item">
+          <span class="fs-item__dot">01</span>
+          <div class="fs-item__main">
+            <p class="fs-item__body">Should auld acquaintance be forgot</p>
+            <span class="fs-bar fs-bar--sm fs-item__bar"><i style="width:88%"></i></span>
+            <p class="fs-item__actions">Reference melody extracted offline &middot; no reference, no pitch score</p>
+          </div>
+          <span class="fs-item__tag">Pitch 88</span>
+        </div>
+        <div class="fs-item">
+          <span class="fs-item__dot">02</span>
+          <div class="fs-item__main">
+            <p class="fs-item__body">and never brought to mind?</p>
+            <span class="fs-bar fs-bar--sm fs-item__bar"><i style="width:74%"></i></span>
+            <p class="fs-item__actions">Melody matched &middot; rhythm inside tolerance</p>
+          </div>
+          <span class="fs-item__tag">Pitch 74</span>
+        </div>
+        <div class="fs-item">
+          <span class="fs-item__dot">03</span>
+          <div class="fs-item__main">
+            <p class="fs-item__body">Should auld acquaintance be forgot</p>
+            <span class="fs-bar fs-bar--sm fs-item__bar"><i style="width:91%"></i></span>
+            <p class="fs-item__actions">Best line of the take &middot; intonation held</p>
+          </div>
+          <span class="fs-item__tag">Pitch 91</span>
+        </div>
+        <div class="fs-item">
+          <span class="fs-item__dot">04</span>
+          <div class="fs-item__main">
+            <p class="fs-item__body">and auld lang syne?</p>
+            <span class="fs-bar fs-bar--sm fs-item__bar"><i style="width:63%"></i></span>
+            <p class="fs-item__actions">Long note drifted flat &middot; worth one more take</p>
+          </div>
+          <span class="fs-item__tag">Pitch 63 &middot; retry</span>
+        </div>
+      </div>
+      <p class="fs-note">M3 &middot; open point &mdash; lines with no reference pitch should be dropped from the average rather than scored as zero.</p>
+    </section>
+
+    <section class="fs-section fade-in" aria-labelledby="sg-how">
+      <div class="fs-duo fs-duo--flip">
+        <div class="fs-duo__text">
+          <p class="fs-kicker">How it works</p>
+          <h2 class="fs-title" id="sg-how">Four steps to finish a song.</h2>
+          <div class="fs-steps">
+            <div class="fs-step">
+              <span class="fs-step__no">01</span>
+              <h3 class="fs-step__title">Pick a song</h3>
+              <p class="fs-step__desc">Public-domain and original tracks only, each annotated with BPM, duration, and LRC timings.</p>
+              <p class="fs-step__meta">Library</p>
+            </div>
+            <div class="fs-step">
+              <span class="fs-step__no">02</span>
+              <h3 class="fs-step__title">Sing the whole track once</h3>
+              <p class="fs-step__desc">One take from start to finish, with lyrics advancing line by line while you sing.</p>
+              <p class="fs-step__meta">One take &middot; up to 180s</p>
+            </div>
+            <div class="fs-step">
+              <span class="fs-step__no">03</span>
+              <h3 class="fs-step__title">The server scores it</h3>
+              <p class="fs-step__desc">Scoring runs as a background task &mdash; queued, processing, done &mdash; and the page polls for the result.</p>
+              <p class="fs-step__meta">Async &middot; never blocks a session</p>
+            </div>
+            <div class="fs-step">
+              <span class="fs-step__no">04</span>
+              <h3 class="fs-step__title">Review the alignment</h3>
+              <p class="fs-step__desc">Per-line pitch, rhythm, and pronunciation, with the lines that dragged the score down.</p>
+              <p class="fs-step__meta">Per-line result</p>
+            </div>
+          </div>
+        </div>
+        <div class="fs-duo__card">
+          <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+            <header class="flex items-center gap-2.5 px-1 pt-2">
+              <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
+              </span>
+              <span class="text-sm font-medium tracking-tight text-foreground">How It Works</span>
+            </header>
+            <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+              <div class="project-card__image-inner">
+                <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                  <title>One take, scored in the background: a single recording feeding an async pipeline</title>
+                  <defs>
+                    <pattern id="sg-dots-4" width="26" height="26" patternUnits="userSpaceOnUse">
+                      <circle class="dot" cx="2" cy="2" r="4"/>
+                    </pattern>
+                  </defs>
+                  <rect width="1000" height="750" fill="url(#sg-dots-4)"/>
+                  <text class="label" x="120" y="150">One take</text>
+                  <text class="label" x="880" y="150" text-anchor="end">Limit 3 min</text>
+                  <rect class="line fill-7" x="120" y="180" width="760" height="40" rx="20"/>
+                  <rect class="ink" x="120" y="180" width="600" height="40" rx="20"/>
+                  <circle class="line fill-7" cx="720" cy="200" r="26"/>
+                  <path class="line-soft dash" d="M 500 260 V 330"/>
+                  <path class="line-soft" d="M 486 318 L 500 332 L 514 318"/>
+                  <path class="line-soft" d="M 250 470 H 750"/>
+                  <circle class="line fill-7" cx="250" cy="470" r="44"/>
+                  <circle class="ink" cx="250" cy="470" r="11"/>
+                  <circle class="line fill-7" cx="500" cy="470" r="44"/>
+                  <path class="line" d="M 500 436 A 34 34 0 0 1 534 470"/>
+                  <circle class="line fill-10" cx="750" cy="470" r="44"/>
+                  <path class="line" d="M 730 470 L 744 484 L 772 452"/>
+                  <text class="label" x="250" y="580" text-anchor="middle">Queued</text>
+                  <text class="label" x="500" y="580" text-anchor="middle">Scoring</text>
+                  <text class="label" x="750" y="580" text-anchor="middle">Done</text>
+                </svg>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2.5 px-1 pb-1">
+              <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                One take, scored in the background.
+              </h3>
+              <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                You sing the whole track once; scoring runs as a queued task and the page polls until the per-line result is ready.
+              </p>
+            </div>
+            <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Async &middot; one take &middot; 180s</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="fs-section fade-in">
+      <div class="fs-band">
+        <h2 class="fs-band__statement">Songs, LRC timings and reference pitch are already in the schema &mdash; the scorer lands with M3.</h2>
+        <p class="fs-band__meta">Audio is kept for 24 hours and then cleaned up; raw recordings are never used for anything else.</p>
+      </div>
+    </section>
+
+    <section class="mx-auto my-12 w-full max-w-275 px-6 sm:my-20 sm:px-10">
+      <div class="fade-in relative w-full overflow-hidden rounded-4xl border border-foreground/8 bg-background p-1.5 shadow-sm">
+        <div class="relative w-full overflow-hidden rounded-[1.6rem]">
+          <div aria-hidden="true" class="pointer-events-none absolute inset-0 opacity-45 dark:opacity-25"
+            style="-webkit-mask-image: radial-gradient(ellipse 90% 110% at 50% 50%, rgba(0,0,0,1) 0%, rgba(0,0,0,0.92) 40%, rgba(0,0,0,0.7) 70%, rgba(0,0,0,0.4) 90%, rgba(0,0,0,0.15) 100%); mask-image: radial-gradient(ellipse 90% 110% at 50% 50%, rgba(0,0,0,1) 0%, rgba(0,0,0,0.92) 40%, rgba(0,0,0,0.7) 70%, rgba(0,0,0,0.4) 90%, rgba(0,0,0,0.15) 100%);">
+            <div class="absolute inset-0 h-full w-full grayscale" data-shader data-scale="3" data-brightness="3"></div>
+          </div>
+
+          <div class="relative grid gap-8 p-6 sm:gap-10 sm:p-7 md:grid-cols-[1.2fr_1fr] md:items-stretch md:gap-6 md:p-6">
+            <div class="flex flex-col gap-5">
+              <h2 class="font-serif text-[2.25rem] font-medium leading-[1.05] tracking-tight text-foreground sm:text-[2.75rem] lg:text-[3.25rem]">
+                Let&rsquo;s connect
+              </h2>
+              <p class="max-w-[29ch] text-[18px] leading-[1.4] tracking-tight text-foreground/65 sm:text-[22px] mb-6">
+                We&rsquo;re always open to discussing new features, creative ideas, or opportunities to shape the future of English learning. Just reach out!
+              </p>
+
+              <div class="mt-2 flex flex-wrap items-center gap-3">
+                <button type="button" data-contact-button data-email="1844622298@qq.com" aria-label="Show email"
+                  class="contact-btn focus-ring relative inline-flex h-11 cursor-pointer items-center justify-center bg-foreground px-5 text-sm font-medium text-background transition-[max-width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
+                  <span class="relative inline-flex items-center">
+                    <span data-contact-state="closed" class="contact-label inline-flex items-center gap-2 whitespace-nowrap">
+                      <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                      <span>Contact</span>
+                    </span>
+                    <span data-contact-state="open" class="contact-label inline-flex items-center gap-2 whitespace-nowrap">
+                      <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                      <span class="tabular-nums">1844622298@qq.com</span>
+                    </span>
+                    <span data-contact-state="copied" class="contact-label inline-flex items-center gap-2 whitespace-nowrap">
+                      <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="tabular-nums">1844622298@qq.com</span>
+                    </span>
+                  </span>
+                </button>
+
+                <a href="index.html"
+                  class="border border-foreground/5 focus-ring group inline-flex cursor-pointer items-center gap-2 rounded-xl bg-background px-5 py-2.5 text-sm font-medium text-foreground shadow-md/2 transition-colors">
+                  See features
+                  <svg class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </a>
+              </div>
+            </div>
+
+            <div class="border-foreground/8 flex flex-col items-center justify-center gap-6 rounded-[1.1rem] border bg-background p-6 sm:p-8">
+              <div class="flex items-center gap-3 opacity-75">
+                <a href="mailto:1844622298@qq.com" aria-label="Email" class="border-foreground/8 hover:border-foreground/15 focus-ring inline-flex h-11 w-11 items-center justify-center rounded-xl border bg-background text-foreground/70 transition-colors hover:text-foreground">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                </a>
+                <a href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" class="border-foreground/8 hover:border-foreground/15 focus-ring inline-flex h-11 w-11 items-center justify-center rounded-xl border bg-background text-foreground/70 transition-colors hover:text-foreground">
+                  <img src="assets/linkedin.svg" alt="" width="14" height="14" aria-hidden="true" class="max-h-[14px] max-w-[14px] object-contain dark:invert" />
+                </a>
+                <a href="https://x.com" target="_blank" rel="noopener noreferrer" aria-label="X" class="border-foreground/8 hover:border-foreground/15 focus-ring inline-flex h-11 w-11 items-center justify-center rounded-xl border bg-background text-foreground/70 transition-colors hover:text-foreground">
+                  <img src="assets/x.svg" alt="" width="14" height="14" aria-hidden="true" class="max-h-[14px] max-w-[14px] object-contain dark:invert" />
+                </a>
+              </div>
+              <div class="flex flex-col items-center gap-1 text-center">
+                <p class="text-[13px] tracking-tight text-foreground/70">2026 &copy; VocalVerse</p>
+                <p class="text-[12px] tracking-tight text-foreground/45">Practice · Immerse · Sing</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="h-12 sm:h-16"></div>
+  </main>
+
+  <script src="js/vendor/lenis.min.js"></script>
+  <script src="js/theme.js" defer></script>
+  <script src="js/gooey-nav.js" defer></script>
+  <script src="js/nav.js" defer></script>
+  <script src="js/animations.js" defer></script>
+  <script src="js/contact.js" defer></script>
+  <script src="js/shader-flow.js" defer></script>
+  <script src="js/scroll-expand.js?v=3" defer></script>
+  <script src="js/nav-reveal.js" defer></script>
+  <script src="js/main.js" defer></script>
+  <script src="js/vendor/gsap.min.js" defer></script>
+  <script src="js/vendor/ScrollTrigger.min.js" defer></script>
+  <script src="js/vendor/SplitText.min.js" defer></script>
+  <script src="js/split-text.js" defer></script>
+  <script src="js/footer.js" defer></script>
+  <script src="js/magic-bento.js" defer></script>
+<script src="js/gradual-blur.js" defer></script>
+  <script src="js/dot-field.js" defer></script>
+  <script type="module" src="js/aero-shards-init.js"></script>
+</body>
+</html>

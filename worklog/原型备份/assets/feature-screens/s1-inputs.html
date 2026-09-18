@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>功能展示 · 胶囊输入框</title>
+<link rel="stylesheet" href="screen.css">
+<style>
+  .caret { width: 1.5px; height: 20px; flex: none; background: var(--accent); border-radius: 1px; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .row .field { margin-bottom: 0; flex: 1; min-width: 0; }
+  .spec { padding: 24px; }
+  .spec dl { display: grid; grid-template-columns: 88px 1fr; row-gap: 10px; font-size: 13px; }
+  .spec dt { color: var(--weak); }
+  .spec dd { color: var(--ink); font-weight: 600; }
+  .spec dd em { font-style: normal; color: var(--sub); font-weight: 400; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <h1 class="h1">胶囊输入框</h1>
+  <p class="sub">输入框 = 胶囊 + 浅灰底；聚焦描边取唯一点缀色 accent</p>
+
+  <div class="sec">
+    <div class="sec-label">四态</div>
+
+    <div class="field">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+      <span class="ph grow">搜索场景或歌曲</span>
+    </div>
+
+    <div class="field">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+      <span class="grow">Coffee shop</span>
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m14.8 9.2-5.6 5.6M9.2 9.2l5.6 5.6"/></svg>
+    </div>
+
+    <div class="field is-focus">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+      <span class="grow">Airport check-in</span>
+      <span class="caret"></span>
+    </div>
+
+    <div class="field is-disabled">
+      <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      <span class="ph grow">登录后可同步学习记录</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-label">组合用法</div>
+    <div class="row">
+      <div class="field">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+        <span class="ph grow">搜索歌曲</span>
+      </div>
+      <span class="iconbtn">
+        <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
+      </span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="card spec">
+      <dl>
+        <dt>高度</dt><dd>52px</dd>
+        <dt>圆角</dt><dd>r-pill <em>（= 高/2）</em></dd>
+        <dt>默认底</dt><dd>track <em>#ECEAE5</em></dd>
+        <dt>聚焦底</dt><dd>card <em>#FFFFFF</em> + accent 光晕</dd>
+        <dt>禁用</dt><dd><em>opacity .45</em></dd>
+      </dl>
+    </div>
+  </div>
+</div>
+</body>
+</html>
