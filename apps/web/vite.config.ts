@@ -60,16 +60,18 @@ export default defineConfig({
         : undefined,
     proxy: {
       // 语音/LLM 热路径：直连 Python（docs/06 第 1 章）
+      // 目标地址可用环境变量覆盖：本机 8000 端口被系统保留时，以
+      // $env:PY_API_TARGET='http://localhost:8001'; pnpm dev 启动即可，不改默认值
       '/api/v1': {
-        target: 'http://localhost:8000',
+        target: process.env.PY_API_TARGET || 'http://localhost:8000',
         changeOrigin: true,
       },
       '/healthz': {
-        target: 'http://localhost:8000',
+        target: process.env.PY_API_TARGET || 'http://localhost:8000',
         changeOrigin: true,
       },
       '/readyz': {
-        target: 'http://localhost:8000',
+        target: process.env.PY_API_TARGET || 'http://localhost:8000',
         changeOrigin: true,
       },
       // 管理端与 JWT 签发：Java
