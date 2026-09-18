@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { centOf, detectPitch, midiOf, noteNameOf } from '@/lib/yin'
+import { centOf, createYinDetector, detectPitch, midiOf, noteNameOf } from '@/lib/yin'
 
 function tone(hz: number, sr = 48000, n = 2048, amp = 0.5): Float32Array {
   const a = new Float32Array(n)
@@ -56,6 +56,44 @@ describe('yin · detectPitch', () => {
 
   it('短窗（<2×65Hz 周期）→ null（防御）', () => {
     expect(detectPitch(new Float32Array(128), 48000)).toBeNull()
+  })
+})
+
+describe('yin · createYinDetector（复用缓冲 · 实时 Worker 链路，2026-09-18）', () => {
+  it('连续多窗（440 → 静音 → 220 → 静音 → 440）与 detectPitch 逐位一致', () => {
+    const det = createYinDetector(48000)
+    const seq = [tone(440), new Float32Array(2048), tone(220), new Float32Array(2048), tone(440)]
+    for (const s of seq) {
+      const a = det.detect(s)
+      const b = detectPitch(s, 48000)
+      if (a === null || b === null) {
+        expect(a).toBe(b) // 同为 null（静音）
+      } else {
+        expect(a.f0).toBe(b.f0)
+        expect(a.confidence).toBe(b.confidence)
+      }
+    }
+  })
+
+  it('44.1k/48k 两档各自正确；tauMax = min(n/2, sr/65)', () => {
+    expect(createYinDetector(48000).tauMax).toBe(Math.min(1024, Math.floor(48000 / 65)))
+    expect(createYinDetector(44100).tauMax).toBe(Math.min(1024, Math.floor(44100 / 65)))
+    const d44 = createYinDetector(44100)
+    const r = d44.detect(tone(440, 44100))
+    expect(r).not.toBeNull()
+    expect(Math.abs(r!.f0 - 440)).toBeLessThan(3)
+  })
+
+  it('跨次调用复用同一缓冲（零分配回归：旧实现每帧新建 2 个 Float64Array）', () => {
+    const det = createYinDetector(48000)
+    const d0 = det.buffers.d
+    const c0 = det.buffers.cmndf
+    det.detect(tone(440))
+    det.detect(tone(220))
+    det.detect(new Float32Array(2048))
+    expect(det.buffers.d).toBe(d0)
+    expect(det.buffers.cmndf).toBe(c0)
+    expect(d0.length).toBe(det.tauMax + 1)
   })
 })
 

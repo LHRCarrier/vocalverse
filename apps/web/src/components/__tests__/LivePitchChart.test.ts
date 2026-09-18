@@ -46,4 +46,25 @@ describe('LivePitchChart', () => {
     expect((w2.find('input').element as HTMLInputElement).checked).toBe(false)
     expect(w2.classes()).toContain('live-pitch--off')
   })
+
+  it('实时分占位（无分数 → 「—」）与副读数 title（练习参考口径，2026-09-18）', () => {
+    const w = mount(LivePitchChart, { props: { detail, stream: null, active: false } })
+    const score = w.find('.live-pitch__score')
+    expect(score.exists()).toBe(true)
+    expect(score.text()).toContain('实时分')
+    expect(score.text()).toContain('—')
+    expect(score.attributes('title')).toContain('练习参考')
+  })
+
+  it('动效档 off（data-motion=off）空态挂载安全，读数与分数均为占位', () => {
+    document.documentElement.dataset.motion = 'off'
+    try {
+      const w = mount(LivePitchChart, { props: { detail, stream: null, active: false } })
+      expect(w.find('.live-pitch__read').text()).toBe('—')
+      expect(w.find('.live-pitch__score').text()).toContain('—')
+      expect(w.text()).toContain('实时参考线')
+    } finally {
+      document.documentElement.dataset.motion = 'high'
+    }
+  })
 })
