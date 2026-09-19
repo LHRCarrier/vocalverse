@@ -99,5 +99,5 @@ python -m http.server 8080     # 或： npx --yes serve .
 - 页面文案为原型英文稿，非最终产品文案；
 - **本地回滚脚手架不入库**：`.orig` 副本 + `restore.ps1` 之类的一次性回滚包只放本机（`local/` 或原型工作目录），
   归档只收原型内容本身——回滚点由 git 历史承担（先例：`starter-rollback/` 2026-09-11 移除、
-  `showcase-rollback/` 2026-09-18 合入前移除，二者删除后仍可用 `git checkout <commit>^ -- <path>` 取回）；
+  `showcase-rollback/` 2026-09-20 合入前移除，二者删除后仍可用 `git checkout <commit>^ -- <path>` 取回）；
 - 归档前请确认不含密钥/真实用户数据（红线见仓库根 `README.md` 与 `AGENTS.md`）。
