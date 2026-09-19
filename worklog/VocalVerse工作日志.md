@@ -3,6 +3,17 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-18 原型备份二期改动合入（PR #38）：showcase 真机截图/交互 + 卡片艺术 + 二期日志 · 评审处置与合入 · 3 op
+
+- **背景**：队友 PR #38（`feat(proto): 同步原型备份二期改动（showcase 交互/卡片艺术/第2周日志等）`，作者 xiaoqing-one，31 文件 / +3673 −481）同步 `web-prototypes/` 归档目录的二期改动：8 个页面的版式与交互（showcase 由占位稿换成真实界面截图 + 缩放灯箱；community / practice / recommend / sing / stats / about / report）、新增 `css/card-art.css`、`css/feature-blocks.css`、`assets/app-shots/` 12 张截图、二期工作日志 `第2周.md`。
+- **冲突核查（"解决冲突"实际为零）**：`git merge-base --is-ancestor origin/main <PR head>` 为真、`git log <head>..origin/main` 为空 ⇒ 分支已含 main；GitHub 侧 `mergeable=MERGEABLE`，`mergeStateStatus=BLOCKED` 的原因是 main 开了「至少 1 个批准评审」（`required_approving_review_count=1`，`enforce_admins=false`），**不是冲突**。
+- **CI 核查（不是"CI 全绿"）**：本 PR 只有 `secret-scan`（无 `paths` 过滤）真实跑过 2 次（`conclusion=SUCCESS`，run 34911683945 / 34914987903）；`frontend-ci` 等有 `paths` 过滤（实测 `frontend-ci` 只挂 `apps/web/**` 与本 workflow 自身），本 PR 未触及这些路径 ⇒ **未运行是预期行为，不是失败**；`web-prototypes/README.md` 开头即声明本目录不参与任何门禁、CI 中只有 secret-scan 会扫到。
+- **评审处置（组长在队友分支上直接落 3 个提交，PR 原地更新，未另开 PR）**：① **删除 `web-prototypes/showcase-rollback/`**（`restore.ps1` + `showcase.html.orig` + `showcase-interactions.js.orig`）——两处 `.orig` 与 main 当前版本**逐字节相同**（blob `36bed2ca40f76ac329646f673ce1b0661be5634b` / `5cc549f7a85e5d5e4c06a83853e9d0304fcba848`，用 `git show <ref>:<path> | git hash-object --stdin` 比对），在库内零信息增量，且属 2026-09-11 移除 `starter-rollback/` 的同族（AGENTS.md 工作流程 §2：过程性产物 → `local/`，不入库；回滚点由 git 历史承担）。② `web-prototypes/README.md` 目录清单补登二期新增（`assets/app-shots/`、`css/card-art.css`、`css/feature-blocks.css`、`第2周.md`），并在 §五 维护约定写明「本地回滚脚手架不入库」的口径与两个先例。③ `第2周.md` 按记录纪律补 `—— 执行人：xiaoqing-one` 署名（原文是会话记录汇总稿，无署名）。
+- **验证（可复现）**：脚本 `local/_check_proto_refs.py`（gitignored）解析分支头 8 个改动 HTML 的 265 处本地 `src`/`href` 引用 → **零缺失**；12 张 app-shots 中 9 张被 `showcase.html` + `js/showcase-interactions.js` 引用，另 3 张（`web-practice` / `web-defense` / `web-skeleton`）**暂未被任何页面引用**（已在 README 注明，未删，留给作者决定）；`第2周.md` **不含密钥值**（trufflehog 已过），文中「9/10 的 API Key 曾出现在对话记录」是**待重置提醒**而非泄漏值（另见下方遗留 ②）；改动只落在 `web-prototypes/`（静态归档，不参与任何门禁）与 worklog/README 文档，未触及 `apps/`、`services/`、迁移与契约。
+- **遗留（转告作者与后人）**：① 分支 `chore/sync-2026-09-18`（9/18 推送、尚无 PR）当前 `web-prototypes/` 相对 main **零 diff**，即本次合入的 app-shots / card-art / feature-blocks / 第2周.md 在该分支上会**显示为删除**——作者开 PR 前需确认是有意回滚还是本地快照漏同步；② 9/10 使用过的 DeepSeek API Key 曾出现在对话记录中，**如仍生效建议重置**（密钥卫生，已在 `第2周.md` §四 记录）；③ 该分支的 `docs(worklog)` 归档条目与本条都会改本文件顶部，合入时按日期倒序手工解冲突。
+
+—— 执行人：LHRCarrier（评审处置与合入）；内容作者：xiaoqing-one（原型备份二期），2026-09-18
+
 ## 2026-09-14 记录纪律 · 署名更正：AI 代工一律署 LHRCarrier（不是分支 owner）· 1 op
 
 - **组长指正**：本轮 AI 代工的产出被署成了 `Faust-sudo`（worklog 署名 70 处 + `git` 提交作者），**两处都错**——把「分支 owner / PR 作者」当成了执行人。**AI 代工的署名应是下指令并认领的人**（AGENTS.md §工作流程 1：署名以认领人为准）。
