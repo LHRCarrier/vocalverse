@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VocalVerse — English Song Singing</title>
-  <meta name="description" content="Sing along with LRC lyrics and get per-line scoring on pitch, rhythm, and pronunciation. Turn singing well into speaking well." />
+  <meta name="description" content="Sing an English song from start to finish and get per-line scoring on pitch, rhythm, and pronunciation, aligned against the reference melody." />
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -12,6 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,100..900,0..100&family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/scroll-expand.css?v=3" />
+  <link rel="stylesheet" href="css/feature-blocks.css" />
+  <link rel="stylesheet" href="css/card-art.css" />
   <link rel="stylesheet" href="css/nav-reveal.css" />
   <link rel="stylesheet" href="css/site-nav.css" />
   <link rel="stylesheet" href="css/gooey-nav.css" />
@@ -103,7 +105,7 @@
         data-se-media-zoom="1.35"
         data-se-start-radius="24"
         data-se-end-radius="0"
-        data-se-scroll-distance="1.2"
+        data-se-scroll-distance="0.6"
         data-se-hold-distance="0.35"
         data-se-smoothing="0.1"
         data-se-overlay-scrim="0.45"
@@ -118,7 +120,7 @@
                 <div class="se-overlay-inner">
                   <div class="se-eyebrow">
                     <span class="se-eyebrow-line" aria-hidden="true"></span>
-                    <span class="se-eyebrow-text">Core module · English song singing</span>
+                    <span class="se-eyebrow-text">Singing line · follow-along scoring</span>
                     <span class="se-eyebrow-line" aria-hidden="true"></span>
                   </div>
                   <div class="se-dotline" aria-hidden="true"></div>
@@ -133,43 +135,42 @@
               </header>
               <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 752 / 497">
                 <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23047857'/><stop offset='1' stop-color='%2310B981'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>📚</text></svg>" alt="English song library" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                  <svg class="pca" viewBox="0 0 1000 661" role="img" focusable="false">
+                    <title>Song library: a vinyl record beside three annotated tracks</title>
+                    <defs>
+                      <pattern id="sg-dots-1" width="26" height="26" patternUnits="userSpaceOnUse">
+                        <circle class="dot" cx="2" cy="2" r="4"/>
+                      </pattern>
+                    </defs>
+                    <rect width="1000" height="661" fill="url(#sg-dots-1)"/>
+                    <circle class="line fill-7" cx="250" cy="330" r="150"/>
+                    <circle class="line-soft" cx="250" cy="330" r="112"/>
+                    <circle class="line" cx="250" cy="330" r="46"/>
+                    <circle class="ink" cx="250" cy="330" r="11"/>
+                    <circle class="line-soft" cx="470" cy="180" r="17"/>
+                    <rect class="fill-22" x="510" y="172" width="240" height="16" rx="8"/>
+                    <rect class="fill-22" x="770" y="172" width="70" height="16" rx="8"/>
+                    <text class="label" x="880" y="188">120</text>
+                    <circle class="line-soft" cx="470" cy="330" r="17"/>
+                    <rect class="fill-22" x="510" y="322" width="200" height="16" rx="8"/>
+                    <rect class="fill-22" x="730" y="322" width="70" height="16" rx="8"/>
+                    <text class="label" x="880" y="338">92</text>
+                    <circle class="line-soft" cx="470" cy="480" r="17"/>
+                    <rect class="fill-22" x="510" y="472" width="260" height="16" rx="8"/>
+                    <rect class="fill-22" x="790" y="472" width="70" height="16" rx="8"/>
+                    <text class="label" x="880" y="488">76</text>
+                  </svg>
                 </div>
               </div>
               <div class="flex flex-col gap-2.5 px-1 pb-1">
                 <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  A curated English song library across pop, folk, and jazz.
+                  An English song library worth singing through.
                 </h3>
                 <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Every track is annotated with BPM and duration, so you can pick by preference and difficulty.
+                  Public-domain and original tracks only &mdash; commercial music never enters the library &mdash; each annotated with BPM, duration, and LRC timings.
                 </p>
               </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Multi-style · BPM &amp; Duration Annotated</p>
-            </article>
-          </div>
-
-          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0.06s">
-            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
-              <header class="flex items-center gap-2.5 px-1 pt-2">
-                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
-                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
-                </span>
-                <span class="text-sm font-medium tracking-tight text-foreground">LRC Lyrics Sync</span>
-              </header>
-              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
-                <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23EA580C'/><stop offset='1' stop-color='%23FDBA74'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>📜</text></svg>" alt="LRC lyric synchronization" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
-                </div>
-              </div>
-              <div class="flex flex-col gap-2.5 px-1 pb-1">
-                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  Lyrics appear line by line and highlight with your progress.
-                </h3>
-                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  LRC-synced lyrics lower the bar for full-song singing, letting you focus on each line&rsquo;s pronunciation and rhythm.
-                </p>
-              </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Line-by-line Highlight · Audio Sync</p>
+              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">BPM &amp; duration · LRC timings</p>
             </article>
           </div>
 
@@ -183,7 +184,30 @@
               </header>
               <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
                 <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%231D4ED8'/><stop offset='1' stop-color='%2393C5FD'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>🎚️</text></svg>" alt="Per-line singing score" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                  <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                    <title>Per-line score: a reference melody and a sung melody, marked line by line</title>
+                    <defs>
+                      <pattern id="sg-dots-2" width="26" height="26" patternUnits="userSpaceOnUse">
+                        <circle class="dot" cx="2" cy="2" r="4"/>
+                      </pattern>
+                    </defs>
+                    <rect width="1000" height="750" fill="url(#sg-dots-2)"/>
+                    <path class="line-soft dash" d="M 80 240 H 920"/>
+                    <path class="line-soft" d="M 80 560 H 920"/>
+                    <path class="line-soft dash" d="M 100 330 Q 200 230 300 330 Q 400 430 500 330 Q 600 230 700 330 Q 800 430 900 330"/>
+                    <path class="line" d="M 100 360 Q 200 270 300 350 Q 400 400 500 380 Q 600 260 700 300 Q 800 420 900 390"/>
+                    <path class="line-soft dash" d="M 300 362 V 548"/>
+                    <path class="line-soft dash" d="M 500 392 V 548"/>
+                    <path class="line-soft dash" d="M 700 312 V 548"/>
+                    <circle class="ink" cx="300" cy="350" r="8"/>
+                    <circle class="ink" cx="500" cy="380" r="8"/>
+                    <circle class="ink" cx="700" cy="300" r="8"/>
+                    <circle class="ink" cx="900" cy="390" r="13"/>
+                    <text class="label" x="300" y="600" text-anchor="middle">88</text>
+                    <text class="label" x="500" y="600" text-anchor="middle">74</text>
+                    <text class="label" x="700" y="600" text-anchor="middle">91</text>
+                    <text class="label" x="900" y="600" text-anchor="middle">63</text>
+                  </svg>
                 </div>
               </div>
               <div class="flex flex-col gap-2.5 px-1 pb-1">
@@ -191,44 +215,20 @@
                   Every line is scored independently on pitch, rhythm, and pronunciation.
                 </h3>
                 <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  The overall score is computed as 0.5&times;pitch + 0.2&times;rhythm + 0.3&times;pronunciation.
+                  Reference pitch is extracted offline, your take is aligned with dynamic time warping, and the song score is 0.5&times;pitch + 0.2&times;rhythm + 0.3&times;pronunciation.
                 </p>
               </div>
               <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Pitch · Rhythm · Pronunciation</p>
             </article>
           </div>
 
-          <div class="fade-in mb-6 break-inside-avoid md:mb-7" style="transition-delay: 0.18s">
-            <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
-              <header class="flex items-center gap-2.5 px-1 pt-2">
-                <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
-                  <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
-                </span>
-                <span class="text-sm font-medium tracking-tight text-foreground">How It Works</span>
-              </header>
-              <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
-                <div class="project-card__image-inner">
-                  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='768' viewBox='0 0 1024 768'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23047857'/><stop offset='1' stop-color='%2310B981'/></linearGradient></defs><rect width='1024' height='768' fill='url(%23g)'/><text x='512' y='470' font-size='300' text-anchor='middle'>🧭</text></svg>" alt="Four steps to finish a song" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
-                </div>
-              </div>
-              <div class="flex flex-col gap-2.5 px-1 pb-1">
-                <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
-                  Four steps to finish a song.
-                </h3>
-                <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
-                  Pick a song → listen and follow along → record line by line → review your scores and pitch alignment.
-                </p>
-              </div>
-              <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">pyin · DTW · 0.5/0.2/0.3 Model</p>
-            </article>
-          </div>
                   </div>
                 </div>
               </div>
             </div>
             <div class="scroll-expand__title">
               <h1 data-split-text>English Song Singing</h1>
-              <p class="se-title-sub" data-split-text>A signature pronunciation module built around songs: follow along line by line, get per-line scoring, and turn &ldquo;singing well&rdquo; into &ldquo;speaking well&rdquo;.</p>
+              <p class="se-title-sub" data-split-text>The singing line of VocalVerse: sing a full track once, get per-line scores on pitch, rhythm, and pronunciation, and use high-intensity shadowing to make your speaking clearer. Rolling out with M3.</p>
             </div>
             <div class="scroll-expand__hint">
               <span>Scroll down · View core features</span>
@@ -236,6 +236,227 @@
             </div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ===== 正文：卡片与文字逐段相间（卡在右 → 全宽文字 → 卡在左） ===== -->
+    <section class="fs-section fade-in" aria-labelledby="sg-lines">
+      <div class="fs-duo">
+        <div class="fs-duo__text">
+          <p class="fs-kicker">Line by line</p>
+          <h2 class="fs-title" id="sg-lines">Every line gets its own score.</h2>
+          <p class="fs-lead">LRC timings decide where a line starts and ends, so pitch, rhythm, and pronunciation can be judged one line at a time instead of over the whole take.</p>
+          <div class="fs-rows">
+            <div class="fs-row">
+              <span class="fs-row__label">Pitch</span>
+              <span class="fs-bar"><i style="width:50%"></i></span>
+              <span class="fs-row__value">50% of the song score</span>
+            </div>
+            <div class="fs-row">
+              <span class="fs-row__label">Rhythm</span>
+              <span class="fs-bar"><i style="width:20%"></i></span>
+              <span class="fs-row__value">20%</span>
+            </div>
+            <div class="fs-row">
+              <span class="fs-row__label">Pronunciation</span>
+              <span class="fs-bar"><i style="width:30%"></i></span>
+              <span class="fs-row__value">30%</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Alignment</span>
+              <span class="fs-row__value">dynamic time warping against the reference melody</span>
+            </div>
+            <div class="fs-row fs-row--plain">
+              <span class="fs-row__label">Cleanup</span>
+              <span class="fs-row__value">audio kept 24 hours, then deleted</span>
+            </div>
+          </div>
+        </div>
+        <div class="fs-duo__card">
+          <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+            <header class="flex items-center gap-2.5 px-1 pt-2">
+              <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+              </span>
+              <span class="text-sm font-medium tracking-tight text-foreground">LRC Lyrics Sync</span>
+            </header>
+            <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+              <div class="project-card__image-inner">
+                <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                  <title>Lyrics sync: five timed lyric lines with the current line playing</title>
+                  <defs>
+                    <pattern id="sg-dots-3" width="26" height="26" patternUnits="userSpaceOnUse">
+                      <circle class="dot" cx="2" cy="2" r="4"/>
+                    </pattern>
+                  </defs>
+                  <rect width="1000" height="750" fill="url(#sg-dots-3)"/>
+                  <path class="line-soft" d="M 100 150 V 590"/>
+                  <circle class="ink" cx="100" cy="363" r="11"/>
+                  <rect class="fill-22" x="160" y="170" width="340" height="26" rx="13"/>
+                  <rect class="fill-22" x="160" y="260" width="420" height="26" rx="13"/>
+                  <rect class="ink" x="160" y="350" width="460" height="26" rx="13"/>
+                  <rect class="fill-22" x="160" y="440" width="400" height="26" rx="13"/>
+                  <rect class="fill-22" x="160" y="530" width="320" height="26" rx="13"/>
+                  <rect class="ink" x="700" y="356" width="9" height="16" rx="4"/>
+                  <rect class="ink" x="717" y="346" width="9" height="26" rx="4"/>
+                  <rect class="ink" x="734" y="358" width="9" height="14" rx="4"/>
+                  <text class="label" x="880" y="189" text-anchor="end">0:12</text>
+                  <text class="label" x="880" y="279" text-anchor="end">0:19</text>
+                  <text class="label" x="880" y="369" text-anchor="end">0:27</text>
+                  <text class="label" x="880" y="459" text-anchor="end">0:35</text>
+                  <text class="label" x="880" y="549" text-anchor="end">0:43</text>
+                </svg>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2.5 px-1 pb-1">
+              <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                Lyrics advance line by line while you sing.
+              </h3>
+              <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                LRC timings drive the highlight, so you always know which phrase is coming and can put your attention on its pronunciation and rhythm.
+              </p>
+            </div>
+            <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Line highlight &middot; LRC timing</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="fs-section fade-in" aria-labelledby="sg-score">
+      <div class="fs-head">
+        <p class="fs-kicker">Per-line result</p>
+        <h2 class="fs-title" id="sg-score">Four lines, four scores.</h2>
+        <p class="fs-lead">Demo lines from a public-domain song &mdash; the library accepts public-domain or original tracks only.</p>
+      </div>
+      <div class="fs-list">
+        <div class="fs-item">
+          <span class="fs-item__dot">01</span>
+          <div class="fs-item__main">
+            <p class="fs-item__body">Should auld acquaintance be forgot</p>
+            <span class="fs-bar fs-bar--sm fs-item__bar"><i style="width:88%"></i></span>
+            <p class="fs-item__actions">Reference melody extracted offline &middot; no reference, no pitch score</p>
+          </div>
+          <span class="fs-item__tag">Pitch 88</span>
+        </div>
+        <div class="fs-item">
+          <span class="fs-item__dot">02</span>
+          <div class="fs-item__main">
+            <p class="fs-item__body">and never brought to mind?</p>
+            <span class="fs-bar fs-bar--sm fs-item__bar"><i style="width:74%"></i></span>
+            <p class="fs-item__actions">Melody matched &middot; rhythm inside tolerance</p>
+          </div>
+          <span class="fs-item__tag">Pitch 74</span>
+        </div>
+        <div class="fs-item">
+          <span class="fs-item__dot">03</span>
+          <div class="fs-item__main">
+            <p class="fs-item__body">Should auld acquaintance be forgot</p>
+            <span class="fs-bar fs-bar--sm fs-item__bar"><i style="width:91%"></i></span>
+            <p class="fs-item__actions">Best line of the take &middot; intonation held</p>
+          </div>
+          <span class="fs-item__tag">Pitch 91</span>
+        </div>
+        <div class="fs-item">
+          <span class="fs-item__dot">04</span>
+          <div class="fs-item__main">
+            <p class="fs-item__body">and auld lang syne?</p>
+            <span class="fs-bar fs-bar--sm fs-item__bar"><i style="width:63%"></i></span>
+            <p class="fs-item__actions">Long note drifted flat &middot; worth one more take</p>
+          </div>
+          <span class="fs-item__tag">Pitch 63 &middot; retry</span>
+        </div>
+      </div>
+      <p class="fs-note">M3 &middot; open point &mdash; lines with no reference pitch should be dropped from the average rather than scored as zero.</p>
+    </section>
+
+    <section class="fs-section fade-in" aria-labelledby="sg-how">
+      <div class="fs-duo fs-duo--flip">
+        <div class="fs-duo__text">
+          <p class="fs-kicker">How it works</p>
+          <h2 class="fs-title" id="sg-how">Four steps to finish a song.</h2>
+          <div class="fs-steps">
+            <div class="fs-step">
+              <span class="fs-step__no">01</span>
+              <h3 class="fs-step__title">Pick a song</h3>
+              <p class="fs-step__desc">Public-domain and original tracks only, each annotated with BPM, duration, and LRC timings.</p>
+              <p class="fs-step__meta">Library</p>
+            </div>
+            <div class="fs-step">
+              <span class="fs-step__no">02</span>
+              <h3 class="fs-step__title">Sing the whole track once</h3>
+              <p class="fs-step__desc">One take from start to finish, with lyrics advancing line by line while you sing.</p>
+              <p class="fs-step__meta">One take &middot; up to 180s</p>
+            </div>
+            <div class="fs-step">
+              <span class="fs-step__no">03</span>
+              <h3 class="fs-step__title">The server scores it</h3>
+              <p class="fs-step__desc">Scoring runs as a background task &mdash; queued, processing, done &mdash; and the page polls for the result.</p>
+              <p class="fs-step__meta">Async &middot; never blocks a session</p>
+            </div>
+            <div class="fs-step">
+              <span class="fs-step__no">04</span>
+              <h3 class="fs-step__title">Review the alignment</h3>
+              <p class="fs-step__desc">Per-line pitch, rhythm, and pronunciation, with the lines that dragged the score down.</p>
+              <p class="fs-step__meta">Per-line result</p>
+            </div>
+          </div>
+        </div>
+        <div class="fs-duo__card">
+          <article class="project-card flex cursor-pointer flex-col gap-4 rounded-3xl border border-foreground/8 bg-background p-3 sm:p-3.5">
+            <header class="flex items-center gap-2.5 px-1 pt-2">
+              <span class="border-foreground/10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-background">
+                <svg class="h-3.5 w-3.5 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
+              </span>
+              <span class="text-sm font-medium tracking-tight text-foreground">How It Works</span>
+            </header>
+            <div class="project-card__image ring-foreground/5 relative w-full overflow-hidden rounded-2xl bg-foreground/5 ring-1" style="aspect-ratio: 1024 / 768">
+              <div class="project-card__image-inner">
+                <svg class="pca" viewBox="0 0 1000 750" role="img" focusable="false">
+                  <title>One take, scored in the background: a single recording feeding an async pipeline</title>
+                  <defs>
+                    <pattern id="sg-dots-4" width="26" height="26" patternUnits="userSpaceOnUse">
+                      <circle class="dot" cx="2" cy="2" r="4"/>
+                    </pattern>
+                  </defs>
+                  <rect width="1000" height="750" fill="url(#sg-dots-4)"/>
+                  <text class="label" x="120" y="150">One take</text>
+                  <text class="label" x="880" y="150" text-anchor="end">Limit 3 min</text>
+                  <rect class="line fill-7" x="120" y="180" width="760" height="40" rx="20"/>
+                  <rect class="ink" x="120" y="180" width="600" height="40" rx="20"/>
+                  <circle class="line fill-7" cx="720" cy="200" r="26"/>
+                  <path class="line-soft dash" d="M 500 260 V 330"/>
+                  <path class="line-soft" d="M 486 318 L 500 332 L 514 318"/>
+                  <path class="line-soft" d="M 250 470 H 750"/>
+                  <circle class="line fill-7" cx="250" cy="470" r="44"/>
+                  <circle class="ink" cx="250" cy="470" r="11"/>
+                  <circle class="line fill-7" cx="500" cy="470" r="44"/>
+                  <path class="line" d="M 500 436 A 34 34 0 0 1 534 470"/>
+                  <circle class="line fill-10" cx="750" cy="470" r="44"/>
+                  <path class="line" d="M 730 470 L 744 484 L 772 452"/>
+                  <text class="label" x="250" y="580" text-anchor="middle">Queued</text>
+                  <text class="label" x="500" y="580" text-anchor="middle">Scoring</text>
+                  <text class="label" x="750" y="580" text-anchor="middle">Done</text>
+                </svg>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2.5 px-1 pb-1">
+              <h3 class="text-[20px] font-medium leading-[1.2] tracking-tight text-foreground sm:text-[22px]">
+                One take, scored in the background.
+              </h3>
+              <p class="text-[14px] leading-normal tracking-tight text-foreground/65 sm:text-[15px]">
+                You sing the whole track once; scoring runs as a queued task and the page polls until the per-line result is ready.
+              </p>
+            </div>
+            <p class="px-1 pb-2 text-[12px] tracking-tight text-foreground/50">Async &middot; one take &middot; 180s</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="fs-section fade-in">
+      <div class="fs-band">
+        <h2 class="fs-band__statement">Songs, LRC timings and reference pitch are already in the schema &mdash; the scorer lands with M3.</h2>
+        <p class="fs-band__meta">Audio is kept for 24 hours and then cleaned up; raw recordings are never used for anything else.</p>
       </div>
     </section>
 
@@ -253,7 +474,7 @@
                 Let&rsquo;s connect
               </h2>
               <p class="max-w-[29ch] text-[18px] leading-[1.4] tracking-tight text-foreground/65 sm:text-[22px] mb-6">
-                We&rsquo;re always open to discussing new features, creative ideas, or opportunities to shape the future of English speaking practice. Just reach out!
+                We&rsquo;re always open to discussing new features, creative ideas, or opportunities to shape the future of English learning. Just reach out!
               </p>
 
               <div class="mt-2 flex flex-wrap items-center gap-3">
@@ -296,8 +517,8 @@
                 </a>
               </div>
               <div class="flex flex-col items-center gap-1 text-center">
-                <p class="text-[13px] tracking-tight text-foreground/70">2026 &copy; Built with Next.js</p>
-                <p class="text-[12px] tracking-tight text-foreground/45">By React Bits Pro</p>
+                <p class="text-[13px] tracking-tight text-foreground/70">2026 &copy; VocalVerse</p>
+                <p class="text-[12px] tracking-tight text-foreground/45">Practice · Immerse · Sing</p>
               </div>
             </div>
           </div>
