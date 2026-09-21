@@ -43,7 +43,7 @@ App（/m/tavern）  ── POST /api/v1/trpg/campaigns/{id}/turns（multipart te
                                                               trpg_* 7 张表（Python 写；迁移 0018）
 ```
 
-## 3. 数据模型（迁移 0018，7 张表）
+## 3. 数据模型（迁移 0018，7 张表；0019 扩场景卡/偏好见 §12）
 
 | 表 | 说明 | 关键列 |
 |---|---|---|
@@ -169,10 +169,74 @@ App（/m/tavern）  ── POST /api/v1/trpg/campaigns/{id}/turns（multipart te
 - **契约**：`python-openapi.json`（81 op）与 `java-openapi.json` 重刷 + `pnpm gen:api`；CI 三步对账；
 - **Java**：`mvn test`（179 例，`ContractSnapshotTest` 需快照刷新后绿）；管理端 `pnpm typecheck/test:run/lint`。
 
+
+## 12. 场景卡与用户设置（2026-09-21 组长追加，同日实施）
+
+> 需求原文：「按 mobile 页面惯例，设置管理里要能设置语言（中英切换）、语音开关、语音声音选择
+> （前端先展示，后续功能）；管理端可以管理固定场景卡（供用户选择），也提供随机生成的选项
+> （有合适的就上架给所有用户用），还能够让 LLM 根据用户输入的词汇随机生成场景（用户自己管理）」。
+
+### 12.1 场景卡体系（开局模板）
+
+**三种来源**（同表 `trpg_scenario_cards`，`owner_user_id` 区分归属）：
+
+| 来源 | owner | 生成者 | 状态流 | 可见性 |
+|---|---|---|---|---|
+| 平台固定卡 | NULL | 管理端手工 + 「随机生成」草稿（LLM） | draft → published → archived | 上架后所有用户在开局引导可选 |
+| 用户私有卡 | user_id | App 内「按关键词生成」（LLM）或手动新建 | 创建即可用；删除 = archived | 仅本人可见/管理 |
+
+**字段**：`title(60)` / `summary(300)` / `language(zh|en)` / `tags(≤6)` / `scene(40)` /
+`opening_line(600)` / `template(JSONB)` / `keywords(200, 生成输入留痕)` / `generated_by(llm|manual)`。
+`template` 形如 `{pc_name, pc:{hp,location,inventory}, facts:[{key,value,modality,speaker}],
+tasks:[...], clues:[{title,content,scene}]}`。
+
+**服务端白名单收口**（LLM 输出不可信）：`normalize_card` 对 facts 的 key 做 `parse_key` +
+`DOMAIN_PROPERTIES` 校验（非法条目静默丢弃）、长度截断、tags 去重、上限裁剪；**只有 title 必填**。
+
+**开局语义**（`POST /api/v1/trpg/cards/{id}/start`）：建 campaign（name=title）→ 应用模板
+（pc/facts 走 `upsert_facts(writer="system")`，不置 `userTouched`，任务/线索直接建行）→ 写 `scene.current`
+→ 落**开场系统卡**（open）+ **开场叙述消息**（卡自带文本，不花 LLM）→ 首回合 `is_first=False`，
+不会重复出开场卡。
+
+**管理端**（Python 控制台：`/api/v1/console/trpg/cards/**`，admin SPA「运营 → 场景卡」）：
+
+| 端点 | 权限码 | 说明 |
+|---|---|---|
+| `GET /` | `content:scenario:read` | 平台卡分页（仅 owner NULL；用户卡不属管理端内容） |
+| `POST /` · `PUT /{id}` | `content:scenario:write` | 新建（草稿）/ 编辑 |
+| `POST /{id}/publish` | `content:scenario:publish` | 上/下架/归档；上架校验失败 → **46011 + data.violations[]** |
+| `POST /generate` | `content:scenario:write` | **随机生成草稿**（keywords 空 = 内置主题池轮换；不落库，人工修订后保存） |
+
+RBAC 三码 `content:scenario:{read,write,publish}` 在 Java `PermissionCatalog` 登记（36 = 原 33 + 3），
+**operator 角色持有**（Python 控制台端点已上线，不存在「有码无处可用」）。
+
+**App 端点**（用户侧）：`GET /cards`（我的卡在前 + 平台已上架）、`POST /cards`、
+`PUT /cards/{id}`、`DELETE /cards/{id}`（归档）、`POST /cards/generate`（扣 llm 桶；失败 47003）、
+`POST /cards/{id}/start`。
+
+### 12.2 用户设置（跨设备偏好）
+
+`trpg_user_prefs`（user_id 唯一）：`lang(zh|en)` / `voice_enabled(bool)` / `voice_name(40, 预留)`。
+
+| 端点 | 说明 |
+|---|---|
+| `GET /api/v1/trpg/preferences` | 未设置过返回默认（`lang=zh, voice_enabled=true, persisted=false`） |
+| `PUT /api/v1/trpg/preferences` | 部分更新（只改传入字段）；lang 非 zh|en → 47001 |
+
+**作用面**：
+- `lang` **只切 DM 输出语言**（`build_dm_system_prompt` 追加语言指令；NPC 台词协议保持中文冒号以兼容前端分段）；
+  界面文案不切换（全 App i18n 不在本期）；
+- `voice_enabled=false` → 回合**服务端不再逐句 TTS**（省配额；前端也即时 flush 播放队列）；
+- `voice_name` 暂时只读展示（音色少，选择器禁用，等音色库扩充后开放）。
+
+**App 入口**（mobile 惯例：每页右上角放本页功能）：酒馆页右上角 `⚙️ 设置` + `⭐ 场景卡` +
+`📖 切换剧本` + `⚙ 主持台`（后两者仅游玩态）。
 ## 11. 已知欠账
 
 1. **酒馆无评分/报告**：TRPG 不产发音分，报告页对酒馆无内容（打卡可计练习量）；
 2. **TTS 上限**：单回合最多 10 句（`TTS_MAX_SENTENCES`），超长旁白只回文本；
+   **音色选择未开放**（`voice_name` 字段与前端选择器已就位，仅禁用展示）；
+   用户卡「编辑」只覆盖标题/场景/开场（模板 JSON 编辑在管理端，App 端后续按需补）；
 3. **`recommend_shadow` 复习席**在候选不足时依赖 L−1 档 `material_difficulty` 行（本次已修 `_review_slots` 参数错位 bug，语义仍以 shadow 为主）；
 4. **`scenarios` 表/管理端权限码的历史行**：RbacBootstrap 为 upsert-only，线上自定义角色残留的场景权限码为孤立行（不影响功能，如需清理走数据迁移）；
 5. **酒馆埋点**：暂未新增事件类型（仅复用 `page_view`）；若需「回合数/剧本开卡数」看板，按 docs/06 §9.1 四处同步纪律新增。
