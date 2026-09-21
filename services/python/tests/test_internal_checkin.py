@@ -17,6 +17,7 @@ from app.db import get_session_factory
 from app.models import Attempt, User
 from app.models import Session as DbSession
 from app.models.base import AttemptKinds, SessionKinds, SessionStatus
+from app.models.trpg import TrpgCampaign, TrpgMessage
 from app.practice import checkin as checkin_service
 
 
@@ -92,7 +93,7 @@ def _new_user() -> int:
         db.close()
 
 
-def _seed_dialog(
+def _seed_completed_session(
     user_id: int,
     *,
     completed_at: datetime,
@@ -103,12 +104,16 @@ def _seed_dialog(
     gram: float | None = None,
     flu: float | None = None,
 ) -> int:
-    """建 1 个已完成 dialog 会话 + 1 条评分 attempt（overall=None 表示评分失败快照）。"""
+    """建 1 个已完成 shadow 会话 + 1 条评分 attempt（overall=None 表示评分失败快照）。
+
+    2026-09-21（酒馆迁移）：练习量口径只计非 dialog 会话 + 酒馆回合，故种子会话改用
+    shadow；attempt.created_at 显式对齐完成时刻，供 UTC 日界过滤。
+    """
     db = get_session_factory()()
     try:
         session = DbSession(
             user_id=user_id,
-            kind=SessionKinds.DIALOG,
+            kind=SessionKinds.SHADOW,
             status=SessionStatus.COMPLETED,
             started_at=completed_at - timedelta(minutes=5),
             completed_at=completed_at,
@@ -122,11 +127,12 @@ def _seed_dialog(
                 Attempt(
                     user_id=user_id,
                     session_id=session.id,
-                    kind=AttemptKinds.DIALOG_SPEECH,
+                    kind=AttemptKinds.SHADOW_SPEECH,
                     overall_score=None if overall is None else Decimal(str(overall)),
                     pron_score=None if pron is None else Decimal(str(pron)),
                     gram_score=None if gram is None else Decimal(str(gram)),
                     flu_score=None if flu is None else Decimal(str(flu)),
+                    created_at=completed_at,
                 )
             )
         db.commit()
@@ -143,7 +149,38 @@ def _seed_null_attempt(session_id: int, user_id: int) -> None:
             Attempt(
                 user_id=user_id,
                 session_id=session_id,
-                kind=AttemptKinds.DIALOG_SPEECH,
+                kind=AttemptKinds.SHADOW_SPEECH,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+
+def _seed_trpg_turns(user_id: int, *, when: datetime, user_turns: int) -> None:
+    """建 1 个酒馆冒险 + 若干玩家行动（role=user/kind=text）+ 1 条旁白（不计入）。"""
+    db = get_session_factory()()
+    try:
+        campaign = TrpgCampaign(user_id=user_id, name="checkin-camp")
+        db.add(campaign)
+        db.flush()
+        for i in range(user_turns):
+            db.add(
+                TrpgMessage(
+                    campaign_id=campaign.id,
+                    role="user",
+                    kind="text",
+                    content=f"action {i}",
+                    created_at=when,
+                )
+            )
+        db.add(
+            TrpgMessage(
+                campaign_id=campaign.id,
+                role="assistant",
+                kind="text",
+                content="narration",
+                created_at=when,
             )
         )
         db.commit()
@@ -156,7 +193,7 @@ def test_manual_checkin_aggregates_day_and_delegates(monkeypatch):
     uid = _new_user()
     now = datetime.now(UTC)
     # 当日两个会话（一个 81.5 分、一个 90 分）+ 一条评分失败 attempt（overall NULL 不参与最佳分）
-    _seed_dialog(
+    _seed_completed_session(
         uid,
         completed_at=now - timedelta(hours=3),
         turn_count=6,
@@ -166,7 +203,7 @@ def test_manual_checkin_aggregates_day_and_delegates(monkeypatch):
         gram=79.5,
         flu=82.0,
     )
-    latest = _seed_dialog(
+    latest = _seed_completed_session(
         uid,
         completed_at=now - timedelta(hours=1),
         turn_count=8,
@@ -177,8 +214,11 @@ def test_manual_checkin_aggregates_day_and_delegates(monkeypatch):
         flu=81.0,
     )
     _seed_null_attempt(latest, uid)
-    # 昨天一个会话：不得计入今天
-    _seed_dialog(
+    # 当日酒馆 3 个玩家行动（assistant 旁白不计）；昨天 1 个不得计入
+    _seed_trpg_turns(uid, when=now - timedelta(hours=2), user_turns=3)
+    _seed_trpg_turns(uid, when=now - timedelta(days=1), user_turns=1)
+    # 昨天一个会话：不得计入今天（attempt.created_at 同步对齐昨天）
+    _seed_completed_session(
         uid,
         completed_at=now - timedelta(days=1),
         turn_count=5,
@@ -197,15 +237,15 @@ def test_manual_checkin_aggregates_day_and_delegates(monkeypatch):
     assert body["sessionId"] == latest  # 最近一次会话
     assert body["practiceDate"] == now.date().isoformat()
     assert body["snapshot"] == {
-        "overall": 90.0,  # 当日最佳（不是最后一次 90？是——两次 81.5/90 取最大）
+        "overall": 90.0,  # 当日最佳（81.5/90 取最大；昨天的 99 已在日界外）
         "pron": 84.0,
         "gram": 80.0,
         "fluency": 81.0,
-        "turns": 14,  # 6 + 8（合计）
+        "turns": 17,  # 6 + 8（会话）+ 3（酒馆玩家行动）
         "durationS": 460,  # 200 + 260
-        "practiceCount": 2,  # 当日已完成会话数（显式回传，Java 侧不再自增）
+        "practiceCount": 5,  # 2 个完成会话 + 3 个酒馆回合
     }
-    assert result == {"date": now.date().isoformat(), "practiceCount": 2, "overall": 90.0}
+    assert result == {"date": now.date().isoformat(), "practiceCount": 5, "overall": 90.0}
 
 
 def test_manual_checkin_repeat_is_idempotent(monkeypatch):
@@ -213,7 +253,7 @@ def test_manual_checkin_repeat_is_idempotent(monkeypatch):
     captured = _install_fake_post(monkeypatch)
     uid = _new_user()
     now = datetime.now(UTC)
-    _seed_dialog(uid, completed_at=now, turn_count=4, duration_s=100, overall=70.0)
+    _seed_completed_session(uid, completed_at=now, turn_count=4, duration_s=100, overall=70.0)
 
     checkin_service.perform_checkin(uid, now.date())
     checkin_service.perform_checkin(uid, now.date())
@@ -259,7 +299,7 @@ def test_complete_session_no_longer_triggers_checkin(monkeypatch):
     """回归守卫（2026-09-21）：练习收尾不得再自动委托打卡（「没操作却自动打卡」的根因）。"""
     captured = _install_fake_post(monkeypatch)
     uid = _new_user()
-    session_id = _seed_dialog(
+    session_id = _seed_completed_session(
         uid,
         completed_at=datetime.now(UTC),
         turn_count=6,

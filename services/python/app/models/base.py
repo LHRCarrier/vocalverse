@@ -161,7 +161,9 @@ class LevelSources:
 
 
 class SessionKinds:
-    DIALOG = "dialog"
+    """会话类型。DIALOG 已退役（2026-09-21 酒馆迁移）：保留取值以兼容历史行。"""
+
+    DIALOG = "dialog"  # 退役：英语场景对话（历史数据仍可能含该值）
     SING = "sing"
     DEFENSE = "defense"  # 答辩会话（docs/14 §6.1，2026-09 拍板）
     SHADOW = "shadow"  # 影子跟读会话（local/31 §2.4，2026-09-02 设计）
@@ -180,7 +182,9 @@ class MessageRoles:
 
 
 class AttemptKinds:
-    DIALOG_SPEECH = "dialog_speech"
+    """录音评分类型。DIALOG_SPEECH 已退役（2026-09-21 酒馆迁移）：保留取值兼容历史行。"""
+
+    DIALOG_SPEECH = "dialog_speech"  # 退役：英语场景对话评分（历史数据仍可能含该值）
     FREE_PRACTICE = "free_practice"
     PLACEMENT_ITEM = "placement_item"
     DEFENSE_ANSWER = "defense_answer"  # 答辩作答（docs/14 §6.1，2026-09 拍板）
@@ -241,7 +245,7 @@ class TicketStatuses:
 
 
 # ---------------------------------------------------------------------------
-# 酒馆（TRPG 跑团）域枚举（docs/30-M3酒馆跑团实施设计 §3；表见 models/trpg.py）
+# 酒馆（TRPG 跑团）域枚举（docs/52 酒馆跑团（TRPG）实施设计 §3；表见 models/trpg.py）
 # ---------------------------------------------------------------------------
 class TrpgFactKinds:
     """事实行类别：state=系统直写状态（pc/scene）；fact=LLM 提取叙事事实（rel/quest/clue）。"""

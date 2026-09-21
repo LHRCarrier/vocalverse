@@ -1,10 +1,12 @@
 """幂等种子数据（docs/10 §7.3 · docs/18 §1 P5）。
 
 覆盖内容（演示数据，单写豁免已随 M2 拍板登记）：
-- scenarios：data/seed/scenarios.json（8 套：4 场景 × 入门/进阶）—— 全文入库；
 - placement_questions：5 句固定朗读 + 1 轮 QA（docs/06 §9.2 入学测试题库，admin 预置可复现）。
 
-幂等策略：自然键查重（scenarios.title；placement_questions 的 (exam_revision, item_index)），
+2026-09-21（酒馆迁移）：scenarios 种子（8 套英语场景）随场景对话移除，
+`data/seed/scenarios.json` 一并删除；影子素材演示数据见 `app/db/seed_recommend.py`。
+
+幂等策略：自然键查重（placement_questions 的 (exam_revision, item_index)），
 已存在则跳过（不覆盖管理员后续编辑）。用户/档案类数据由 Java 侧播种（CommandLineRunner）。
 
 用法（services/python 目录）：
@@ -13,20 +15,12 @@
 
 from __future__ import annotations
 
-import json
 import sys
 
 from sqlalchemy import select
 
-from app.core.paths import seed_dir
 from app.db import get_session_factory
-from app.models import PlacementQuestion, Scenario
-
-# 2026-09-14：原先用 `parents[4]` + `except IndexError` 兜容器，但**容器分支实际触发不了** ——
-# `/app/app/db/seed.py` 的 `parents[4]` 是 `/`（根目录的父目录还是自己），不会抛 IndexError，
-# 于是容器内去找 `/data/seed/scenarios.json`，而挂载点是 `/app/data/seed` → 播种被静默跳过。
-# 改用向上找标记目录的 `paths.seed_dir()`（裸跑/容器同口径，见 app/core/paths.py）。
-SCENARIOS_SEED = seed_dir() / "scenarios.json"
+from app.models import PlacementQuestion
 
 # 入学测试题库（docs/06 §9.2：5 条固定朗读句 + 1 轮 QA；演示可复现）
 PLACEMENT_QUESTIONS = [
@@ -70,22 +64,6 @@ PLACEMENT_QUESTIONS = [
 ]
 
 
-def seed_scenarios(session) -> int:
-    if not SCENARIOS_SEED.exists():
-        print(f"[seed] 跳过 scenarios：缺 {SCENARIOS_SEED}")
-        return 0
-    data = json.loads(SCENARIOS_SEED.read_text(encoding="utf-8"))
-    inserted = 0
-    for item in data["scenarios"]:
-        exists = session.execute(select(Scenario.id).where(Scenario.title == item["title"])).first()
-        if exists:
-            continue
-        session.add(Scenario(**item))
-        inserted += 1
-    session.flush()
-    return inserted
-
-
 def seed_placement_questions(session) -> int:
     inserted = 0
     for item in PLACEMENT_QUESTIONS:
@@ -106,10 +84,9 @@ def seed_placement_questions(session) -> int:
 def main() -> int:
     session = get_session_factory()()
     try:
-        n_scenarios = seed_scenarios(session)
         n_questions = seed_placement_questions(session)
         session.commit()
-        print(f"[seed] scenarios +{n_scenarios} / placement_questions +{n_questions}（跳过已存在）")
+        print(f"[seed] placement_questions +{n_questions}（跳过已存在）")
         return 0
     finally:
         session.close()

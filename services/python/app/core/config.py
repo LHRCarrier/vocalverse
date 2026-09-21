@@ -228,9 +228,6 @@ class Settings(BaseSettings):
     learner_cache_ttl_s: int = 900  # 画像进程内缓存 TTL（15min；会话收尾主动失效兜底）
     learner_word_error_window: int = 20  # 词级错误聚合窗口（最近 N 条 dialog attempt）
 
-    # ---- Agent Lab（test-only 前端测试台，docs/26 §8；默认关闭，生产禁止开启） ----
-    agent_lab_enabled: bool = False  # APP_AGENT_LAB_ENABLED=true 时注册 /api/v1/agent-lab/*
-
     # ---- 流利度特征测试台（test-only 前端联调页，docs/06 §9.3；默认关闭，生产禁止开启） ----
     fluency_preview_enabled: bool = False  # 开启时注册 /api/v1/fluency-preview/*
 

@@ -11,9 +11,6 @@ os.environ.setdefault("APP_JWT_SECRET", "vocalverse-dev-jwt-secret-0123456789abc
 os.environ.setdefault("APP_AUDIO_DIR", "./data/audio-test")
 # 媒体目录同样隔离到 *-test（docs/47 §4.1）：单测不得写坏开发库的 data/media
 os.environ.setdefault("APP_MEDIA_DIR", "./data/media-test")
-# Agent Lab 测试台：即使本地 .env 开启 APP_AGENT_LAB_ENABLED=true，测试环境也钉回默认关闭
-# （test_agent_lab_disabled_returns_404 断言路由 404；env 变量优先级高于 .env）
-os.environ.setdefault("APP_AGENT_LAB_ENABLED", "false")
 # 流利度特征测试台同规格：默认关闭钉回（test_fluency_preview_disabled_returns_404）
 os.environ.setdefault("APP_FLUENCY_PREVIEW_ENABLED", "false")
 # 影子跟读测试台同规格：默认关闭钉回（test_shadow_preview_disabled_returns_404）

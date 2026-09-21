@@ -1,4 +1,8 @@
-"""掌握度写入单测（local/31 §6.1 A 组关联 + local/29 §3 派生链）。"""
+"""掌握度写入单测（local/31 §6.1 A 组关联 + local/29 §3 派生链）。
+
+2026-09-21（酒馆迁移）：句级 ``user_corpus_mastery`` 写入随英语场景对话移除
+（``app/mastery/service.py`` 只保留内容级）；本文件改为 shadow 素材的内容级掌握度回归。
+"""
 
 from __future__ import annotations
 
@@ -10,10 +14,8 @@ from app.db import get_session_factory
 from app.mastery.service import update_session_mastery
 from app.models import (
     Attempt,
-    Scenario,
-    ScenarioMessage,
+    ShadowMaterial,
     User,
-    UserCorpusMastery,
     UserMastery,
 )
 from app.models import (
@@ -23,26 +25,27 @@ from app.models.base import AttemptKinds, SessionKinds, SessionStatus
 from sqlalchemy import select
 
 
-def _seed_dialog_session(
-    user_id: int, scores: list[tuple[float, float]], hits: list[dict]
-) -> tuple[int, int]:
-    """建 1 个 dialog 会话：scenario + attempts + user 消息 corpus_hits。"""
+def _seed_shadow_session(user_id: int, scores: list[tuple[float, float]]) -> tuple[int, int]:
+    """建 1 个 shadow 会话：素材 + attempts（pron/flu 对）；返回 (session_id, material_id)。"""
     db = get_session_factory()()
     try:
-        scenario = Scenario(
-            title="s",
-            scene_type="cafe",
-            difficulty=2,
-            system_prompt="p",
-            opening_line="o",
-            target_corpus="How much is it?|多少钱\nThank you so much.|谢谢",
+        material = ShadowMaterial(
+            title="mastery-shadow",
+            level=2,
+            text_content="How much is it?",
+            audio_url="/demo/audio/shadow/mastery.mp3",
+            wpm=120,
+            duration_s=10,
+            interest_tags=[],
+            source="demo_only",
+            status="published",
         )
-        db.add(scenario)
+        db.add(material)
         db.flush()
         session = DbSession(
             user_id=user_id,
-            kind=SessionKinds.DIALOG,
-            scenario_id=scenario.id,
+            kind=SessionKinds.SHADOW,
+            shadow_material_id=material.id,
             status=SessionStatus.COMPLETED,
             started_at=datetime.now(UTC),
         )
@@ -53,77 +56,46 @@ def _seed_dialog_session(
                 Attempt(
                     user_id=user_id,
                     session_id=session.id,
-                    kind=AttemptKinds.DIALOG_SPEECH,
+                    kind=AttemptKinds.SHADOW_SPEECH,
                     pron_score=Decimal(str(p)),
                     flu_score=Decimal(str(f)),
                 )
             )
-        # 两条 user 消息，各自带 corpus_hits
-        for i, h in enumerate(hits, start=1):
-            db.add(
-                ScenarioMessage(
-                    session_id=session.id, seq=i, role="user", content="hi", meta={"corpus_hits": h}
-                )
-            )
         db.commit()
-        return int(session.id), int(scenario.id)
+        return int(session.id), int(material.id)
     finally:
         db.close()
 
 
-def test_session_mastery_writes_scene_and_corpus() -> None:
-    """句级 + 场景级掌握度：达标句 mastered、待纠错句 not_mastered；场景级按均值判定。"""
+def test_session_mastery_writes_shadow_level() -> None:
+    """内容级掌握度：会话综合分（0.6·pron+0.4·flu）均值 + 达标计数 + 状态判定。"""
     db = get_session_factory()()
     try:
         uid = User(username=f"m{uuid4().hex[:8]}", nickname="m", password_hash="x")
         db.add(uid)
-        db.flush()
+        db.commit()
         u = int(uid.id)
     finally:
         db.close()
 
     # pron=80,flu=75 → S=78 ≥ 75（达标）；pron=88,flu=90 → S=88.8（达标）
-    sess_id, scen_id = _seed_dialog_session(
-        u,
-        [(80, 75), (88, 90)],
-        [
-            [{"phrase": "How much is it?", "state": "ok"}],
-            [{"phrase": "Thank you so much.", "state": "fix"}],
-        ],
-    )
+    sess_id, mid = _seed_shadow_session(u, [(80, 75), (88, 90)])
 
     db = get_session_factory()()
     try:
         update_session_mastery(db, sess_id)
         db.commit()
 
-        # 场景级
         mrow = db.execute(
             select(UserMastery).where(
                 UserMastery.user_id == u,
-                UserMastery.content_type == "scene",
-                UserMastery.content_id == scen_id,
+                UserMastery.content_type == "shadow",
+                UserMastery.content_id == mid,
             )
         ).scalar_one()
         assert mrow.attempt_count == 2
         assert float(mrow.mastery_score) == 83.4  # (78+88.8)/2
         assert mrow.pass_count == 1  # 达标按会话级（均值 83.4≥75），1 次会话
         assert mrow.status == "in_progress"  # 需 ≥2 次达标才 mastered；本次 in_progress
-
-        # 句级
-        rows = (
-            db.execute(
-                select(UserCorpusMastery).where(
-                    UserCorpusMastery.user_id == u, UserCorpusMastery.scenario_id == scen_id
-                )
-            )
-            .scalars()
-            .all()
-        )
-        by_line = {r.line_index: r for r in rows}
-        assert by_line[1].status == "mastered"  # ok 句
-        assert by_line[2].status == "not_mastered"  # fix 句
-        assert by_line[1].mastery_score == 100
-        assert by_line[2].mastery_score == 30
     finally:
         db.close()

@@ -1,7 +1,10 @@
-"""M2 练习域业务逻辑：会话创建/收尾/报告、答辩、覆盖度汇总（docs/14 全部口径落点）。
+"""练习域业务逻辑：会话创建/收尾/报告、答辩知识包（docs/14 口径落点）。
 
 写方（Single Writer 视角）：sessions / scenario_messages / attempts / scores /
 defense_profiles / events / placements 均为 **Python 写**；users 只读。
+
+2026-09-21（酒馆迁移）：英语「场景对话」（kind=dialog + scenarios 内容 + 覆盖度/语料链路）
+整体移除——本模块保留 defense / shadow / sing 三种会话共用能力（建会话、收尾报告、答辩知识包）。
 """
 
 from __future__ import annotations
@@ -20,7 +23,6 @@ from app.models import (
     Attempt,
     DefenseProfile,
     Report,
-    Scenario,
     ScenarioMessage,
     ShadowMaterial,
 )
@@ -28,19 +30,12 @@ from app.models import (
     Session as DbSession,
 )
 from app.models.base import SessionKinds, SessionStatus
-from app.practice.corpus import parse_corpus
 from app.practice.shadow import split_sentences
 from app.practice.state import SessionState, get_state_store
 from fastapi import HTTPException
 from sqlalchemy import select
 
 logger = logging.getLogger("vocalverse")
-
-DEFAULT_TURNS = 8
-DEFAULT_TARGET_MIN = 2  # 完成率兜底：2min
-
-# 句子边界（TTS 逐句切分）
-_SENTENCE_END = ".!?"
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +44,6 @@ _SENTENCE_END = ".!?"
 async def create_session(
     user_id: int,
     kind: str,
-    scenario_id: int | None,
     profile_id: int | None,
     difficulty: int | None,
     turn_limit: int | None,
@@ -61,7 +55,6 @@ async def create_session(
         _create_session_sync,
         user_id,
         kind,
-        scenario_id,
         profile_id,
         difficulty,
         turn_limit,
@@ -79,25 +72,17 @@ async def create_session(
 def _create_session_sync(
     user_id: int,
     kind: str,
-    scenario_id: int | None,
     profile_id: int | None,
     difficulty: int | None,
     turn_limit: int | None,
     shadow_material_id: int | None = None,
     song_id: int | None = None,
 ) -> tuple[DbSession, SessionState | None, list[str]]:
-    """同步实现（线程池内执行）：建会话 + 开场白落库，返回三元组供异步侧调度。"""
+    """同步实现（线程池内执行）：建会话（defense/shadow/sing），返回三元组供异步侧调度。"""
     db = get_session_factory()()
-    scenario = None  # dialog 分支赋值；defense/shadow 为 None（2026-09-04 修复未曾覆盖的
-    # UnboundLocalError——此前 defense 建会话同样会踩中，只是无测试覆盖）
     material = None
     try:
-        if kind == SessionKinds.DIALOG:
-            scenario = db.get(Scenario, scenario_id) if scenario_id else None
-            if scenario is None:
-                raise HTTPException(status_code=404, detail="scenario not found")
-            assigned = turn_limit or scenario.estimated_turns or DEFAULT_TURNS
-        elif kind == SessionKinds.DEFENSE:
+        if kind == SessionKinds.DEFENSE:
             profile = db.get(DefenseProfile, profile_id) if profile_id else None
             if profile is None or profile.status != "active":
                 raise HTTPException(status_code=404, detail="profile not found")
@@ -139,7 +124,7 @@ def _create_session_sync(
         session = DbSession(
             user_id=user_id,
             kind=kind,
-            scenario_id=scenario_id,
+            scenario_id=None,  # 场景对话移除（2026-09-21）：历史行保留该列，新会话恒空
             profile_id=profile_id,
             shadow_material_id=shadow_material_id,
             song_id=song_id,
@@ -160,38 +145,18 @@ def _create_session_sync(
             kind=kind,
             state="awaiting_user",
             assembled={
-                "scenario_id": scenario_id,
                 "difficulty": difficulty,
-                "opening_text": (getattr(scenario, "opening_line", None) if scenario else None),
-                "corpus": [
-                    {"phrase": it.phrase, "gloss": it.gloss}
-                    for it in parse_corpus(scenario.target_corpus)
-                ]
-                if scenario
-                else [],
                 "shadow_material_id": shadow_material_id,
                 "shadow_sentences": split_sentences(material.text_content)
                 if kind == SessionKinds.SHADOW
                 else [],
             },
         )
-        # 开场白作为 assistant 消息落库（seq=1；client 另行播放）
-        if scenario is not None:
-            db.add(
-                ScenarioMessage(
-                    session_id=session.id,
-                    seq=state.next_seq,
-                    role="assistant",
-                    content=scenario.opening_line,
-                    meta={"type": "opening"},
-                )
-            )
-            state.next_seq += 1
-        # 预热文本（已知文本：开场白 + target_corpus 短语 + 影子逐句示范）——
-        # collect_warm_texts 保序去重；异步侧 schedule_texts_warm 后台预热
+        # 预热文本（影子跟读逐句示范）：collect_warm_texts 保序去重；
+        # 异步侧 schedule_texts_warm 后台预热（2026-09-21：场景开场白/语料预热随 dialog 移除）
         warm_texts = collect_warm_texts(
-            [scenario.opening_line if scenario else None],
-            [it.phrase for it in parse_corpus(scenario.target_corpus)] if scenario else [],
+            [],
+            [],
             split_sentences(material.text_content) if kind == SessionKinds.SHADOW else [],
         )
         db.commit()
@@ -257,19 +222,15 @@ def complete_session(session_id: int, llm: LLMClient, summary_text: str | None =
         attempts = list(
             db.execute(select(Attempt).where(Attempt.session_id == session_id)).scalars()
         )
-        coverage = _coverage_summary(msgs, attempts)
-        semantic = _semantic_summary(msgs)  # ③ 语义子分聚合（不进量化总分，docs/07 Q38）
         summary = summary_text or f"会话完成：{len(user_msgs)} 轮口头交流。"
 
         metrics = {
             "summary": summary,
-            "coverage": coverage,
-            "semantic": semantic,  # ③ 语义子分（content/vocab；不进总分，展示口径）
             "kind": session.kind,
             "assigned_turns": session.assigned_turns,
             "user_turn_count": len(user_msgs),
             "duration_s": session.duration_s,
-            "suggestions": _suggestions(attempts, coverage),
+            "suggestions": _suggestions(attempts),
             "attempts": [
                 {
                     "id": a.id,
@@ -331,70 +292,13 @@ def _post_session_skills(db, session) -> None:
             "post-session skills skipped session=%s (self-heal next practice)", session.id
         )
         db.rollback()
-    # 学习者画像缓存失效（docs/26 ⑥）：会话完结后掌握度/水平已重算，下次注入须读到新画像。
-    # 独立于 skills 更新成败（数据已可能变化，按"保守失效"处理）；异常吞掉不阻塞收尾。
-    try:
-        from app.agent.domains.learner import invalidate as _learner_invalidate
-
-        _learner_invalidate(int(session.user_id))
-    except Exception:
-        pass
 
 
 def _f(v: Decimal | None) -> float | None:
     return float(v) if v is not None else None
 
 
-def _coverage_summary(msgs: list[ScenarioMessage], attempts: list[Attempt]) -> dict:
-    """覆盖度三栏（docs/14 §2.1/§5）：已覆盖(自然达意)/需纠错/待练。
-
-    依据：user 消息的 meta.corpus_hits（编排器按 action 已过滤 retry/hint/demo 轮）。
-    """
-    ok: list[str] = []
-    fix: list[str] = []
-    for m in msgs:
-        if m.role != "user":
-            continue
-        for hit in (m.meta or {}).get("corpus_hits", []) or []:
-            phrase = hit.get("phrase")
-            if not phrase:
-                continue
-            (ok if hit.get("state") == "ok" else fix).append(phrase)
-    seen = set(ok) | set(fix)
-    return {
-        "covered": sorted(set(ok)),
-        "needs_fix": sorted(set(fix)),
-        "to_practice": [],
-        "coverage_count": len(seen),
-    }
-
-
-def _semantic_summary(msgs: list[ScenarioMessage]) -> dict:
-    """③ 语义子分聚合（docs/07 Q38：LLM 判定、进展示**不进量化总分**）。
-
-    取 assistant 消息 meta 的 content/vocab（META 契约增量字段）；无数据 → score=None。
-    返回：{"content": {"score": avg|None, "turns": n}, "vocab": {...}}
-    """
-
-    def _avg(key: str) -> tuple[float | None, int]:
-        vals: list[float] = []
-        for m in msgs:
-            if m.role != "assistant":
-                continue
-            v = (m.meta or {}).get(key)
-            if isinstance(v, dict) and isinstance(v.get("score"), (int, float)):
-                vals.append(float(v["score"]))
-        return (round(sum(vals) / len(vals), 1) if vals else None), len(vals)
-
-    content_avg, content_n = _avg("content")
-    vocab_avg, vocab_n = _avg("vocab")
-    return {
-        "content": {"score": content_avg, "turns": content_n},
-        "vocab": {"score": vocab_avg, "turns": vocab_n},
-    }
-
-
-def _suggestions(attempts: list[Attempt], coverage: dict) -> list[str]:
+def _suggestions(attempts: list[Attempt]) -> list[str]:
     scored = [a for a in attempts if a.gram_score is not None or a.pron_score is not None]
     suggestions: list[str] = []
     if scored:
@@ -524,54 +428,3 @@ def _strip_json_fence(raw: str) -> str:
 # ---------------------------------------------------------------------------
 # 工具
 # ---------------------------------------------------------------------------
-def build_llm_context(
-    state: SessionState,
-    scenario_prompt: str,
-    corpus_text: str,
-    difficulty: int,
-    user_text: str,
-    action: str,
-    hits_so_far: list[str],
-    concluded_by_turn: bool,
-    learner_profile: str = "",
-    rolling_summary: str = "",
-) -> list[dict]:
-    """对话回合 system/user 消息（docs/14 §3.4）。
-
-    兼容薄壳：实现已迁至 Agent 框架层 `app.agent.runtime.context_builder.build_context`
-    （docs/26：静态 system + user 尾部 [context]（画像/摘要/难度/语料/命中）+ ⑤契约稳定）；
-    本函数保留签名供既有引用，新代码一律直调框架层。
-    """
-    from app.agent.runtime.context_builder import build_context
-
-    return build_context(
-        state,
-        scenario_prompt,
-        corpus_text,
-        difficulty,
-        user_text,
-        action,
-        hits_so_far,
-        concluded_by_turn,
-        learner_profile=learner_profile,
-        rolling_summary=rolling_summary,
-    )
-
-
-def _count_errors(errors: list) -> int:
-    return len(errors) if errors else 0
-
-
-def tts_sentences(text: str) -> list[str]:
-    """按句边界切分（保留标点；空句剔除）。"""
-    out: list[str] = []
-    buf = ""
-    for ch in text:
-        buf += ch
-        if ch in _SENTENCE_END:
-            if buf.strip():
-                out.append(buf.strip())
-            buf = ""
-    if buf.strip():
-        out.append(buf.strip())
-    return out or ([text] if text else [])

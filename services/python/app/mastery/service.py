@@ -1,12 +1,11 @@
 """匹配机制：掌握度写入（**Python 写方**；local/31 §2.3 · local/29 §3）。
 
-派生链：attempts × corpus_hit → user_corpus_mastery（句级）→ 聚合 → user_mastery（场景级）。
-两表均 Python 写、会话收尾同事务（由 complete_session 收尾挂钩调用）。
+内容级 ``user_mastery``：mastery_score = 素材近期练习综合分（0.6·pron+0.4·flu）增量均值；
+状态判定（local/31 §5.1）：mastered = 达标≥2 且均值≥75；in_progress = 60≤均值<75；
+否则 not_mastered。
 
-- 场景级 ``user_mastery``：mastery_score = 该场景近期练习综合分（0.6·pron+0.4·flu）增量均值；
-- 句级 ``user_corpus_mastery``：按 corpus_hit 的 phrase/state 写入（ok=达标、fix=待纠错）；
-- 状态判定（local/31 §5.1）：mastered = 达标≥2 且均值≥75；in_progress = 60≤均值<75；
-  否则 not_mastered。
+2026-09-21（酒馆迁移）：英语场景对话移除后，句级 ``user_corpus_mastery`` 不再有新写入
+（表保留历史数据）；内容级掌握度仅由影子跟读（shadow）产生。
 """
 
 from __future__ import annotations
@@ -19,12 +18,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.difficulty.batch import parse_corpus
 from app.models import (
     Attempt,
-    Scenario,
-    ScenarioMessage,
-    UserCorpusMastery,
     UserMastery,
 )
 from app.models import (
@@ -104,87 +99,14 @@ def _upsert_scene_mastery(
     row.status = _status_from(float(row.mastery_score), row.attempt_count, row.pass_count)
 
 
-def _corpus_line_map(scenario: Scenario) -> dict[str, int]:
-    """target_corpus 的 'English|中文' 行 → phrase 序号（1..n）。"""
-    return {ph: i + 1 for i, ph in enumerate(parse_corpus(scenario.target_corpus or ""))}
-
-
-def _upsert_corpus_mastery(
-    db: Session, user_id: int, scenario: Scenario, msgs: list[ScenarioMessage]
-) -> None:
-    """句级掌握度：按 user 消息 meta.corpus_hits 的 {phrase,state} 逐句 upsert。
-
-    ok=100、fix=30（达标/待纠错）；status 按最近命中状态推进。
-    """
-    line_map = _corpus_line_map(scenario)
-    hits: list[tuple[int, str, bool]] = []  # (line_index, phrase, ok)
-    for m in msgs:
-        if m.role != "user":
-            continue
-        for h in (m.meta or {}).get("corpus_hits", []) or []:
-            phrase = h.get("phrase")
-            if not phrase or phrase not in line_map:
-                continue
-            hits.append((line_map[phrase], phrase, h.get("state") == "ok"))
-    for line_index, phrase, ok in hits:
-        row = db.execute(
-            select(UserCorpusMastery).where(
-                UserCorpusMastery.user_id == user_id,
-                UserCorpusMastery.scenario_id == int(scenario.id),
-                UserCorpusMastery.line_index == line_index,
-            )
-        ).scalar_one_or_none()
-        score = 100.0 if ok else 30.0
-        if row is None:
-            row = UserCorpusMastery(
-                user_id=user_id,
-                scenario_id=int(scenario.id),
-                line_index=line_index,
-                phrase=phrase,
-                mastery_score=Decimal(str(score)),
-                attempt_count=1,
-                pass_count=1 if ok else 0,
-                last_score=Decimal(str(score)),
-                last_practiced_at=datetime.now(UTC),
-                status=MasteryStatus.MASTERED if ok else MasteryStatus.NOT_MASTERED,
-            )
-            db.add(row)
-        else:
-            prev = float(row.mastery_score)
-            new_count = row.attempt_count + 1
-            row.mastery_score = Decimal(
-                str(round((prev * row.attempt_count + score) / new_count, 2))
-            )
-            row.attempt_count = new_count
-            if ok:
-                row.pass_count += 1
-            row.last_score = Decimal(str(score))
-            row.last_practiced_at = datetime.now(UTC)
-            row.status = (
-                MasteryStatus.MASTERED
-                if (ok and row.pass_count >= _MASTERED_MIN_PASS)
-                else (MasteryStatus.IN_PROGRESS if ok else MasteryStatus.NOT_MASTERED)
-            )
-
-
 def update_session_mastery(db: Session, session_id: int) -> None:
-    """会话收尾：写句级 + 场景级掌握度（dialog 场景有 corpus_hits；shadow 只写素材级）。"""
+    """会话收尾：写内容级掌握度（shadow 素材；历史 dialog 会话仍可按 scene 类型补写）。"""
     session = db.get(DbSession, session_id)
     if session is None:
         return
     attempts = list(db.execute(select(Attempt).where(Attempt.session_id == session_id)).scalars())
-    # 素材级（scene / shadow）掌握度
+    # 素材级（scene=历史 dialog 行 / shadow）掌握度
     content_type = "scene" if session.scenario_id is not None else "shadow"
     content_id = session.scenario_id or session.shadow_material_id
     if content_id is not None:
         _upsert_scene_mastery(db, int(session.user_id), content_type, int(content_id), attempts)
-    # 句级掌握度（仅 dialog 场景）
-    if session.kind == "dialog" and session.scenario_id is not None:
-        scenario = db.get(Scenario, session.scenario_id)
-        if scenario is not None:
-            msgs = list(
-                db.execute(
-                    select(ScenarioMessage).where(ScenarioMessage.session_id == session_id)
-                ).scalars()
-            )
-            _upsert_corpus_mastery(db, int(session.user_id), scenario, msgs)

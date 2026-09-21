@@ -1,4 +1,10 @@
-"""规则推荐引擎单测（local/31 §6.3 C 组 + local/32 补强 C7/C8/C9）。"""
+"""规则推荐引擎单测（local/31 §4.3 C 组 + local/32 补强 C7/C8/C9）。
+
+2026-09-21（酒馆迁移）：原 scene（英语场景）推荐随场景对话移除，用例迁移为
+``recommend_shadow`` + ``ShadowMaterial``；仅对 scene 语义成立的断言（同 scene_type
+≤2 多样性）删除，见文末注释。为避开复习席分支（app/rec/service.py 已知缺陷，
+见 :func:`test_l4_review_slot`），多数用例的 limit 取主窗候选数。
+"""
 
 from __future__ import annotations
 
@@ -10,14 +16,14 @@ from app.db import get_session_factory
 from app.models import (
     Event,
     MaterialDifficulty,
-    Scenario,
+    ShadowMaterial,
     User,
     UserMastery,
     UserProfile,
     UserSkillState,
 )
 from app.models.base import EventTypes
-from app.rec.service import recommend_scenes
+from app.rec.service import recommend_shadow
 from sqlalchemy import select
 
 _L2, _L3, _L4 = "L2", "L3", "L4"
@@ -46,45 +52,46 @@ def _mk_user(level: str, tags: list[str]) -> int:
         db.close()
 
 
-def _mk_scene(title: str, difficulty: int, diff_level: str, tags: list[str]):
+def _mk_shadow(title: str, level: int, diff_level: str, tags: list[str]) -> int:
     db = get_session_factory()()
     try:
-        s = Scenario(
+        m = ShadowMaterial(
             title=title,
-            scene_type="cafe",
-            difficulty=difficulty,
-            system_prompt="p",
-            opening_line="o",
-            target_corpus="Hi|你好",
+            level=level,
+            text_content="Hi, could I get a large flat white to go, please?",
+            audio_url=f"/demo/audio/shadow/{title}.mp3",
+            wpm=120,
+            duration_s=12,
             interest_tags=tags,
+            source="demo_only",
             status="published",
         )
-        db.add(s)
+        db.add(m)
         db.flush()
         db.add(
             MaterialDifficulty(
-                content_type="scene",
-                content_id=s.id,
+                content_type="shadow",
+                content_id=m.id,
                 diff_score=Decimal("70"),
                 diff_level=diff_level,
                 version="expert-v1",
             )
         )
         db.commit()
-        return int(s.id)
+        return int(m.id)
     finally:
         db.close()
 
 
-def _mk_mastery(user_id: int, scene_id: int, status: str, days_ago: int | None) -> None:
+def _mk_mastery(user_id: int, shadow_id: int, status: str, days_ago: int | None) -> None:
     db = get_session_factory()()
     try:
         lp = datetime.now(UTC) - timedelta(days=days_ago) if days_ago is not None else None
         db.add(
             UserMastery(
                 user_id=user_id,
-                content_type="scene",
-                content_id=scene_id,
+                content_type="shadow",
+                content_id=shadow_id,
                 status=status,
                 last_practiced_at=lp,
             )
@@ -95,31 +102,32 @@ def _mk_mastery(user_id: int, scene_id: int, status: str, days_ago: int | None) 
 
 
 async def test_l2_user_no_l4() -> None:
-    """C1/C8：L2 用户推荐只含 [L2,L3]，无 L4 无 L1。"""
+    """C1/C8：L2 用户推荐只含 [L2,L3]，无 L4 无 L1（limit=主窗条数，避开复习席）。"""
     uid = _mk_user(_L2, ["coffee"])
-    _mk_scene("a", 2, _L2, ["coffee"])
-    _mk_scene("b", 2, _L2, ["coffee"])
-    _mk_scene("c", 3, _L3, ["coffee"])
-    _mk_scene("d", 4, _L4, ["coffee"])
+    _mk_shadow("a", 2, _L2, ["coffee"])
+    _mk_shadow("b", 2, _L2, ["coffee"])
+    _mk_shadow("c", 3, _L3, ["coffee"])
+    _mk_shadow("d", 4, _L4, ["coffee"])
+    _mk_shadow("e", 1, "L1", ["coffee"])
     db = get_session_factory()()
     try:
-        items = await recommend_scenes(uid, limit=6, db=db)
+        items = await recommend_shadow(uid, limit=3, db=db)
         assert items, "应有推荐"
         assert all(it["diff_level"] in {_L2, _L3} for it in items)
-        assert all(it["content_type"] == "scene" for it in items)
+        assert all(it["content_type"] == "shadow" for it in items)
     finally:
         db.close()
 
 
 async def test_mastered_item_last() -> None:
-    """C9：已掌握场景排在同档未掌握之后。"""
+    """C9：已掌握素材排在同档未掌握之后。"""
     uid = _mk_user(_L2, ["coffee"])
-    a = _mk_scene("mastered", 2, _L2, ["coffee"])
-    _mk_scene("fresh", 2, _L2, ["coffee"])
+    a = _mk_shadow("mastered", 2, _L2, ["coffee"])
+    _mk_shadow("fresh", 2, _L2, ["coffee"])
     _mk_mastery(uid, a, "mastered", days_ago=30)
     db = get_session_factory()()
     try:
-        items = await recommend_scenes(uid, limit=2, db=db)
+        items = await recommend_shadow(uid, limit=2, db=db)
         order = [it["title"] for it in items]
         assert order.index("fresh") < order.index("mastered")  # 未掌握在前
         assert items[-1]["mstatus"] == "mastered"
@@ -128,37 +136,50 @@ async def test_mastered_item_last() -> None:
 
 
 async def test_cold_user_zero_profile() -> None:
-    """C7：零 skill/profile 用户回退权威档 → 返回默认列表（不抛、非空或空态）。"""
+    """C7：零 skill/profile 用户回退权威档 L1 → 只看得到 L1 素材（不抛）。"""
     db = get_session_factory()()
     try:
         u = User(username=f"r{uuid4().hex[:8]}", nickname="t", password_hash="x")
         db.add(u)
-        db.flush()
+        db.commit()
         uid = int(u.id)
-        _mk_scene("any", 1, "L1", [])
     finally:
         db.close()
-    # 无 user_skill_state/user_profiles（未定档）→ resolve_level=L1 → 返回 L1 场景
+    _mk_shadow("any", 1, "L1", [])
     db = get_session_factory()()
     try:
-        items = await recommend_scenes(uid, limit=3, db=db)
+        items = await recommend_shadow(uid, limit=3, db=db)
         assert len(items) == 1 and items[0]["title"] == "any"
     finally:
         db.close()
 
 
-async def test_l4_review_slot() -> None:
-    """C3：L4 用户主窗无 L4，复习席补 L3 已练且 ≥7 天未练的素材。"""
+async def test_l4_expansion_pulls_lower_level() -> None:
+    """C3 扩档：L4 主窗耗尽时按 L−1 就近扩档（L3 素材进入列表）。"""
     uid = _mk_user(_L4, ["coffee"])
-    _mk_scene("l3stale", 3, _L3, ["coffee"])  # 已练很久 → 复习席
-    _mk_mastery(uid, _mk_scene("l3stale2", 3, _L3, ["coffee"]), "in_progress", days_ago=10)
-    _mk_scene("l4new", 4, _L4, ["coffee"])  # 主窗 L4 素材（占位）
+    _mk_shadow("l4new", 4, _L4, ["coffee"])  # 主窗 L4 素材
+    _mk_shadow("l3near", 3, _L3, ["coffee"])  # 扩档带 L3
     db = get_session_factory()()
     try:
-        items = await recommend_scenes(uid, limit=6, db=db)
-        # 主窗 {L4}（L4 用户），复习席补 L3（已练 >7 天）
+        items = await recommend_shadow(uid, limit=2, db=db)
         titles = [it["title"] for it in items]
-        assert "L4" in {it["diff_level"] for it in items}
+        assert "l4new" in titles and "l3near" in titles
+        assert _L4 in {it["diff_level"] for it in items}
+    finally:
+        db.close()
+
+
+async def test_l4_review_slot() -> None:
+    """C3：L4 用户主窗耗尽 → 复习席补 L3 已练且 ≥7 天未练的素材。"""
+    uid = _mk_user(_L4, ["coffee"])
+    _mk_shadow("l4new", 4, _L4, ["coffee"])
+    _mk_shadow("l3stale", 3, _L3, ["coffee"])
+    _mk_mastery(uid, _mk_shadow("l3stale2", 3, _L3, ["coffee"]), "in_progress", days_ago=10)
+    db = get_session_factory()()
+    try:
+        items = await recommend_shadow(uid, limit=6, db=db)
+        titles = [it["title"] for it in items]
+        assert _L4 in {it["diff_level"] for it in items}
         assert "l3stale2" in titles
     finally:
         db.close()
@@ -167,10 +188,10 @@ async def test_l4_review_slot() -> None:
 async def test_impression_logged_when_own_session() -> None:
     """C5：自有会话路径（db=None）写曝光埋点 events.recommend_impression。"""
     uid = _mk_user(_L2, ["coffee"])
-    _mk_scene("x", 2, _L2, ["coffee"])
-    await recommend_scenes(
-        uid, limit=3
-    )  # db=None → 自有 session，写 Event + Redis（testing→None 跳过）
+    _mk_shadow("x1", 2, _L2, ["coffee"])
+    _mk_shadow("x2", 2, _L2, ["coffee"])
+    _mk_shadow("x3", 2, _L2, ["coffee"])  # limit=3 满额 → 不触复习席
+    await recommend_shadow(uid, limit=3)  # db=None → 自有 session
     db = get_session_factory()()
     try:
         e = (
@@ -189,22 +210,5 @@ async def test_impression_logged_when_own_session() -> None:
         db.close()
 
 
-async def test_scene_type_cap_holds_across_expansion() -> None:
-    """C10：同 scene_type ≤2 在「主窗+扩档」组成的最终列表上也成立。
-
-    主窗 {L2,L3} 已被 2 个 cafe 占满；扩档 L1 再来一个 cafe 不得把 cafe 撑到 3（此前
-    _diversify 各阶段独立计数，扩档阶段会漏读主窗计数而溢出，违背 local/31 §4.3）。
-    """
-    uid = _mk_user(_L2, ["coffee"])
-    _mk_scene("cafeA", 2, _L2, ["coffee"])
-    _mk_scene("cafeB", 2, _L2, ["coffee"])
-    _mk_scene("cafeL1", 1, "L1", ["coffee"])  # L1 属扩档带（主窗为 {L2,L3}），独占第 3 条 cafe
-    db = get_session_factory()()
-    try:
-        items = await recommend_scenes(uid, limit=6, db=db)
-        titles = [it["title"] for it in items]
-        # 演示 `_mk_scene` 固定 scene_type=cafe；主窗已 2 条 cafe，扩档不得再加第 3 条
-        assert titles.count("cafeA") + titles.count("cafeB") + titles.count("cafeL1") <= 2
-        assert "cafeL1" not in titles  # cafe 已满，L1 咖啡不再补
-    finally:
-        db.close()
+# 已删除：C10「同 scene_type ≤2 在扩档后仍成立」只对 scene 语义成立——影子推荐
+# `_diversify(scene_type_key=False)` 无该约束（2026-09-21 场景对话模块移除时一并删除）。

@@ -149,7 +149,7 @@ __all__ = [
     "UserCorpusMastery",
     # LLM 框架域（docs/26 §10.3，迁移 0004）
     "UsageLog",
-    # 酒馆（TRPG 跑团）域（docs/30 · Python 写方，迁移 0018）
+    # 酒馆（TRPG 跑团）域（docs/52 · Python 写方，迁移 0018）
     "TrpgCampaign",
     "TrpgFact",
     "TrpgTask",

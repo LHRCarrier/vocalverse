@@ -100,7 +100,7 @@ def test_pg_full_turn_flow_and_idempotent_complete(pg_url) -> None:
         _run_alembic("upgrade")
         from app.db import get_session_factory
         from app.main import app
-        from app.models import Report, Scenario, User
+        from app.models import Report, ShadowMaterial, User
         from fastapi.testclient import TestClient
 
         db = get_session_factory()()
@@ -118,19 +118,20 @@ def test_pg_full_turn_flow_and_idempotent_complete(pg_url) -> None:
                     status="active",
                 )
             )
-            scenario = Scenario(
-                title="PG 集成场景",
-                scene_type="cafe",
-                difficulty=1,
-                system_prompt="You are Bella, a friendly barista.",
-                opening_line="Hi there!",
-                target_corpus="I'd like a coffee, please.|请给我来杯咖啡",
+            material = ShadowMaterial(
+                title="PG 集成素材",
+                level=2,
+                text_content="I'd like a coffee, please.",
+                audio_url="/demo/audio/shadow/pg.mp3",
+                wpm=120,
+                duration_s=10,
                 interest_tags=["cafe"],
+                source="demo_only",
                 status="published",
             )
-            db.add(scenario)
+            db.add(material)
             db.commit()
-            sid = scenario.id
+            mid = material.id
         finally:
             db.close()
 
@@ -138,12 +139,12 @@ def test_pg_full_turn_flow_and_idempotent_complete(pg_url) -> None:
         auth = {"X-Test-User-Id": "1"}
         # 建会话（PG 落库 + 状态入内存后端——集成用例聚焦 DB 方言）
         r = client.post(
-            "/api/v1/sessions", json={"kind": "dialog", "scenario_id": sid}, headers=auth
+            "/api/v1/sessions", json={"kind": "shadow", "shadow_material_id": mid}, headers=auth
         )
         assert r.status_code == 200, r.text
         session_id = r.json()["data"]["id"]
 
-        # 完整回合（Fake ASR/META/TTS → SSE）+ 首句落库
+        # 完整回合（Fake ASR/ISE/TTS → SSE）+ 首句示范落库
         r = client.post(
             f"/api/v1/sessions/{session_id}/turns",
             data={"action": "start"},
@@ -163,7 +164,7 @@ def test_pg_full_turn_flow_and_idempotent_complete(pg_url) -> None:
         try:
             report = db.get(Report, report_id)
             assert report is not None
-            assert report.metrics.get("kind") == "dialog"  # JSONB 往返
+            assert report.metrics.get("kind") == "shadow"  # JSONB 往返
             assert report.computed_at.tzinfo is not None  # timestamptz aware
             assert (
                 db.execute(Report.__table__.select().where(Report.id == report_id)).fetchone()

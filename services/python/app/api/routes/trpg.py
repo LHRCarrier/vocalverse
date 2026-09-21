@@ -1,4 +1,4 @@
-"""酒馆（TRPG 跑团）路由：剧本 CRUD / 主持台面板 / SSE 回合（docs/30 §4）。
+"""酒馆（TRPG 跑团）路由：剧本 CRUD / 主持台面板 / SSE 回合（docs/52 §4）。
 
 拓扑：前端直连 Python（SSE 热路径）；JWT 由 Java 签发、本服务验签；剧本为用户私有，
 所有端点先校验归属（越权按资源不存在处理，不泄露存在性）。
@@ -160,7 +160,7 @@ async def post_turn(
     audio: UploadFile | None = File(default=None),
     user_id: int = Depends(get_current_user_id),
 ):
-    """回合主入口：multipart（text / audio 至少其一）→ SSE 事件流（docs/30 §4.2）。"""
+    """回合主入口：multipart（text / audio 至少其一）→ SSE 事件流（docs/52 §4.2）。"""
     campaign = _require_campaign(campaign_id, user_id)
     settings = get_settings()
     if not settings.testing and not settings.deepseek_api_key:

@@ -1,6 +1,8 @@
-"""M2 练习域路由：会话/回合(SSE)/收尾/报告/音频回放（docs/14 §6.2）。
+"""练习域路由：会话/回合(SSE)/收尾/报告/音频回放（docs/14 §6.2）。
 
 拓扑：前端直连 Python（SSE 热路径）；JWT 由 Java 签发、本服务验签。
+2026-09-21（酒馆迁移）：英语「场景对话」（dialog）与 `GET /scenarios` 移除；
+本路由保留 defense / shadow / sing 会话与报告/音频回放能力。
 """
 
 from __future__ import annotations
@@ -50,8 +52,9 @@ RESTORE_MESSAGES_LIMIT = 12
 
 
 class SessionCreate(BaseModel):
+    """会话创建入参（2026-09-21 起仅 defense/shadow/sing；dialog 随酒馆迁移移除）。"""
+
     kind: str
-    scenario_id: int | None = None
     profile_id: int | None = None
     difficulty: int | None = None
     turn_limit: int | None = None
@@ -65,50 +68,6 @@ class CheckinBody(BaseModel):
     date: str | None = None
 
 
-@router.get("/scenarios")
-async def list_scenarios(user_id: int = Depends(get_current_user_id)):
-    """预置场景列表（读侧；写侧归 Java 管理端，Python 只读——docs/10 §3）。"""
-    # docs/19 P0-2：查询收进 to_thread（短事务，不阻塞事件循环）
-    # 注意：路由 docstring 会进入 OpenAPI description（契约快照为文本级对账）——
-    # 实现说明一律写代码注释，不动 docstring（2026-09-07 踩坑，见工作日志）
-    from sqlalchemy import select
-
-    from app.models import Scenario
-    from app.models.base import ContentStatus
-
-    def _q():
-        db = get_session_factory()()
-        try:
-            return (
-                db.execute(
-                    select(Scenario)
-                    .where(Scenario.status == ContentStatus.PUBLISHED)
-                    .order_by(Scenario.scene_type, Scenario.difficulty)
-                )
-                .scalars()
-                .all()
-            )
-        finally:
-            db.close()
-
-    rows = await asyncio.to_thread(_q)
-    return ok(
-        [
-            {
-                "id": s.id,
-                "title": s.title,
-                "scene_type": s.scene_type,
-                "difficulty": s.difficulty,
-                "description": s.description,
-                "opening_line": s.opening_line,
-                "target_corpus": s.target_corpus,
-                "estimated_turns": s.estimated_turns,
-            }
-            for s in rows
-        ]
-    )
-
-
 @router.post("/sessions")
 async def post_session(
     body: SessionCreate,
@@ -117,7 +76,6 @@ async def post_session(
     session = await create_session(
         user_id=user_id,
         kind=body.kind,
-        scenario_id=body.scenario_id,
         profile_id=body.profile_id,
         difficulty=body.difficulty,
         turn_limit=body.turn_limit,
