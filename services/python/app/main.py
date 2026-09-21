@@ -31,6 +31,7 @@ from app.api.routes import (
     reading_tts,
     recommendations,
     singing,
+    trpg,
 )
 from app.console.api.deps import ConsoleBizError
 from app.console.ops.middleware import HttpMetricsMiddleware
@@ -253,6 +254,7 @@ app.include_router(recommendations.router)
 app.include_router(reading.router)  # 读书域（docs/45：书架/查词/生词/批注/进度/音色）
 app.include_router(reading_tts.router)  # 听书（单句音频/预合成 SSE/任务）
 app.include_router(media.router)  # 媒体（社区 S3 · docs/47 §4.1：图片/视频/头像上传与读取）
+app.include_router(trpg.router)  # 酒馆（TRPG 跑团 · docs/30：剧本/主持台/SSE 回合）
 # 管理端控制台 · Python 侧端点（docs/50 §10.3）：运维/遥测 + 内容治理（library）。
 # 鉴权走独立的控制台令牌（get_console_admin），与学习者 JWT 双密钥双 audience；
 # 端点内部各自做功能位闸门（APP_OPS_TELEMETRY_ENABLED / APP_LLM_TRACE_ENABLED → 46014）。

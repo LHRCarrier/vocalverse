@@ -136,6 +136,20 @@ class FakeLLMClient(LLMClient):
             ),
         )
 
+    async def stream_with_tools(
+        self,
+        messages: list[dict],
+        *,
+        tools: list[dict] | None = None,
+        tool_choice: str = "auto",
+        temperature: float = 0.8,
+        max_tokens: int = 1200,
+    ):
+        """Fake 工具流（酒馆 DM）：默认不调用工具，只吐一段旁白 + 用量（同真实现事件形状）。"""
+        for c in ("（DM）酒馆的", "烛火摇晃，", "角落里有人朝你举了举酒杯。"):
+            yield ("delta", c)
+        yield ("usage", {"model": "fake", "prompt_tokens": 120, "completion_tokens": 30})
+
 
 # ── 注册表登记（in_auto_chain=False：只有显式指名才用 Fake）──────────────────────
 register(

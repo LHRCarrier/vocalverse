@@ -110,6 +110,8 @@ class Settings(BaseSettings):
     max_speech_seconds: int = 60
     max_sing_seconds: int = 180
     max_dialog_seconds: int = 15  # 对话单轮录音上限（docs/14 §3.2）
+    # 酒馆（TRPG）单轮语音输入上限：玩家常需口述一段行动，较对话轮宽松（2026-09-21 迁移）
+    trpg_max_seconds: int = 30
     dialog_idle_seconds: int = 8  # 无录音救援触发（docs/14 §2.3）
     # 语言点命中（docs/14 §3.5）：规则通道（词序包含）权威；LLM 兜底命中默认**关闭**
     # （2026-09-07 真实 LLM 上线后误标「已使用」——宁漏勿误，需要语义级命中再开）。

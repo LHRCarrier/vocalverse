@@ -238,3 +238,45 @@ class TicketStatuses:
     PROCESSING = "processing"
     RESOLVED = "resolved"
     CLOSED = "closed"
+
+
+# ---------------------------------------------------------------------------
+# 酒馆（TRPG 跑团）域枚举（docs/30-M3酒馆跑团实施设计 §3；表见 models/trpg.py）
+# ---------------------------------------------------------------------------
+class TrpgFactKinds:
+    """事实行类别：state=系统直写状态（pc/scene）；fact=LLM 提取叙事事实（rel/quest/clue）。"""
+
+    STATE = "state"
+    FACT = "fact"
+
+
+class TrpgFactModalities:
+    """事实模态（P2-23 防剧透）：fact=系统确认 / claim=NPC 声称 / rumor=传闻。"""
+
+    FACT = "fact"
+    CLAIM = "claim"
+    RUMOR = "rumor"
+
+
+class TrpgTaskStatuses:
+    ACTIVE = "active"
+    DONE = "done"
+    FAILED = "failed"
+
+
+class TrpgEntityKinds:
+    NPC = "npc"
+    PC = "pc"
+    TASK = "task"
+    CLUE = "clue"
+    SCENE = "scene"
+
+
+class TrpgMessageRoles:
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+class TrpgMessageKinds:
+    TEXT = "text"
+    SYSTEM = "system"  # 系统卡（开卡/过场/判定），payload.trpgSys 协议
