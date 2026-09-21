@@ -5459,6 +5459,56 @@ body.is-login {
   font-size: 12px;
 }
 
+/* ---- 逐词高亮（卡拉OK：语音朗读时按进度点亮）+ 长按操作 ---- */
+.t-msg {
+  /* 长按弹菜单（替代原生选择菜单）：禁掉文本选择/系统 callout，避免手势冲突 */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.t-tok {
+  transition: color 90ms linear;
+}
+
+/* 已朗读到的词：亮色（炭黑 → 主题蓝），当前词随进度推进 */
+.t-tok.is-lit {
+  color: var(--u-accent);
+}
+
+.u-chat.is-marked .u-bubble {
+  box-shadow: inset 3px 0 0 var(--u-star), var(--u-shadow-float);
+}
+
+.t-mark {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--u-sub);
+}
+
+/* 长按动作条行 */
+.t-act {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--u-r-inner);
+  background: var(--u-paper);
+  color: var(--u-ink);
+  font-family: var(--u-font);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.t-act:active {
+  background: var(--u-track);
+}
+
 /* ---- 输入 dock（位于 u-chat-dock 内）---- */
 .t-dock-wrap {
   width: 100%;

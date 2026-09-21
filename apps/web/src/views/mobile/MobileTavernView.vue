@@ -12,6 +12,8 @@ import { useRouter } from 'vue-router'
 
 import { useTavernAudio } from '@/composables/useTavernAudio'
 import { useTavernCards } from '@/composables/useTavernCards'
+import { useTavernMarks } from '@/composables/useTavernMarks'
+import { useTavernMessageActions } from '@/composables/useTavernMessageActions'
 import { useTavernSession } from '@/composables/useTavernSession'
 import { useAuthStore } from '@/stores/auth'
 
@@ -22,8 +24,10 @@ import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import TrpgActionDock from '@/components/mobile/trpg/TrpgActionDock.vue'
+import TrpgCampaignPicker from '@/components/mobile/trpg/TrpgCampaignPicker.vue'
 import TrpgCardSheet from '@/components/mobile/trpg/TrpgCardSheet.vue'
 import TrpgConsoleSheet from '@/components/mobile/trpg/TrpgConsoleSheet.vue'
+import TrpgMessageActions from '@/components/mobile/trpg/TrpgMessageActions.vue'
 import TrpgMessageItem from '@/components/mobile/trpg/TrpgMessageItem.vue'
 import TrpgOnboarding from '@/components/mobile/trpg/TrpgOnboarding.vue'
 import TrpgSettingsSheet from '@/components/mobile/trpg/TrpgSettingsSheet.vue'
@@ -78,11 +82,19 @@ const {
   npcNames,
 } = session
 
+const marks = useTavernMarks()
+const msgActions = useTavernMessageActions(rows, audio, marks)
 const consoleOpen = ref(false)
 const pickerOpen = ref(false)
 const settingsOpen = ref(false)
 const cardsOpen = ref(false)
 const scrollBox = ref<HTMLElement | null>(null)
+
+watch(
+  campaignId,
+  (id) => marks.load(id),
+  { immediate: true },
+)
 
 onMounted(() => {
   void session.boot()
@@ -247,9 +259,9 @@ async function onCreateCard(payload: { title: string; scene: string; opening_lin
             :live="m.live"
             :npc-names="npcNames"
             :avatar-letter="avatarLetter"
-            :speakable="m.speakable"
-            :playing="audio.playingIndex.value === i"
-            @replay="audio.replay(i, m.content)"
+            :marked="marks.has(m.content)"
+            :highlight="msgActions.highlightFor(i)"
+            @actions="msgActions.open(i)"
           />
           <div v-if="rows.length === 0" class="u-empty u-empty--center">
             <div class="u-empty__art"><MobileArt name="wave" :size="96" /></div>
@@ -296,6 +308,22 @@ async function onCreateCard(payload: { title: string; scene: string; opening_lin
       @refresh-narrative="session.onRefreshNarrative"
     />
 
+    <TrpgMessageActions
+      :open="msgActions.actionIndex.value != null"
+      :role="msgActions.actionRow.value?.role ?? 'assistant'"
+      :marked="msgActions.actionRow.value ? marks.has(msgActions.actionRow.value.content) : false"
+      :playing="msgActions.actionIndex.value != null && audio.playingIndex.value === msgActions.actionIndex.value"
+      :speakable="
+        !!msgActions.actionRow.value &&
+          msgActions.actionRow.value.kind !== 'system' &&
+          !!msgActions.actionRow.value.content.trim()
+      "
+      @close="msgActions.close"
+      @listen="msgActions.listen"
+      @toggle-mark="msgActions.toggleMark"
+      @copy="msgActions.copy"
+    />
+
     <TrpgSettingsSheet
       :open="settingsOpen"
       :prefs="prefs"
@@ -322,44 +350,14 @@ async function onCreateCard(payload: { title: string; scene: string; opening_lin
       @remove="removeCard"
     />
 
-    <div v-if="pickerOpen" class="t-sheet">
-      <div class="t-sheet__backdrop" role="presentation" @click="pickerOpen = false" />
-      <section class="t-sheet__panel t-sheet__panel--short" role="dialog" aria-label="选择剧本">
-        <header class="t-sheet__head">
-          <div class="t-sheet__title">我的剧本</div>
-          <button
-            class="t-sheet__close"
-            type="button"
-            title="关闭"
-            aria-label="关闭"
-            @click="pickerOpen = false"
-          >
-            <MobileIcon name="x" :size="18" />
-          </button>
-        </header>
-        <div class="t-sheet__body">
-          <button
-            v-for="c in campaigns"
-            :key="c.id"
-            class="t-pick"
-            :class="{ 'is-on': c.id === campaignId }"
-            type="button"
-            @click="onSwitch(c.id)"
-          >
-            {{ c.name }}
-          </button>
-          <button
-            class="u-btn u-btn--secondary u-btn--block"
-            type="button"
-            @click="pickerOpen = false; openCards()"
-          >
-            ＋ 用场景卡开新局
-          </button>
-          <button class="u-btn u-btn--outline u-btn--block" type="button" @click="onRestart">
-            重开本剧本（清空对话）
-          </button>
-        </div>
-      </section>
-    </div>
+    <TrpgCampaignPicker
+      :open="pickerOpen"
+      :campaigns="campaigns"
+      :current-id="campaignId"
+      @close="pickerOpen = false"
+      @switch="onSwitch"
+      @new-campaign="pickerOpen = false; openCards()"
+      @restart="onRestart"
+    />
   </div>
 </template>

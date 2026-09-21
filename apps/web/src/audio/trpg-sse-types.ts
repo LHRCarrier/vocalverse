@@ -35,6 +35,10 @@ export interface TrpgAudioChunkEvent {
   type: 'audio_chunk'
   url: string
   duration?: number | null
+  /** 本句原文（卡拉OK逐词高亮定位用；2026-09-21 加） */
+  text?: string | null
+  /** 本句在 DM 整段内容里的字符偏移 */
+  offset?: number | null
 }
 
 /** 系统卡（开场/过场/判定）——与 trpg_messages.kind=system 同协议 */

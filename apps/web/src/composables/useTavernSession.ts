@@ -47,6 +47,8 @@ export function useTavernSession(audio: TavernAudio) {
   const recording = ref(false)
   const statusHint = ref<string | null>(null)
   const currentAssistant = ref<TavernRow | null>(null)
+  /** 最近一条 DM 文本行的下标（系统卡可能在其后插入，音频块到达时不能靠 rows.length 反推） */
+  const assistantRowIndex = ref<number | null>(null)
 
   const recorder = new VoiceRecorder()
   let abort = new AbortController()
@@ -94,6 +96,7 @@ export function useTavernSession(audio: TavernAudio) {
     abort = new AbortController()
     audio.flush()
     currentAssistant.value = null
+    assistantRowIndex.value = null
     inputError.value = null
     sending.value = false
     campaignId.value = id
@@ -234,6 +237,7 @@ export function useTavernSession(audio: TavernAudio) {
         if (!currentAssistant.value) {
           rows.value.push({ role: 'assistant', kind: 'text', content: '', live: true })
           currentAssistant.value = rows.value[rows.value.length - 1]!
+          assistantRowIndex.value = rows.value.length - 1
         }
         currentAssistant.value.content += e.text
         break
@@ -249,7 +253,14 @@ export function useTavernSession(audio: TavernAudio) {
         })
         break
       case 'audio_chunk':
-        audio.queueChunk(e.url)
+        // 逐词高亮：服务端带句子文本与偏移（docs/52 §12.3）
+        audio.queueChunk(
+          e.url,
+          assistantRowIndex.value ?? rows.value.length - 1,
+          e.text ?? null,
+          e.offset ?? null,
+          e.duration ?? null,
+        )
         break
       case 'turn_end':
         if (currentAssistant.value) {
