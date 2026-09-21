@@ -31,6 +31,7 @@ from app.api.routes import (
     reading_tts,
     recommendations,
     singing,
+    stats,
     trpg,
 )
 from app.console.api.deps import ConsoleBizError
@@ -249,6 +250,7 @@ app.include_router(defense.router)
 app.include_router(placement.router)
 app.include_router(events.router)
 app.include_router(recommendations.router)
+app.include_router(stats.router)  # 学习指标（docs/53 P2：四指标 + 个人报表）
 app.include_router(reading.router)  # 读书域（docs/45：书架/查词/生词/批注/进度/音色）
 app.include_router(reading_tts.router)  # 听书（单句音频/预合成 SSE/任务）
 app.include_router(media.router)  # 媒体（社区 S3 · docs/47 §4.1：图片/视频/头像上传与读取）
@@ -258,11 +260,13 @@ app.include_router(trpg.router)  # 酒馆（TRPG 跑团 · docs/52：剧本/主�
 # 端点内部各自做功能位闸门（APP_OPS_TELEMETRY_ENABLED / APP_LLM_TRACE_ENABLED → 46014）。
 from app.console.api.routes import library as console_library  # noqa: E402
 from app.console.api.routes import ops as console_ops  # noqa: E402
+from app.console.api.routes import insight as console_insight  # noqa: E402
 from app.console.api.routes import trpg_cards as console_trpg_cards  # noqa: E402
 
 app.include_router(console_ops.router)
 app.include_router(console_library.router)
 app.include_router(console_trpg_cards.router)  # 酒馆场景卡（docs/52 §12.1：平台固定卡治理）
+app.include_router(console_insight.router)  # 学习指标看板（docs/53 P2：只读聚合）
 # 流利度特征测试台（test-only 前端联调；默认关闭，开启才注册 → 404；删除无影响，
 # 见 fluency_preview.py 删除清单）
 if get_settings().fluency_preview_enabled:
