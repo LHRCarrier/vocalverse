@@ -127,8 +127,7 @@ public class PublishService {
         }
       }
       default ->
-          throw ConsoleException.of(
-              ConsoleErrorCodes.INVALID_PARAM, "内容域仅支持 song|listening");
+          throw ConsoleException.of(ConsoleErrorCodes.INVALID_PARAM, "内容域仅支持 song|listening");
     }
 
     if (!violations.isEmpty()) {

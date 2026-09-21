@@ -15,11 +15,12 @@ import java.util.Set;
  * <p>矩阵要点：
  *
  * <ul>
- *   <li>{@code super} 只登记 {@code *} 通配，由 {@link RbacService} 展开为全部权限码 —— 新增权限码时 super
- *       **自动获得**，不必改 seed（docs/50 §4.2）；
+ *   <li>{@code super} 只登记 {@code *} 通配，由 {@link RbacService} 展开为全部权限码 —— 新增权限码时 super **自动获得**，不必改
+ *       seed（docs/50 §4.2）；
  *   <li>{@code ops} = {@code ops:*}(7) + {@code console:audit:read}；
- *   <li>{@code operator} = 运营域 **Java 实现的** 10 个 content 码（song/listening/question/ticket
- *       × read/write/publish）+ {@code console:audit:read}；
+ *   <li>{@code operator} = 运营域 **Java 实现的** 10 个 content 码（song/listening/question/ticket ×
+ *       read/write/publish）+ **酒馆场景卡 3 码**（{@code content:scenario:*}，Python 控制台实现、 运营内容治理必备）+
+ *       {@code console:audit:read}；
  *   <li>{@code moderator} = {@code moderation:*}(4) + 内容只读 4 个（song/listening/book/**media**）+
  *       {@code console:audit:read}。
  * </ul>
@@ -30,8 +31,10 @@ import java.util.Set;
  *   <li><b>去掉 {@code moderation:word:read/write}</b>：§6.2 联动硬点 4 明确「自动送审本期不接关键词引擎 （敏感词库为
  *       P1）」，即**没有任何端点消费这两个码**。保留它们会让权限控制台显示「审核员能管敏感词」 而实际点开是 404 —— 一个不能用的权限比没有权限更糟（它会让运维以为已经配好了）。
  *       与 §4.2 表格的「moderation:* = 7」相差 2 条，正是这两个；去掉后总数恰好是设计反复引用的 **35**；
- *   <li><b>{@code operator} 不拿 Python 侧的 content 码</b>（{@code content:book:*} / {@code
- *       content:media:*}， docs/50 §3.2 明确归 Python）：Java 侧无对应端点，发放等于造出「表里有、实际无处可用」的权限；
+ *   <li><b>{@code operator} 不拿 Python 侧的 {@code content:book:*} / {@code
+ *       content:media:*}</b>（docs/50 §3.2 明确归 Python、默认只有 super/自定义角色可管）；<b>例外</b>：{@code
+ *       content:scenario:*}（酒馆场景卡， 2026-09-21）发给 operator —— 场景卡是运营内容治理（固定卡上架/随机生成），Python
+ *       控制台端点已上线， 不存在「有码无处可用」的问题；
  *   <li><b>{@code moderator} 必须持有 {@code content:media:read}</b>（原设计只给了 {@code
  *       content:{song,listening,book}:read}）：用户点名的职责是「社区帖子、评论、**视频（媒体）**审核」，
  *       而审批媒体举报必须看得见媒体条目。缺这个码会让「视频审核」在权限矩阵里根本不存在 —— 审核员点进媒体审核页只会拿到 46002。 <b>注意 {@code
@@ -74,8 +77,8 @@ public final class BuiltinRoles {
         new Role(
             OPERATOR,
             "运营",
-            "Java 侧内容域全量 + 工单 + 敏感词只读",
-            20,
+            "Java 侧内容域全量 + 酒馆场景卡 + 工单 + 敏感词只读",
+            23,
             Set.of(
                 PermissionCatalog.CONTENT_SONG_READ,
                 PermissionCatalog.CONTENT_SONG_WRITE,
@@ -85,6 +88,10 @@ public final class BuiltinRoles {
                 PermissionCatalog.CONTENT_LISTENING_PUBLISH,
                 PermissionCatalog.CONTENT_QUESTION_READ,
                 PermissionCatalog.CONTENT_QUESTION_WRITE,
+                // 2026-09-21：酒馆场景卡（docs/52 §12）——Python 控制台端点已上线，运营可直接维护
+                PermissionCatalog.CONTENT_SCENARIO_READ,
+                PermissionCatalog.CONTENT_SCENARIO_WRITE,
+                PermissionCatalog.CONTENT_SCENARIO_PUBLISH,
                 PermissionCatalog.CONTENT_TICKET_READ,
                 PermissionCatalog.CONTENT_TICKET_WRITE,
                 PermissionCatalog.CONSOLE_AUDIT_READ,

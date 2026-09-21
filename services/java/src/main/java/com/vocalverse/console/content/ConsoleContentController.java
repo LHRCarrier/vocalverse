@@ -307,8 +307,7 @@ public class ConsoleContentController {
   public Envelope<PageView<Map<String, Object>>> publishEvents(
       @RequestParam(defaultValue = "1") @Min(1) int page,
       @RequestParam(name = "page_size", defaultValue = "20") @Min(1) @Max(100) int pageSize,
-      @RequestParam(required = false)
-          @Pattern(regexp = "song|listening_material|book|chapter")
+      @RequestParam(required = false) @Pattern(regexp = "song|listening_material|book|chapter")
           String targetType) {
     Page<AdminAuditLogEntity> rows =
         auditLogs.publishEvents(
