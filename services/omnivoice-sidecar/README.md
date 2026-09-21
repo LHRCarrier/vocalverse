@@ -53,10 +53,25 @@ pwsh -File scripts/dev-up.ps1 start          # 含边车；不想起加 -NoVoice
 ```
 
 健康检查：`curl http://127.0.0.1:8765/health` → `ok=true` 表示模型就绪
-（模型加载约 7~8 秒；`/health` 在加载完成前就可用，所以能区分「没起」和「起了但还在加载」）。
+（模型加载约 7~10s；`/health` 在加载完成前就可用，所以能区分「没起」和「起了但还在加载」）。
+**主服务只认 `ok=true`** —— 加载窗口内它会继续用 edge，不会撞 503。
 
 主服务侧不需要额外配置：`APP_TTS_PROVIDER` 默认 `auto`，链首就是本引擎；
-它**探测 `/health`** 决定是否可用（10s TTL 缓存），边车没起就自动回落 kitten/edge。
+它**探测 `/health` 且要求 `ok=true`**（5s TTL 缓存），边车没起或没加载完就自动回落 kitten/edge。
+
+**「用哪个 python / 权重在哪」的真源**：`scripts/lib/omnivoice.ps1`，
+被 `start-omnivoice-sidecar.ps1` 与 `dev-up.ps1` 共用（各写一遍必然漂移）。
+查找顺序（都可用环境变量覆盖，优先级最高）：
+
+| | python（判据 `import omnivoice` 成功） | 权重缓存根 |
+|---|---|---|
+| 1 | `$env:OMNIVOICE_PYTHON` | `$env:OMNIVOICE_HF_CACHE` |
+| 2 | `<repo>/.venv-omnivoice/Scripts/python.exe`（README 推荐位置） | **`<repo>/data/models`**（fetch 脚本落点） |
+| 3 | `<repo>/services/python/.venv/Scripts/python.exe` | 本机已知 dev 环境（VoiceStudio 缓存） |
+| 4 | 本机已知 dev 环境（VoiceStudio 应用 venv） | `~/.cache/huggingface/hub` |
+| 5 | `python`（PATH） | `%LOCALAPPDATA%\huggingface\hub` |
+
+> 换机器只需要设 `$env:OMNIVOICE_PYTHON` / `$env:OMNIVOICE_HF_CACHE`，不必改脚本。
 
 ## 3. 依赖与权重（**权重不入库**）
 

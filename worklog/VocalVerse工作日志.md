@@ -3,6 +3,17 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-21 修复：边车探测漏掉本机已有环境（dev-up 误报"没装 omnivoice"）+ 加载窗口 503 · 1 op
+
+- **组长实测反馈**：`dev-up.ps1 start` 打印「⏭ 跳过：没找到装了 omnivoice 的 python」，但组长本机**有**（xiaohaishi 起得来）。属实 —— 我为了"避免硬编码机器路径"，把 `Resolve-OmnivoicePython` 的候选表写成了「`OMNIVOICE_PYTHON` → 本仓 venv → PATH python」，**恰好排除了唯一能用的那个**（VoiceStudio 的应用 venv `F:\WorkingL\VoiceStudio\OmniVoiceStudio-Data\env\project\.venv\Scripts\python.exe`，实测 `omnivoice` + `torch 2.8.0+cu128` + `cuda_available=True`）。权重同理：本机那份在 `…\VoiceStudio\...\data\models`，而候选表里只有"本仓 data/models + HF 默认缓存"。**教训**：为了"通用"而砍掉已知可用的候选，换来的是"用户本来能跑却不被识别"——这个交换不划算；正确的做法是**把候选写成可覆盖的列表**（显式 env 永远最高优先），而不是砍短它。
+- **修法（收敛成真源，不各写一遍）**：新增 **`scripts/lib/omnivoice.ps1`** —— python 与权重缓存根的查找顺序只此一份，`dev-up.ps1` 与 `start-omnivoice-sidecar.ps1` 都 dot-source 它（本仓已经栽过"端口列表三处各写一遍、加第四端必漏一处"的同类坑）。候选：`$env:OMNIVOICE_PYTHON` → `<repo>/.venv-omnivoice`（**README 推荐的自建位置，之前居然没被搜到**）→ `<repo>/services/python/.venv` → 本机已知 dev 环境（VoiceStudio）→ PATH；权重：`$env:OMNIVOICE_HF_CACHE` → `<repo>/data/models` → 本机已知 dev 环境 → HF 默认缓存。**换机器只需设两个 env，不用改脚本**。顺带修掉 `-Fake` 的一个逻辑错：它原先也走 `import omnivoice` 探测，而 `-Fake` 的全部意义恰恰是"没有 omnivoice 环境也能验链路"——现在退回"任意可用 python"。
+- **真机端到端实测（组长那条命令，一次跑通）**：`pwsh -File scripts/dev-up.ps1 start`（三端已在跑，只补起边车）→ 边车在 **cuda / float16** 上从 `…\VoiceStudio\...\snapshots\c5fdb5cc…` 加载，**10.3s 就绪**（`/health` → `ok=true, sr=24000`）；用主服务客户端真合成两把嗓子：**The Anchor** 112,844 B / 2.35s 音频（冷启 4.06s）、**The Podcaster** 136,364 B / 2.84s（热态 **2.17s**），均为合法 24kHz RIFF/WAVE；默认配置下 `resolve_tts_client()` 解析为 **omnivoice / audio-wav**（`APP_VOICE_REFS_DIR` 留空即用仓库内参考件，**零配置**）。
+- **实测中抓到的第 3 个真问题（加载窗口 503）**：边车刚起来、模型还在加载的那 ~10s 里 `/health` 已经返 **200 但 `ok=false`**，而 `_probe_health()` 只判 `status_code == 200` → 主服务在这个窗口内**选中了它**，于是边车日志里出现连着三条 `POST /synthesize 503`。修：判据改为**响应体 `ok == true`**（边车本来就是为此才在 `/health` 里区分 `ok` 与 `loadError`），并把 TTL 从 10s 收到 **5s**（否则"刚就绪"之后还要多等一截才被选中）。新增 3 条用例：`200 但 ok=false → 不可用`、非 JSON 响应不抛错按不可用、探测结果命中缓存。
+- **门禁**：`ruff check` 全绿 + `ruff format --check app tests` 221 文件已格式化；**`pytest -q -m "not gpu"` 744 passed / 4 skipped**（+2 例）；4 个 `.ps1` 全过 PowerShell AST 语法检查。
+- **产出**：新增 `scripts/lib/omnivoice.ps1`；改 `scripts/dev-up.ps1`、`scripts/start-omnivoice-sidecar.ps1`（去重，改用真源；`-Fake` 不再要求 omnivoice）、`services/python/app/audio/tts_omnivoice.py`（`_probe_health` 判 `ok=true` + TTL 5s）、`services/python/tests/test_tts_omnivoice.py`（+3 例）、`services/omnivoice-sidecar/README.md`（补"查找顺序真源"表 + `ok=true` 判据）、`docs/audit/ASR-TTS链路审计与重构方案.md` §7.3。
+- **遗留**：本机边车已随 `dev-up.ps1 start` 起在 8765（GPU 常驻）；`pwsh -File scripts/dev-up.ps1 stop` 会连带停它。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-21
 ## 2026-09-21 边车接入一键启动（dev-up.ps1 -NoVoice）+ 权重一键下载脚本（fetch-omnivoice-weights.ps1）· 2 op
 
 - **背景（组长追加两条）**：「一键起服务把边车也加上，还有权重给队友一个方式下载」。上一轮边车虽然落成本仓服务，但要么单独起、要么得自己想办法搞 3.28 GB 权重 —— 队友实际跑不起来。

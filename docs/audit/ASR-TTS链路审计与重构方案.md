@@ -364,9 +364,13 @@ pwsh -File scripts/dev-up.ps1 start        # 不想起加 -NoVoice
 
 > **omnivoice 的可用性不只查配置**：它在链首，若只看「参考件目录配了没」，
 > 就会出现「配了目录但边车没起 → 被选中 → 每次合成都失败」。故 `is_available()` 额外做
-> `GET {endpoint}/health` 探测（结果按 **10s TTL 缓存**，避免每个请求打一次网络）；
-> 边车不在即让位给 kitten/edge。这条已由 `tests/test_tts_omnivoice.py` 的两个用例锁住
-> （边车在线 → 选 omnivoice；边车离线 → 落 edge）。
+> `GET {endpoint}/health` 探测（结果按 **5s TTL 缓存**，避免每个请求打一次网络）；
+> 边车不在即让位给 kitten/edge。
+> ⚠️ 判据是响应体里的 **`ok == true`，不是 HTTP 200**：边车进程起来后模型还要加载约 **10s**，
+> 这期间 `/health` 已返 200 但 `ok=false`（设计如此，好让调用方区分「没起」与「起了但还在加载」）。
+> 只认 200 会让主服务在加载窗口内选中它 —— 真机实测边车日志里连着三条 `POST /synthesize 503`。
+> 这两条已由 `tests/test_tts_omnivoice.py` 的用例锁住（边车在线 → 选 omnivoice；
+> 边车离线 → 落 edge；**200 但 ok=false → 落 edge**）。
 
 权重**不入库**（红线：模型权重，约 3.3 GB），只做运行时路径引用；
 **参考件入库**（`data/seed/voices/`，约 1.9 MB，`.gitignore` 开了窄豁免）—— 音色 = 参考件字节
