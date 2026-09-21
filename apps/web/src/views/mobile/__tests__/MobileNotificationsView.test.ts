@@ -109,6 +109,15 @@ describe('MobileNotificationsView（S2 真实化 + 私信 IM）', () => {
     expect(mocks.openMessageStream).toHaveBeenCalled() // SSE 优先，失败才降级轮询
   })
 
+  it('未读角标：私信 tab 显示全局未读数；实现说明提示文字已移除', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.find('.u-notif-tab__badge').text()).toBe('2')
+    // 图三反馈：docs/49 实现说明不该出现在用户界面
+    expect(wrapper.text()).not.toContain('docs/49')
+    expect(wrapper.text()).not.toContain('弱网自动降级')
+  })
+
   it('离开私信 tab：收流（不再占用长连）', async () => {
     const wrapper = mountView()
     await flushPromises()

@@ -92,6 +92,23 @@ describe('MobilePostCard', () => {
     expect(text).toContain('2026-09-06')
   })
 
+  it('打卡卡（无练习记录）：只显示「今日已打卡」+ 日期，不显示 0 次/空分数', () => {
+    const wrapper = mountCard(
+      makePost({
+        kind: 'checkin',
+        domain: null,
+        checkinOverall: null,
+        checkinPracticeCount: 0,
+        checkinDate: '2026-09-21',
+      }),
+    )
+    const text = wrapper.text()
+    expect(text).toContain('今日已打卡')
+    expect(text).toContain('2026-09-21')
+    expect(text).not.toContain('0 次口语练习')
+    expect(text).not.toContain('今日综合分')
+  })
+
   it('点赞按钮：click 触发 toggle-like；liked 态带 is-liked 与 aria-pressed', async () => {
     const wrapper = mountCard(makePost())
     const button = wrapper.get('button[aria-label="点赞"]')

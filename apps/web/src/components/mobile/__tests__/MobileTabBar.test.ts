@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
+import { useMessagesStore } from '@/stores/messages'
 import MobileLearnView from '@/views/mobile/MobileLearnView.vue'
 import MobileNotesView from '@/views/mobile/MobileNotesView.vue'
 
@@ -12,6 +13,7 @@ const routes = [
   { path: '/m/search', component: { template: '<div/>' } },
   { path: '/m/learn', component: MobileLearnView },
   { path: '/m/learn/:module', component: { template: '<div/>' } },
+  { path: '/m/checkin', component: { template: '<div/>' } },
   { path: '/m/notes', component: MobileNotesView },
   { path: '/m/chat', component: { template: '<div/>' } },
   { path: '/m/chat/:sceneId?', component: { template: '<div/>' } },
@@ -74,6 +76,24 @@ describe('MobileTabBar（双场景分组）', () => {
     }
     const compose = await mountAt('/m/compose')
     expect(compose.find('.u-tabbar').exists()).toBe(false)
+  })
+
+  it('通知 tab 显示全局未读角标（私信未读；>99 → 99+）', async () => {
+    const wrapper = await mountAt('/m/home')
+    const messages = useMessagesStore()
+    messages.unreadTotal = 7
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('a[aria-label="通知"] .u-badge').text()).toBe('7')
+
+    messages.unreadTotal = 120
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('a[aria-label="通知"] .u-badge').text()).toBe('99+')
+  })
+
+  it('打卡页属学习组（底栏保持可见）', async () => {
+    const wrapper = await mountAt('/m/checkin')
+    expect(wrapper.find('.u-tabbar').exists()).toBe(true)
+    expect(wrapper.find('a[aria-label="返回社区"]').exists()).toBe(true)
   })
 })
 
