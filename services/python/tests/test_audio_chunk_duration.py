@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import logging
 
+from app.audio.duration import audio_duration_seconds, mp3_duration_seconds, wav_duration_seconds
 from app.audio.stubs import FakeTTSClient
-from app.audio.tts import mp3_duration_seconds
 from app.practice import events as ev
 from app.practice.orchestrator import _tts_url_from_bytes
 
@@ -67,6 +67,68 @@ def test_duration_returns_none_for_invalid_input() -> None:
 def test_duration_never_raises_on_random_bytes() -> None:
     for blob in (b"\x00" * 512, bytes(range(256)) * 2, b"\xff" * 64 + b"\x27"):
         assert mp3_duration_seconds(blob) is None
+
+
+# ---------------------------------------------------------------------------
+# WAV 时长 + 按容器分派（2026-09 重构：本地引擎出 WAV，热路径时长不再恒为 None）
+# ---------------------------------------------------------------------------
+
+
+def _wav_bytes(seconds: float, rate: int = 24000, channels: int = 1, bits: int = 16) -> bytes:
+    import struct
+    import wave
+    from io import BytesIO
+
+    frames = int(rate * seconds)
+    buf = BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(channels)
+        wf.setsampwidth(bits // 8)
+        wf.setframerate(rate)
+        wf.writeframes(b"\x00" * frames * channels * (bits // 8))
+    data = buf.getvalue()
+    assert struct.unpack_from("<I", data, 4)  # 结构自检：RIFF 尺寸字段可读
+    return data
+
+
+def test_wav_duration_matches_header() -> None:
+    d = wav_duration_seconds(_wav_bytes(2.0))
+    assert d is not None
+    assert abs(d - 2.0) < 0.01
+
+
+def test_wav_duration_none_for_non_wav() -> None:
+    assert wav_duration_seconds(b"") is None
+    assert wav_duration_seconds(b"ID3nope") is None
+    assert wav_duration_seconds(b"RIFF\x00\x00\x00\x00WAVEfmt ") is None
+    assert wav_duration_seconds(_frames(10)) is None  # MP3 帧不是 WAV
+
+
+def test_audio_duration_dispatches_by_container() -> None:
+    """按容器选估算器：这是「换本地 WAV 引擎后 duration 不再恒为 None」的关键。"""
+    assert abs((audio_duration_seconds(_wav_bytes(1.5)) or 0) - 1.5) < 0.01
+    mp3 = audio_duration_seconds(_frames(100))
+    assert mp3 is not None and abs(mp3 - 100 * _FRAME_S) < 0.01
+    assert audio_duration_seconds(b"") is None
+    assert audio_duration_seconds(b"garbage") is None
+
+
+async def test_tts_url_duration_works_for_wav_engine() -> None:
+    """本地 WAV 引擎（KittenTTS/OmniVoice）经热路径也能拿到 duration。"""
+
+    class _WavTTS(FakeTTSClient):
+        provider_id = "kitten"
+        ext = "wav"
+        media_type = "audio/wav"
+
+        async def synthesize(
+            self, text: str, voice: str = "en-US-JennyNeural", rate: str = "+0%"
+        ) -> bytes:
+            return _wav_bytes(1.0)
+
+    url, duration = await _tts_url_from_bytes(_WavTTS(), "Hi.", "Jasper", "+0%")
+    assert url is not None and url.endswith(".wav")  # 落盘扩展名按魔数嗅探
+    assert duration is not None and abs(duration - 1.0) < 0.05
 
 
 # ---------------------------------------------------------------------------
