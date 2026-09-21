@@ -21,7 +21,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class InternalCheckinController {
 
   public record Snapshot(
-      Double overall, Double pron, Double gram, Double fluency, Integer turns, Integer durationS) {}
+      Double overall,
+      Double pron,
+      Double gram,
+      Double fluency,
+      Integer turns,
+      Integer durationS,
+      Integer practiceCount) {}
 
   public record CheckinRequest(
       @NotNull Long userId,
@@ -48,7 +54,8 @@ public class InternalCheckinController {
             s.gram(),
             s.fluency(),
             s.turns(),
-            s.durationS());
+            s.durationS(),
+            s.practiceCount());
     return Envelope.ok(postId);
   }
 }

@@ -306,8 +306,9 @@ public class CommunityService {
   // ------------------------------------------------------------------ /internal/checkin
 
   /**
-   * 打卡卡物化 upsert（docs/21 §4 · 幂等键 (author_id, checkin_date)：存在则 practice_count+1、
-   * overall=GREATEST(旧,新)、其余子分/时长更新为本次；否则插入新卡。仅 kind='checkin' 命中。
+   * 打卡卡物化 upsert（docs/21 §4 · 幂等键 (author_id, checkin_date)）。
+   *
+   * <p>{@code practiceCount} 由调用方显式给出时按值写入（手动打卡：重复调用=幂等刷新，不自增）； 缺省时才沿用旧的「当日 +1」语义（兼容既有调用）。
    */
   @Transactional
   public long upsertCheckin(
@@ -319,7 +320,8 @@ public class CommunityService {
       Double gram,
       Double fluency,
       Integer turns,
-      Integer durationS) {
+      Integer durationS,
+      Integer practiceCount) {
     users
         .findById(userId)
         .orElseThrow(
@@ -344,7 +346,15 @@ public class CommunityService {
       post.setShareCount(0);
       post.setCreatedAt(now);
       post.setCheckinSnapshot(
-          writeCheckinSnapshot(null, overall, pron, gram, fluency, turns, durationS, 1));
+          writeCheckinSnapshot(
+              null,
+              overall,
+              pron,
+              gram,
+              fluency,
+              turns,
+              durationS,
+              practiceCount != null ? practiceCount : 1));
     } else {
       post.setSessionId(sessionId == null ? post.getSessionId() : sessionId);
       // 当日终态（C-16 口径：明示会刷新，不承诺历史稳定）
@@ -357,7 +367,7 @@ public class CommunityService {
               fluency,
               turns,
               durationS,
-              null));
+              practiceCount));
     }
     post.setUpdatedAt(now);
     return posts.save(post).getId();
@@ -699,6 +709,14 @@ public class CommunityService {
     List<Long> postIds = rows.stream().map(PostEntity::getId).toList();
     Map<Long, AuthorView> authorMap =
         loadAuthors(rows.stream().map(PostEntity::getAuthorId).toList());
+    // commentCount 真源 = post_comments 实算（2026-09-21）：posts.comment_count 冗余列对种子/历史行
+    // 可能是静态假数（详情页 46 条评论却一条都读不出）——展示口径一律以评论表为准。
+    Map<Long, Long> commentCounts =
+        comments.countVisibleByPostIds(postIds).stream()
+            .collect(
+                Collectors.toMap(
+                    PostCommentRepository.CommentCountRow::getPostId,
+                    PostCommentRepository.CommentCountRow::getCount));
     Set<Long> likedSet = new HashSet<>();
     Set<Long> coinedSet = new HashSet<>();
     if (actorId != null) {
@@ -714,7 +732,8 @@ public class CommunityService {
                     p,
                     authorMap.getOrDefault(p.getAuthorId(), emptyAuthor(p.getAuthorId())),
                     likedSet.contains(p.getId()),
-                    coinedSet.contains(p.getId())))
+                    coinedSet.contains(p.getId()),
+                    commentCounts.getOrDefault(p.getId(), 0L)))
         .toList();
   }
 
@@ -754,7 +773,7 @@ public class CommunityService {
   }
 
   private CommunityPostView toPostView(
-      PostEntity p, AuthorView author, boolean liked, boolean coined) {
+      PostEntity p, AuthorView author, boolean liked, boolean coined, long commentCount) {
     JsonNode media = parseJson(p.getMedia());
     Double checkinOverall = null;
     Integer checkinPracticeCount = null;
@@ -778,7 +797,7 @@ public class CommunityService {
         p.getCreatedAt(),
         p.getLikeCount(),
         p.getCoinCount(),
-        p.getCommentCount(),
+        (int) Math.min(commentCount, Integer.MAX_VALUE),
         p.getShareCount(),
         liked,
         coined,

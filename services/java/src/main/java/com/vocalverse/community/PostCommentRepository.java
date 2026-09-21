@@ -2,10 +2,13 @@ package com.vocalverse.community;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * 评论仓库（Java 写方；展示过滤统一可见谓词；keyset ASC 分页）。
@@ -21,6 +24,19 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
  */
 public interface PostCommentRepository
     extends JpaRepository<PostCommentEntity, Long>, JpaSpecificationExecutor<PostCommentEntity> {
+
+  /** 批量可见评论计数（feed/detail 的 commentCount 真源：不再信 posts.comment_count 冗余列，防种子假数）。 */
+  interface CommentCountRow {
+    Long getPostId();
+
+    Long getCount();
+  }
+
+  @Query(
+      "SELECT c.postId AS postId, COUNT(c) AS count FROM PostCommentEntity c "
+          + "WHERE c.postId IN :postIds AND c.status NOT IN ('hidden', 'deleted') "
+          + "GROUP BY c.postId")
+  List<CommentCountRow> countVisibleByPostIds(@Param("postIds") Collection<Long> postIds);
 
   default List<PostCommentEntity> page(Long postId, Instant ts, Long id, Pageable pageable) {
     return findAll(
