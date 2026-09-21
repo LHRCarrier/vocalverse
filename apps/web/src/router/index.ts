@@ -22,9 +22,9 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '自由对话', requiresAuth: true },
   },
   {
-    path: '/m/chat/:sceneId?',
-    component: () => import('@/views/mobile/MobileSpeakingView.vue'),
-    meta: { title: '场景对话', requiresAuth: true },
+    path: '/m/tavern',
+    component: () => import('@/views/mobile/MobileTavernView.vue'),
+    meta: { title: '酒馆', requiresAuth: true },
   },
   {
     path: '/m/report',
@@ -133,16 +133,6 @@ const routes: RouteRecordRaw[] = [
         path: 'placement',
         component: () => import('@/views/PlacementView.vue'),
         meta: { title: '入学测试', requiresAuth: true },
-      },
-      {
-        path: 'practice',
-        component: () => import('@/views/PracticeHubView.vue'),
-        meta: { title: '练习', requiresAuth: true },
-      },
-      {
-        path: 'practice/:sceneId',
-        component: () => import('@/views/PracticeView.vue'),
-        meta: { title: '场景对话', requiresAuth: true },
       },
       {
         path: 'defense',

@@ -3,16 +3,17 @@
  * 移动端底部 Tab 栏（2026-09-05 组长拍板 7：**双场景分组，全局挂载 App.vue**）
  * 社区场景一组 tab、学习场景一组 tab；各场景功能直接上底栏，彼此以出口图标互切：
  * - 社区组（/m/home 等）：🏠 社区 / 🔍 搜索 / ＋发帖(中央) / 📚 学习(出口) / ✉️ 私信
- * - 学习组（/m/learn 等）：🏠 Home(出口) / ☕ 场景对话 / 📖 笔记(中央) / 🎵 唱吧 / 💬 自由对话
- * 场景归属：社区 = home/search/notifications(含会话)/report；学习 = learn(含 :module 详情)/notes/chat(含场景)/free-chat/sing；
- * 沉浸页 compose 无底部栏。2026-09-05 晚 8：练习 → 学习更名（路由 /m/learn）；09-09 /m/me 舍弃（收敛进抽屉）；私信收敛进通知中心。
+ * - 学习组（/m/learn 等）：🏠 Home(出口) / 🍺 酒馆(中央) / 📖 笔记 / 🎵 唱吧 / 💬 自由对话
+ * 场景归属：社区 = home/search/notifications(含会话)/report；学习 = learn(含 :module 详情)/notes/tavern/free-chat/sing；
+ * 沉浸页 compose 无底部栏。2026-09-05 晚 8：练习 → 学习更名（路由 /m/learn）；09-09 /m/me 舍弃（收敛进抽屉）；
+ * 私信收敛进通知中心。2026-09-21：场景对话 /m/chat → 酒馆 /m/tavern（ai4u TRPG 迁移，docs/30）。
  */
 import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
+import IconBeer from '~icons/tabler/beer'
 import IconBell from '~icons/tabler/bell'
 import IconBook from '~icons/tabler/book'
-import IconCoffee from '~icons/tabler/coffee'
 import IconHome from '~icons/tabler/home'
 import IconMessageCircle from '~icons/tabler/message-circle'
 import IconMicrophone from '~icons/tabler/microphone'
@@ -50,7 +51,7 @@ const group = computed<null | 'community' | 'learn'>(() => {
     p.startsWith('/m/learn/') ||
     p === '/m/checkin' ||
     p === '/m/notes' ||
-    p.startsWith('/m/chat') ||
+    p === '/m/tavern' ||
     p === '/m/free-chat' ||
     p === '/m/sing' ||
     /* 读书域（docs/45 §6）：书架/书详情/生词本属学习组；阅读器保持沉浸（null） */
@@ -109,13 +110,13 @@ const group = computed<null | 'community' | 'learn'>(() => {
       <IconHome />
     </RouterLink>
     <RouterLink
-      to="/m/chat"
+      to="/m/tavern"
       class="u-tab"
-      :class="{ active: route.path.startsWith('/m/chat') }"
-      title="场景对话"
-      aria-label="场景对话"
+      :class="{ active: route.path === '/m/tavern' }"
+      title="酒馆"
+      aria-label="酒馆"
     >
-      <IconCoffee />
+      <IconBeer />
     </RouterLink>
     <RouterLink to="/m/notes" class="u-tab--main" title="笔记" aria-label="笔记">
       <IconBook />

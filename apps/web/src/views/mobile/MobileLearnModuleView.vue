@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 学习模块详情页（/m/learn/:module · 2026-09-09 组长拍板 v4：数据细节下沉到详情层）
- * 主页只给一句话结论，这里才是数据展示：单词 / 社区足迹 / 我的发音 / 练习情况。
+ * 主页只给一句话结论，这里才是数据展示：单词 / 社区足迹 / 我的发音 / 冒险进度。
  * 演示帧数据为主（M3 接 attempts/词级/埋点聚合）；布局 X 式（顶部标题 + 内容区）。
  */
 import { computed, ref } from 'vue'
@@ -19,7 +19,7 @@ const MODULE_TITLES: Record<ModuleKey, string> = {
   words: '我的单词',
   community: '社区足迹',
   speaking: '我的发音',
-  practice: '练习情况',
+  practice: '冒险进度',
 }
 
 const moduleKey = computed<ModuleKey>(() => {
@@ -47,7 +47,7 @@ function barH(v: number) {
   return Math.max(10, Math.min(100, ((v - 60) / 35) * 100))
 }
 
-/* ---------- 练习情况（12 周热力图复用主页逻辑 · 演示帧） ---------- */
+/* ---------- 冒险进度（酒馆剧本 · 12 周热力图复用主页逻辑 · 演示帧） ---------- */
 type HeatCell = { date: Date; level: 0 | 1 | 2 | 3; xp: number }
 function dayLevel(d: Date): { level: 0 | 1 | 2 | 3; xp: number } {
   const today = new Date()
@@ -92,14 +92,12 @@ const selectedXpLabel = computed(() =>
 )
 
 const scenes = [
-  { name: '咖啡馆 · 点单', score: 78 },
-  { name: '咖啡馆 · 订单沟通', score: 54 },
-  { name: '机场 · 值机出行', score: 82 },
-  { name: '机场 · 航班变动', score: 47 },
-  { name: '面试 · 自我介绍', score: 85 },
-  { name: '面试 · 深挖追问', score: 38 },
-  { name: '图书馆 · 借阅', score: 70 },
-  { name: '图书馆 · 学业交流', score: 61 },
+  { name: '迷雾酒馆 · 打听怪谈', score: 78 },
+  { name: '酒馆地下室 · 暗门', score: 54 },
+  { name: '镇口哨站 · 盘问', score: 82 },
+  { name: '荒野驿道 · 遭遇', score: 47 },
+  { name: '地城入口 · 交涉', score: 85 },
+  { name: '地城深处 · 判定', score: 38 },
 ] as const
 function band(score: number) {
   return score >= 80 ? 'high' : score >= 60 ? 'mid' : 'low'
@@ -172,7 +170,7 @@ const words = [
         </section>
       </template>
 
-      <!-- 练习情况：热力图 + 场景掌握度 -->
+      <!-- 冒险进度：热力图 + 酒馆剧本推进度 -->
       <template v-else-if="moduleKey === 'practice'">
         <section class="u-learn-detail__card">
           <div class="u-learn-detail__sub">近 12 周练习热力图</div>
@@ -192,7 +190,7 @@ const words = [
         </section>
 
         <section class="u-learn-detail__card">
-          <div class="u-learn-detail__sub">场景掌握度（8 套 · Duo-Strength 式）</div>
+          <div class="u-learn-detail__sub">酒馆剧本推进度（Demo 帧 · 舞台完成度）</div>
           <ul class="u-learn-scenes">
             <li v-for="s in scenes" :key="s.name" class="u-learn-scenes__row">
               <span class="u-learn-scenes__name">{{ s.name }}</span>

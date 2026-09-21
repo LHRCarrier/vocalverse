@@ -27,14 +27,13 @@ export default defineConfig({
       output: {
         // fe-09（2026-09-09）manualChunks：大依赖出专块——
         // · 移动端 WebView 首屏不解析 desktop 侧 naive-ui（走懒加载块）；
-        // · p5/echarts 保持独立块（本就是动态 import，rename 仅防合流）；
+        // · echarts 保持独立块（本就是动态 import，rename 仅防合流）；
         // · vue 栈稳定快照块提高缓存命中（应用发布不重拉框架代码）。
         // CI 门禁 apps/web/scripts/check-bundle.mjs 断言：preview 树零体积、
-        // p5 不进入口块、echarts 零残留——与 production 行为绑定，防回潮。
+        // p5/echarts 零残留——与 production 行为绑定，防回潮。
         manualChunks(id: string) {
           if (!id.includes('node_modules')) return undefined
           if (id.includes('/naive-ui/')) return 'naive-ui'
-          if (id.includes('/p5/')) return 'p5'
           if (id.includes('/echarts/')) return 'echarts'
           if (id.includes('/vue/') || id.includes('/vue-router/') || id.includes('/pinia/')) {
             return 'vue-vendor'

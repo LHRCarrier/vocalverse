@@ -1,9 +1,13 @@
 /**
  * 埋点上报（docs/06 §9.1 / docs/14 §6.3）：13 类事件 + client_event_id 幂等去重。
  * 失败静默（埋点非关键路径）；每次生成唯一事件 id 防重复上报。
- * beacon 模式（`beacon: true`）：用于页面卸载/刷新/路由切换边界的关键转化事件
- * （scene_start / practice_complete），用 `keepalive: true` 的 fetch 携带 Authorization
- * （sendBeacon 无法带 Authorization header，而本接口经 get_current_user_id 鉴权）。
+ * beacon 模式（`beacon: true`）：用于页面卸载/刷新/路由切换边界的关键转化事件，
+ * 用 `keepalive: true` 的 fetch 携带 Authorization（sendBeacon 无法带 Authorization
+ * header，而本接口经 get_current_user_id 鉴权）。
+ *
+ * 2026-09-21（酒馆迁移）：英语「场景对话」闭环移除后，`corpus_hit` 不再有新生产者
+ * （后端 EventTypes 保留该值以兼容历史数据）；`scene_start` / `practice_complete`
+ * 仍由答辩/入学测试等模块上报，保持不变。
  */
 
 let seq = 0

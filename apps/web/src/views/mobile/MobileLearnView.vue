@@ -127,8 +127,8 @@ const modules = [
     key: 'practice',
     icon: 'flame',
     tint: 'var(--u-dark-purple)',
-    title: '练习情况',
-    summary: '场景掌握 5/8 · 本周 86 分钟',
+    title: '冒险进度',
+    summary: '酒馆剧本 3 场 · 本周 86 分钟',
     path: '/m/learn/practice',
   },
 ] as const

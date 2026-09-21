@@ -41,10 +41,8 @@ export default tseslint.config(
   {
     // 灰名单（fe-08）：存量超限文件（350 行约定落地时已是历史行数；重构摘除后删除本组）
     files: [
-      'src/views/mobile/MobileSpeakingView.vue',
       'src/views/mobile/MobileFreeChatView.vue',
       'src/views/LoginView.vue',
-      'src/views/PracticeView.vue',
       'src/views/preview/FluencyPreview.vue',
       'src/views/preview/uic/UicHome.vue',
       'src/views/preview/uic/UicSinging.vue',
@@ -55,10 +53,8 @@ export default tseslint.config(
   {
     // 灰名单（fe-08）：函数体语句超限存量文件（开关型 onSseEvent/~setup 函数）
     files: [
-      'src/views/mobile/MobileSpeakingView.vue',
       'src/views/mobile/MobileFreeChatView.vue',
       'src/views/LoginView.vue',
-      'src/views/PracticeView.vue',
       'src/views/preview/FluencyPreview.vue',
     ],
     rules: { 'max-statements': 'off' },

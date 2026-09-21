@@ -1,22 +1,15 @@
 /**
- * M2 练习 API 封装（docs/14 §6.2）：会话/回合/报告/场景/答辩。
- * SSE 回合流经 openSseFetch（POST 音频 → 事件流），不走 request() 的 JSON 路径。
+ * M2 练习 API 封装（docs/14 §6.2）：答辩 / 报告 / 自由对话 / TTS。
+ *
+ * 2026-09-21 酒馆迁移：英语「场景对话」闭环整体移除（会话创建/回合流/场景列表），
+ * 本模块保留答辩（defense）、报告、自由对话与 TTS；TTS 实现已移到 `./tts`
+ * （此处 re-export，旧引用零改动）。
  */
-import { DEFAULT_TTS_RATE, DEFAULT_TTS_VOICE } from '@/audio/tts-config'
 import { openSseFetch } from '@/audio/sse'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { authHeaders, request } from './client'
 
-export interface ScenarioItem {
-  id: number
-  title: string
-  scene_type: string
-  difficulty: number
-  description?: string | null
-  opening_line?: string | null
-  target_corpus?: string | null
-  estimated_turns?: number | null
-}
+export { tts } from './tts'
 
 export interface SessionCreated {
   id: number
@@ -24,37 +17,6 @@ export interface SessionCreated {
   scenario_id?: number | null
   profile_id?: number | null
   assigned_turns?: number | null
-}
-
-/** R-13 会话恢复：断线/刷新后据此重建对话 UI 与轮次（服务端权威） */
-export interface RestoredMessage {
-  seq: number
-  role: 'system' | 'user' | 'assistant'
-  content: string
-  audio_url?: string | null
-  origin?: string | null
-  action?: string | null
-  /** B4 词级时间轴：用户消息 meta 持久化的 ASR 词时间戳（点播自己录音/听读对轴） */
-  words?: Array<{ word: string; start: number; end: number; [key: string]: unknown }> | null
-  created_at?: string | null
-}
-
-export interface SessionRestore {
-  id: number
-  kind: string
-  status: 'active' | 'completed' | 'abandoned'
-  assigned_turns?: number | null
-  state: string
-  current_turn: number
-  next_seq: number
-  next_expected_turn: number
-  report_id?: number | null
-  messages: RestoredMessage[]
-}
-
-export async function fetchSessionRestore(sessionId: number): Promise<SessionRestore> {
-  const resp = await request<SessionRestore>(`/api/v1/sessions/${sessionId}`)
-  return resp.data
 }
 
 export interface ReportPayload {
@@ -76,11 +38,6 @@ export interface DefenseProfileView {
   question_count: number
   bank_version: number
   knowledge_bank: Record<string, unknown>
-}
-
-export async function fetchScenarios(): Promise<ScenarioItem[]> {
-  const resp = await request<ScenarioItem[]>('/api/v1/scenarios')
-  return resp.data
 }
 
 /** 自由对话消息（客户端携带的滚动历史，MVP 无状态，docs/14 §12） */
@@ -105,8 +62,7 @@ export function streamFreeChat(
 }
 
 export async function createSession(payload: {
-  kind: 'dialog' | 'defense'
-  scenario_id?: number
+  kind: 'defense'
   profile_id?: number
   difficulty?: number
   turn_limit?: number
@@ -151,33 +107,6 @@ export async function createDefenseProfile(payload: Record<string, unknown>) {
     body: JSON.stringify(payload),
   })
   return resp.data
-}
-
-export async function tts(text: string, rate = DEFAULT_TTS_RATE): Promise<Blob> {
-  const form = new FormData()
-  form.append('text', text)
-  form.append('voice', DEFAULT_TTS_VOICE)
-  form.append('rate', rate)
-  const resp = await request<{
-    audio_bytes: string
-    length: number
-    /** 后端自报的输出容器（2026-09 契约增补）；旧后端无此字段时回落 audio/mpeg */
-    media_type?: string
-  }>('/api/v1/tts', {
-    method: 'POST',
-    body: form,
-  })
-  // ⚠️ 不能一律写死 'audio/mpeg'：本地引擎（KittenTTS/OmniVoice）出的是 24kHz WAV，
-  // Blob type 标错会让 <audio> 解码失败（docs/46 B-3 同类问题）。
-  return new Blob([hexToBytes(resp.data.audio_bytes)], {
-    type: resp.data.media_type || 'audio/mpeg',
-  })
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const out = new Uint8Array(hex.length / 2)
-  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
-  return out
 }
 
 export { authHeaders }

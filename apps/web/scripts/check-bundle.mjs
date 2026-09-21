@@ -7,11 +7,11 @@
  * 断言（任一违反 → 退出码 1，frontend-ci 红）：
  * 1. **preview 树零体积**：无任何 manifest 键/产物文件含 preview 页源路径
  *    （docs/13 §8：dev-only 子树生产构建常量折叠剔除——AGENTS 预览机制承诺的机器验证版）；
- * 2. **manualChunks 生效**：naive-ui / vue-vendor / vendor / p5 专块存在且资产落盘
+ * 2. **manualChunks 生效**：naive-ui / vue-vendor / vendor 专块存在且资产落盘
  *    （naive-ui 允许在入口条目 imports 里——App.vue 根 Provider 架构必需首屏加载，
- *    但必须独立块：缓存分离、业务发布不重拉；p5 禁止）；
- * 3. **p5 只进 p5 专块**：p5 块不在入口条目 imports/dynamicImports 里
- *    （p5 = 录音声波动态加载，仅用声波的页面块触发）；
+ *    但必须独立块：缓存分离、业务发布不重拉）；
+ * 3. **p5 零残留**（2026-09-21 酒馆迁移）：p5 唯一使用方（场景对话录音声波
+ *    useP5Wave）随模块删除，依赖同步移除——无 manifest 键/产物文件名含 p5；
  * 4. **echarts 零残留**：无 manifest 键/产物文件名含 echarts（仅 preview 树使用）。
  */
 
@@ -52,7 +52,7 @@ for (const f of files) {
 }
 
 // 2) manualChunks 专块存在（键=块名 `${name}${hash}.js`，file=assets/...）
-for (const keyPart of ['_naive-ui-', '_vue-vendor-', '_vendor-', '_p5-']) {
+for (const keyPart of ['_naive-ui-', '_vue-vendor-', '_vendor-']) {
   const chunkKey = keys.find((k) => k.startsWith(keyPart))
   const asset = chunkKey ? manifest[chunkKey].file : null
   if (!chunkKey || !asset || !existsSync(path.join(DIST, asset))) {
@@ -60,10 +60,12 @@ for (const keyPart of ['_naive-ui-', '_vue-vendor-', '_vendor-', '_p5-']) {
   }
 }
 
-// 3) 入口块壳：p5 不得进（懒加载由页面块触发）；naive-ui 允许但必须独立块（根 Provider 架构必需）
-const entryImports = [...(entry.imports ?? []), ...(entry.dynamicImports ?? [])]
-for (const imp of entryImports) {
-  if (/^p5-[A-Za-z0-9_-]+\.js/.test(imp)) fail(`入口块引入 p5：${imp}`)
+// 3) p5 零残留（2026-09-21：唯一使用方随场景对话删除；源路径键 + 产物文件名）
+for (const k of keys) {
+  if (/p5/i.test(k)) fail(`manifest 含 p5：${k}`)
+}
+for (const f of files) {
+  if (/-p5-[A-Za-z0-9_-]+\.js$/.test(f)) fail(`产物含 p5 块：${f}`)
 }
 
 // 4) echarts 零残留（源路径键 + 产物文件名）
@@ -82,5 +84,5 @@ if (failed) {
 const sizes = [...files]
   .map((f) => ({ f, kb: Math.round(readFileSync(path.join(DIST, f)).length / 1024) }))
   .sort((a, b) => b.kb - a.kb)
-console.log(`✓ 包体积门禁通过（fe-09）：preview 零体积 / 入口块无 naive-ui·p5 / echarts 零残留 / 专块齐`)
+console.log(`✓ 包体积门禁通过（fe-09）：preview 零体积 / p5·echarts 零残留 / 专块齐`)
 for (const { f, kb } of sizes) console.log(`  ${`${kb}`.padStart(5)} kB  ${f}`)
