@@ -3,6 +3,7 @@
  */
 import { reactive, ref } from 'vue'
 
+import { track } from '@/api/events'
 import { prepareChapter } from '@/api/reading'
 
 export function useChapterPrep() {
@@ -19,6 +20,8 @@ export function useChapterPrep() {
     prepState.done = 0
     prepState.text = '预合成中…'
     prepAbort.value?.abort()
+    // 埋点（docs/45 §9 tts_prepare）：整章预合成发起
+    void track('tts_prepare', { targetType: 'book', payload: { chapter_id: chapterId } })
     const ctrl = new AbortController()
     prepAbort.value = ctrl
     prepareChapter(

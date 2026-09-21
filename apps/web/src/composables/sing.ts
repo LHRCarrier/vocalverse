@@ -11,6 +11,7 @@ import { computed, onUnmounted, ref } from 'vue'
 import type { Ref } from 'vue'
 
 import { VoiceRecorder, micErrorMessage } from '@/audio/recorder'
+import { track } from '@/api/events'
 import {
   createSingSession,
   fetchSingResult,
@@ -277,6 +278,19 @@ export function useSingPlay(): SingPlay {
           if (my !== epoch) return
           result.value = r
           phase.value = 'done'
+          // 埋点（docs/53 P1）：唱吧评分完成 → score_event；整首完成（is_complete）→ practice_complete
+          void track('score_event', {
+            targetType: 'song',
+            songId: r.song_id,
+            payload: { overall: r.overall ?? undefined, is_complete: r.is_complete },
+          })
+          if (r.is_complete) {
+            void track('practice_complete', {
+              targetType: 'song',
+              songId: r.song_id,
+              payload: { kind: 'sing' },
+            })
+          }
           return
         }
         if (s.status === 'failed') {
