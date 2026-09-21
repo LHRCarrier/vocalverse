@@ -3,6 +3,33 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-21 M3 收口 P4（部分）：学习主页画像接真 + 模块详情接口就绪 · 1 op
+
+> 归属：Python 后端 + Web 移动端。计划见 `docs/53`。
+
+- **背景**：`learner.py` 已随英语场景对话下线（2026-09-21），学习页画像/热力图/模块摘要失去数据源，
+  一直靠演示帧（伪随机热力图 + 写死摘要）。本阶段按事实表重建聚合。
+- **后端 `app/insight/learn.py`**（新）：
+  - `learn_overview`：一句话画像（近 30 天练习次数/活跃天数/综合分变化）+ 热力图（events 按日计数 → 0/1-4/5-9/10+）
+    + 四模块摘要（words = user_vocabulary；community = 埋点足迹；speaking = attempts 三维均分；
+    practice = 会话分钟 + 酒馆剧本数）；
+  - `learn_module(key)`：speaking（三维按日趋势 + **薄弱音素 Top3**，来自 `scores.error_type` 聚合）、
+    practice（会话按 kind + 剧本回合强度 + 热力图）、words（生词本列表）、community（足迹分布 + 常逛页面）；
+  - 路由：`GET /api/v1/stats/learn`、`GET /api/v1/stats/learn/{module}`（未知模块 400）；learn 响应附 `forecast`。
+- **前端 `MobileLearnView` 全部接真**：热力图（API 按日等级 + 选中格显示当日事件数）、一句话画像、
+  4 条模块摘要（书房保持静态元数据）、新增预测行「水平预测：下月综合分 X（↑/↓ delta）」；
+  接口失败回退占位文案（画像非关键路径）。
+- **测试**：Python `tests/test_m3_learn.py` 5 例（聚合/空态/speaking 音素/practice 剧本/words+community/未知模块）；
+  前端热力图用例改「接口两格数据」桩（原伪随机演示数据已删除）。
+- **门禁**：pytest **761 passed, 4 skipped**；ruff 绿；web `lint`/`typecheck`/**340 passed**/`build`/`check-bundle` 绿。
+- **Playwright 自检（Edge · 390×844）**：画像行「近 30 天练了 9 次（5 天有练习），综合分 +6.2。」、
+  热力图 84 格 / 2 格有数据 / 选中格 +12 XP、模块摘要 4 条来自接口、
+  预测行「水平预测：下月综合分 86.4（↑ 6.2）」；截图 `local/ui-check/m3-learn-profile.png`。
+- **遗留（下轮）**：① `MobileLearnModuleView`（模块详情页）仍是演示帧——接口已就绪，只需把 4 个数据块
+  换成 `fetchLearnModule(key)`；② P5（搜索/笔记·生词本落库/XP 后端化/账户抽屉设置页）与 P6（清理收尾）未动。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-21
+
 ## 2026-09-21 M3 收口 P3：内容型推荐接真 + 水平预测模型（后端 + 学习页推荐位）· 1 op
 
 > 归属：Python 后端 + Web 移动端。计划见 `docs/53`；算法借用说明见 docs/53 §3。
