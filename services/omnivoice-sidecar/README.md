@@ -24,16 +24,21 @@ services/python/app/audio/tts_omnivoice.py ──HTTP──> 本服务 ──GPU
 ## 2. 怎么起
 
 ```powershell
-# ① 下权重（约 3.28 GB，不入库）。默认走 HF 镜像下到 <仓库>/data/models
+# ① 装环境（约 3~5 GB；装到 <仓库>/.venv-omnivoice —— lib 的首选搜索位置）
+pwsh -File scripts/setup-omnivoice-env.ps1
+#    只跑 CPU：-Torch cpu      装 GitHub 源码版：-FromSource
+#    国内镜像：-IndexUrl https://pypi.tuna.tsinghua.edu.cn/simple
+
+# ② 下权重（约 3.28 GB，不入库）。默认走 HF 镜像下到 <仓库>/data/models
 pwsh -File scripts/fetch-omnivoice-weights.ps1
 #    本机已有缓存就别下了，直接复制：-FromLocal <HF 缓存根>
 #    只验链路/试网速：              -Only "config.json"
 
-# ② 起边车（启动前会自检依赖、探端口、探权重）
+# ③ 起边车（启动前会自检依赖、探端口、探权重）
 pwsh -File scripts/start-omnivoice-sidecar.ps1
 #    无 GPU / 只想验链路：          -Fake
 
-# ③ 或者：随三端一起起（一键启动默认就会尝试边车，起不来只提示不阻塞）
+# ④ 或者：随三端一起起（一键启动默认就会尝试边车，起不来只提示不阻塞）
 pwsh -File scripts/dev-up.ps1 start          # 含边车；不想起加 -NoVoice
 ```
 
@@ -77,14 +82,14 @@ pwsh -File scripts/dev-up.ps1 start          # 含边车；不想起加 -NoVoice
 
 | 项 | 说明 |
 |---|---|
-| Python 环境 | OmniVoice + torch + soundfile，**不装在 `services/python/.venv`**（那是 CPU 运行时）。单独建一个环境，用 `-Python` 或 `OMNIVOICE_PYTHON` 指过来 |
+| Python 环境 | OmniVoice + torch + soundfile，**不装在 `services/python/.venv`**（那是 CPU 运行时）。一键：`pwsh -File scripts/setup-omnivoice-env.ps1`（装到 `<仓库>/.venv-omnivoice`，约 3~5 GB）；也可用 `-Python` / `OMNIVOICE_PYTHON` 指向已有环境 |
 | 模型权重 | 约 **3.28 GB**（`model.safetensors` 2.45 GB + `audio_tokenizer/model.safetensors` 806 MB 等）；用 `scripts/fetch-omnivoice-weights.ps1` 下到 `<仓库>/data/models`（gitignored），或 `-FromLocal` 从别人机器拷 |
 | 音色参考件 | `data/seed/voices/`（`VOICES.json` + 4 个 wav，合计约 1.9 MB，**随仓库入库**）；主服务侧 `APP_VOICE_REFS_DIR` **留空即自动用它** |
 
-> ⚠️ **欠账**：没有"一键装好环境"的脚本。换机器要自己让 `import omnivoice` 成立
-> （建 venv + `pip install omnivoice torch soundfile`）。**权重**已经有一键脚本
-> （`scripts/fetch-omnivoice-weights.ps1`，镜像默认 `hf-mirror.com`，本机实测 huggingface.co 直连超时）。
-> `-Fake` 可以在没有环境的机器上先把链路跑通，但**不能**验证音质。
+> ⚠️ **欠账**：`scripts/setup-omnivoice-env.ps1` 已写好，但**尚未在有 GPU 的干净机器上端到端跑通过**
+> （作者机器上用的是既有的 VoiceStudio 环境，未按脚本重装）。首次使用者若卡住，请把报错贴回来补。
+> 本机已验证的是：**两套 API 都受支持**（当前走打包版的 `prompt` 路径，见启动日志）；
+> `-Fake` 可在没有环境的机器上先把链路跑通，但**不能**验证音质。
 
 ## 4. HTTP 接口
 
@@ -118,6 +123,25 @@ POST /synthesize
    漂移——那等于音色每天在变。参考文本是**音色定义的一部分**。
 4. **参考件走 base64 放进 JSON**，既不传路径也不用 multipart。传路径 = 引入"文件被换掉"
    这类**静默变声**的可能；multipart = 边车要多一个解析依赖。
+
+### 兼容两套上游 API（**按能力探测，不按版本号猜**）
+
+实测（2026-09-21）存在两条并存实现，导入路径、加载签名、克隆调用**全都不一样**：
+
+| | 上游 [`k2-fsa/OmniVoice`](https://github.com/k2-fsa/OmniVoice)（PyPI `omnivoice` / GitHub） | VoiceStudio 打包版（`omnivoice` 0.5.1，editable） |
+|---|---|---|
+| 导入 | `from omnivoice import OmniVoice` | `from omnivoice.models.omnivoice import OmniVoice` |
+| 加载 | `from_pretrained(dir, device_map="cuda:0", dtype=torch.float16)` | `from_pretrained(dir, torch_dtype=torch.float16)` + `.to("cuda")` |
+| 克隆 | `generate(text=…, ref_audio=(wav, sr), ref_text=…)` | `create_voice_clone_prompt(…)` → `generate(voice_clone_prompt=…)` |
+| 调参 | 示例只给 `text/ref_audio/ref_text/instruct` | `num_step` / `guidance_scale` / `denoise` / `postprocess_output` … |
+
+服务端对这三处**都做了回退**：导入失败换深路径；`from_pretrained` 按 `TypeError` 逐个试关键字；
+`generate` 按**实际签名**过滤参数（有 `**kwargs` 全放行，签名窄就丢掉它不认的键并打日志——
+不是静默，因为那意味着定稿调参没生效）。启动日志会打印实际走的是哪套：
+`模型就绪：… （克隆 API：prompt|ref_audio）`。
+
+> 只支持一种的后果很实：队友按上游 README 装好后边车直接崩。这条差异是在写
+> "一键装环境"脚本时对着上游 README/notebook 核对才发现的。
 
 ### 只用标准库
 

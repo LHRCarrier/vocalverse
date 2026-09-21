@@ -3,6 +3,25 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-21 一键装 OmniVoice 环境（setup-omnivoice-env.ps1）+ 边车兼容两套上游 API · 1 op
+
+- **背景**：组长追加「一键装 OmniVoice 环境」也要做。做之前先对着[上游 k2-fsa/OmniVoice 的 README 与官方 notebook](https://github.com/k2-fsa/OmniVoice) 核对安装路径与 API，**核出一个会让队友直接崩掉的不兼容**（见下条第 3 点）。
+- **产出 ①：`scripts/setup-omnivoice-env.ps1`** —— 按上游官方顺序（**先 torch 再 omnivoice**）装到 **`<仓库>/.venv-omnivoice`**（正是 `scripts/lib/omnivoice.ps1` 的首选搜索位置，所以装完 `dev-up.ps1 start` 直接认得，零配置）。要点：`uv venv --python 3.12`；`torch==2.8.0+cu128`/`torchaudio` + `--extra-index-url https://download.pytorch.org/whl/cu128`（CUDA 轮子只有 pytorch 索引有，PyPI 上没有 `+cu128`）；`-Torch cpu` / `-FromSource` / `-IndexUrl <清华或阿里镜像>`（实测 pypi.org、清华、阿里、pytorch 索引四个源**都可达**）；幂等（已装且可 import 就跳过）；收尾自检打印 `torch 版本 / cuda_available / GPU 名 / omnivoice 版本与路径`。`-Force` 用 `uv venv --clear` 重建而**不是** `Remove-Item -Recurse -Force`（后者会被安全护栏拦，且删的是 3~5 GB 目录）。
+- **产出 ②：边车兼容两套上游 API（本轮最有价值的发现）** —— 实测本机那份 `omnivoice` **不是上游包**：`pip show` 显示 Home-page `github.com/debpalash/VoiceStudio`、License AGPL-3.0-only、editable 装在 VoiceStudio 项目里（0.5.1）。而上游（PyPI `omnivoice` / GitHub k2-fsa）与它**三处都不一样**：
+  | | 上游 | VoiceStudio 打包版 |
+  |---|---|---|
+  | 导入 | `from omnivoice import OmniVoice` | `from omnivoice.models.omnivoice import OmniVoice` |
+  | 加载 | `from_pretrained(dir, device_map="cuda:0", dtype=fp16)` | `from_pretrained(dir, torch_dtype=fp16)` + `.to("cuda")` |
+  | 克隆 | `generate(text=…, ref_audio=(wav,sr), ref_text=…)` | `create_voice_clone_prompt(…)` → `generate(voice_clone_prompt=…)` |
+  （顺带确认：上游 `omnivoice/__init__.py` 也是从 `omnivoice.models.omnivoice` 导出的 —— 所以深路径导入对两边都通。）**只支持一种的后果**：队友按上游 README 装好，边车在 `create_voice_clone_prompt` 处直接崩。改法：**按能力探测**而非按版本猜 —— 导入失败换深路径；`from_pretrained` 按 `TypeError` 逐个试关键字（`device_map`/`dtype` → `torch_dtype` → 裸调，且只有没走 `device_map` 时才自己 `.to("cuda")`）；`generate` 用 `inspect.signature` **按实际签名过滤**参数（有 `**kwargs` 全放行；签名窄就丢掉它不认的键**并打日志**——不静默，因为那意味着定稿调参没生效）；输出归一同时接受 torch.Tensor 与 numpy（上游 notebook 返回 `audio[0]` ndarray）。启动日志会打印实际走哪套：`模型就绪：… （克隆 API：prompt|ref_audio）`。
+- **回归验证（改完必须证明没打断正在用的那条路）**：重启边车 → 日志明确 `用时 8.4s （克隆 API：prompt）`（即正确识别出打包版）；再用主服务客户端合成两把嗓子，**字节数与改动前逐字节一致**（The Anchor 112,844 B / 2.35s；The Podcaster 136,364 B / 2.84s），两次 `POST /synthesize` 均 **200**。新增 4 条纯逻辑用例（`**kwargs` 放行 / 窄签名过滤 / 签名不可内省时原样传 / 克隆 API 能力探测），不需要 torch。
+- **按组长指示未真装**：脚本写完即停（组长说"别真装了"），所以**它尚未在干净机器上端到端跑通过** —— 已在 sidecar README 顶部把这条欠账写清，首次使用者卡住请把报错贴回来。过程中脚本暴露并修掉一个自己的 bug：`uv venv` 返回后目标 `Scripts/python.exe` 偶发尚不可见（本机文件系统可见性延迟，实测同一路径**几秒后就存在**），一次 `Test-Path` 断言会把"其实建好了"误报成失败 → 改为**轮询 10×300ms + 失败时打印目录实际内容**便于定位。
+- **顺带观察**：本机 torch 打印 `UserWarning: expandable_segments not supported on this platform` —— `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` 在 Windows 这个 torch 构建上**不生效**（上游那组"显存 7911→2772 MiB"的实测应在支持它的平台/构建上取得）。变量保留（`setdefault`，别的平台有效且这里是无害的），但**别把那条收益当成 Windows 上的既定事实**。
+- **门禁**：`ruff check` 全绿 + `ruff format --check app tests` 221 文件已格式化；聚焦测试 **45 passed**；5 个 `.ps1` 全过 PowerShell AST 语法检查。
+- **产出**：新增 `scripts/setup-omnivoice-env.ps1`；改 `services/omnivoice-sidecar/server.py`（`load` 双 API + `_from_pretrained` 回退 + `_generate_kwargs` 签名过滤 + `_decode_ref_audio` + 输出归一）、`services/python/tests/test_omnivoice_sidecar.py`（+4 例）、`.gitignore`（`.venv-omnivoice/`）、`services/omnivoice-sidecar/README.md`、`README.md`。
+- **遗留**：① `.venv-omnivoice/` 里留着一个**只建了框架、没装包**的 venv（约几 MB，已 gitignore；它现在是探测链首位但因 import 失败会自动跳过，无影响）；要清掉需 `Remove-Item -Recurse -Force .venv-omnivoice`（会被护栏拦，可手动删）。② 上游 API 分支的代码路径**本机无法实测**（本机只有打包版），靠的是官方 README/notebook 的签名 + 能力探测 + 纯逻辑用例；谁先按上游装成，请跑一次并回报。③ GPU 侧音质判据仍需真机单独验。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-21
 ## 2026-09-21 修复：边车探测漏掉本机已有环境（dev-up 误报"没装 omnivoice"）+ 加载窗口 503 · 1 op
 
 - **组长实测反馈**：`dev-up.ps1 start` 打印「⏭ 跳过：没找到装了 omnivoice 的 python」，但组长本机**有**（xiaohaishi 起得来）。属实 —— 我为了"避免硬编码机器路径"，把 `Resolve-OmnivoicePython` 的候选表写成了「`OMNIVOICE_PYTHON` → 本仓 venv → PATH python」，**恰好排除了唯一能用的那个**（VoiceStudio 的应用 venv `F:\WorkingL\VoiceStudio\OmniVoiceStudio-Data\env\project\.venv\Scripts\python.exe`，实测 `omnivoice` + `torch 2.8.0+cu128` + `cuda_available=True`）。权重同理：本机那份在 `…\VoiceStudio\...\data\models`，而候选表里只有"本仓 data/models + HF 默认缓存"。**教训**：为了"通用"而砍掉已知可用的候选，换来的是"用户本来能跑却不被识别"——这个交换不划算；正确的做法是**把候选写成可覆盖的列表**（显式 env 永远最高优先），而不是砍短它。
