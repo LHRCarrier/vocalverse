@@ -20,7 +20,6 @@ export const previewPages: PreviewPage[] = [
   { path: '/preview/uic-home', label: 'UIC 概念 · 学习主页', group: '用户端', layout: 'gallery' },
   { path: '/preview/uic-speaking', label: 'UIC 概念 · 口语陪练', group: '用户端', layout: 'gallery' },
   { path: '/preview/uic-singing', label: 'UIC 概念 · 唱歌评分报告', group: '用户端', layout: 'gallery' },
-  { path: '/preview/agent-lab', label: 'Agent Lab · LLM 框架测试台', group: '用户端', layout: 'gallery' },
   {
     path: '/preview/fluency',
     label: '流利度特征 · 联调测试台（docs/06 §9.3）',

@@ -6,7 +6,7 @@
  * - 学习组（/m/learn 等）：🏠 Home(出口) / 🍺 酒馆(中央) / 📖 笔记 / 🎵 唱吧 / 💬 自由对话
  * 场景归属：社区 = home/search/notifications(含会话)/report；学习 = learn(含 :module 详情)/notes/tavern/free-chat/sing；
  * 沉浸页 compose 无底部栏。2026-09-05 晚 8：练习 → 学习更名（路由 /m/learn）；09-09 /m/me 舍弃（收敛进抽屉）；
- * 私信收敛进通知中心。2026-09-21：场景对话 /m/chat → 酒馆 /m/tavern（ai4u TRPG 迁移，docs/30）。
+ * 私信收敛进通知中心。2026-09-21：场景对话 /m/chat → 酒馆 /m/tavern（ai4u TRPG 迁移，docs/52）。
  */
 import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'

@@ -1,5 +1,5 @@
 /**
- * 酒馆（TRPG 跑团）API 封装（docs/30 §4）：剧本/主持台面板/桌骰/SSE 回合。
+ * 酒馆（TRPG 跑团）API 封装（docs/52 §4）：剧本/主持台面板/桌骰/SSE 回合。
  *
  * SSE 回合流经 openSseFetch（POST multipart → 事件流），不走 request() 的 JSON 路径；
  * 主持人回复的逐句 TTS 由服务端合成（audio_chunk），前端只负责排队播放。
