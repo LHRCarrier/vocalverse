@@ -3,6 +3,40 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-21 M3 收口 P2：指标聚合与看板（Python 四指标 + Web /stats + 管理端 /insight）· 1 op
+
+> 归属：后端 + Web + 管理端。计划见 `docs/53`；口径 = `docs/06 §9.1`（同日 P1 修订）。
+
+- **后端 `app/insight/service.py`**（口径唯一实现，前端只展示）：
+  - `overview`：四指标（分子/分母/比率同存可审计）+ 逐日趋势 + 维度 TopN（page/level/age_group/channel/target_type/song）；
+    * CTR = 曝光组（`recommend_group_id` 去重）中 30min 内有点击的组 / 曝光组；
+    * 完成率 = 完成单元 / 发起单元，按来源拆分（唱吧 status=completed；酒馆 ≥1 玩家消息；答辩 status=completed；入学测试 completed_at）；
+    * 互动率 = 酒馆玩家/DM 消息 + 答辩作答/分配轮；自由对话无服务端会话 → 不计（`notes` 明示）；
+    * 跳出率 = 1 − 参与率（参与 = 时长>10s 或 含关键事件 或 ≥2 page_view）。
+  - `me`：个人概览（会话/录音/分钟/均分/最佳）+ 按日趋势 + 五维雷达（发音/流利/语法/音准/节奏）。
+- **端点**：`GET /api/v1/stats/overview`、`GET /api/v1/stats/me`（学习者 JWT）；
+  `GET /api/v1/console/insight/overview`（控制台令牌 + `ops:metric:read`）。
+  **决策**：控制台权限码复用 `ops:metric:read`（新增独立码需同步 PermissionCatalog/RbacBootstrap/
+  docs/50 §4.2 目录计数与角色发放，demo 范围收益低）——理由写进端点头注。
+- **Web `/stats` 报表页接真**（原 PlaceholderView）：四指标卡（比率 + 分子分母 + 口径提示）、平台趋势折线、
+  我的五维雷达、我的概览、维度 TopN、口径注记；**导出 CSV**（分子分母 + 趋势原始值，可复算）与 **PNG**（getDataURL）；
+  时间范围 7/30/90 切换原地更新。`useECharts` 扩展 setOption/getDataURL + RadarChart 注册。
+- **管理端 `/insight` 学习指标页**（运维组导航，图标 chart-dots 已登记）：StatTile 四指标 + Mono 发丝线（F2）趋势 +
+  维度 TopN；数据源与控制台端点同源。
+- **包体积门禁修订（fe-09）**：echarts 从「零残留」改为「懒加载边界」——①不得进入口静态依赖图
+  （BFS manifest `imports`），②单块 ≤500KB（实测 394KB）。原断言基于「echarts 仅 preview 树使用」，`/stats` 上线后失效。
+- **测试**：`tests/test_m3_insight.py` 3 例（四指标口径逐项断言 / 个人报表雷达与趋势 / 控制台权限 46002）。
+- **门禁**：pytest **750 passed, 4 skipped**；ruff 绿；web `lint`/`typecheck`/**337 passed**/`build`/`check-bundle` 绿；
+  admin `lint`/`typecheck`/**75 passed**/`build` 绿。
+- **Playwright 自检（Edge）**：报表页四指标卡真值（40.0%/50.0%/50.0%/50.0% + 分子分母）、2 张画布（趋势/雷达）、
+  CSV/PNG 下载文件名正确、切换 7 天后重拉；管理端标题「学习指标」+ 指标值 + 趋势线（14 条 path）。
+  截图 `local/ui-check/m3-stats-web.png`、`m3-insight-admin.png`。
+- **遗留（P3~P6 按 docs/53）**：推荐前端联调（CTR 目前无曝光/点击数据 → 报表里 CTR 为 0/0，属预期）、
+  学习画像接真、搜索/笔记/XP/设置页、清理收尾。另：报表页「我的五维」雷达当前只有口语 attempts 与 sing_attempts 两个来源，
+  数据少时形状偏空（后续 P4 画像接真时补足）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-21
+
 ## 2026-09-21 M3 收口 P1：埋点链路修复与补齐（target_type/维度/游客 page_view/生产者）· 1 op
 
 > 归属：本条记**后端 + Web 前端**面（无 App UI 改动）。计划与阶段划分见 `docs/53`；口径修订见 `docs/06 §9.1`。
