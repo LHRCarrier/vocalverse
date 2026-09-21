@@ -60,6 +60,55 @@ export interface StatsMe {
   generated_at: string
 }
 
+export interface LearnModuleSummary {
+  total?: number
+  learning?: number
+  events?: number
+  page_views?: number
+  pron?: number | null
+  flu?: number | null
+  gram?: number | null
+  minutes?: number
+  campaigns?: number
+  summary: string
+}
+
+export interface LearnOverview {
+  profile_line: string
+  heatmap: { date: string; count: number; level: number }[]
+  modules: Record<'words' | 'community' | 'speaking' | 'practice', LearnModuleSummary>
+  generated_at: string
+  forecast?: LevelForecast
+}
+
+export async function fetchLearnOverview(): Promise<LearnOverview> {
+  const res = await request<LearnOverview>('/api/v1/stats/learn', undefined, PYTHON_BASE)
+  return res.data
+}
+
+export interface LearnModuleDetail {
+  key: string
+  dims?: { pron: number | null; flu: number | null; gram: number | null }
+  trend?: { date: string; pron: number | null; flu: number | null; gram: number | null }[]
+  weak_phonemes?: { phoneme: string; count: number; avg: number | null }[]
+  minutes?: number
+  by_kind?: { kind: string; count: number; minutes: number }[]
+  campaigns?: { id: number; name: string; turns: number; user_turns: number; last_active_at: string | null }[]
+  heatmap?: { date: string; count: number; level: number }[]
+  items?: { word: string; status: string; scene: string; created_at: string | null }[]
+  pages?: { page: string; count: number }[]
+  events?: { event_type: string; count: number }[]
+}
+
+export async function fetchLearnModule(key: string, days = 30): Promise<LearnModuleDetail> {
+  const res = await request<LearnModuleDetail>(
+    `/api/v1/stats/learn/${key}?days=${days}`,
+    undefined,
+    PYTHON_BASE,
+  )
+  return res.data
+}
+
 export async function fetchStatsOverview(days = 30): Promise<StatsOverview> {
   const res = await request<StatsOverview>(`/api/v1/stats/overview?days=${days}`, undefined, PYTHON_BASE)
   return res.data

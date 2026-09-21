@@ -11,12 +11,13 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_id
 from app.core.response import ok
 from app.db import get_session_factory
+from app.insight import learn as learn_insight
 from app.insight import service as insight
 from app.rec.level_model import forecast
 
@@ -35,6 +36,36 @@ async def stats_overview(
     db = _db()
     try:
         return ok(insight.overview(db, days=days))
+    finally:
+        db.close()
+
+
+@router.get("/learn")
+async def stats_learn(
+    user_id: int = Depends(get_current_user_id),
+):
+    """学习主页画像（docs/53 P4）：一句话画像 + 热力图 + 四模块摘要。"""
+    db = _db()
+    try:
+        data = learn_insight.learn_overview(db, user_id)
+        data["forecast"] = forecast(db, user_id)  # 学习主页进步趋势（docs/06 §9.5）
+        return ok(data)
+    finally:
+        db.close()
+
+
+@router.get("/learn/{module}")
+async def stats_learn_module(
+    module: str,
+    days: int = Query(default=30, ge=1, le=180),
+    user_id: int = Depends(get_current_user_id),
+):
+    """模块详情（words/community/speaking/practice）——未知模块 40001。"""
+    if module not in learn_insight.MODULES:
+        raise HTTPException(status_code=400, detail="unknown module")
+    db = _db()
+    try:
+        return ok(learn_insight.learn_module(db, user_id, module, days=days))
     finally:
         db.close()
 
