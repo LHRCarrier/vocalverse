@@ -3,6 +3,19 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-21 旧管理端废弃面（`/api/v1/admin/**`）残留清理：过时文档 + 脱节测试（代码面早已退役，未重复删）
+
+- **起因**：任务「删掉已经废弃的旧管理端 HTTP 面（`/api/v1/admin/**`）」。核查结论是**代码面早已删干净**，本轮不重复删除：后端 `0a635587`（2026-09-10）删 4 控制器 27 op + 只测旧面的 2 个测试类 + `SecurityConfig` 的 `hasRole("ADMIN")` matcher；前端 `8d404b5f` 删 `/admin` 壳；契约快照/生成类型里旧面 **0 条**（两个提交均为当前 HEAD 祖先，`git merge-base --is-ancestor` 复核）。残留只有三类：说明退役沿革的注释、**刻意保留**的负向回归测试、把旧面写成现行接口的过时文档——故本轮只清后两类中的过时项。
+- **改测试（1 处，意图已脱节）**：`ErrorEnvelopeTest.adminNotFound_isEnvelope40401` 打的是 `GET /api/v1/admin/users/99999999`，但该路径已无任何控制器（全仓 grep 复核），用例靠「未匹配路由 → `NoResourceFoundException` → `GlobalExceptionHandler` 40401」通过——名字与意图不符（并不再验证「缺用户的 admin 端点」）。改为 `unknownRoute_isEnvelope40401`：用普通注册用户打 `GET /api/v1/not-a-route/99999999`，断言仍是 `Envelope{404, 40401, data=null}`（覆盖同一条全局兜底分支），并去掉不再需要的 `seedAdminAndLogin()`；javadoc 记录改前路径与原因。
+- **改文档（旧面从「现行接口」改为「已退役」，并指向控制台）**：
+  - `docs/21-接口设计说明书.md` §2.2：删 6 行旧 admin 端点（用户管理/场景/歌曲/听力素材/题库/工单·管理），换 1 行「控制台（`/api/v1/console/**`，完整 59 op 见 docs/50 §10.2，四内置角色 super/ops/operator/moderator）」，Java op 计数按入库快照改为 **93（服务域 34 + 控制台 59）**；2026-09-07 的「管理端最小集落地」更新条改写为 2026-09-21 退役对账条（引用 docs/50 §15.5）。
+  - `docs/20-系统架构设计说明书.md` §4.5：该行整改结论补「2026-09-10 旧面 27 op 与 `ROLE_ADMIN` 守卫整体退役，能力迁控制台（`admin_users` 独立身份 + 权限码）」。
+  - `docs/42-App功能说明书.md` 角色矩阵管理员/审核员两行 + 第 17 章「运营后台」：改为控制台口径（独立身份、权限码、审计；审核台/运营已随控制台上线）。
+- **不动（有意保留）**：① 退役负向证据测试——`ConsoleCrossTokenTest`（控制台令牌打旧路径必须 404）、`ConsoleChainIsolationTest`（安全链隔离断言）；② 退役记录 `docs/50 §15.5`、`docs/51`；③ 历史设计文档（`docs/singing/*` 等按旧面叙述，属历史快照）；④ 主代码里的退役说明注释。
+- **验证**：`mvn -Dtest=ErrorEnvelopeTest test` → **Tests run: 6, Failures: 0, Errors: 0**；`mvn -q spotless:check` exit 0（google-java-format 门禁）。本轮未改前端/Python，故未复跑对应门禁。
+- **遗留**：① `docs/42` 是本仓 README 已登记、但**从未 git add** 的文件（`git status` 为 `??`）；本轮已一并补交入库（随本批 docs 提交）；② `docs/singing/*` 历史文档未回填退役注记（历史快照口径）；③ `docs/21` Java 表仍为域分组摘要，控制台端点明细以 docs/50 §10.2 为准。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-21
 ## 2026-09-21 一键装 OmniVoice 环境（setup-omnivoice-env.ps1）+ 边车兼容两套上游 API · 1 op
 
 - **背景**：组长追加「一键装 OmniVoice 环境」也要做。做之前先对着[上游 k2-fsa/OmniVoice 的 README 与官方 notebook](https://github.com/k2-fsa/OmniVoice) 核对安装路径与 API，**核出一个会让队友直接崩掉的不兼容**（见下条第 3 点）。
