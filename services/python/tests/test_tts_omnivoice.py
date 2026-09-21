@@ -178,12 +178,53 @@ def test_probe_health_is_false_for_dead_endpoint() -> None:
     assert omni._probe_health("http://127.0.0.1:9", timeout_s=0.2) is False
 
 
+def test_probe_health_requires_ok_true_not_just_http_200(monkeypatch) -> None:
+    """**加载窗口的关键判据**：`/health` 返 200 但 `ok:false`（模型还在加载）必须算不可用。
+
+    否则主服务会在那 ~10s 内选中本引擎，然后每次合成 503（边车日志实测连着三条）。
+    """
+
+    class _Resp:
+        status_code = 200
+
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: _Resp({"ok": False, "loadError": None}))
+    omni.reset_health_cache()
+    assert omni._probe_health("http://loading") is False
+
+    omni.reset_health_cache()
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: _Resp({"ok": True}))
+    assert omni._probe_health("http://ready") is True
+
+
+def test_probe_health_false_on_non_json_body(monkeypatch) -> None:
+    """非 JSON 响应（代理拦页等）不得抛错，按未就绪处理。"""
+
+    class _Bad:
+        status_code = 200
+
+        def json(self):
+            raise ValueError("not json")
+
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: _Bad())
+    omni.reset_health_cache()
+    assert omni._probe_health("http://garbage") is False
+
+
 def test_probe_health_caches_result(monkeypatch) -> None:
     """探测结果按 TTL 缓存：auto 链每次解析都会问，不能每请求打一次网络。"""
     calls: list[str] = []
 
     class _Resp:
         status_code = 200
+
+        def json(self):
+            return {"ok": True}
 
     def _fake_get(url, timeout=None):  # noqa: ARG001
         calls.append(url)

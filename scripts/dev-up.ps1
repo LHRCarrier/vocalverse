@@ -158,39 +158,9 @@ function Start-Detached($Name, [string]$Cmd, [string]$WorkDir) {
 # 设计原则：**带上它，但永不阻塞**。本地克隆音色在 TTS 引擎链里是首位但**可选**
 # （起不来会自动回落 kitten/edge），所以缺环境/缺权重时只打印一条可读提示并继续，
 # 绝不因为它是可选档而拖住三端启动。
-function Resolve-OmnivoicePython {
-    $cands = @()
-    if ($env:OMNIVOICE_PYTHON) { $cands += $env:OMNIVOICE_PYTHON }
-    $cands += (Join-Path $Root 'services/python/.venv/Scripts/python.exe')
-    $cands += 'python'
-    foreach ($c in $cands) {
-        if ($c -ne 'python' -and -not (Test-Path $c)) { continue }
-        & $c -c "import omnivoice" 2>$null
-        if ($LASTEXITCODE -eq 0) { return $c }
-    }
-    return $null
-}
-
-# 权重缓存根：优先仓库内 data/models（fetch-omnivoice-weights.ps1 的默认落点），
-# 再本机 HF 缓存。判据与边车一致：快照目录里要有 config.json + 至少一个 *.safetensors
-# （只看目录存在会把"下载到一半"当成可用权重）。
-function Resolve-OmnivoiceCache {
-    $cands = @()
-    if ($env:OMNIVOICE_HF_CACHE) { $cands += $env:OMNIVOICE_HF_CACHE }
-    $cands += (Join-Path $Root 'data\models')
-    $cands += (Join-Path $env:USERPROFILE '.cache/huggingface/hub')
-    if ($env:LOCALAPPDATA) { $cands += (Join-Path $env:LOCALAPPDATA 'huggingface/hub') }
-    foreach ($c in $cands) {
-        $snaps = Join-Path $c 'models--k2-fsa--OmniVoice/snapshots'
-        if (-not (Test-Path $snaps)) { continue }
-        $ok = Get-ChildItem $snaps -Directory -ErrorAction SilentlyContinue | Where-Object {
-            (Test-Path (Join-Path $_.FullName 'config.json')) -and
-            (Get-ChildItem $_.FullName -Filter '*.safetensors' -ErrorAction SilentlyContinue)
-        }
-        if ($ok) { return $c }
-    }
-    return $null
-}
+# 「该用哪个 python / 权重在哪 / 什么算完整」的**真源在 scripts/lib/omnivoice.ps1**，
+# 与 scripts/start-omnivoice-sidecar.ps1 共用（各写一遍必然漂移）。
+. (Join-Path $PSScriptRoot 'lib/omnivoice.ps1')
 
 function Start-VoiceSidecar {
     if ((Get-PortPid 8765).Count -gt 0) { Write-Host "  已在运行，跳过。"; return $true }
@@ -198,16 +168,17 @@ function Start-VoiceSidecar {
     $py = Resolve-OmnivoicePython
     if (-not $py) {
         Write-Host "  ⏭ 跳过：没找到装了 omnivoice 的 python（本地克隆音色是可选档，TTS 会自动回落 edge）。"
-        Write-Host "     要启用：单独建环境并装上游 —— python -m venv .venv-omnivoice;"
+        Write-Host "     任选其一："
+        Write-Host "     ① 复用已有环境：`$env:OMNIVOICE_PYTHON = '<装了 omnivoice 的 python.exe>'"
+        Write-Host "     ② 新建：python -m venv .venv-omnivoice;"
         Write-Host "             .\.venv-omnivoice\Scripts\pip install omnivoice torch soundfile"
-        Write-Host "     再设 `$env:OMNIVOICE_PYTHON 指向它。详见 services/omnivoice-sidecar/README.md"
+        Write-Host "     探测过的位置见 scripts/lib/omnivoice.ps1（真源）；详见 services/omnivoice-sidecar/README.md"
         return $false
     }
 
     $cache = Resolve-OmnivoiceCache
     if (-not $cache) {
-        Write-Host "  ⏭ 跳过：没找到 OmniVoice 权重（约 3.28 GB，不入库）。先下载："
-        Write-Host "     pwsh -File scripts/fetch-omnivoice-weights.ps1"
+        Write-OmnivoiceWeightsHint
         return $false
     }
 
@@ -216,8 +187,9 @@ function Start-VoiceSidecar {
     if (-not $env:PYTORCH_CUDA_ALLOC_CONF) { $env:PYTORCH_CUDA_ALLOC_CONF = 'expandable_segments:True' }
     $server = Join-Path $Root 'services/omnivoice-sidecar/server.py'
     Start-Detached "omnivoice-8765" "& '$py' '$server' --host 127.0.0.1 --port 8765" $Root
-    Write-Host "      权重：$cache"
-    Write-Host "      模型加载约 7~8s；/health 的 ok=true 表示就绪（before that 也可用）"
+    Write-Host "      python：$py"
+    Write-Host "      权重：  $cache"
+    Write-Host "      模型加载约 7~8s；/health 先可用，ok=true 表示就绪"
     return $true
 }
 

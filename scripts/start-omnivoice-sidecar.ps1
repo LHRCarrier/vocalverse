@@ -33,41 +33,39 @@ $server = Join-Path $root 'services/omnivoice-sidecar/server.py'
 if (-not (Test-Path $server)) { throw "找不到 $server —— 请在仓库根运行本脚本" }
 
 # ── 找 python ────────────────────────────────────────────────────────────────
-# 顺序：显式传参 → 环境变量 → 常见位置 → PATH 上的 python。
-# ⚠️ 不硬编码成"唯一答案"：换台机器路径就不一样，而**报错要说清去哪找**。
-$candidates = @()
-if ($Python) { $candidates += $Python }
-if ($env:OMNIVOICE_PYTHON) { $candidates += $env:OMNIVOICE_PYTHON }
-$candidates += (Join-Path $root 'services/python/.venv/Scripts/python.exe')
-$candidates += (Join-Path $root 'services/python/.venv/bin/python')
-$candidates += 'python'
+# python 与权重的查找顺序**真源在 scripts/lib/omnivoice.ps1**（与 dev-up.ps1 共用一份，
+# 各写一遍必然漂移）。`-Python` 作为最高优先的显式覆盖。
+. (Join-Path $PSScriptRoot 'lib/omnivoice.ps1')
+if ($Python) { $env:OMNIVOICE_PYTHON = $Python }
+if ($HfCache) { $env:OMNIVOICE_HF_CACHE = $HfCache }
 
-$py = $null
-foreach ($c in $candidates) {
-  if ($c -eq 'python') { $py = 'python'; break }
-  if (Test-Path $c) { $py = $c; break }
-}
-if (-not $py) { throw "没找到可用的 python。用 -Python <路径> 或设 `$env:OMNIVOICE_PYTHON" }
-Write-Host "[1/4] python: $py"
-
-# ── 依赖自检：把"能不能跑"提前到启动前说清楚 ─────────────────────────────────
-if (-not $Fake) {
-  $probe = & $py -c "import importlib.util as u; print('omnivoice' if u.find_spec('omnivoice') else 'MISSING')" 2>&1
-  if ($probe -notmatch 'omnivoice') {
-    Write-Host ""
-    Write-Host "✗ 这个 python 里没有装 omnivoice：$py"
-    Write-Host "  OmniVoice 是重依赖（torch + GPU），**不装在 python-api 的 venv 里**。"
-    Write-Host "  单独建一个环境并安装上游，例如："
-    Write-Host "    python -m venv .venv-omnivoice"
-    Write-Host "    .\.venv-omnivoice\Scripts\pip install omnivoice torch soundfile"
-    Write-Host "  然后用 -Python .\.venv-omnivoice\Scripts\python.exe 重跑本脚本，"
-    Write-Host "  或设 `$env:OMNIVOICE_PYTHON 指向它。"
+$py = Resolve-OmnivoicePython
+if ($Fake) {
+  # --fake 的**全部意义**就是在没有 omnivoice 环境的机器上验链路，所以这里不能要求
+  # `import omnivoice` 成功 —— 退回"任意可用 python"（本仓 venv 优先，其次 PATH）。
+  if (-not $py) {
+    foreach ($c in @(
+        (Join-Path $root 'services/python/.venv/Scripts/python.exe'),
+        (Join-Path $root 'services/python/.venv/bin/python'),
+        'python'
+      )) {
+      if ($c -eq 'python' -or (Test-Path -LiteralPath $c)) { $py = $c; break }
+    }
+  }
+  if (-not $py) { throw "没找到任何可用 python（--Fake 也至少需要一个解释器）" }
+  Write-Host "[1/4] python: $py"
+  Write-Host "[2/4] --Fake：跳过依赖自检（不加载权重、不 import torch）"
+} else {
+  if (-not $py) {
+    Write-Host "✗ 没找到装了 omnivoice 的 python。探测过的位置（scripts/lib/omnivoice.ps1）："
+    foreach ($c in (Get-OmnivoicePythonCandidates)) { Write-Host "    $c" }
+    Write-Host "  用 -Python <路径> 或设 `$env:OMNIVOICE_PYTHON 指过去；"
+    Write-Host "  或自建：python -m venv .venv-omnivoice; .\.venv-omnivoice\Scripts\pip install omnivoice torch soundfile"
     Write-Host "  只想验证链路（不合成真音频）：加 -Fake。"
     exit 2
   }
+  Write-Host "[1/4] python: $py"
   Write-Host "[2/4] 依赖自检通过（omnivoice 可导入）"
-} else {
-  Write-Host "[2/4] --Fake：跳过依赖自检（不加载权重）"
 }
 
 # ── 启动前先检查：它真的需要启动吗 ───────────────────────────────────────────
@@ -93,36 +91,20 @@ try {
 # ── 权重位置 ────────────────────────────────────────────────────────────────
 # 只在调用方没给时才猜：HF cache 下 models--k2-fsa--OmniVoice/snapshots/<rev>。
 # ⚠️ 权重约 3.3 GB，**不入库**（红线）；换机器需要自己下载或拷一份。
-$cacheRoot = $null
-if ($HfCache) { $cacheRoot = $HfCache }
-elseif ($env:OMNIVOICE_HF_CACHE) { $cacheRoot = $env:OMNIVOICE_HF_CACHE }
-else {
-  # 顺序与边车/ dev-up.ps1 一致：**先本仓** data\models（fetch 脚本的默认落点，下完即零配置），
-  # 再本机 HF 默认缓存。判据含 *.safetensors，避免把"下载到一半"当成可用权重。
-  foreach ($c in @(
-      (Join-Path $root 'data/models'),
-      (Join-Path $env:USERPROFILE '.cache/huggingface/hub'),
-      (Join-Path $env:LOCALAPPDATA 'huggingface/hub')
-    )) {
-    if (-not $c) { continue }
-    $snaps = Join-Path $c 'models--k2-fsa--OmniVoice/snapshots'
-    if (-not (Test-Path $snaps)) { continue }
-    $ok = Get-ChildItem $snaps -Directory -ErrorAction SilentlyContinue | Where-Object {
-      (Test-Path (Join-Path $_.FullName 'config.json')) -and
-      (Get-ChildItem $_.FullName -Filter '*.safetensors' -ErrorAction SilentlyContinue)
-    }
-    if ($ok) { $cacheRoot = $c; break }
-  }
-}
+# 查找顺序复用 lib 的真源（`-HfCache` → `$env:OMNIVOICE_HF_CACHE` → <仓库>/data/models
+# → 本机已知环境 → HF 默认缓存）。
+$cacheRoot = Resolve-OmnivoiceCache
 if (-not $Fake) {
   if ($cacheRoot) {
     $env:OMNIVOICE_HF_CACHE = $cacheRoot
     Write-Host "[4/4] 权重缓存：$cacheRoot"
   } else {
     Write-Host "[4/4] ⚠️ 没找到本机 OmniVoice 快照 —— 将回落到仓库 id `k2-fsa/OmniVoice`（首次自动下载，需联网）"
+    Write-Host "      探测过的位置（scripts/lib/omnivoice.ps1）："
+    foreach ($c in (Get-OmnivoiceCacheCandidates)) { Write-Host "        $c" }
     Write-Host "      一键下载（默认走 hf-mirror.com 镜像，下到 <仓库>\data\models）："
     Write-Host "        pwsh -File scripts/fetch-omnivoice-weights.ps1"
-    Write-Host "      本机已有缓存可直接复制：-FromLocal <HF 缓存根>；离线机器用 -HfCache <目录>。"
+    Write-Host "      复用它处已有缓存：-HfCache <HF 缓存根> 或 `$env:OMNIVOICE_HF_CACHE。"
   }
 } else {
   Write-Host "[4/4] --Fake：不需要权重"

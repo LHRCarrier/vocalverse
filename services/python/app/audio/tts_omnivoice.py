@@ -50,7 +50,9 @@ MANIFEST_NAME = "VOICES.json"
 # 而边车没起时，auto 会选中它 → 每次合成都失败。把连通性纳入 is_available() 后，
 # 边车没起就自动跳到 kitten/edge，链路不受影响。
 # 探测结果按 TTL 缓存：auto 链每次解析都会问一遍 is_available()，不能每请求打网络。
-_HEALTH_TTL_S = 10.0
+# TTL 取 5s（不是 10s）：边车从进程起来到模型就绪约 **10s**，这段时间 is_available()
+# 必须是 False；TTL 太长会让"模型刚就绪"之后还要多等一截才被选中。
+_HEALTH_TTL_S = 5.0
 _HEALTH_TIMEOUT_S = 2.0
 _health_cache: dict[str, tuple[float, bool]] = {}
 _health_lock = threading.Lock()
@@ -63,7 +65,13 @@ def reset_health_cache() -> None:
 
 
 def _probe_health(endpoint: str, timeout_s: float = _HEALTH_TIMEOUT_S) -> bool:
-    """``GET {endpoint}/health`` 是否 200；结果按 TTL 缓存，绝不抛错。"""
+    """``GET {endpoint}/health`` 是否**模型已就绪**；结果按 TTL 缓存，绝不抛错。
+
+    ⚠️ 判据是响应体里的 ``ok``，**不是 HTTP 200**：边车进程起来后模型要加载约 10s，
+    这期间 ``/health`` 已经返回 200 但 ``ok=false``（设计如此，好让调用方区分
+    "没起" 与 "起了但还在加载"）。只认 200 会让主服务在加载窗口内选中它 →
+    ``POST /synthesize`` 503（实测：边车日志里连着三条 503）。
+    """
     import time
 
     now = time.monotonic()
@@ -75,8 +83,10 @@ def _probe_health(endpoint: str, timeout_s: float = _HEALTH_TIMEOUT_S) -> bool:
     try:
         import httpx
 
-        ok = httpx.get(f"{endpoint}/health", timeout=timeout_s).status_code == 200
-    except Exception:  # noqa: BLE001 — 连接失败/超时/协议错一律视为未就绪
+        resp = httpx.get(f"{endpoint}/health", timeout=timeout_s)
+        payload = resp.json() if resp.status_code == 200 else {}
+        ok = bool((payload or {}).get("ok"))
+    except Exception:  # noqa: BLE001 — 连接失败/超时/非 JSON 一律视为未就绪
         ok = False
     with _health_lock:
         _health_cache[endpoint] = (now + _HEALTH_TTL_S, ok)
