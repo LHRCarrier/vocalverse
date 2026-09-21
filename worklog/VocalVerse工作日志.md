@@ -3,6 +3,41 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-21 酒馆场景卡体系 + 用户设置（后端/契约/管理端）：平台固定卡上架 + LLM 生成 + 跨设备偏好
+
+> 归属：本条记**后端/契约/管理端**面。App 端 UI（设置抽屉 + 场景卡抽屉）见 `worklog/安卓开发日志.md` 同日条。
+> 需求（组长）：设置管理要能设语言（中英）/语音开关/音色（预留）；管理端可管固定场景卡并提供随机生成上架；用户可用 LLM 按词汇生成自己的卡。口径四项已拍板（服务端偏好表 / Python 拥有卡片表 / 固定卡+用户私有卡不做投稿 / 语言只切 DM 输出）。
+
+### 后端（Python）
+
+- **迁移 0019**：`trpg_scenario_cards`（owner NULL=平台固定卡、非 NULL=用户私有卡；template JSONB 开局模板；source/status/language CHECK）与 `trpg_user_prefs`（user_id 唯一：lang/voice_enabled/voice_name）两表；`alembic heads` 仍单头 0019。
+- **卡片域** `app/trpg/cards.py`：`normalize_card` 宽容归一（facts 逐条过 key 白名单 `parse_key` + `DOMAIN_PROPERTIES`、长度截断、tags 去重上限、仅 title 必填）、用户卡 CRUD/归档、平台卡 CRUD + 上架校验（46011 violations）、`generate_card`（LLM → JSON 容错解析 → 归һ；非法 → 47003）、`start_campaign_from_card`（建 campaign → 模板落 pc/facts/tasks/clues（system 写者，不置 userTouched）→ scene.current → 开场系统卡 + 开场叙述消息，首回合不再重复开卡）。
+- **接口**：App 侧 6 op（`GET/POST /cards`、`PUT/DELETE /cards/{id}`、`POST /cards/generate`（扣 llm 桶）、`POST /cards/{id}/start`）+ 2 op（`GET/PUT /preferences`）；控制台侧 5 op（`/api/v1/console/trpg/cards`：list/create/update/publish/generate，权限 `content:scenario:{read,write,publish}`，上架校验 46011）。错误码新增 **47003**（先登记 `docs/api/error-codes.md`）。
+- **回合口径**：`turns` 新增可选 `lang`（缺省读用户偏好）；`voice_enabled=false` 时**服务端跳过逐句 TTS**（省配额）；DM prompt 按语言追加输出指令（NPC 台词格式保持中文冒号以兼容前端分段协议）。
+- **种子**：`app/db/seed_trpg.py` 幂等上架两张平台卡（迷雾酒馆 / 雨夜驿站）。
+
+### 管理端（apps/admin + Java）
+
+- Java `PermissionCatalog` 加回 `content:scenario:{read,write,publish}`（36 = 33 + 3，content 18），**operator 持有**（Python 控制台端点已上线；javadoc 记录例外理由）；`PermissionCatalogTest`/`ConsoleRbacApiTest` 计数同步。
+- admin 新增「运营 → 场景卡」页（`ScenarioCardsView.vue`）：分页/搜索/状态筛选 + 新建/编辑弹窗（含 template JSON）+ **随机生成**（关键词可空=主题池轮换）+ 上架/下架（复用 `PublishActionButton`，46011 violations 原样展示）；`ops.ts` 补 5 个方法 + `dto/content.ts` 类型 + 契约测试。
+
+### 契约与文档
+
+- `python-openapi.json` 81 → **90 op**；`pnpm gen:api` 重生成双 d.ts；Java 契约不变（`ContractSnapshotTest` 复核通过）。
+- **`docs/52` 新增 §12**（场景卡体系 + 偏好口径 + 两端端点表 + RBAC 说明）；同步 `docs/10`（9 表）、`docs/21`（trpg 22 op）、`docs/42`、`README`（功能定位/seed 命令）。
+
+### 验证
+
+- Python：`ruff check/format` 绿；`pytest -q` **737 passed, 4 skipped**（新增 `tests/test_trpg_cards.py` 11 例：归一白名单/偏好/语言与语音开关/用户卡 CRUD 与越权/模板开局/生成失败与脚本化生成/控制台权限与 violations）；`alembic heads` = 0019。
+- 管理端：`typecheck` / `test:run`（74 例，含场景卡契约用例）/ `lint` 全绿。
+- Java：`mvn test`（权限计数同步后）**179 例**通过；`ContractSnapshotTest` 绿。
+
+### 遗留
+
+1. App 端用户卡「编辑」只覆盖标题/场景/开场（模板 JSON 编辑在管理端）；2. 音色选择仅禁用展示（等音色库扩充）；3. 用户卡暂不支持投稿到管理端（本次拍板不做）；4. 控制台生成暂未单独限流（依赖控制台账号级限流 + RBAC）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-21
+
 ## 2026-09-21 酒馆跑团（TRPG）迁移：Python 后端域 7 表 + 老「场景对话」闭环删除 + 管理端场景 CRUD 退役 + 契约重刷
 
 > 归属：本条记**后端/契约/管理端/文档**面。App 端 UI（`/m/tavern` 页面与底栏入口）见 `worklog/安卓开发日志.md` 同日条；BUG 归档见 `worklog/BUG实测/影子跟读ASR失败NameError.md`。
