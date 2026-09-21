@@ -10,6 +10,7 @@ const auth = useAuthStore()
 
 const nav = [
   { label: '骨架演示', to: '/demo' },
+  { label: '社区', to: '/m/home' },
   { label: '酒馆', to: '/m/tavern' },
   { label: '答辩导师', to: '/defense' },
   { label: '入学测试', to: '/placement' },
