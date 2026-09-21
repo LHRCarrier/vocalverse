@@ -62,6 +62,23 @@ describe('MobileTopBar', () => {
   })
 
   /**
+   * 2026-09-21 组长反馈：标题居中 + 功能项可放左（左右两组宽度差的一半 = 标题偏移量）。
+   * left 插槽 = 头像之后的功能项组；不传时不渲染空容器（否则 gap 会多 8px）。
+   */
+  it('left 插槽渲染在头像之后；未传时不渲染左侧功能组', () => {
+    const wrapper = mount(MobileTopBar, {
+      props: { title: '酒馆' },
+      slots: { left: '<button class="u-topbar__act" aria-label="酒馆设置">x</button>' },
+    })
+    const left = wrapper.get('.u-topbar__left')
+    expect(left.element.firstElementChild?.classList.contains('u-topbar__ava')).toBe(true)
+    expect(wrapper.get('.u-topbar__leftacts button.u-topbar__act').attributes('aria-label')).toBe('酒馆设置')
+
+    const bare = mount(MobileTopBar, { props: { title: '社区' } })
+    expect(bare.find('.u-topbar__leftacts').exists()).toBe(false)
+  })
+
+  /**
    * 2026-09-21 组长反馈：改语言/切领域要滑回顶部 → 顶栏吸顶 + 下滚收起、上滚出现。
    * 接线断言：顶栏单独用时收起自身；包在 .u-head 吸顶区时收起整块（顶栏 + 页首控制行）。
    */

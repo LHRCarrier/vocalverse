@@ -151,6 +151,33 @@ beforeEach(() => {
 })
 
 describe('酒馆设置 + 场景卡（docs/52 §12）', () => {
+  /**
+   * 2026-09-21 组长反馈：标题居中 + 功能项可放左。
+   * 结构断言 = 左右两组钮数配平（游玩态 2:3、无剧本态 1:2）；happy-dom 无布局，
+   * 真实居中量由 Playwright 坐标实测（见 worklog 安卓日志同日条）。
+   */
+  it('顶栏配平：游玩态 设置+场景卡 在左；无剧本态星标回右', async () => {
+    const wrapper = await mountView()
+    expect(
+      wrapper.findAll('.u-topbar__leftacts .u-topbar__act').map((b) => b.attributes('aria-label')),
+    ).toEqual(['酒馆设置', '场景卡'])
+    expect(wrapper.findAll('.u-topbar__acts .u-topbar__act').map((b) => b.attributes('aria-label'))).toEqual([
+      '切换剧本',
+      '主持台',
+      '离开',
+    ])
+
+    mocks.fetchCampaigns.mockResolvedValueOnce([])
+    const onboarding = await mountView()
+    expect(
+      onboarding.findAll('.u-topbar__leftacts .u-topbar__act').map((b) => b.attributes('aria-label')),
+    ).toEqual(['酒馆设置'])
+    expect(onboarding.findAll('.u-topbar__acts .u-topbar__act').map((b) => b.attributes('aria-label'))).toEqual([
+      '场景卡',
+      '离开',
+    ])
+  })
+
   it('设置面板：语言切换与语音开关写服务端偏好；音色为预留禁用', async () => {
     const wrapper = await mountView()
     await wrapper.find('button[aria-label="酒馆设置"]').trigger('click')
