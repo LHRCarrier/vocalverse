@@ -97,22 +97,23 @@ function tintGradient(tint: string | null | undefined): string {
 
 <template>
   <div class="u-phone">
-    <!-- 统一顶栏（全局头像 → 账户抽屉 / 标题「社区」/ 右侧：加好友 + 写消息） -->
-    <MobileTopBar title="社区">
-      <template #actions>
-        <button class="u-topbar__act" type="button" title="关注" aria-label="关注" @click="demoAddFriend">
-          <IconUserPlus />
-        </button>
-        <button class="u-topbar__act" type="button" title="写消息" aria-label="写消息" @click="openMessages">
-          <IconMail />
-          <MobileUnreadBadge :count="messages.unreadTotal" />
-        </button>
-      </template>
-    </MobileTopBar>
+    <!-- 统一顶栏（全局头像 → 账户抽屉 / 标题「社区」/ 右侧：加好友 + 写消息）
+         + 领域标签行 → 同一吸顶区：长信息流里也能随时切领域/开私信（2026-09-21 组长反馈） -->
+    <div class="u-head">
+      <MobileTopBar title="社区">
+        <template #actions>
+          <button class="u-topbar__act" type="button" title="关注" aria-label="关注" @click="demoAddFriend">
+            <IconUserPlus />
+          </button>
+          <button class="u-topbar__act" type="button" title="写消息" aria-label="写消息" @click="openMessages">
+            <IconMail />
+            <MobileUnreadBadge :count="messages.unreadTotal" />
+          </button>
+        </template>
+      </MobileTopBar>
 
-    <div class="u-comm">
       <!-- 领域标签行（X 式文字标签：为你推荐▾ + 三个领域） -->
-      <nav class="u-x-tabs" aria-label="社区领域">
+      <nav class="u-x-tabs u-head__row" aria-label="社区领域">
         <button
           v-for="t in tabs"
           :key="t.label"
@@ -126,7 +127,9 @@ function tintGradient(tint: string | null | undefined): string {
           <span v-if="t.id === null" class="u-x-caret" aria-hidden="true">▾</span>
         </button>
       </nav>
+    </div>
 
+    <div class="u-comm">
       <!-- 加载态：骨架卡（docs/31 硬规则 3：>300ms 才出现） -->
       <section v-if="community.loading" class="u-comm-skel" aria-label="动态加载中" aria-busy="true">
         <div v-for="i in 3" :key="i" class="u-comm-skel__card">

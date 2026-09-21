@@ -194,33 +194,36 @@ const hasFollows = computed(() => followList.value.length > 0)
 
 <template>
   <div class="u-phone">
-    <MobileTopBar title="通知">
-      <template #actions>
-        <button class="u-topbar__act" type="button" title="新消息（演示）" aria-label="新消息" @click="newMessage">
-          <IconMail />
-          <MobileUnreadBadge :count="messages.unreadTotal" />
-        </button>
-        <button class="u-topbar__act" type="button" title="通知设置（演示）" aria-label="通知设置" @click="messageSettings">
-          <IconSettings />
-        </button>
-      </template>
-    </MobileTopBar>
+    <!-- 顶栏 + 分类 tab → 同一吸顶区：长列表里也能随时切「私信/通知/关注」（2026-09-21 组长反馈） -->
+    <div class="u-head">
+      <MobileTopBar title="通知">
+        <template #actions>
+          <button class="u-topbar__act" type="button" title="新消息（演示）" aria-label="新消息" @click="newMessage">
+            <IconMail />
+            <MobileUnreadBadge :count="messages.unreadTotal" />
+          </button>
+          <button class="u-topbar__act" type="button" title="通知设置（演示）" aria-label="通知设置" @click="messageSettings">
+            <IconSettings />
+          </button>
+        </template>
+      </MobileTopBar>
 
-    <!-- X 式 tab（均分整行 · 激活加粗 + 下划线） -->
-    <nav class="u-notif-tabs" aria-label="通知分类">
-      <button
-        v-for="t in tabs"
-        :key="t"
-        class="u-notif-tab"
-        :class="{ active: activeTab === t }"
-        type="button"
-        :aria-selected="activeTab === t"
-        @click="activeTab = t"
-      >
-        {{ t }}
-        <MobileUnreadBadge v-if="t === '私信'" class="u-notif-tab__badge" :count="messages.unreadTotal" />
-      </button>
-    </nav>
+      <!-- X 式 tab（均分整行 · 激活加粗 + 下划线） -->
+      <nav class="u-notif-tabs" aria-label="通知分类">
+        <button
+          v-for="t in tabs"
+          :key="t"
+          class="u-notif-tab"
+          :class="{ active: activeTab === t }"
+          type="button"
+          :aria-selected="activeTab === t"
+          @click="activeTab = t"
+        >
+          {{ t }}
+          <MobileUnreadBadge v-if="t === '私信'" class="u-notif-tab__badge" :count="messages.unreadTotal" />
+        </button>
+      </nav>
+    </div>
 
     <!-- Tab 1 · 私信（真实会话列表：对端 + 最后一条 + 服务端水位未读） -->
     <div v-if="activeTab === '私信'" class="u-msg">

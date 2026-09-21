@@ -58,6 +58,11 @@
   --u-scrim: rgba(20, 20, 18, 0.92);
   --u-z-lightbox: 80;
   --u-avatar-fallback: #37546e;
+  /* 点格底纹（2026-09-05 dot-grid：双 radial-gradient 交错点阵；点色 = 墨色 20%，网格 48px）。
+   * 抽成变量供 .u-phone 与吸顶页首区（.u-head）共用——吸顶区滚动时盖在内容上，底纹必须同源。 */
+  --u-paper-dots:
+    radial-gradient(rgba(28, 28, 26, 0.2) 5%, transparent 6%),
+    radial-gradient(rgba(28, 28, 26, 0.2) 5%, transparent 6%);
 }
 
 /* 系统深色模式下，表单控件（file input / select）会走 UA 深色皮肤，与纸面白卡冲突。
@@ -96,14 +101,15 @@ body.is-login {
   min-height: 100vh;
   background-color: var(--u-paper);
   /* 点格背景（组员提供的 dot-grid 方案，2026-09-05：双 radial-gradient 交错点阵；点色 = 墨色 20%，网格 48px） */
-  background-image:
-    radial-gradient(rgba(28, 28, 26, 0.2) 5%, transparent 6%),
-    radial-gradient(rgba(28, 28, 26, 0.2) 5%, transparent 6%);
+  background-image: var(--u-paper-dots);
   background-position:
     0 0,
     24px 24px;
   background-size: 48px 48px;
   position: relative;
+  /* 吸顶页首区（.u-head）要求本容器不是滚动容器：overflow-x: hidden 会把
+   * overflow-y 计算成 auto → 生成不滚动的 scrollport，position: sticky 失效（2026-09-21）。
+   * clip 不产生滚动容器，故支持时用 clip；老内核回退 hidden（保持既有裁剪、只是不吸顶）。 */
   overflow-x: hidden;
   font-family: var(--u-font);
   color: var(--u-ink);
@@ -111,6 +117,13 @@ body.is-login {
 }
 
 /* 学习页与全局一致：纸面点格背景（2026-09-09 曾试纯色，组长拍板恢复全局统一——跨页一致性优先） */
+
+/* overflow-x: clip 支持时替换 .u-phone 的 hidden（见上方注：hidden 会让吸顶失效） */
+@supports (overflow-x: clip) {
+  .u-phone {
+    overflow-x: clip;
+  }
+}
 
 .u-content {
   padding: 24px 20px 140px; /* 底部留白给浮动 Tab 栏 */
@@ -3406,10 +3419,63 @@ body.is-login {
 }
 
 /* ============================================================
+ * 页首吸顶区（2026-09-21 组长反馈：酒馆改语言 / 社区切领域 要滑回顶部才够得着）
+ *
+ * 形态 = 社交 App 惯例：顶栏常驻吸顶，下滚收起、上滚出现（方向判定在
+ * useAutoHideOnScroll，本段只管位移与过渡）。
+ * 结构两种，页面按有无「页首控制行」选：
+ *   - 只有顶栏：MobileTopBar 直接是 .u-phone 子元素（选择器 .u-phone > .u-topbar）；
+ *   - 顶栏 + 页首控制行（社区领域标签 / 通知分类 / 搜索条 / 笔记分类）：包成 .u-head，
+ *     整块一起吸顶、一起收起（行不能单独 sticky，否则与顶栏错位）。
+ * 背景 = 纸面 + 同源点格（--u-paper-dots）：滚动时盖住下方内容，观感与页面底一致。
+ * ============================================================ */
+.u-phone > .u-topbar,
+.u-head {
+  position: sticky;
+  top: 0;
+  z-index: 20; /* 低于状态线 .v-line(30) 与弹层（≥44）；高于内容与底栏(6) */
+  background-color: var(--u-paper);
+  background-image: var(--u-paper-dots);
+  background-position:
+    0 0,
+    24px 24px;
+  background-size: 48px 48px;
+  transition: transform 180ms ease-out;
+}
+
+.u-phone > .u-topbar.is-hidden,
+.u-head.is-hidden {
+  transform: translateY(-100%);
+}
+
+/* 吸顶区内的页首控制行（自 16px 内距的容器上移而来）：补左右留白 */
+.u-head__row {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* 吸顶区内的搜索条容器（原 .u-search 的顶部 6px 内距移到这里；底距由后续行/区块自带） */
+.u-head__search {
+  padding: 6px 16px 0;
+}
+
+/* 吸顶区内标签行的底外边距归零（否则 margin 塌出吸顶背景，滚动时露内容缝） */
+.u-head .u-x-tabs {
+  margin-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u-phone > .u-topbar,
+  .u-head {
+    transition: none;
+  }
+}
+
+/* ============================================================
  * 搜索页（底部搜索 tab · 2026-09-05 组长拍板 4；演示帧）
  * ============================================================ */
 .u-search {
-  padding: 6px 16px 120px;
+  padding: 0 16px 120px; /* 顶部 6px 内距随搜索条移入吸顶区（.u-head__search，2026-09-21） */
 }
 
 .u-searchbar {

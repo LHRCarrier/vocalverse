@@ -56,17 +56,18 @@ function addNote() {
 
 <template>
   <div class="u-phone">
-    <MobileTopBar title="笔记" back @back="router.push('/m/learn')">
-      <template #actions>
-        <button class="u-topbar__act" type="button" title="添加笔记（演示）" aria-label="添加笔记" @click="addNote">
-          <IconPlus />
-        </button>
-      </template>
-    </MobileTopBar>
+    <!-- 顶栏 + 分类标签行 → 同一吸顶区：长笔记列表里也能随时切分类（2026-09-21 组长反馈） -->
+    <div class="u-head">
+      <MobileTopBar title="笔记" back @back="router.push('/m/learn')">
+        <template #actions>
+          <button class="u-topbar__act" type="button" title="添加笔记（演示）" aria-label="添加笔记" @click="addNote">
+            <IconPlus />
+          </button>
+        </template>
+      </MobileTopBar>
 
-    <div class="u-notes">
       <!-- 分类标签行（X 式） -->
-      <nav class="u-x-tabs" aria-label="笔记分类">
+      <nav class="u-x-tabs u-head__row" aria-label="笔记分类">
         <button
           v-for="c in cats"
           :key="c"
@@ -79,7 +80,9 @@ function addNote() {
           {{ c }}
         </button>
       </nav>
+    </div>
 
+    <div class="u-notes">
       <ul v-if="visible.length" class="u-notes__list">
         <li v-for="n in visible" :key="n.id" class="u-notes__card">
           <span class="u-notes__body">

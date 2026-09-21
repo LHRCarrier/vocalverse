@@ -79,22 +79,42 @@ function pick(k: string) {
 
 <template>
   <div class="u-phone">
-    <MobileTopBar title="搜索" />
+    <!-- 顶栏 + 搜索条（+ 结果分类行）→ 同一吸顶区：翻长结果时也能随时改词/切分类（2026-09-21 组长反馈） -->
+    <div class="u-head">
+      <MobileTopBar title="搜索" />
 
-    <div class="u-search">
       <!-- 搜索输入条（X 式：放大镜 + 圆角大输入） -->
-      <div class="u-searchbar">
-        <MobileIcon name="search" :size="16" />
-        <input
-          v-model="keyword"
-          class="u-searchbar__input"
-          type="search"
-          maxlength="60"
-          placeholder="搜索帖子、用户、教程"
-          aria-label="搜索关键词"
-        >
+      <div class="u-head__search">
+        <div class="u-searchbar">
+          <MobileIcon name="search" :size="16" />
+          <input
+            v-model="keyword"
+            class="u-searchbar__input"
+            type="search"
+            maxlength="60"
+            placeholder="搜索帖子、用户、教程"
+            aria-label="搜索关键词"
+          >
+        </div>
       </div>
 
+      <!-- 有关键词：分类标签行（X 式，跟随吸顶） -->
+      <nav v-if="keyword.trim()" class="u-x-tabs u-search__tabs u-head__row" aria-label="搜索分类">
+        <button
+          v-for="t in tabs"
+          :key="t"
+          class="u-x-tab"
+          :class="{ active: activeTab === t }"
+          type="button"
+          :aria-selected="activeTab === t"
+          @click="activeTab = t"
+        >
+          {{ t }}
+        </button>
+      </nav>
+    </div>
+
+    <div class="u-search">
       <!-- 无关键词：历史 + 热门（演示 chips，点击回填） -->
       <template v-if="!keyword.trim()">
         <section class="u-search__section">
@@ -115,22 +135,8 @@ function pick(k: string) {
         </section>
       </template>
 
-      <!-- 有关键词：分类标签行（X 式）+ 结果列表 -->
+      <!-- 有关键词：结果列表 -->
       <template v-else>
-        <nav class="u-x-tabs u-search__tabs" aria-label="搜索分类">
-          <button
-            v-for="t in tabs"
-            :key="t"
-            class="u-x-tab"
-            :class="{ active: activeTab === t }"
-            type="button"
-            :aria-selected="activeTab === t"
-            @click="activeTab = t"
-          >
-            {{ t }}
-          </button>
-        </nav>
-
         <div v-if="currentCount" class="u-search__list">
           <!-- 帖子结果 -->
           <template v-if="activeTab === '帖子'">
