@@ -3,6 +3,24 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-21 组长手机实测四缺陷修复（后端/契约/全局面）：打卡改手动（去自动委托 + 新用户端点）、评论数改真源
+
+> 归属：本条只记**后端/契约/全局**改动。App UI 部分（打卡页/侧边提示/私信角标/提示文字/打卡卡文案）见 `worklog/安卓开发日志.md` 同日条。
+
+- **背景**：组长手机实测四张截图四条反馈：① 打卡老是自动出现、机制不清、没有入口；② 私信未读无图标角标、看完回来还显示新消息；③ 通知页实现说明文字该去掉；④ 帖子 46 条评论点开一条都没有（假数据）。①④②的后端面在本条，③与②的 UI 面在安卓日志。
+- **打卡口径改版（组长拍板：不由练习自动触发，打卡由用户手动触发）**：
+  - **Python 去自动委托**：删 `complete_session` 收尾挂钩 `_post_session_checkin`（`app/practice/service.py`）——「没操作却自动打卡」的根因；`sessions.checkin_synced_at` 列保留（不迁移，仅不再写入）。
+  - **新增手动打卡**：`app/practice/checkin.py` + 用户端点 `POST /api/v1/checkin`（`{date?}` 客户端本地日期，缺省 UTC 当天）。聚合当日**已完成 dialog 会话**：`practiceCount`（会话数）、最佳总分、最新子分、轮数/时长合计；无练习也可打卡（`practiceCount=0`，卡面只显示「今日已打卡」）。同日重复调用**幂等**（按值写快照，不自增）；Java 不可达 → **50002 明确失败**（用户主动操作必须有反馈，不再沿用收尾挂钩的静默容忍）。
+  - **Java 内部契约扩参**：`/internal/checkin` 的 `Snapshot` 增 `practiceCount`（显式给出按值写入，缺省保持旧「+1」语义兼容）；`CommunityService.upsertCheckin` 同步扩参。
+  - **种子去假数据**：`CommunitySeeder` 删 demoadult 两条历史假打卡卡 + 不再预置评论数（点赞/投币/分享的静态展示计数保留）。
+- **评论数改真源（图四「46 条评论」）**：feed/detail 的 `commentCount` 改为 `post_comments` 批量实算（`PostCommentRepository.countVisibleByPostIds` + `buildViews`），`posts.comment_count` 冗余列退出展示口径 → 种子/历史行的静态假数不再泄漏。**修复前必失败实测**：临时还原 `toPostView` 的旧取值（`p.getCommentCount()`）后跑新用例 → `expected: <0> but was: <46>`；还原修复后 12/12 绿。
+- **契约与快照**：`python-openapi.json` 67→**68 op**（+`/api/v1/checkin`）+ `java-openapi.json` Snapshot 增 `practiceCount`（手工最小 diff 方式保留键序；`ContractSnapshotTest` 语义对账绿）；`pnpm gen:api` 重生成双 `d.ts`。
+- **文档同步**：`docs/21` §2.2 端点表 + §4 internal/checkin 契约（practiceCount/调用方改手动）；`docs/37` 顶部 2026-09-21 修订条；`docs/42` 打卡自动生成→手动（5 处）；`docs/49` §4.1 可见面扩角标 + §4.2 B 项落地；`docs/13 §8` 联调页例外登记（打卡端点即生产端点，`/m/checkin` 真页可验收）。错误码零新增（复用 50002/42201）。
+- **验证**：Python `ruff check` + `ruff format --check` 绿，`pytest -q` **752 passed, 4 skipped**（`test_internal_checkin.py` 重写：手动打卡聚合/重复幂等/无练习可打卡/委托失败 50002/日期校验/路由 envelope 与 42201/**收尾不再触发回归**，共 11 例全绿）；Java 全量 `mvn test` **181 passed**（含 `InternalCheckinApiTest` 显式 practiceCount 幂等、`CommunityApiTest` 假数回归、`ContractSnapshotTest` 对账）；前端门禁见安卓日志。
+- **遗留**：① 本机/演示库里**已存在的两条假打卡卡**不会被幂等种子自动删除（种子只增不改）——需要时手工清：`DELETE FROM posts WHERE kind='checkin' AND author_id=(SELECT id FROM users WHERE username='demoadult') AND checkin_date < CURRENT_DATE;`（执行前先确认没有真实历史打卡）；② 打卡页/侧边提示的真机观感随下轮真机验证；③ `sessions.checkin_synced_at` 已成死列（保留待后续清理）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-21
+
 ## 2026-09-21 旧管理端废弃面（`/api/v1/admin/**`）残留清理：过时文档 + 脱节测试（代码面早已退役，未重复删）
 
 - **起因**：任务「删掉已经废弃的旧管理端 HTTP 面（`/api/v1/admin/**`）」。核查结论是**代码面早已删干净**，本轮不重复删除：后端 `0a635587`（2026-09-10）删 4 控制器 27 op + 只测旧面的 2 个测试类 + `SecurityConfig` 的 `hasRole("ADMIN")` matcher；前端 `8d404b5f` 删 `/admin` 壳；契约快照/生成类型里旧面 **0 条**（两个提交均为当前 HEAD 祖先，`git merge-base --is-ancestor` 复核）。残留只有三类：说明退役沿革的注释、**刻意保留**的负向回归测试、把旧面写成现行接口的过时文档——故本轮只清后两类中的过时项。
