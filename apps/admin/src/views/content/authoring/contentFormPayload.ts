@@ -16,9 +16,6 @@ import type {
   QuestionKind,
   QuestionPatch,
   QuestionUpsert,
-  SceneType,
-  ScenarioDetail,
-  ScenarioUpsert,
   SongDetail,
   SongSource,
   SongUpsert,
@@ -31,8 +28,6 @@ import type {
   MaterialUpsertPatch,
   QuestionForm,
   QuestionPatchBody,
-  ScenarioForm,
-  ScenarioUpsertPatch,
   SongForm,
   SongUpsertPatch,
 } from './contentFormTypes'
@@ -56,23 +51,6 @@ export function fillSongForm(detail: SongDetail): SongForm {
     coverUrl: detail.coverUrl ?? '',
     interestTags: detail.interestTags ?? '',
     source: (detail.source as SongSource | null) ?? 'public_domain',
-    status: (detail.status as ContentStatus | null) ?? 'draft',
-  }
-}
-
-export function fillScenarioForm(detail: ScenarioDetail): ScenarioForm {
-  return {
-    title: detail.title ?? '',
-    sceneType: (detail.sceneType as SceneType | null) ?? null,
-    difficulty: detail.difficulty ?? null,
-    description: detail.description ?? '',
-    systemPrompt: detail.systemPrompt ?? '',
-    openingLine: detail.openingLine ?? '',
-    targetCorpus: detail.targetCorpus ?? '',
-    interestTags: detail.interestTags ?? '',
-    promptVersion: detail.promptVersion === null ? '' : String(detail.promptVersion),
-    estimatedTurns: detail.estimatedTurns === null ? '' : String(detail.estimatedTurns),
-    estimatedMinutes: detail.estimatedMinutes === null ? '' : String(detail.estimatedMinutes),
     status: (detail.status as ContentStatus | null) ?? 'draft',
   }
 }
@@ -137,30 +115,6 @@ export function songUpsertFromForm(form: SongForm, original: SongForm | null): S
   }
 }
 
-/** 场景：同上，未改动字段发 null */
-export function scenarioUpsertFromForm(
-  form: ScenarioForm,
-  original: ScenarioForm | null,
-): ScenarioUpsertPatch {
-  const next = toScenarioUpsert(form)
-  if (original === null) return next
-  const base = toScenarioUpsert(original)
-  return {
-    title: patchOf(next.title, base.title),
-    sceneType: patchOf(next.sceneType, base.sceneType),
-    difficulty: patchOf(next.difficulty, base.difficulty),
-    description: patchOf(next.description, base.description),
-    systemPrompt: patchOf(next.systemPrompt, base.systemPrompt),
-    openingLine: patchOf(next.openingLine, base.openingLine),
-    targetCorpus: patchOf(next.targetCorpus, base.targetCorpus),
-    interestTags: patchOf(next.interestTags, base.interestTags),
-    promptVersion: patchOf(next.promptVersion, base.promptVersion),
-    estimatedTurns: patchOf(next.estimatedTurns, base.estimatedTurns),
-    estimatedMinutes: patchOf(next.estimatedMinutes, base.estimatedMinutes),
-    status: patchOf(next.status, base.status),
-  }
-}
-
 /** 听力素材：同上，未改动字段发 null */
 export function materialUpsertFromForm(
   form: MaterialForm,
@@ -212,24 +166,6 @@ export function toSongUpsert(form: SongForm): SongUpsert {
     coverUrl: trimmedOrNull(form.coverUrl),
     interestTags: trimmedOrNull(form.interestTags),
     source: form.source,
-    status: form.status,
-  }
-}
-
-/** 表单 → 新建体（场景） */
-export function toScenarioUpsert(form: ScenarioForm): ScenarioUpsert {
-  return {
-    title: form.title.trim(),
-    sceneType: form.sceneType ?? 'other',
-    difficulty: form.difficulty ?? 1,
-    description: trimmedOrNull(form.description),
-    systemPrompt: form.systemPrompt.trim(),
-    openingLine: form.openingLine.trim(),
-    targetCorpus: trimmedOrNull(form.targetCorpus),
-    interestTags: trimmedOrNull(form.interestTags),
-    promptVersion: parseWhole(form.promptVersion) ?? null,
-    estimatedTurns: parseWhole(form.estimatedTurns) ?? null,
-    estimatedMinutes: parseWhole(form.estimatedMinutes) ?? null,
     status: form.status,
   }
 }

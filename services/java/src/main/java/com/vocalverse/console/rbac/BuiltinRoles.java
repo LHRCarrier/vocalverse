@@ -15,10 +15,10 @@ import java.util.Set;
  * <p>矩阵要点：
  *
  * <ul>
- *   <li>{@code super} 只登记 {@code *} 通配，由 {@link RbacService} 展开为全部 35 个码 —— 新增权限码时 super
+ *   <li>{@code super} 只登记 {@code *} 通配，由 {@link RbacService} 展开为全部权限码 —— 新增权限码时 super
  *       **自动获得**，不必改 seed（docs/50 §4.2）；
  *   <li>{@code ops} = {@code ops:*}(7) + {@code console:audit:read}；
- *   <li>{@code operator} = 运营域 **Java 实现的** 15 个 content 码（song/listening/scenario/question/ticket
+ *   <li>{@code operator} = 运营域 **Java 实现的** 10 个 content 码（song/listening/question/ticket
  *       × read/write/publish）+ {@code console:audit:read}；
  *   <li>{@code moderator} = {@code moderation:*}(4) + 内容只读 4 个（song/listening/book/**media**）+
  *       {@code console:audit:read}。
@@ -83,9 +83,6 @@ public final class BuiltinRoles {
                 PermissionCatalog.CONTENT_LISTENING_READ,
                 PermissionCatalog.CONTENT_LISTENING_WRITE,
                 PermissionCatalog.CONTENT_LISTENING_PUBLISH,
-                PermissionCatalog.CONTENT_SCENARIO_READ,
-                PermissionCatalog.CONTENT_SCENARIO_WRITE,
-                PermissionCatalog.CONTENT_SCENARIO_PUBLISH,
                 PermissionCatalog.CONTENT_QUESTION_READ,
                 PermissionCatalog.CONTENT_QUESTION_WRITE,
                 PermissionCatalog.CONTENT_TICKET_READ,

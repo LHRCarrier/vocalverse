@@ -23,7 +23,7 @@ public @interface Audited {
   /** 动作名（{@code domain.thing.verb} 形式，如 {@code moderation.decide}）。 */
   String action();
 
-  /** 目标类型（docs/50 §5.3.7：song|scenario|listening_material|post|comment|admin_user|role|…）。 */
+  /** 目标类型（docs/50 §5.3.7：song|listening_material|post|comment|admin_user|role|…）。 */
   String targetType() default "";
 
   /** 人类可读的一句话（写进 {@code summary}）。 */

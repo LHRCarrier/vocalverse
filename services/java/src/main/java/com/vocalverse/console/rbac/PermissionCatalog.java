@@ -12,8 +12,8 @@ import java.util.stream.Collectors;
  * <p>本类是唯一真源：{@code admin_permissions} 表由 {@link RbacBootstrap} 启动时按本目录幂等 upsert 回写。
  * 任何「改库不改代码」的权限改动都会在下次启动被覆盖 —— 这是刻意的（docs/50 §4.2 注释）。
  *
- * <p><b>共 34 个权限码</b>（{@code PermissionCatalogTest} 钉死精确值，防「悄悄少登记/多登记」）， 4 个 module：{@code
- * console}(5) / {@code content}(18) / {@code moderation}(4) / {@code ops}(7) —— 另有 {@code *}
+ * <p><b>共 33 个权限码</b>（{@code PermissionCatalogTest} 钉死精确值，防「悄悄少登记/多登记」）， 4 个 module：{@code
+ * console}(7) / {@code content}(15) / {@code moderation}(4) / {@code ops}(7) —— 另有 {@code *}
  * 通配行（seed 用，不计入，见 {@link #WILDCARD_PERMISSION}）。
  *
  * <h2>计数口径与 docs/50 §4.2 的核对（逐个从表格数出来，不是抄数字）</h2>
@@ -34,6 +34,10 @@ import java.util.stream.Collectors;
  *
  * <p>若上游决定保留 {@code moderation:word:read/write}，只需在下面 raw 列表加回两行 → 总数 36；若决定维持「35」，需要文档明确指出多出来的那 1
  * 条到底是哪个码。
+ *
+ * <p><b>2026-09-21 更新</b>：英语「场景对话」模块整体移除（Java 后端 + Web 前端 + seed 内容）， 故删除
+ * {@code content:scenario:{read,write,publish}} 三码 —— 当前实际计数为 <b>33 = 36 − 3</b>（content
+ * 15）。上文「34/35/36」的推导保留为历史记录。
  */
 public final class PermissionCatalog {
 
@@ -74,7 +78,7 @@ public final class PermissionCatalog {
   /** App 用户停用/启用 + 学习档案维护（封禁能力的唯一实现）。 */
   public static final String CONSOLE_USER_WRITE = "console:user:write";
 
-  // ------------------------------------------------------------------ content（18）
+  // ------------------------------------------------------------------ content（15）
 
   public static final String CONTENT_SONG_READ = "content:song:read";
   public static final String CONTENT_SONG_WRITE = "content:song:write";
@@ -82,9 +86,6 @@ public final class PermissionCatalog {
   public static final String CONTENT_LISTENING_READ = "content:listening:read";
   public static final String CONTENT_LISTENING_WRITE = "content:listening:write";
   public static final String CONTENT_LISTENING_PUBLISH = "content:listening:publish";
-  public static final String CONTENT_SCENARIO_READ = "content:scenario:read";
-  public static final String CONTENT_SCENARIO_WRITE = "content:scenario:write";
-  public static final String CONTENT_SCENARIO_PUBLISH = "content:scenario:publish";
   public static final String CONTENT_QUESTION_READ = "content:question:read";
   public static final String CONTENT_QUESTION_WRITE = "content:question:write";
 
@@ -158,9 +159,6 @@ public final class PermissionCatalog {
             new Object[] {MODULE_CONTENT, CONTENT_LISTENING_READ, "听力素材查看", "听力素材列表与详情"},
             new Object[] {MODULE_CONTENT, CONTENT_LISTENING_WRITE, "听力素材增改删", "听力素材元数据维护"},
             new Object[] {MODULE_CONTENT, CONTENT_LISTENING_PUBLISH, "听力素材上下架", "听力素材 status 迁移"},
-            new Object[] {MODULE_CONTENT, CONTENT_SCENARIO_READ, "场景查看", "对话场景列表与详情"},
-            new Object[] {MODULE_CONTENT, CONTENT_SCENARIO_WRITE, "场景增改删", "场景模板维护"},
-            new Object[] {MODULE_CONTENT, CONTENT_SCENARIO_PUBLISH, "场景上下架", "场景 status 迁移"},
             new Object[] {
               MODULE_CONTENT, CONTENT_QUESTION_READ, "题库查看", "入学测试题库（题库无 draft，故无 publish）"
             },
@@ -237,7 +235,7 @@ public final class PermissionCatalog {
     return ALL.size();
   }
 
-  /** 各 module 的条数（{@code console:5 / content:18 / moderation:5 / ops:7}）；自证用。 */
+  /** 各 module 的条数（{@code console:7 / content:15 / moderation:4 / ops:7}）；自证用。 */
   public static Map<String, Integer> countByModule() {
     Map<String, Integer> m = new LinkedHashMap<>();
     for (Permission p : ALL) {

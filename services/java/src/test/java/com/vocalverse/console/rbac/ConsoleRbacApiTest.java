@@ -245,7 +245,7 @@ class ConsoleRbacApiTest extends AbstractConsoleApiTest {
     assertTrue(adminRoles.findByCode(superRoleCode()).isPresent(), "super 角色必须仍然存在");
   }
 
-  /** 权限目录端点按 module 分组返回，总条数 = 35。 */
+  /** 权限目录端点按 module 分组返回，总条数 = 33（2026-09-21 场景码移除后）。 */
   @Test
   void permissions_endpoint_groups_by_module() throws Exception {
     String token = seedAdminAndLogin(uniqueName("csu"), superRoleCode());
@@ -257,6 +257,6 @@ class ConsoleRbacApiTest extends AbstractConsoleApiTest {
       total += group.path("permissions").size();
     }
     assertEquals(catalogSize(), total, "目录端点必须回传全部权限码：" + r.path("data"));
-    assertTrue(total == 36, "目录条数（推导见 PermissionCatalog 类注释）：" + total);
+    assertTrue(total == 33, "目录条数（推导见 PermissionCatalog 类注释）：" + total);
   }
 }

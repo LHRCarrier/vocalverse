@@ -14,8 +14,6 @@ import com.vocalverse.content.LrcEntity;
 import com.vocalverse.content.LrcRepository;
 import com.vocalverse.content.PlacementQuestionEntity;
 import com.vocalverse.content.PlacementQuestionRepository;
-import com.vocalverse.content.ScenarioEntity;
-import com.vocalverse.content.ScenarioRepository;
 import com.vocalverse.content.SongEntity;
 import com.vocalverse.content.SongRepository;
 import jakarta.validation.Valid;
@@ -42,13 +40,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 运营域**内容写入**端点（场景 / 歌曲 + LRC / 听力素材 / 题库）。
+ * 运营域**内容写入**端点（歌曲 + LRC / 听力素材 / 题库）。
  *
  * <h2>为什么这个文件存在（而不是什么都不做）</h2>
  *
  * <p>旧管理端（{@code /api/v1/admin/**} 的 {@code ContentAdminController} / {@code
  * QuestionAdminController}）被整体退役。但退役前逐条核对能力矩阵发现： 控制台的内容面**只有读 + 上下架**，没有任何 create/update/delete。
- * 若直接删掉旧控制器，全仓将**不存在**任何能新建/编辑歌曲、场景、听力素材、题库的 HTTP 端点 —— 运营的职责（docs/50 §0「音乐、书籍、音频/媒体管理」，其中音乐/音频/题库归
+ * 若直接删掉旧控制器，全仓将**不存在**任何能新建/编辑歌曲、听力素材、题库的 HTTP 端点 —— 运营的职责（docs/50 §0「音乐、书籍、音频/媒体管理」，其中音乐/音频/题库归
  * Java） 就没有写路径了，而且 {@link PublishService} 也失去意义（没有内容可上架）。
  *
  * <p>这与工单域是同一类问题（前端查到的「删了以后没人能处理」），所以采用同一处置： **把能力搬到控制台**，然后删掉旧路径。净效果仍是「{@code /api/v1/admin/**}
@@ -71,20 +69,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class ConsoleContentWriteController {
 
   // ------------------------------------------------------------------ DTO（与旧面同形）
-
-  public record ScenarioUpsert(
-      @NotBlank @Size(max = 128) String title,
-      @NotBlank @Pattern(regexp = "cafe|airport|interview|library|other") String sceneType,
-      @NotNull @Min(1) @Max(4) Integer difficulty,
-      @Size(max = 512) String description,
-      @NotBlank String systemPrompt,
-      @NotBlank String openingLine,
-      String targetCorpus,
-      String interestTags,
-      @Min(1) Integer promptVersion,
-      @Min(1) Integer estimatedTurns,
-      @Min(1) Integer estimatedMinutes,
-      @Pattern(regexp = "draft|published|archived") String status) {}
 
   public record SongUpsert(
       @NotBlank @Size(max = 128) String title,
@@ -134,7 +118,6 @@ public class ConsoleContentWriteController {
   // ------------------------------------------------------------------ 字段
 
   private final SongRepository songs;
-  private final ScenarioRepository scenarios;
   private final ListeningMaterialRepository materials;
   private final PlacementQuestionRepository questions;
   private final LrcRepository lrcs;
@@ -142,13 +125,11 @@ public class ConsoleContentWriteController {
 
   public ConsoleContentWriteController(
       SongRepository songs,
-      ScenarioRepository scenarios,
       ListeningMaterialRepository materials,
       PlacementQuestionRepository questions,
       LrcRepository lrcs,
       AuditService audit) {
     this.songs = songs;
-    this.scenarios = scenarios;
     this.materials = materials;
     this.questions = questions;
     this.lrcs = lrcs;
@@ -168,13 +149,6 @@ public class ConsoleContentWriteController {
     return Envelope.ok(songView(requireSong(id)));
   }
 
-  @GetMapping("/scenarios/{id}")
-  @RequireConsolePermission(PermissionCatalog.CONTENT_SCENARIO_READ)
-  @Transactional(readOnly = true)
-  public Envelope<Map<String, Object>> getScenario(@PathVariable Long id) {
-    return Envelope.ok(scenarioView(requireScenario(id)));
-  }
-
   @GetMapping("/listening-materials/{id}")
   @RequireConsolePermission(PermissionCatalog.CONTENT_LISTENING_READ)
   @Transactional(readOnly = true)
@@ -191,71 +165,6 @@ public class ConsoleContentWriteController {
             .findById(id)
             .orElseThrow(() -> ConsoleException.of(ConsoleErrorCodes.TARGET_NOT_FOUND, "题目不存在"));
     return Envelope.ok(questionView(e));
-  }
-
-  // ------------------------------------------------------------------ 场景
-
-  @PostMapping("/scenarios")
-  @RequireConsolePermission(PermissionCatalog.CONTENT_SCENARIO_WRITE)
-  @Transactional
-  public Envelope<Map<String, Object>> createScenario(
-      @CurrentAdmin ConsolePrincipal me, @Valid @RequestBody ScenarioUpsert body) {
-    Instant now = Instant.now();
-    ScenarioEntity e = new ScenarioEntity();
-    applyScenario(e, body);
-    e.setCreatedAt(now);
-    e.setUpdatedAt(now);
-    ScenarioEntity saved = scenarios.save(e);
-    auditRecord(
-        me, "content.scenario.create", "scenario", saved.getId(), "新建场景：" + saved.getTitle());
-    return Envelope.ok(scenarioView(saved));
-  }
-
-  @PutMapping("/scenarios/{id}")
-  @RequireConsolePermission(PermissionCatalog.CONTENT_SCENARIO_WRITE)
-  @Transactional
-  public Envelope<Map<String, Object>> updateScenario(
-      @CurrentAdmin ConsolePrincipal me,
-      @PathVariable Long id,
-      @Valid @RequestBody ScenarioUpsert body) {
-    ScenarioEntity e = requireScenario(id);
-    String prev = e.getStatus();
-    applyScenario(e, body);
-    e.setUpdatedAt(Instant.now());
-    ScenarioEntity saved = scenarios.save(e);
-    auditRecord(
-        me,
-        "content.scenario.update",
-        "scenario",
-        id,
-        "更新场景：" + saved.getTitle(),
-        Map.of("prevStatus", prev, "nextStatus", saved.getStatus()));
-    return Envelope.ok(scenarioView(saved));
-  }
-
-  /**
-   * 归档（**禁物理删除**，与旧面同语义）：{@code status → archived}。
-   *
-   * <p>旧面注释已经说明「归档即软删」，控制台沿用 —— 物理删除会让已发出的题目/战绩引用悬空， 而 {@code docs/50 §6.1} 也明确「控制台不再提供物理删除」。
-   */
-  @DeleteMapping("/scenarios/{id}")
-  @RequireConsolePermission(PermissionCatalog.CONTENT_SCENARIO_WRITE)
-  @Transactional
-  public Envelope<Map<String, Object>> archiveScenario(
-      @CurrentAdmin ConsolePrincipal me, @PathVariable Long id) {
-    ScenarioEntity e = requireScenario(id);
-    String prev = e.getStatus();
-    e.setStatus(PublishService.STATUS_ARCHIVED);
-    e.setUpdatedAt(Instant.now());
-    ScenarioEntity saved = scenarios.save(e);
-    auditRecord(
-        me,
-        "content.scenario.archive",
-        "scenario",
-        id,
-        "归档场景：" + saved.getTitle(),
-        Map.of("prevStatus", prev, "nextStatus", saved.getStatus()));
-    return Envelope.ok(scenarioView(saved));
   }
 
   // ------------------------------------------------------------------ 歌曲 + LRC
@@ -575,21 +484,6 @@ public class ConsoleContentWriteController {
     audit.record(me, action, targetType, String.valueOf(id), summary, detail);
   }
 
-  private void applyScenario(ScenarioEntity e, ScenarioUpsert b) {
-    e.setTitle(b.title());
-    e.setSceneType(b.sceneType());
-    e.setDifficulty(b.difficulty());
-    e.setDescription(b.description());
-    e.setSystemPrompt(b.systemPrompt());
-    e.setOpeningLine(b.openingLine());
-    e.setTargetCorpus(b.targetCorpus());
-    e.setInterestTags(b.interestTags() == null ? "[]" : b.interestTags());
-    e.setPromptVersion(b.promptVersion() == null ? 1 : b.promptVersion());
-    e.setEstimatedTurns(b.estimatedTurns());
-    e.setEstimatedMinutes(b.estimatedMinutes());
-    e.setStatus(b.status() == null ? PublishService.STATUS_DRAFT : b.status());
-  }
-
   private void applySong(SongEntity e, SongUpsert b) {
     e.setTitle(b.title());
     e.setArtist(b.artist());
@@ -631,12 +525,6 @@ public class ConsoleContentWriteController {
     e.setStatus(b.status() == null ? PublishService.STATUS_DRAFT : b.status());
   }
 
-  private ScenarioEntity requireScenario(Long id) {
-    return scenarios
-        .findById(id)
-        .orElseThrow(() -> ConsoleException.of(ConsoleErrorCodes.TARGET_NOT_FOUND, "场景不存在"));
-  }
-
   private SongEntity requireSong(Long id) {
     return songs
         .findById(id)
@@ -665,26 +553,6 @@ public class ConsoleContentWriteController {
     m.put("source", e.getSource());
     m.put("status", e.getStatus());
     m.put("pitchRefStatus", e.getPitchRefStatus());
-    m.put("createdAt", e.getCreatedAt());
-    m.put("updatedAt", e.getUpdatedAt());
-    return m;
-  }
-
-  private static Map<String, Object> scenarioView(ScenarioEntity e) {
-    Map<String, Object> m = new LinkedHashMap<>();
-    m.put("id", e.getId());
-    m.put("title", e.getTitle());
-    m.put("sceneType", e.getSceneType());
-    m.put("difficulty", e.getDifficulty());
-    m.put("description", e.getDescription());
-    m.put("systemPrompt", e.getSystemPrompt());
-    m.put("openingLine", e.getOpeningLine());
-    m.put("targetCorpus", e.getTargetCorpus());
-    m.put("interestTags", e.getInterestTags());
-    m.put("promptVersion", e.getPromptVersion());
-    m.put("estimatedTurns", e.getEstimatedTurns());
-    m.put("estimatedMinutes", e.getEstimatedMinutes());
-    m.put("status", e.getStatus());
     m.put("createdAt", e.getCreatedAt());
     m.put("updatedAt", e.getUpdatedAt());
     return m;

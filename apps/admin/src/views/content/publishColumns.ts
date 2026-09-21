@@ -16,7 +16,7 @@ import { fmtDateTime, fmtRelative } from '@/utils/format'
 import PublishActionButton from './PublishActionButton.vue'
 
 export interface PublishColumnsOptions {
-  /** 上下架动作的域 code（`PublishService.DOMAIN_*`：song / listening / scenario） */
+  /** 上下架动作的域 code（`PublishService.DOMAIN_*`：song / listening） */
   domain: PublishDomain
   /** 该域专属的上下架权限码（docs/50 §4.2：每个域一个 publish 码） */
   publishPermission: string

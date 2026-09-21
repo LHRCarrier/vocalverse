@@ -15,8 +15,6 @@ import com.vocalverse.content.ListeningMaterialEntity;
 import com.vocalverse.content.ListeningMaterialRepository;
 import com.vocalverse.content.PlacementQuestionEntity;
 import com.vocalverse.content.PlacementQuestionRepository;
-import com.vocalverse.content.ScenarioEntity;
-import com.vocalverse.content.ScenarioRepository;
 import com.vocalverse.content.SongEntity;
 import com.vocalverse.content.SongRepository;
 import com.vocalverse.ticket.TicketEntity;
@@ -49,7 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <h2>与既有 {@code /api/v1/admin/**} 的关系</h2>
  *
- * <p>本控制器**只读取**既有仓库、**只新增**上架/下架这一条写路径（docs/50 §6.1 的 status 迁移）。 歌曲/听力/场景的 CRUD 仍走既有 {@code
+ * <p>本控制器**只读取**既有仓库、**只新增**上架/下架这一条写路径（docs/50 §6.1 的 status 迁移）。 歌曲/听力素材的 CRUD 仍走既有 {@code
  * ContentAdminController}（ADMIN 角色守门），一行未改 —— 控制台不复制 CRUD，避免「两处都能改内容元数据、规则不同」的分叉。
  *
  * <p><b>工单</b>：既有 {@code AdminTicketController} 覆盖了状态流转，所以这里**不重写状态机**， 而是调用抽出来的 {@link
@@ -88,15 +86,6 @@ public class ConsoleContentController {
       String status,
       Instant updatedAt) {}
 
-  public record ScenarioRow(
-      Long id,
-      String title,
-      String sceneType,
-      Integer difficulty,
-      String status,
-      int corpusItemCount,
-      Instant updatedAt) {}
-
   public record QuestionRow(
       Long id,
       Integer examRevision,
@@ -108,7 +97,6 @@ public class ConsoleContentController {
 
   private final SongRepository songs;
   private final ListeningMaterialRepository materials;
-  private final ScenarioRepository scenarios;
   private final PlacementQuestionRepository questions;
   private final TicketRepository tickets;
   private final TicketWorkflowService ticketWorkflow;
@@ -119,7 +107,6 @@ public class ConsoleContentController {
   public ConsoleContentController(
       SongRepository songs,
       ListeningMaterialRepository materials,
-      ScenarioRepository scenarios,
       PlacementQuestionRepository questions,
       TicketRepository tickets,
       TicketWorkflowService ticketWorkflow,
@@ -128,7 +115,6 @@ public class ConsoleContentController {
       AuditService audit) {
     this.songs = songs;
     this.materials = materials;
-    this.scenarios = scenarios;
     this.questions = questions;
     this.tickets = tickets;
     this.ticketWorkflow = ticketWorkflow;
@@ -182,31 +168,6 @@ public class ConsoleContentController {
       @PathVariable Long id,
       @Valid @RequestBody PublishRequest body) {
     return Envelope.ok(applyPublish(me, PublishService.DOMAIN_LISTENING, id, body.status()));
-  }
-
-  // ------------------------------------------------------------------ 场景
-
-  @GetMapping("/scenarios")
-  @RequireConsolePermission(PermissionCatalog.CONTENT_SCENARIO_READ)
-  @Transactional(readOnly = true)
-  public Envelope<PageView<ScenarioRow>> listScenarios(
-      @RequestParam(defaultValue = "1") @Min(1) int page,
-      @RequestParam(name = "page_size", defaultValue = "20") @Min(1) @Max(100) int pageSize,
-      @RequestParam(required = false) @Pattern(regexp = "draft|published|archived") String status,
-      @RequestParam(required = false) String sceneType) {
-    Page<ScenarioEntity> rows =
-        scenarios.search(status, sceneType, PageRequest.of(page - 1, pageSize));
-    return Envelope.ok(PageView.of(rows.map(ConsoleContentController::toRow)));
-  }
-
-  @PostMapping("/scenarios/{id}/publish")
-  @RequireConsolePermission(PermissionCatalog.CONTENT_SCENARIO_PUBLISH)
-  @Transactional
-  public Envelope<PublishView> publishScenario(
-      @CurrentAdmin ConsolePrincipal me,
-      @PathVariable Long id,
-      @Valid @RequestBody PublishRequest body) {
-    return Envelope.ok(applyPublish(me, PublishService.DOMAIN_SCENARIO, id, body.status()));
   }
 
   // ------------------------------------------------------------------ 题库（只读：题库无 draft，故无
@@ -347,7 +308,7 @@ public class ConsoleContentController {
       @RequestParam(defaultValue = "1") @Min(1) int page,
       @RequestParam(name = "page_size", defaultValue = "20") @Min(1) @Max(100) int pageSize,
       @RequestParam(required = false)
-          @Pattern(regexp = "song|listening_material|scenario|book|chapter")
+          @Pattern(regexp = "song|listening_material|book|chapter")
           String targetType) {
     Page<AdminAuditLogEntity> rows =
         auditLogs.publishEvents(
@@ -395,7 +356,6 @@ public class ConsoleContentController {
     return switch (domain) {
       case PublishService.DOMAIN_SONG -> "song";
       case PublishService.DOMAIN_LISTENING -> "listening_material";
-      case PublishService.DOMAIN_SCENARIO -> "scenario";
       default -> domain;
     };
   }
@@ -420,17 +380,6 @@ public class ConsoleContentController {
         e.getAudioUrl(),
         e.getTranscript() != null && !e.getTranscript().isBlank(),
         e.getStatus(),
-        e.getUpdatedAt());
-  }
-
-  private static ScenarioRow toRow(ScenarioEntity e) {
-    return new ScenarioRow(
-        e.getId(),
-        e.getTitle(),
-        e.getSceneType(),
-        e.getDifficulty(),
-        e.getStatus(),
-        PublishService.countCorpusItems(e.getTargetCorpus()),
         e.getUpdatedAt());
   }
 

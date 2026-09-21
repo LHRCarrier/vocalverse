@@ -27,19 +27,22 @@ import { fmtDateTime, fmtInt, fmtRelative } from '@/utils/format'
 /**
  * 筛选档 → 后端 `targetType` 取值。
  * 权威：`ConsoleContentController.publishEvents` 的 `@Pattern(regexp =
- * "song|listening_material|scenario|book|chapter")` —— 是**下划线**与单数，不是端点路径那种复数。
+ * "song|listening_material|book|chapter")` —— 是**下划线**与单数，不是端点路径那种复数。
  */
 const TARGET_TYPES: { label: string; value: PublishTargetType }[] = [
   { label: '歌曲', value: 'song' },
   { label: '听力素材', value: 'listening_material' },
-  { label: '场景', value: 'scenario' },
   { label: '书籍', value: 'book' },
   { label: '章节', value: 'chapter' },
 ]
 
 const targetTypeOptions = TARGET_TYPES.map(({ label, value }) => ({ label, value }))
 
-/** 审计里的内容域 code（`PublishService.DOMAIN_*`，单数）→ 中文 */
+/**
+ * 审计里的内容域 code（`PublishService.DOMAIN_*`，单数）→ 中文。
+ * `scenario` 仅作**历史流水展示**：英语「场景对话」模块已于 2026-09-21 移除，
+ * 旧的审计行里可能仍有 `content.scenario.publish`，此处不再提供筛选入口但保留中文名。
+ */
 const DOMAIN_LABEL: Record<string, string> = {
   song: '歌曲',
   listening: '听力素材',

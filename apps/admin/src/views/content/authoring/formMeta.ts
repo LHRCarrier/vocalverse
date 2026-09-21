@@ -3,7 +3,7 @@
  *
  * 为什么单独一个文件（而不是散在四个弹窗里）：这些取值域**全部来自后端注解**，
  * 是"改了以后前端会静默发非法值、直到运营点了保存才吃 422"的那类字面量。
- * 集中一处才能逐个标注权威来源（其余文件只引用 `SCENE_TYPES` 这类常量，不重复字面量）。
+ * 集中一处才能逐个标注权威来源（其余文件只引用 `LEVEL_OPTIONS` 这类常量，不重复字面量）。
  */
 
 import type { NButton } from 'naive-ui'
@@ -61,15 +61,6 @@ export const SOURCE_OPTIONS = [
   { label: '仅演示（demo_only）', value: 'demo_only' },
 ] as const
 
-/** 场景类型（`ScenarioUpsert.sceneType` 的 `@Pattern`）：**封闭**取值域，不是自由文本 */
-export const SCENE_TYPE_OPTIONS = [
-  { label: '咖啡馆（cafe）', value: 'cafe' },
-  { label: '机场（airport）', value: 'airport' },
-  { label: '面试（interview）', value: 'interview' },
-  { label: '图书馆（library）', value: 'library' },
-  { label: '其它（other）', value: 'other' },
-] as const
-
 /** 题目类型（`QuestionUpsert.kind`）：read=朗读题（跟读评分）、qa=问答题 */
 export const QUESTION_KIND_OPTIONS = [
   { label: '朗读题（read）', value: 'read' },
@@ -83,14 +74,6 @@ export const LEVEL_OPTIONS = [
   { label: '3 · 中级', value: 3 },
   { label: '4 · 高级', value: 4 },
 ] as const
-
-/**
- * 目标语料的**权威格式**（`PublishService.countCorpusItems` + `app/practice/corpus.py` 同口径）：
- * 逐行一条，`English phrase|中文释义`，只统计含 `|` 且 `|` 前有实际短语的行。
- * 上架要求 ≥3 条 —— 这条格式说明就是那次 46011 的可操作版本。
- */
-export const TARGET_CORPUS_HINT =
-  '每行一条语言点，格式 `English phrase|中文释义`（与 Python 解析口径一致，PublishService.countCorpusItems）。上架要求 ≥ 3 条。'
 
 /** 兴趣标签列的事实格式：JSON 数组**文本**（Java `String interestTags`；空值服务端回落 `"[]"`） */
 export const INTEREST_TAGS_HINT =
@@ -160,52 +143,11 @@ export const FIELD_META = {
     field: 'status',
     label: '状态',
     kind: 'enum',
-    // 歌曲 / 场景 / 听力素材共用的三态（`PublishService.STATUS_*`）；题库是两态，见 `QUESTION_STATUS_OPTIONS`
+    // 歌曲 / 听力素材共用的三态（`PublishService.STATUS_*`）；题库是两态，见 `QUESTION_STATUS_OPTIONS`
     options: ['draft', 'published', 'archived'],
   },
   // 歌曲：LRC 行（发布前置条件，见 §6.1）。field 名叫 `lines` 与 `LrcLine` 数组对齐
   lines: { field: 'lines', label: 'LRC 歌词行', kind: 'list', requiredHint: '至少 1 行（上架前置条件）' },
-
-  // 场景
-  sceneType: {
-    field: 'sceneType',
-    label: '场景类型',
-    kind: 'enum',
-    requiredHint: '必填',
-    options: ['cafe', 'airport', 'interview', 'library', 'other'],
-  },
-  difficulty: {
-    field: 'difficulty',
-    label: '难度',
-    kind: 'int',
-    requiredHint: '必填',
-    min: 1,
-    max: 4,
-  },
-  description: { field: 'description', label: '场景描述', kind: 'text', maxLength: URL_MAX },
-  systemPrompt: {
-    field: 'systemPrompt',
-    label: '系统提示词',
-    kind: 'text',
-    requiredHint: '不能为空',
-    keywords: ['systemPrompt'],
-  },
-  openingLine: {
-    field: 'openingLine',
-    label: '开场白',
-    kind: 'text',
-    requiredHint: '不能为空（上架前置条件）',
-    keywords: ['openingLine', '开场白'],
-  },
-  targetCorpus: {
-    field: 'targetCorpus',
-    label: '目标语料',
-    kind: 'lines',
-    keywords: ['targetCorpus', '目标语料', '语料'],
-  },
-  promptVersion: { field: 'promptVersion', label: '提示词版本', kind: 'int', min: 1 },
-  estimatedTurns: { field: 'estimatedTurns', label: '预计轮次', kind: 'int', min: 1 },
-  estimatedMinutes: { field: 'estimatedMinutes', label: '预计时长（分钟）', kind: 'int', min: 1 },
 
   // 听力素材
   transcript: {

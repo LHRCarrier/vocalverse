@@ -18,7 +18,7 @@ import PermissionGate from '@/components/common/PermissionGate.vue'
 import { PUBLISH_REASONS, UNPUBLISH_REASONS, confirmWithReason } from './actionReason'
 
 const props = defineProps<{
-  /** 内容域 code（Java `PublishService.DOMAIN_*`：song / listening / scenario）；书籍等 Python 侧内容改传 `submit` */
+  /** 内容域 code（Java `PublishService.DOMAIN_*`：song / listening）；书籍等 Python 侧内容改传 `submit` */
   domain?: PublishDomain
   id: number
   title: string

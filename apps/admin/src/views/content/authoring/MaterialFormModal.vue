@@ -2,7 +2,7 @@
 /**
  * 听力素材新建 / 编辑弹窗（`POST|PUT /content/listening-materials`）。
  *
- * 与 `SongFormModal` / `ScenarioFormModal` 同构。素材特有的两点：
+ * 与 `SongFormModal` 同构。素材特有的两点：
  * 1. **列表行只有 `hasTranscript` 布尔位**（服务端不把转写原文放进列表），而编辑需要原文 ——
  *    所以"编辑前先回读单条"在这里不是优化而是必需：拿列表行回填会让 transcript 变成空串，
  *    保存即把已有转写清掉。

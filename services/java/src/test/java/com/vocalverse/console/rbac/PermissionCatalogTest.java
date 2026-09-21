@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 /**
  * 权限目录自证（docs/50 §4.2）。
  *
- * <p>把目录条数钉死（**34**，推导见 {@code PermissionCatalog} 类注释与下方说明）。刻意用**精确计数**而不是「≥ 某个数」：目录少登记一个码时，
+ * <p>把目录条数钉死（**33**，推导见 {@code PermissionCatalog} 类注释与下方说明）。刻意用**精确计数**而不是「≥ 某个数」：目录少登记一个码时，
  * 拥有对应权限的角色会在运行时拿到 46002，而那种缺陷在功能测试里极难定位 （端点存在、角色存在、就是点不动）。这里让它在构建期就红。
  *
  * <h2>这个数字是逐个从 §4.2 表格数出来的</h2>
@@ -28,19 +28,21 @@ import org.junit.jupiter.api.Test;
  *       而不是凑一个没有端点的码出来。
  * </ol>
  *
+ * <p>2026-09-21：场景（scenario）模块整体移除，再删 3 个 {@code content:scenario:*} 码 → 当前 33。
+ *
  * <p>取整过程与「若上游要 36/35 该怎么改」写在 {@code PermissionCatalog} 类注释。
  */
 class PermissionCatalogTest {
 
-  /** 目录条数（34；推导见类注释）。 */
-  private static final int EXPECTED_TOTAL = 36;
+  /** 目录条数（33；推导见类注释）。 */
+  private static final int EXPECTED_TOTAL = 33;
 
   @Test
-  void catalog_has_exactly_thirty_four_codes() {
+  void catalog_has_exactly_thirty_three_codes() {
     assertEquals(
         EXPECTED_TOTAL,
         PermissionCatalog.size(),
-        "权限码总数必须恰为 36（推导见 PermissionCatalog 类注释）；实际：" + PermissionCatalog.allCodes());
+        "权限码总数必须恰为 33（推导见 PermissionCatalog 类注释）；实际：" + PermissionCatalog.allCodes());
   }
 
   @Test
@@ -50,7 +52,7 @@ class PermissionCatalogTest {
         7,
         byModule.get(PermissionCatalog.MODULE_CONSOLE),
         "console 模块（5 账号/角色/审计 + 2 App 用户）：" + byModule);
-    assertEquals(18, byModule.get(PermissionCatalog.MODULE_CONTENT), "content 模块：" + byModule);
+    assertEquals(15, byModule.get(PermissionCatalog.MODULE_CONTENT), "content 模块：" + byModule);
     assertEquals(
         4,
         byModule.get(PermissionCatalog.MODULE_MODERATION),
@@ -101,7 +103,7 @@ class PermissionCatalogTest {
             .anyMatch(p -> PermissionCatalog.WILDCARD.equals(p.code())),
         "allForSeed() 必须含通配符行（否则 RbacBootstrap 解析不到 * 的 id → super 零权限）");
     assertEquals(
-        EXPECTED_TOTAL + 1, PermissionCatalog.allForSeed().size(), "seed 清单 = 36 个真实码 + 1 行通配符");
+        EXPECTED_TOTAL + 1, PermissionCatalog.allForSeed().size(), "seed 清单 = 33 个真实码 + 1 行通配符");
     assertTrue(
         PermissionCatalog.byModule().values().stream()
             .flatMap(List::stream)
@@ -151,11 +153,11 @@ class PermissionCatalogTest {
     BuiltinRoles.Role operator = BuiltinRoles.byCode(BuiltinRoles.OPERATOR);
     assertNotNull(operator);
     assertEquals(
-        16,
+        13,
         operator.permissionCodes().size(),
-        "运营 = Java 侧 content 13（song/listening/scenario 各 3 = 9 + question 2 + ticket 2）"
+        "运营 = Java 侧 content 10（song/listening 各 3 = 6 + question 2 + ticket 2）"
             + " + console:user:read/write 2（App 用户管理已随旧管理端退役搬进控制台，运营要能管用户）"
-            + " + console:audit:read 1 = 16。"
+            + " + console:audit:read 1 = 13。"
             + "⚠️ 这个数**从 BuiltinRoles 的实现推导**，不是抄文档——文档里的权限码数量已错过三次"
             + "（docs/51 §1.1 B-10），凡数量断言都要说清它由哪几项加出来，否则下次仍然对不上。");
     for (String c : operator.permissionCodes()) {
@@ -165,9 +167,6 @@ class PermissionCatalogTest {
     }
     assertTrue(operator.permissionCodes().contains(PermissionCatalog.CONTENT_SONG_PUBLISH));
     assertTrue(operator.permissionCodes().contains(PermissionCatalog.CONTENT_TICKET_WRITE));
-    assertTrue(
-        operator.permissionCodes().contains(PermissionCatalog.CONTENT_SCENARIO_PUBLISH),
-        "运营必须能上下架场景");
     // 题库在 Java 侧只读（§4.2：题库无 draft，故无 publish）
     assertTrue(operator.permissionCodes().contains(PermissionCatalog.CONTENT_QUESTION_READ));
   }

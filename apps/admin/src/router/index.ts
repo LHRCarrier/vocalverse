@@ -95,12 +95,6 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '书籍', permission: 'content:book:read' },
       },
       {
-        path: 'content/scenarios',
-        name: 'content-scenarios',
-        component: () => import('@/views/content/ScenariosView.vue'),
-        meta: { title: '场景库', permission: 'content:scenario:read' },
-      },
-      {
         // 题库：端点与权限码（content:question:read/write）从控制台模块第一天起就存在，
         // 但此前没有任何页面用它 —— 权限码成了发不出去也测不到的装饰（docs/51 §1.7 的另一面）
         path: 'content/questions',

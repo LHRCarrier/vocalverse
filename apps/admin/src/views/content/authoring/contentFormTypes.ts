@@ -19,12 +19,7 @@
  * 审阅时一眼能看出某次改动动的是契约还是本地校验。
  */
 
-import type {
-  ContentStatus,
-  QuestionKind,
-  SceneType,
-  SongSource,
-} from '@/api'
+import type { ContentStatus, QuestionKind, SongSource } from '@/api'
 import type { FormFieldKey } from './formMeta'
 
 // ── 更新体：字段类型「值 + 缺省」 ────────────────────────────────────────
@@ -49,22 +44,6 @@ export interface SongUpsertPatch {
   coverUrl: Patched<string | null>
   interestTags: Patched<string | null>
   source: Patched<SongSource | null>
-  status: Patched<ContentStatus | null>
-}
-
-/** 场景更新体 */
-export interface ScenarioUpsertPatch {
-  title: Patched<string>
-  sceneType: Patched<SceneType>
-  difficulty: Patched<number>
-  description: Patched<string | null>
-  systemPrompt: Patched<string>
-  openingLine: Patched<string>
-  targetCorpus: Patched<string | null>
-  interestTags: Patched<string | null>
-  promptVersion: Patched<number | null>
-  estimatedTurns: Patched<number | null>
-  estimatedMinutes: Patched<number | null>
   status: Patched<ContentStatus | null>
 }
 
@@ -132,21 +111,6 @@ export interface LrcFormRow {
   offsetMs: string
   endOffsetMs: string
   lineText: string
-}
-
-export interface ScenarioForm {
-  title: string
-  sceneType: SceneType | null
-  difficulty: number | null
-  description: string
-  systemPrompt: string
-  openingLine: string
-  targetCorpus: string
-  interestTags: string
-  promptVersion: string
-  estimatedTurns: string
-  estimatedMinutes: string
-  status: ContentStatus
 }
 
 export interface MaterialForm {

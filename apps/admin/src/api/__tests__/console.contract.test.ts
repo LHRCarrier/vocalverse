@@ -32,7 +32,6 @@ describe('内容域推导（publish-events 不返回 domain）', () => {
   it('从 action `content.{domain}.publish` 取中间段', () => {
     expect(publishEventDomain(event(null))).toBe('song')
     expect(publishEventDomain(event(null, 'content.listening.publish'))).toBe('listening')
-    expect(publishEventDomain(event(null, 'content.scenario.publish'))).toBe('scenario')
   })
 
   it('形状不符时返回 null（调用方回落到 targetType，不编一个域出来）', () => {
@@ -78,11 +77,10 @@ describe('46011 字段级违规的字段名（PublishService.Violation）', () =
 })
 
 describe('内容域的查询参数名（v1 多传了一个后端不接收的 q）', () => {
-  /** Java 四个 listXxx 的 @RequestParam 实际取值（ConsoleContentController 144-235 行） */
+  /** Java 三个 listXxx 的 @RequestParam 实际取值（ConsoleContentController） */
   const QUERY_PARAMS: Record<string, string[]> = {
     songs: ['page', 'page_size', 'status'],
     'listening-materials': ['page', 'page_size', 'status'],
-    scenarios: ['page', 'page_size', 'status', 'sceneType'],
     questions: ['page', 'page_size', 'examRevision', 'status'],
   }
 
@@ -91,7 +89,6 @@ describe('内容域的查询参数名（v1 多传了一个后端不接收的 q�
       expect(params).not.toContain('q')
       expect(params).toContain('page_size')
     }
-    expect(QUERY_PARAMS.scenarios).toContain('sceneType')
     expect(QUERY_PARAMS.questions).toContain('examRevision')
   })
 

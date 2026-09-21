@@ -6,8 +6,6 @@ import com.vocalverse.content.ListeningMaterialEntity;
 import com.vocalverse.content.ListeningMaterialRepository;
 import com.vocalverse.content.LrcEntity;
 import com.vocalverse.content.LrcRepository;
-import com.vocalverse.content.ScenarioEntity;
-import com.vocalverse.content.ScenarioRepository;
 import com.vocalverse.content.SongEntity;
 import com.vocalverse.content.SongRepository;
 import java.time.Instant;
@@ -23,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <h2>校验规则与列的存在性（逐条核实；不发明不存在的列）</h2>
  *
- * <p>docs/50 §6.1 给了 5 条规则。写代码前逐条对照了真实实体，<b>发现 3 处与真实 schema 不符</b>， 处理方式见下：
+ * <p>docs/50 §6.1 给了 5 条规则。写代码前逐条对照了真实实体，<b>发现若干处与真实 schema 不符</b>， 处理方式见下：
  *
  * <table border="1">
  *   <tr><th>文档规则</th><th>真实列 / 数据</th><th>本实现</th></tr>
@@ -41,15 +39,6 @@ import org.springframework.transaction.annotation.Transactional;
  *       <td>{@code audio_url} 是 varchar **NOT NULL**（同样恒真）；{@code transcript} 可为 NULL ✔</td>
  *       <td>{@code transcript} 非空为**真校验**（保留）；{@code audio_url} 只做非空串兜底并注释说明
  *           「该列 NOT NULL，此处仅防空串」——不假装它是一道有意义的闸门</td></tr>
- *   <tr><td>场景：{@code opening_line} + 目标语料（语言点）≥3 条</td>
- *       <td>{@code opening_line} 存在 ✔；「语言点」**没有独立表/集列**，只有 {@code target_corpus}
- *           一个 text 列。**权威解析格式**：每行 {@code English phrase|中文释义}
- *           （{@code app/practice/corpus.py} 的 {@code parse_target_corpus}：
- *           {@code for line in raw.splitlines()} + {@code if "|" in line: phrase, gloss = line.split("|", 1)}），
- *           实际种子数据 {@code app/db/seed_recommend.py} 也是这个格式</td>
- *       <td>{@code opening_line} 非空（阻断）+ {@code target_corpus} 中**含 {@code |} 的语料行 ≥3**
- *           （阻断）。按 {@code |} 计数而不是按行计数：先前的「按换行/分号切分」会与 Python 的解析口径
- *           不一致（一行里塞多个分号会被算成多条，而 Python 只认 {@code |}）—— 校验器与消费者必须同口径</td></tr>
  *   <tr><td>书籍：{@code book_chapters} ≥1 章且每章 {@code status='published'}</td>
  *       <td>{@code books}/{@code book_chapters} **归 Python 写**（docs/50 §5.4），
  *           且 {@code book_chapters.status} 目前在 Java 侧**没有任何读取方**</td>
@@ -76,7 +65,6 @@ public class PublishService {
 
   public static final String DOMAIN_SONG = "song";
   public static final String DOMAIN_LISTENING = "listening";
-  public static final String DOMAIN_SCENARIO = "scenario";
 
   /** 字段级违规项（docs/50 §10.4 46011 {@code data.violations[]}）。 */
   public record Violation(String field, String code, String message) {}
@@ -84,17 +72,12 @@ public class PublishService {
   private final SongRepository songs;
   private final LrcRepository lrcs;
   private final ListeningMaterialRepository materials;
-  private final ScenarioRepository scenarios;
 
   public PublishService(
-      SongRepository songs,
-      LrcRepository lrcs,
-      ListeningMaterialRepository materials,
-      ScenarioRepository scenarios) {
+      SongRepository songs, LrcRepository lrcs, ListeningMaterialRepository materials) {
     this.songs = songs;
     this.lrcs = lrcs;
     this.materials = materials;
-    this.scenarios = scenarios;
   }
 
   // ------------------------------------------------------------------ 上架
@@ -143,25 +126,9 @@ public class PublishService {
           materials.save(e);
         }
       }
-      case DOMAIN_SCENARIO -> {
-        ScenarioEntity e =
-            scenarios
-                .findById(id)
-                .orElseThrow(
-                    () -> ConsoleException.of(ConsoleErrorCodes.TARGET_NOT_FOUND, "场景不存在"));
-        prev = e.getStatus();
-        if (STATUS_PUBLISHED.equals(next)) {
-          violations.addAll(validateScenario(e));
-        }
-        if (violations.isEmpty()) {
-          e.setStatus(next);
-          e.setUpdatedAt(Instant.now());
-          scenarios.save(e);
-        }
-      }
       default ->
           throw ConsoleException.of(
-              ConsoleErrorCodes.INVALID_PARAM, "内容域仅支持 song|listening|scenario");
+              ConsoleErrorCodes.INVALID_PARAM, "内容域仅支持 song|listening");
     }
 
     if (!violations.isEmpty()) {
@@ -227,59 +194,6 @@ public class PublishService {
       out.add(new Violation("audioUrl", "required", "听力素材 audioUrl 为空串（该列 NOT NULL，此处防脏数据）"));
     }
     return out;
-  }
-
-  /**
-   * 场景上架：{@code opening_line} 非空 + 目标语料 ≥3 条（docs/50 §6.1-3）。
-   *
-   * <p>「≥3 条」的载体是 {@code scenarios.target_corpus}（单个 text 列，库里无独立语言点表）， 按**权威格式** {@code
-   * English|中文} 逐行计数 —— 与 {@code app/practice/corpus.py} 的解析口径一致。
-   */
-  private List<Violation> validateScenario(ScenarioEntity e) {
-    List<Violation> out = new ArrayList<>();
-    if (isBlank(e.getOpeningLine())) {
-      out.add(new Violation("openingLine", "required", "场景必须填写开场白 openingLine"));
-    }
-    int corpusItems = countCorpusItems(e.getTargetCorpus());
-    if (corpusItems < 3) {
-      out.add(
-          new Violation(
-              "targetCorpus",
-              "too_few_items",
-              "目标语料至少 3 条语言点（每行一条，格式 `English phrase|中文释义`，与 Python 解析口径一致），当前 "
-                  + corpusItems
-                  + " 条"));
-    }
-    return out;
-  }
-
-  /**
-   * 目标语料条目数：按 {@code app/practice/corpus.py} 的权威格式逐行计数 —— 只统计**含 {@code |} 且 {@code |}
-   * 前有实际短语**的行（Python 端 {@code parse_target_corpus} 同口径： {@code splitlines()} → 跳过空行 → {@code "|"
-   * in line} 时拆 phrase/gloss → phrase 为空则跳过）。
-   *
-   * <p>为什么不按换行/分号切分：那样会把一行内带分号的中文释义算成多条，与真实消费方（Python）的解析结果 不一致。校验器与消费者同口径是硬要求 —— 否则会出现「Java 说够 3
-   * 条、Python 只解析出 2 条」。
-   */
-  static int countCorpusItems(String targetCorpus) {
-    if (isBlank(targetCorpus)) {
-      return 0;
-    }
-    int count = 0;
-    for (String line : targetCorpus.split("\\r?\\n")) {
-      String trimmed = line.strip();
-      if (trimmed.isEmpty()) {
-        continue;
-      }
-      int bar = trimmed.indexOf('|');
-      if (bar <= 0) {
-        continue;
-      }
-      if (!trimmed.substring(0, bar).strip().isEmpty()) {
-        count++;
-      }
-    }
-    return count;
   }
 
   static String requireStatus(String raw) {
