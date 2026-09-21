@@ -52,22 +52,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/console/content/scenarios/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getScenario"];
-        put: operations["updateScenario"];
-        post?: never;
-        delete: operations["archiveScenario"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/console/content/questions/{id}": {
         parameters: {
             query?: never;
@@ -164,22 +148,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/internal/level": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["setLevel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/internal/song/{songId}/pitch-status": {
         parameters: {
             query?: never;
@@ -190,6 +158,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["setPitchStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/level": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["setLevel"];
         delete?: never;
         options?: never;
         head?: never;
@@ -414,38 +398,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["publishSong"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/console/content/scenarios": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listScenarios"];
-        put?: never;
-        post: operations["createScenario"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/console/content/scenarios/{id}/publish": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["publishScenario"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1183,24 +1135,6 @@ export interface components {
                 [key: string]: Record<string, never>;
             }[];
         };
-        ScenarioUpsert: {
-            title: string;
-            sceneType: string;
-            /** Format: int32 */
-            difficulty: number;
-            description?: string;
-            systemPrompt: string;
-            openingLine: string;
-            targetCorpus?: string;
-            interestTags?: string;
-            /** Format: int32 */
-            promptVersion?: number;
-            /** Format: int32 */
-            estimatedTurns?: number;
-            /** Format: int32 */
-            estimatedMinutes?: number;
-            status?: string;
-        };
         QuestionPatch: {
             prompt: string;
             referenceAnswer?: string;
@@ -1263,10 +1197,11 @@ export interface components {
             message?: string;
             data?: Record<string, never>;
         };
-        LevelRequest: {
+        PitchStatusRequest: {
             /** Format: int64 */
-            userId: number;
-            level: string;
+            songId: number;
+            status: string;
+            version?: string;
         };
         EnvelopeLong: {
             /** Format: int32 */
@@ -1274,6 +1209,11 @@ export interface components {
             message?: string;
             /** Format: int64 */
             data?: number;
+        };
+        LevelRequest: {
+            /** Format: int64 */
+            userId: number;
+            level: string;
         };
         CheckinRequest: {
             /** Format: int64 */
@@ -1691,12 +1631,6 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
-        PitchStatusRequest: {
-            /** Format: int64 */
-            songId: number;
-            status: string;
-            version?: string;
-        };
         ProfileUpdate: {
             ageGroup?: string;
             cefrLevel?: string;
@@ -1841,34 +1775,6 @@ export interface components {
             audioUrl?: string;
             status?: string;
             pitchRefStatus?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        EnvelopePageViewScenarioRow: {
-            /** Format: int32 */
-            code?: number;
-            message?: string;
-            data?: components["schemas"]["PageViewScenarioRow"];
-        };
-        PageViewScenarioRow: {
-            items?: components["schemas"]["ScenarioRow"][];
-            /** Format: int64 */
-            total?: number;
-            /** Format: int32 */
-            page?: number;
-            /** Format: int32 */
-            page_size?: number;
-        };
-        ScenarioRow: {
-            /** Format: int64 */
-            id?: number;
-            title?: string;
-            sceneType?: string;
-            /** Format: int32 */
-            difficulty?: number;
-            status?: string;
-            /** Format: int32 */
-            corpusItemCount?: number;
             /** Format: date-time */
             updatedAt?: string;
         };
@@ -2267,80 +2173,6 @@ export interface operations {
             };
         };
     };
-    getScenario: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
-                };
-            };
-        };
-    };
-    updateScenario: {
-        parameters: {
-            query: {
-                me: components["schemas"]["ConsolePrincipal"];
-            };
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ScenarioUpsert"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
-                };
-            };
-        };
-    };
-    archiveScenario: {
-        parameters: {
-            query: {
-                me: components["schemas"]["ConsolePrincipal"];
-            };
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
-                };
-            };
-        };
-    };
     getQuestion: {
         parameters: {
             query?: never;
@@ -2625,16 +2457,18 @@ export interface operations {
             };
         };
     };
-    setLevel: {
+    setPitchStatus: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                songId: number;
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["LevelRequest"];
+                "application/json": components["schemas"]["PitchStatusRequest"];
             };
         };
         responses: {
@@ -2649,18 +2483,16 @@ export interface operations {
             };
         };
     };
-    setPitchStatus: {
+    setLevel: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                songId: number;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PitchStatusRequest"];
+                "application/json": components["schemas"]["LevelRequest"];
             };
         };
         responses: {
@@ -3073,85 +2905,6 @@ export interface operations {
         };
     };
     publishSong: {
-        parameters: {
-            query: {
-                me: components["schemas"]["ConsolePrincipal"];
-            };
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PublishRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopePublishView"];
-                };
-            };
-        };
-    };
-    listScenarios: {
-        parameters: {
-            query?: {
-                page?: number;
-                page_size?: number;
-                status?: string;
-                sceneType?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopePageViewScenarioRow"];
-                };
-            };
-        };
-    };
-    createScenario: {
-        parameters: {
-            query: {
-                me: components["schemas"]["ConsolePrincipal"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ScenarioUpsert"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["EnvelopeMapStringObject"];
-                };
-            };
-        };
-    };
-    publishScenario: {
         parameters: {
             query: {
                 me: components["schemas"]["ConsolePrincipal"];

@@ -109,26 +109,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/scenarios": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Scenarios
-         * @description 预置场景列表（读侧；写侧归 Java 管理端，Python 只读——docs/10 §3）。
-         */
-        get: operations["list_scenarios_api_v1_scenarios_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/sessions": {
         parameters: {
             query?: never;
@@ -567,7 +547,7 @@ export interface paths {
         };
         /**
          * Recommendations
-         * @description 推荐列表。type=scene 返回场景，type=shadow 返回影子跟读；limit 覆盖默认条数。
+         * @description 推荐列表（type=shadow 影子跟读素材；limit 缺省按配置）。
          */
         get: operations["recommendations_api_v1_recommendations_get"];
         put?: never;
@@ -892,6 +872,266 @@ export interface paths {
         post?: never;
         /** Remove */
         delete: operations["remove_api_v1_media__public_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Campaigns
+         * @description 我的剧本列表（按最近活跃倒序）。
+         */
+        get: operations["list_campaigns_api_v1_trpg_campaigns_get"];
+        put?: never;
+        /**
+         * Create Campaign
+         * @description 新建剧本（名称可空 → 未命名剧本）。
+         */
+        post: operations["create_campaign_api_v1_trpg_campaigns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Campaign State
+         * @description 全量状态（一次拉全：事实/任务/线索/实体/事件/快照/校验 + 最近消息）。
+         */
+        get: operations["get_campaign_state_api_v1_trpg_campaigns__campaign_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Clear Messages
+         * @description 清空对话流水（重开本剧本；事实/任务/线索保留）——前端「重新开始」用。
+         */
+        delete: operations["clear_messages_api_v1_trpg_campaigns__campaign_id__messages_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/turns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Turn
+         * @description 回合主入口：multipart（text / audio 至少其一）→ SSE 事件流（docs/52 §4.2）。
+         */
+        post: operations["post_turn_api_v1_trpg_campaigns__campaign_id__turns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/facts/edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Edit Fact */
+        post: operations["edit_fact_api_v1_trpg_campaigns__campaign_id__facts_edit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/facts/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete Fact */
+        post: operations["delete_fact_api_v1_trpg_campaigns__campaign_id__facts_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/facts/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Fact */
+        post: operations["restore_fact_api_v1_trpg_campaigns__campaign_id__facts_restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Task */
+        post: operations["create_task_api_v1_trpg_campaigns__campaign_id__tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/tasks/{task_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Task Status */
+        post: operations["set_task_status_api_v1_trpg_campaigns__campaign_id__tasks__task_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/clues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Clue */
+        post: operations["create_clue_api_v1_trpg_campaigns__campaign_id__clues_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/clues/{clue_id}/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Clue Recover */
+        post: operations["set_clue_recover_api_v1_trpg_campaigns__campaign_id__clues__clue_id__recover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/scene": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Campaign Scene */
+        post: operations["set_campaign_scene_api_v1_trpg_campaigns__campaign_id__scene_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/roll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Roll Dice
+         * @description 桌骰：系统判定并落表（与 DM 的 roll_dice 工具同一条写路径）。
+         */
+        post: operations["roll_dice_api_v1_trpg_campaigns__campaign_id__roll_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/narrative/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Narrative
+         * @description 重新渲染叙事摘要（P2-45 状态模板渲染；零 LLM 成本）。
+         */
+        post: operations["refresh_narrative_api_v1_trpg_campaigns__campaign_id__narrative_refresh_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1491,6 +1731,13 @@ export interface components {
             /** Expected Turn */
             expected_turn?: number | null;
         };
+        /** Body_post_turn_api_v1_trpg_campaigns__campaign_id__turns_post */
+        Body_post_turn_api_v1_trpg_campaigns__campaign_id__turns_post: {
+            /** Text */
+            text?: string | null;
+            /** Audio */
+            audio?: string | null;
+        };
         /** Body_score_api_v1_score_post */
         Body_score_api_v1_score_post: {
             /** Audio */
@@ -1581,6 +1828,11 @@ export interface components {
              */
             chapters: components["schemas"]["ChapterMetaView"][];
         };
+        /** CampaignCreate */
+        CampaignCreate: {
+            /** Name */
+            name?: string | null;
+        };
         /** ChapterMetaView */
         ChapterMetaView: {
             /** Id */
@@ -1643,6 +1895,20 @@ export interface components {
         CheckinBody: {
             /** Date */
             date?: string | null;
+        };
+        /** ClueCreate */
+        ClueCreate: {
+            /** Title */
+            title: string;
+            /** Content */
+            content?: string | null;
+            /** Scene */
+            scene?: string | null;
+        };
+        /** ClueRecover */
+        ClueRecover: {
+            /** Recovered */
+            recovered: boolean;
         };
         /** Envelope[ASRResult] */
         Envelope_ASRResult_: {
@@ -2031,6 +2297,25 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** FactEdit */
+        FactEdit: {
+            /** Key */
+            key: string;
+            /** Value */
+            value: string;
+        };
+        /** FactKey */
+        FactKey: {
+            /** Key */
+            key: string;
+        };
+        /** FactRestore */
+        FactRestore: {
+            /** Key */
+            key: string;
+            /** Value */
+            value: string;
+        };
         /**
          * FavoriteState
          * @description 收藏切换结果（PUT=收藏 / DELETE=取消，均幂等；docs/21 §3.6）。
@@ -2161,6 +2446,26 @@ export interface components {
             /** Updated At */
             updated_at?: string | null;
         };
+        /** RollBody */
+        RollBody: {
+            /** Dice */
+            dice: string;
+            /** Modifier */
+            modifier?: number | null;
+            /** Vs */
+            vs?: number | null;
+            /** Dc */
+            dc?: number | null;
+            /** Effects */
+            effects?: {
+                [key: string]: unknown;
+            }[] | null;
+        };
+        /** SceneBody */
+        SceneBody: {
+            /** Scene */
+            scene: string;
+        };
         /**
          * ScoreLine
          * @description 逐句评分（sing_attempts.lines[i]；结构契约 docs/10 §4.3）。
@@ -2236,12 +2541,13 @@ export interface components {
             /** End */
             end: number;
         };
-        /** SessionCreate */
+        /**
+         * SessionCreate
+         * @description 会话创建入参（2026-09-21 起仅 defense/shadow/sing；dialog 随酒馆迁移移除）。
+         */
         SessionCreate: {
             /** Kind */
             kind: string;
-            /** Scenario Id */
-            scenario_id?: number | null;
             /** Profile Id */
             profile_id?: number | null;
             /** Difficulty */
@@ -2417,6 +2723,13 @@ export interface components {
              */
             provider: string;
         };
+        /** TaskCreate */
+        TaskCreate: {
+            /** Title */
+            title: string;
+            /** Scene */
+            scene?: string | null;
+        };
         /**
          * TaskProgress
          * @description 任务进度（轮询展示用）。
@@ -2432,6 +2745,11 @@ export interface components {
              * @default 0
              */
             total: number;
+        };
+        /** TaskStatus */
+        TaskStatus: {
+            /** Status */
+            status: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -2675,38 +2993,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_ChatResult_"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_scenarios_api_v1_scenarios_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-                "x-test-user-id"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -4466,6 +4752,560 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_dict_str__bool__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_campaigns_api_v1_trpg_campaigns_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_campaign_api_v1_trpg_campaigns_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_campaign_state_api_v1_trpg_campaigns__campaign_id__get: {
+        parameters: {
+            query?: {
+                messages?: number;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_messages_api_v1_trpg_campaigns__campaign_id__messages_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_turn_api_v1_trpg_campaigns__campaign_id__turns_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_post_turn_api_v1_trpg_campaigns__campaign_id__turns_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_fact_api_v1_trpg_campaigns__campaign_id__facts_edit_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_fact_api_v1_trpg_campaigns__campaign_id__facts_delete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactKey"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_fact_api_v1_trpg_campaigns__campaign_id__facts_restore_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactRestore"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_task_api_v1_trpg_campaigns__campaign_id__tasks_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_task_status_api_v1_trpg_campaigns__campaign_id__tasks__task_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskStatus"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_clue_api_v1_trpg_campaigns__campaign_id__clues_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClueCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_clue_recover_api_v1_trpg_campaigns__campaign_id__clues__clue_id__recover_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+                clue_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClueRecover"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_campaign_scene_api_v1_trpg_campaigns__campaign_id__scene_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SceneBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    roll_dice_api_v1_trpg_campaigns__campaign_id__roll_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RollBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_narrative_api_v1_trpg_campaigns__campaign_id__narrative_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
