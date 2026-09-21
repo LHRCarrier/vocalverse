@@ -3,6 +3,26 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-21 酒馆：消息翻译端点（中英互切）+ 长按可用性修复（服务端契约）
+
+> 归属：本条记**后端/契约**面。App 端（翻译角标、长按反馈、选中可见性）见 `worklog/安卓开发日志.md` 同日条。
+
+- **新增 `POST /api/v1/trpg/translate`**：`{text(1-2000 字), target?}`；target 缺省按内容自动判方向
+  （含 CJK → en，否则 → zh），实现「中英互切」；prompt 要求保留分段与 `Name: ...` 台词格式；
+  扣 llm 桶；失败 → 47003（LLM 异常 → 50001）。原文不动、不入库。
+- **契约**：`python-openapi.json` 90 → **91 op**（+translate）；`pnpm gen:api` 重生成；Java 契约不变。
+- **实测**（本地真模型）：`你推开门，潮湿的空气扑面而来。` → `You push open the door, and the damp air rushes to meet you.`；
+  `You push the door open.` → `你推开门。`（方向判定正确）。
+- **测试**：`tests/test_trpg_cards.py` 增 2 例（脚本化 LLM 双向 + 显式 target；空/超长/非法 target → 47001）；
+  `pytest -q` **740 passed, 4 skipped**；ruff/format 绿。
+- **踩坑（dev 环境，复现第 2 次）**：Windows 下 uvicorn `--reload` 会出现**多个 spawn worker 同时监听同一端口**
+  （套接字复制），请求被轮询分发到新旧 worker → 「新接口 404 / 新逻辑时灵时不灵」。
+  本次现象：`/translate` 返回 `{"detail":"Not Found"}`，排查发现 3 个 worker（19:36 / 20:47 两个世代）同时存活。
+  处置：`Stop-Process` 清掉旧世代的 spawn 子进程后接口立即可用。**已升级为固定动作：改后端后先核对
+  `Get-CimInstance Win32_Process` 里 spawn worker 的创建时间，只保留最新世代。**
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-21
+
 ## 2026-09-21 酒馆：语言开关实测修复（输入侧语言归一）+ 朗读逐词高亮协议 + 消息长按操作（后端/协议）
 
 > 归属：本条记**后端与 SSE 协议**面。App 端 UI（卡拉OK高亮渲染 + 长按动作条）见 `worklog/安卓开发日志.md` 同日条。
