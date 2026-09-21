@@ -2580,6 +2580,7 @@ body.is-login {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
   padding: 8px;
   background: var(--u-card);
   border: 1px solid var(--u-paper-grid);
@@ -5257,6 +5258,8 @@ body.is-login {
 }
 
 .t-stage__name {
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: 15px;
   font-weight: 800;
   white-space: nowrap;
@@ -5308,6 +5311,17 @@ body.is-login {
   background: var(--u-track);
   color: var(--u-ink);
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 长文本 chip（位置/持有：可跨行、允许换行，不裁切） */
+.t-chip--wrap {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
+  border-radius: var(--u-r-chip);
 }
 
 .t-chip--hp {
@@ -5319,7 +5333,9 @@ body.is-login {
 }
 
 .t-stage__atmo {
-  margin-left: auto;
+  flex-basis: 100%;
+  margin-top: 2px;
+  text-align: right;
   font-size: 11px;
   color: var(--u-sub);
 }
@@ -5443,9 +5459,10 @@ body.is-login {
   font-size: 12px;
 }
 
-/* ---- 输入 dock ---- */
+/* ---- 输入 dock（位于 u-chat-dock 内）---- */
 .t-dock-wrap {
-  margin-top: 8px;
+  width: 100%;
+  margin: 0;
 }
 
 .t-dock-state {
@@ -5458,16 +5475,12 @@ body.is-login {
   text-align: center;
 }
 
+/* 快捷行动：两行内自动折行（旧版横向滚动会把末个芯片裁一半，手机上像坏了） */
 .t-quick {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
   padding-bottom: 8px;
-  scrollbar-width: none;
-}
-
-.t-quick::-webkit-scrollbar {
-  display: none;
 }
 
 .t-quick__chip {

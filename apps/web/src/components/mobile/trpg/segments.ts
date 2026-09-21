@@ -61,15 +61,19 @@ export function npcSegments(content: string, npcNames: Set<string>): TrpgSegment
 /** 场景氛围（迁移自 ai4u scene-utils.toneKey）：四套色仅作用于色条与色点 */
 export function sceneTone(scene: string | null | undefined): 'warm' | 'cold' | 'green' | 'city' {
   const s = scene ?? ''
-  if (/酒馆|旅店|吧台|tavern|inn/i.test(s)) return 'warm'
-  if (/地城|地下|遗迹|洞窟|dungeon|cave/i.test(s)) return 'cold'
-  if (/森林|野外|湖畔|forest|woods/i.test(s)) return 'green'
+  if (/酒馆|旅店|吧台|客栈|驿站|tavern|inn/i.test(s)) return 'warm'
+  if (/地城|地下|遗迹|洞窟|矿坑|密室|dungeon|cave/i.test(s)) return 'cold'
+  if (/森林|林地|树林|野外|湖畔|荒原|雪原|林|forest|woods/i.test(s)) return 'green'
   return 'city'
 }
 
+/** 城镇/聚落关键词（city 色档内再分「人来人往」与中性文案，避免森林场景显示市集话术） */
+const SETTLEMENT = /城|镇|村|集|街|巷|广场|港|市|驿站|营地|town|city|village|market/i
+
 /** 场景氛围文案（顶部状态带右侧提示） */
 export function sceneAtmosphere(scene: string | null | undefined): string {
-  switch (sceneTone(scene)) {
+  const s = scene ?? ''
+  switch (sceneTone(s)) {
     case 'warm':
       return '烛火与低语 · 适合打听消息'
     case 'cold':
@@ -77,6 +81,6 @@ export function sceneAtmosphere(scene: string | null | undefined): string {
     case 'green':
       return '风声与虫鸣 · 视野开阔'
     default:
-      return '人来人往 · 众目睽睽'
+      return SETTLEMENT.test(s) ? '人来人往 · 众目睽睽' : '安静得能听见自己的呼吸'
   }
 }

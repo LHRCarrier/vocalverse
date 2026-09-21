@@ -62,9 +62,13 @@ const atmosphere = computed(() => sceneAtmosphere(props.scene))
     </div>
     <div class="t-stage__stats">
       <span v-if="hp" class="t-chip t-chip--hp">❤ HP {{ hp }}</span>
-      <span v-if="location" class="t-chip">📍 {{ location }}</span>
-      <span v-if="inventory" class="t-chip">🎒 {{ inventory }}</span>
       <span v-if="activeTasks > 0" class="t-chip">⚔ 任务 {{ activeTasks }}</span>
+      <span v-if="location" class="t-chip t-chip--wrap" :title="location">
+        📍 {{ location }}
+      </span>
+      <span v-if="inventory" class="t-chip t-chip--wrap" :title="inventory">
+        🎒 {{ inventory }}
+      </span>
       <span class="t-stage__atmo">{{ atmosphere }}</span>
     </div>
   </header>

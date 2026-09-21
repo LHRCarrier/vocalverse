@@ -258,15 +258,18 @@ async function onCreateCard(payload: { title: string; scene: string; opening_lin
           <div v-if="statusHint" class="t-status" role="status">{{ statusHint }}</div>
           <div v-if="inputError" class="u-error">{{ inputError }}</div>
         </div>
-
-        <TrpgActionDock
-          :sending="sending"
-          :recording="recording"
-          :max-seconds="30"
-          @send="session.sendText"
-          @toggle-mic="session.toggleMic"
-        />
       </template>
+    </div>
+
+    <!-- 底部 dock：与口语页同款 u-chat-dock（fixed 于底栏之上，内容区 216px 预留） -->
+    <div v-if="stage === 'play'" class="u-chat-dock">
+      <TrpgActionDock
+        :sending="sending"
+        :recording="recording"
+        :max-seconds="30"
+        @send="session.sendText"
+        @toggle-mic="session.toggleMic"
+      />
     </div>
 
     <TrpgConsoleSheet
