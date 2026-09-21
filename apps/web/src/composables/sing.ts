@@ -83,7 +83,7 @@ export function useSingPlay(): SingPlay {
   const recorder = new VoiceRecorder()
   /**
    * recorder 状态 → 视图 phase 的映射（单一约定：**非 recording 即复位**，与
-   * MobileSpeakingView / PracticeView / PlacementView / DefenseView / MobileFreeChatView 五处录音页同款）。
+   * PlacementView / DefenseView / MobileFreeChatView / MobileTavernView 等录音页同款）。
    *
    * 2026-09-10 BUG 修复：「放弃重录」后整页按钮失效——`cancel()` 走
    * `recorder.stop() → onstop(cancelled) → setState('idle')`，旧实现只处理

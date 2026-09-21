@@ -13,7 +13,7 @@ beforeEach(() => {
 describe('track（埋点 fe-06）', () => {
   it('默认 POST JSON 到 /api/v1/events', async () => {
     mocks.request.mockResolvedValue({ code: 0, message: 'ok', data: null })
-    await track('scene_start', { page: '/m/chat', sceneId: 1 })
+    await track('scene_start', { page: '/m/tavern', sceneId: 1 })
     expect(mocks.request).toHaveBeenCalledWith(
       '/api/v1/events',
       expect.objectContaining({ method: 'POST' }),
