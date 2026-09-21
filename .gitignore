@@ -20,6 +20,9 @@ apps/web/.output/
 __pycache__/
 *.py[cod]
 .venv/
+# OmniVoice 边车专用环境（scripts/setup-omnivoice-env.ps1 建在这里；`scripts/lib/omnivoice.ps1`
+# 会优先搜它）。torch+cu128 约 3~5 GB，绝不入库。
+.venv-omnivoice/
 venv/
 .pytest_cache/
 .ruff_cache/

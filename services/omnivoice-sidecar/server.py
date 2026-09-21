@@ -138,6 +138,25 @@ class SynthError(Exception):
         self.message = message
 
 
+def _decode_ref_audio(ref_bytes: bytes) -> tuple[Any, int]:
+    """参考件字节 → ``(float32 单声道 tensor[1, N], sample_rate)``。
+
+    解不开按**调用方输入错**报 400（不是 500）：参考件来自请求体，格式不对是调用方的事。
+    两套克隆 API 都要它（打包版拿去建 prompt，上游版直接传给 `generate`），故独立成函数。
+    """
+    import soundfile as sf  # noqa: PLC0415
+    import torch  # noqa: PLC0415
+
+    try:
+        wav, sr = sf.read(io.BytesIO(ref_bytes), always_2d=True, dtype="float32")
+    except Exception as exc:  # noqa: BLE001
+        raise SynthError(
+            400, "REF_AUDIO_UNDECODABLE", f"参考件解不开（需要 wav/flac/ogg）：{exc}"
+        ) from exc
+    mono = wav.mean(axis=1)
+    return torch.from_numpy(mono).unsqueeze(0), int(sr)
+
+
 # ---------------------------------------------------------------------------
 # 引擎
 # ---------------------------------------------------------------------------
@@ -163,26 +182,65 @@ class Engine:
     # -- 加载 ---------------------------------------------------------------
 
     def load(self) -> None:
+        """加载模型。**刻意兼容两套上游 API 形状**（见下），不做假设。
+
+        实测（2026-09-21）两条并存的实现，签名与调用方式都不同：
+
+        | | 上游 `k2-fsa/OmniVoice`（PyPI `omnivoice` / GitHub） | VoiceStudio 打包版（`omnivoice` 0.5.1，editable） |
+        |---|---|---|
+        | 导入 | `from omnivoice import OmniVoice` | `from omnivoice.models.omnivoice import OmniVoice` |
+        | 加载 | `from_pretrained(dir, device_map="cuda:0", dtype=torch.float16)` | `from_pretrained(dir, torch_dtype=torch.float16)` + `.to("cuda")` |
+        | 克隆 | `generate(text=…, ref_audio=(wav, sr), ref_text=…)` | `create_voice_clone_prompt(…)` → `generate(voice_clone_prompt=…)` |
+
+        只支持一种的后果很实：队友按上游 README 装好后边车直接崩。故这里**按能力探测**
+        （导入回退 + `from_pretrained` 关键字回退 + `generate` 参数过滤），而不是写死一种。
+        """
         import torch  # noqa: PLC0415  延迟导入：--help 不该拖起 torch
 
-        from omnivoice.models.omnivoice import OmniVoice  # noqa: PLC0415
+        try:
+            from omnivoice import OmniVoice  # noqa: PLC0415  上游公开 API
+        except ImportError:  # pragma: no cover - 打包版的模块布局
+            from omnivoice.models.omnivoice import OmniVoice  # noqa: PLC0415
 
         t0 = time.time()
-        kwargs: dict[str, Any] = {}
-        if self.device == "cuda":
-            kwargs["torch_dtype"] = torch.float16 if self.dtype == "float16" else torch.float32
-        model = OmniVoice.from_pretrained(self.model_dir, **kwargs)
-        if self.device == "cuda":
-            model = model.to("cuda")
-        model.eval()
+        model = self._from_pretrained(OmniVoice, torch)
         self.model = model
-        self.sample_rate = int(getattr(model, "sampling_rate", 24000) or 24000)
+        self.sample_rate = int(
+            getattr(model, "sampling_rate", None)
+            or getattr(model, "sample_rate", None)
+            or 24000
+        )
         self.loaded = True
         print(
             f"[{SERVER_NAME}] 模型就绪：{self.model_dir} device={self.device} "
-            f"dtype={self.dtype} sr={self.sample_rate} 用时 {time.time() - t0:.1f}s",
+            f"dtype={self.dtype} sr={self.sample_rate} 用时 {time.time() - t0:.1f}s "
+            f"（克隆 API：{'prompt' if hasattr(model, 'create_voice_clone_prompt') else 'ref_audio'}）",
             flush=True,
         )
+
+    def _from_pretrained(self, cls: Any, torch: Any) -> Any:
+        """按可用关键字回退加载（不同上游版本的 `from_pretrained` 签名不一致）。"""
+        dtype = torch.float16 if self.dtype == "float16" else torch.float32
+        attempts: list[dict[str, Any]] = []
+        if self.device == "cuda":
+            attempts.append({"device_map": "cuda:0", "dtype": dtype})  # 上游 README 示例
+            attempts.append({"torch_dtype": dtype})  # 打包版
+        attempts.append({})  # 谁都不认就裸调，交给上游默认（通常是 CPU/float32）
+
+        last: Exception | None = None
+        for kwargs in attempts:
+            try:
+                model = cls.from_pretrained(self.model_dir, **kwargs)
+            except TypeError as exc:  # 关键字不被接受 → 试下一个
+                last = exc
+                continue
+            # 只有没交给 device_map 时才自己搬设备：device_map 已经放好了，
+            # 再 .to() 在 accelerate 管理的模型上会报错。
+            if "device_map" not in kwargs and self.device == "cuda":
+                model = model.to("cuda")
+            model.eval()
+            return model
+        raise SynthError(500, "ENGINE_LOAD_FAILED", f"from_pretrained 全部签名都不匹配：{last}")
 
     # -- 克隆条件 -----------------------------------------------------------
 
@@ -192,29 +250,52 @@ class Engine:
         if hit is not None:
             return hit, True
 
-        import soundfile as sf  # noqa: PLC0415
-        import torch  # noqa: PLC0415
-
-        try:
-            wav, sr = sf.read(io.BytesIO(ref_bytes), always_2d=True, dtype="float32")
-        except Exception as exc:  # noqa: BLE001
-            raise SynthError(
-                400, "REF_AUDIO_UNDECODABLE", f"参考件解不开（需要 wav/flac/ogg）：{exc}"
-            ) from exc
-
-        mono = wav.mean(axis=1)
-        tensor = torch.from_numpy(mono).unsqueeze(0)
+        tensor, sr = _decode_ref_audio(ref_bytes)
         # 走 (waveform, sample_rate) 元组而不是临时文件：参考件是内存里的字节，
         # 落盘会引入"路径上的文件被换掉"这一类静默错误。
         prompt = self.model.create_voice_clone_prompt(
-            ref_audio=(tensor, int(sr)), ref_text=ref_text, preprocess_prompt=True
+            ref_audio=(tensor, sr), ref_text=ref_text, preprocess_prompt=True
         )
         self._prompts[key] = prompt
         return prompt, False
 
     # -- 合成 ---------------------------------------------------------------
 
+    def _uses_clone_prompt(self) -> bool:
+        """本模型走哪套克隆 API？
+
+        - `create_voice_clone_prompt` 存在 → 打包版：先把参考件转成说话人条件再 `generate`；
+        - 不存在 → 上游版：`generate(ref_audio=(waveform, sr), ref_text=…)` 直接传参考件。
+        """
+        return hasattr(self.model, "create_voice_clone_prompt")
+
+    def _generate_kwargs(self, gen_kwargs: dict[str, Any]) -> dict[str, Any]:
+        """按 `generate` 的**实际签名**过滤参数（两套上游接受的调参项并不相同）。
+
+        `num_step` / `guidance_scale` / `denoise` 这些是打包版才有的调参；上游版直接传会
+        `TypeError`。有 `**kwargs` 就全放行，否则只保留签名里出现的键 —— 被丢掉的键记一条
+        日志（不是静默：音质调参没生效调用方要能看见）。
+        """
+        import inspect  # noqa: PLC0415
+
+        try:
+            params = inspect.signature(self.model.generate).parameters
+        except (TypeError, ValueError):  # pragma: no cover - 不可内省就原样传
+            return gen_kwargs
+        if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
+            return gen_kwargs
+        kept = {k: v for k, v in gen_kwargs.items() if k in params}
+        dropped = sorted(set(gen_kwargs) - set(kept))
+        if dropped:
+            print(
+                f"[{SERVER_NAME}] 注意：当前 OmniVoice 的 generate() 不接受 {dropped}，已忽略"
+                f"（换上游实现时这些定稿调参可能不生效）",
+                flush=True,
+            )
+        return kept
+
     def synthesize(self, req: dict[str, Any]) -> tuple[bytes, dict[str, Any]]:
+        import numpy as np  # noqa: PLC0415
         import soundfile as sf  # noqa: PLC0415
         import torch  # noqa: PLC0415
 
@@ -246,9 +327,15 @@ class Engine:
 
             cache = "n/a"
             if mode == "clone":
-                prompt, cached = self._prompt_for(req["ref"]["audio"], req["ref"]["text"])
-                cache = "hit" if cached else "miss"
-                gen_kwargs["voice_clone_prompt"] = prompt
+                ref_bytes, ref_text = req["ref"]["audio"], req["ref"]["text"]
+                if self._uses_clone_prompt():
+                    prompt, cached = self._prompt_for(ref_bytes, ref_text)
+                    cache = "hit" if cached else "miss"
+                    gen_kwargs["voice_clone_prompt"] = prompt
+                else:
+                    # 上游 API：参考件以 (waveform, sample_rate) 直接交给 generate
+                    gen_kwargs["ref_audio"] = _decode_ref_audio(ref_bytes)
+                    gen_kwargs["ref_text"] = ref_text
             elif mode == "design":
                 gen_kwargs["instruct"] = req["instruct"]
 
@@ -258,24 +345,27 @@ class Engine:
                 torch.manual_seed(int(seed))
             t0 = time.time()
             try:
-                outs = self.model.generate(**gen_kwargs)
+                outs = self.model.generate(**self._generate_kwargs(gen_kwargs))
             except ValueError as exc:
                 # instruct 词表外的 token、参考件为空等，都是**调用方输入错**，不是 500
                 raise SynthError(400, "SYNTHESIS_REJECTED", str(exc)) from exc
             elapsed_ms = int((time.time() - t0) * 1000)
-            wav = outs[0] if isinstance(outs, (list, tuple)) else outs
-            if wav.dim() == 1:
-                wav = wav.unsqueeze(0)
+
+            # 输出归一：打包版返回 torch.Tensor，上游示例返回 numpy 数组（`audio[0]`）。
+            sample = outs[0] if isinstance(outs, (list, tuple)) else outs
+            if hasattr(sample, "detach"):  # torch.Tensor
+                arr = sample.detach().cpu().float().numpy()
+            else:  # numpy.ndarray / 可转数组
+                arr = np.asarray(sample, dtype="float32")
+            arr = np.squeeze(arr)
+            if arr.ndim > 1:  # 多声道 → 单声道（本服务契约是 mono）
+                arr = arr.mean(axis=0) if arr.shape[0] < arr.shape[-1] else arr.mean(axis=-1)
+            if arr.ndim == 0:
+                raise SynthError(500, "SYNTHESIS_FAILED", "模型返回了标量而非音频波形")
 
             buf = io.BytesIO()
             container, subtype, _mime = FORMATS[fmt]
-            sf.write(
-                buf,
-                wav.squeeze(0).detach().cpu().numpy(),
-                self.sample_rate,
-                format=container,
-                subtype=subtype,
-            )
+            sf.write(buf, arr, self.sample_rate, format=container, subtype=subtype)
             audio = buf.getvalue()
 
         return audio, {

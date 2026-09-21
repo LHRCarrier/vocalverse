@@ -205,3 +205,81 @@ def test_client_seed_override_survives_validation(tmp_path) -> None:
     _client(wav_dir)  # 建好参考件目录
     client = OmniVoiceTTSClient(endpoint="http://x", refs_dir=str(wav_dir), seed=7)
     assert sidecar.validate(client.build_request("hi"))["seed"] == 7
+
+
+# ---------------------------------------------------------------------------
+# 两套上游 API 的兼容（实测：上游 k2-fsa/OmniVoice 与 VoiceStudio 打包版的
+# from_pretrained / generate 签名都不同；队友按上游 README 装好后不能让边车崩）
+# ---------------------------------------------------------------------------
+
+
+class _Signatures:
+    """按不同上游版本模拟 `generate` 的签名（不加载权重、不需要 torch）。"""
+
+    @staticmethod
+    def var_keyword():
+        class _Model:
+            def generate(self, text=None, **kw):  # noqa: ARG002
+                return [text]
+
+        return _Model()
+
+    @staticmethod
+    def narrow():
+        class _Model:
+            def generate(self, text=None, ref_audio=None, ref_text=None):  # noqa: ARG002
+                return [text]
+
+        return _Model()
+
+
+def _engine_with_model(model) -> object:
+    engine = sidecar.Engine("(none)", "cpu", "float32")
+    engine.model = model
+    return engine
+
+
+def test_generate_kwargs_passthrough_when_var_keyword() -> None:
+    """上游 accept **kwargs → 全部下发（我们的定稿调参能生效）。"""
+    engine = _engine_with_model(_Signatures.var_keyword())
+    full = {"text": "hi", "num_step": 16, "denoise": True}
+    assert engine._generate_kwargs(full) == full
+
+
+def test_generate_kwargs_filtered_for_narrow_signature() -> None:
+    """上游签名窄（只认 text/ref_audio/ref_text）→ 过滤掉它不认的调参，不抛 TypeError。
+
+    这是"队友按上游 README 装好后边车不崩"的关键：直接传 num_step/denoise 会 TypeError。
+    """
+    engine = _engine_with_model(_Signatures.narrow())
+    got = engine._generate_kwargs(
+        {"text": "hi", "ref_audio": (1, 2), "ref_text": "x", "num_step": 16, "denoise": True}
+    )
+    assert got == {"text": "hi", "ref_audio": (1, 2), "ref_text": "x"}
+
+
+def test_generate_kwargs_passthrough_when_signature_unavailable(monkeypatch) -> None:
+    """签名不可内省（C 扩展/包装对象）→ 原样传，不因"探测失败"而丢参数。"""
+    import inspect as _inspect
+
+    def _boom(*_a, **_kw):
+        raise ValueError("no signature")
+
+    monkeypatch.setattr(_inspect, "signature", _boom)
+    engine = _engine_with_model(_Signatures.narrow())
+    full = {"text": "hi", "num_step": 16}
+    assert engine._generate_kwargs(full) == full
+
+
+def test_clone_api_shape_detection() -> None:
+    """两套克隆 API 按**能力探测**，而不是按版本号猜。"""
+
+    class _Packaged:  # 打包版：有 create_voice_clone_prompt
+        def create_voice_clone_prompt(self, **kw):  # noqa: ARG002
+            return "prompt"
+
+    class _Upstream:  # 上游版：没有它，直接 generate(ref_audio=…)
+        pass
+
+    assert _engine_with_model(_Packaged())._uses_clone_prompt() is True
+    assert _engine_with_model(_Upstream())._uses_clone_prompt() is False
