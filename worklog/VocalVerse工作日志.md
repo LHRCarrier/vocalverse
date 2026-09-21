@@ -3,6 +3,36 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-21 M3 收口 P1：埋点链路修复与补齐（target_type/维度/游客 page_view/生产者）· 1 op
+
+> 归属：本条记**后端 + Web 前端**面（无 App UI 改动）。计划与阶段划分见 `docs/53`；口径修订见 `docs/06 §9.1`。
+
+- **背景**：M3 状态盘点（同日上一条）发现埋点「采集管道真、指标零实现」，且有静默丢事件缺陷。本阶段只修链路，不做指标。
+- **缺陷修复（必修）**：`DefenseView` 三处埋点传 `target_type='defense'`，而 `events` 的 CHECK 只允许 `scene/song/home`
+  → `IntegrityError` 被当作「重复上报」静默吞掉，**答辩链路 scene_start/recording_start/recording_complete 实际 0 落库**。
+  修复 = CHECK 扩到 9 值（迁移 0020，NOT VALID + VALIDATE）+ 新增 `TargetTypes` 常量（四处同步）+ 前端 `TARGET_TYPES`。
+  **修复前必失败实测**：临时还原旧 CHECK → `test_defense_target_type_persists` 红；还原即绿。
+- **白名单修正**：原 `ALLOWED_TYPES = set(EventTypes.__dict__.values()) - {"__module__","__doc__"}` 减的是**键名字面量**，
+  模块名/描述符混进白名单（docs/19 已点名）→ 改为按 `key.isupper()` 派生；非法 `target_type` 现在显式 `dropped`，不再靠 DB 冲突兜。
+- **维度快照（原为死列）**：`level`/`age_group` 服务端按用户档案填充（不信任客户端）、`channel` 客户端传
+  （Capacitor→android/ios、standalone→pwa、其余 web）、`server_offset_ms = 接收时间 − occurred_at`、
+  `browse_session_id` 前端每次 App 会话生成（sessionStorage）贯穿 page_view/impression/click。
+- **游客 page_view**：新增 `get_optional_user_id`；`events.user_id` 本可空，此前游客访问静默丢事件。其余事件仍强鉴权。
+- **约束兜底**：FK 维度（song_id/session_id/scene_id）指向不存在行 → `expunge_all` + 去维度重试一次，事件不丢；
+  payload 白名单（仅标量、≤4KB，超限丢 payload 保留事件）。
+- **前端补齐**：`EVENT_NAMES` 20 类与后端逐一对齐（原缺读书域 5 类 + 推荐 2 类）；生产者接线
+  `word_lookup`/`vocab_add`/`annotation_add`/`tts_play`/`tts_prepare`（读书域）+ `score_event`/`practice_complete`（唱吧）。
+  **退役 4 类**（保留枚举兼容）：`fun_action`/`corpus_hit`（对话下线）、`free_chat_switch`/`free_chat_rate`（功能行已改版）。
+- **测试**：`tests/test_m3_events.py` 7 例（含修复前必失败 1 例 + 开 `PRAGMA foreign_keys=ON` 复现 FK 兜底）；
+  前端 `events.test.ts` +2 例（20 类全集 / browse_session_id 稳定 + 维度透传）。
+- **门禁**：pytest **747 passed, 4 skipped**；ruff check/format 绿；web `pnpm lint`/`typecheck`/**337 passed (56 files)**/build 待本阶段末统一跑。
+- **口径修订**：`docs/06 §9.1` 跳出率改用 GA4/PostHog/Plausible 通行口径（参与会话 = >10s 或 关键事件 或 ≥2 pageview；
+  跳出率 = 1 − 参与率）；完成率/互动率按现玩法（酒馆/自由对话/唱吧/答辩）重写。
+- **遗留**：① 指标聚合/看板（P2）、推荐联调（P3）、画像接真（P4）按 docs/53 继续；
+  ② 前端 page_view 暂不带 target_type/target_id（P2 做跳出率聚合时按 page 路径判定，若需要再补）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-21
+
 ## 2026-09-21 酒馆：消息翻译端点（中英互切）+ 长按可用性修复（服务端契约）
 
 > 归属：本条记**后端/契约**面。App 端（翻译角标、长按反馈、选中可见性）见 `worklog/安卓开发日志.md` 同日条。
