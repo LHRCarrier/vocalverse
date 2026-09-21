@@ -158,9 +158,8 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'stats',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: { title: '报表', desc: '趋势/雷达图/四指标看板（docs/06 §9.1）——M3' },
-        meta: { title: '报表' },
+        component: () => import('@/views/StatsView.vue'),
+        meta: { title: '报表', requiresAuth: true },
       },
       {
         path: 'community',
