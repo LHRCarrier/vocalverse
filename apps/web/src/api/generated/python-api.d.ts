@@ -750,7 +750,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Voices */
+        /**
+         * List Voices
+         * @description 可选音色 = edge 在线档 + 已就绪的本地引擎档（app/audio/voices.py 单一真源）。
+         *
+         *     本节此前自己硬编码 edge 清单并直接 ``import KittenTTSClient`` 探测——加一个本地
+         *     引擎要改路由层；现在只做「领域模型 → 响应模型」的搬运。
+         */
         get: operations["list_voices_api_v1_reading_voices_get"];
         put?: never;
         post?: never;
@@ -2360,13 +2366,28 @@ export interface components {
         };
         /**
          * TTSResult
-         * @description TTS 响应数据。M1 stub 为 hex 字符串；M2 真 TTS 改二进制/URL 时更新契约（docs/06 §8）。
+         * @description TTS 响应数据（``/api/v1/tts``）。
+         *
+         *     2026-09 增补 ``media_type`` / ``provider``：此前只回 hex 字节、无容器信息，
+         *     消费方只能一律按 ``audio/mpeg`` 猜——本地引擎（KittenTTS/OmniVoice）出的是 24kHz
+         *     WAV，被当 mp3 喂给 ``<audio>`` 会播坏（docs/46 B-3 同类问题）。两字段为**纯增量**，
+         *     旧消费方忽略即可。
          */
         TTSResult: {
             /** Audio Bytes */
             audio_bytes: string;
             /** Length */
             length: number;
+            /**
+             * Media Type
+             * @default audio/mpeg
+             */
+            media_type: string;
+            /**
+             * Provider
+             * @default edge
+             */
+            provider: string;
         };
         /**
          * TaskProgress
