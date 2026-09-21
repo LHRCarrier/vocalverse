@@ -5,7 +5,8 @@
 - ``GET /api/v1/stats/me``：个人报表（概览/趋势/五维雷达）——同一页面的「我的学习」区。
 
 两者均要求学习者登录（``get_current_user_id``）；管理端看板走控制台端点
-``/api/v1/console/insight/overview``（Python 控制台令牌 + 权限码，见 console/api/routes/insight.py）。
+``/api/v1/console/insight/overview``（Python 控制台令牌 + 权限码，见
+``console/api/routes/insight.py``）。
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from app.core.auth import get_current_user_id
 from app.core.response import ok
 from app.db import get_session_factory
 from app.insight import service as insight
+from app.rec.level_model import forecast
 
 router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
 
@@ -44,6 +46,8 @@ async def stats_me(
 ):
     db = _db()
     try:
-        return ok(insight.me(db, user_id, days=days))
+        data = insight.me(db, user_id, days=days)
+        data["forecast"] = forecast(db, user_id, days=days)  # docs/06 §9.5 水平预测（进步趋势展示）
+        return ok(data)
     finally:
         db.close()

@@ -160,6 +160,8 @@ class Settings(BaseSettings):
     #     见 docs/48 B3）。
     # =========================================================================
     media_dir: str = "./data/media"
+    # 水平预测模型持久化路径（docs/53 P3：训练一次 + 启动加载；joblib；不入库）
+    level_model_path: str = "./data/models/level_model.joblib"
     # 视频 64MB（图片/头像沿用 max_upload_bytes 20MB）
     media_max_video_bytes: int = 64 * 1024 * 1024
     media_rate_per_hour: int = 60  # 上传限流桶（docs/47 §4.1）
