@@ -3,6 +3,52 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-21 酒馆跑团（TRPG）迁移：Python 后端域 7 表 + 老「场景对话」闭环删除 + 管理端场景 CRUD 退役 + 契约重刷
+
+> 归属：本条记**后端/契约/管理端/文档**面。App 端 UI（`/m/tavern` 页面与底栏入口）见 `worklog/安卓开发日志.md` 同日条；BUG 归档见 `worklog/BUG实测/影子跟读ASR失败NameError.md`。
+> 迁移来源：ai4u 酒馆（跑团 DM）模块全量移植；四个已定口径见 `docs/52 §1.2`（只换场景对话闭环 / 移动端优先 + TTS+ASR / 新建 trpg 域 + 新表 / 彻底删除并同步文档契约）。执行人 LHRCarrier（AI 代工）。分支 `feat/trpg-tavern-game`。
+
+### 后端：新 trpg 域（Python）
+
+- **数据模型（迁移 0018，7 表）**：`trpg_campaigns`（剧本，用户私有）/`trpg_facts`（事实表，`(campaign_id, fact_key)` upsert 锚点 + 墓碑 `user_deleted_at` + 用户手改 `user_touched_at`）/`trpg_tasks`/`trpg_clues`/`trpg_entities`（pending 懒确认）/`trpg_events`（append-only）/`trpg_messages`（对话 + kind=system 系统卡）；明细 CASCADE、user RESTRICT。本地已做 SQLite DDL 验证（列与模型零差异、downgrade 干净）。
+- **三件套纯函数逐条移植**（`app/trpg/{facts,dice,snapshot,verify}.py`）：key 两级白名单 + upsert 裁决矩阵（llm-state/user-touched/tombstone/未知实体注册）、骰子解析判定（骰面 2-1000/骰数 1-10/effects 仅 State 域）、快照四规则与上限（线索 8/关系 6）、悬空-落差-矛盾三态 +【待记住】补丁。
+- **状态服务**（`state.py`）唯一写入口：LLM 提取/骰子直写/场景切换/用户编辑删除全部收敛；叙事摘要由状态模板渲染（**较 ai4u 改进：每回合自动增量刷新**，ai4u 仅手动刷新）。
+- **DM 门面 + 工具循环**（`service.py`/`turn.py`/`tools.py`）：上下文（DM 人设 + 摘要 + 快照 + 补丁 + **仅 kind=text 的最近 8 条历史**——修掉 ai4u 系统卡空 assistant 混入 prompt 的缺陷）；`roll_dice`/`set_scene` 工具循环（2 轮工具 + 1 轮强制正文，工具轮 4096 tokens）；LLM 客户端新增 `DeepSeekLLMClient.stream_with_tools`（流式工具调用）+ Fake 同形桩。
+- **SSE 协议**（`app/trpg/events.py`）：`trpg_ready/system/user_transcript/text_delta/status/audio_chunk/turn_end/error`；序列化复用练习域 `sse_payload`/`heartbeat_stream`，**不动**练习域 9 类事件 golden。DM 回复逐句 TTS（上限 10 句，缓存命中零成本）+ 语音轮 ASR（上限 30s，新配置 `trpg_max_seconds`）。
+- **接口 14 op**（`/api/v1/trpg/*`）：剧本 CRUD/消息清空/SSE 回合/事实手改·墓碑·恢复/任务线索/切场景/桌骰/摘要刷新；全部先校验归属（越权 40401）；`turns` 扣 llm（+asr）桶（预检后扣）。新错误码 **47001/47002** 已先登记 `docs/api/error-codes.md`。
+- **事实提取**：每 2 个玩家回合（后台 fire-and-forget，light 语义/≤3 条/usage 分账 `factExtract`）+ 待确认实体懒清理。
+
+### 删除：老「场景对话」闭环
+
+- **Python**：`GET /scenarios`；`create_session` 的 dialog 分支与 `scenario_id` 入参；`orchestrator._dialog_turn/_persist_dialog_turn/_fallback_reply`（run_turn 仅 defense/shadow）；`practice/corpus.py`、`agent/runtime/context_builder.py`、`meta_executor.py`、`agent/domains/learner.py`、`api/routes/agent_lab.py`（+ `APP_AGENT_LAB_ENABLED` 开关与 `docs/06 §17` 行）；`difficulty/batch.py` 与 `rules.scenario_prior`；`rec.recommend_scenes` 与 `type=scene`（推荐仅 shadow）；mastery 句级 `user_corpus_mastery` 写入；warmup 场景/启动预热；`seed_scenarios` 与 `data/seed/scenarios.json`；`seed_recommend` 演示场景/场景难度。
+- **打卡口径修订**（组长口径「打卡聚合改挂 TRPG」）：`practiceCount` = 当日酒馆玩家回合数 + 当日完成的其他类型会话数；评分取当日 attempts（任意 kind）最佳/最新；turns/duration 相应合计。
+- **Java/管理端**：`ScenarioEntity`/`ScenarioRepository`、控制台场景 CRUD/上架/`validateScenario`、RBAC 场景权限码（36→33、operator 16→13）删除；管理端 `ScenariosView`/`ScenarioFormModal`/`scenarioColumns`/API/测试清理；工单 `targetType=scene`（App 对象类型，与内容管理无关）按登记保留。
+- **保留**：`scenarios`/`scenario_messages` 表与 dialog 枚举取值（历史数据；`models/base.py` 标注退役）、报告页/打卡页、`app/practice/meta.py`（自由对话/答辩/影子仍用）。
+
+### 契约与文档
+
+- `python-openapi.json` 重刷（**81 op**）、`java-openapi.json` 重刷（`CONTRACT_SNAPSHOT_GENERATE=1` 跑 `ContractSnapshotTest`）、`pnpm gen:api` 重生成双 d.ts；CI 三步对账口径不变。
+- 新增 **`docs/52-酒馆跑团（TRPG）实施设计.md`**（本域权威设计，含删除清单/打卡口径/欠账）；同步：`README`（功能定位/能测清单/seed 注释/文档索引）、`docs/10`（7 表 + scenarios 退役）、`docs/13`（路由表 + 预览页清单 + 联调页撤销登记）、`docs/14`（退役横幅）、`docs/21`、`docs/26`、`docs/42`。
+- **AGENTS.md 工作流程 §3 撤销**（组长拍板）：新功能不再要求联调测试页 / 后端 test-only 接口 / 删除清单；预览画廊机制保留（`docs/13 §8` 同步撤销登记）。本次酒馆**未**新增 preview 联调页。
+
+### 顺带修的真实 BUG（归档）
+
+- `_shadow_turn` 的 ASR 异常路径引用未绑定 `res` → `NameError` 被路由兜成 `error(internal)`（用户无法区分「听不清」与「服务故障」）。修复 `res = None`；新增 `tests/test_shadow_asr_failure.py`（2 例），**修复前实测失败、修复后通过**；详见 `worklog/BUG实测/影子跟读ASR失败NameError.md`。
+- 重构中自查出并修复 `rec._review_slots` 调 `_candidates` 参数错位（多传 ctype）导致的复习席 `TypeError`。
+
+### 验证
+
+- **Python**：`ruff check` + `ruff format --check` 全绿；`pytest -q` → **726 passed, 4 skipped**（含 `tests/test_trpg.py` 18 例、`tests/test_shadow_asr_failure.py` 2 例；删除/改写 dialog 用例后其余全绿）。
+- **前端**：`pnpm lint / typecheck / test:run（314 例）/ build` 全绿；`scripts/check-bundle.mjs` 通过（preview 零体积 / p5·echarts 零残留）。
+- **Java**：`mvn test` **179 例通过**（快照重刷后 `ContractSnapshotTest` 绿）；**管理端** `typecheck / test:run（73 例）/ lint` 全绿。
+- **契约**：本地 Python 契约对账（快照 == `app.openapi()`）通过。
+
+### 遗留
+
+1. 酒馆无评分/报告（打卡只计练习量）；2. 单回合 TTS 上限 10 句；3. 线上库 `scenarios` 历史行与自定义角色的场景权限码为孤立数据（不影响功能，清理需数据迁移）；4. 酒馆暂未新增埋点事件类型（如需看板按 docs/06 §9.1 纪律新增）；5. 本机 SQLite 无法整体 `alembic upgrade head`（0002 起就用 PG 专属 ALTER，属既有现状，CI 只校验单头）——0018 已用 DDL 级验证。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-21
+
 ## 2026-09-21 组长手机实测四缺陷修复（后端/契约/全局面）：打卡改手动（去自动委托 + 新用户端点）、评论数改真源
 
 > 归属：本条只记**后端/契约/全局**改动。App UI 部分（打卡页/侧边提示/私信角标/提示文字/打卡卡文案）见 `worklog/安卓开发日志.md` 同日条。
