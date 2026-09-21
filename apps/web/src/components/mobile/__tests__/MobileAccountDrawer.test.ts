@@ -51,13 +51,17 @@ describe('MobileAccountDrawer', () => {
     await wrapper.findAll('.u-drawer__subitem')[2].trigger('click')
     expect(wrapper.emitted('navigate')).toEqual([['/m/learn/speaking'], ['/m/notifications?tab=follow']])
     expect(wrapper.find('.u-drawer__submenu').exists()).toBe(false)
-    // 设置与隐私：展开子面板（帮助与反馈/数据与隐私/关于声语界），无 navigate
+    // 设置与隐私：展开子面板（帮助与反馈/数据与隐私/关于声语界 → /m/settings/:section 真实页）
     await items[2].trigger('click')
     expect(wrapper.emitted('navigate')).toEqual([['/m/learn/speaking'], ['/m/notifications?tab=follow']])
     expect(wrapper.find('.u-drawer__submenu').exists()).toBe(true)
     expect(wrapper.text()).toContain('帮助与反馈')
-    // 子项点击 → toast + 收起
     await wrapper.findAll('.u-drawer__subitem')[0].trigger('click')
+    expect(wrapper.emitted('navigate')).toEqual([
+      ['/m/learn/speaking'],
+      ['/m/notifications?tab=follow'],
+      ['/m/settings/help'],
+    ])
     expect(wrapper.find('.u-drawer__submenu').exists()).toBe(false)
   })
 

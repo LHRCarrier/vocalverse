@@ -9,7 +9,7 @@ from app.models.analytics import Event
 from app.models.base import SessionKinds
 from app.models.practice import Attempt, Score
 from app.models.practice import Session as PracticeSession
-from app.models.reading import UserVocabulary
+from app.models.reading import DictionaryEntry, UserVocabulary
 from app.models.trpg import TrpgCampaign, TrpgMessage
 from app.models.user import User, UserProfile
 
@@ -92,7 +92,10 @@ def _seed(user_id: int) -> None:
                 duration_s=300,
             )
         )
-        # 生词本
+        # 生词本（coffee 有词典释义 · lighthouse 未收录，两者都要展示）
+        db.add(
+            DictionaryEntry(word="coffee", phonetic="ˈkɔːfi", translation="n. 咖啡\n（另）咖啡色")
+        )
         db.add(UserVocabulary(user_id=user_id, word="coffee", status="learning", scene="reading"))
         db.add(UserVocabulary(user_id=user_id, word="lighthouse", status="new", scene="reading"))
         # 酒馆剧本 + 回合
@@ -151,6 +154,10 @@ def test_learn_module_words_and_community(client, auth_headers):
     _seed(user_id)
     words = client.get("/api/v1/stats/learn/words", headers=auth_headers).json()["data"]["items"]
     assert {w["word"] for w in words} == {"coffee", "lighthouse"}
+    by_word = {w["word"]: w for w in words}
+    assert by_word["coffee"]["translation"] == "n. 咖啡"
+    assert by_word["coffee"]["phonetic"] == "ˈkɔːfi"
+    assert by_word["lighthouse"]["translation"] is None  # 词典未收录仍展示
     community = client.get("/api/v1/stats/learn/community", headers=auth_headers).json()["data"]
     assert community["pages"][0]["page"] == "/m/home"
     assert any(e["event_type"] == "word_lookup" for e in community["events"])

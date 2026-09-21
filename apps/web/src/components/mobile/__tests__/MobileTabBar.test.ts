@@ -33,6 +33,28 @@ vi.mock('@/api/stats', () => ({
 }))
 vi.mock('@/api/reco', () => ({ fetchItemsRecommendations: vi.fn(async () => ({ items: [] })) }))
 vi.mock('@/api/events', () => ({ track: vi.fn() }))
+/* 笔记页接真（docs/53 P5）：跨章批注来自 /reading/notes */
+vi.mock('@/api/reading', () => ({
+  fetchNotes: vi.fn(async () => ({
+    items: [
+      {
+        id: 1,
+        kind: 'note',
+        chapter_id: 5,
+        book_id: 2,
+        chapter_title: 'Chapter 1',
+        book_title: 'Demo Book',
+        start_offset: 0,
+        end_offset: 5,
+        content_version: 1,
+        text_snippet: 'Alice knew',
+        note: '过去式',
+        created_at: '2026-09-21T10:00:00+00:00',
+      },
+    ],
+    has_more: false,
+  })),
+}))
 
 const routes = [
   { path: '/m/home', component: { template: '<div/>' } },
@@ -124,10 +146,16 @@ describe('MobileTabBar（双场景分组）', () => {
 
 describe('MobileLearnView（我的学习 · v4 画像总览 2026-09-09）', () => {
   it('渲染欢迎定位 + 识别行 + 热力图 + 6 模块列表（读书域并入 2026-09-10）', async () => {
+    // XP/等级服务端化（docs/53 P5）：冷启动展示缓存快照
+    localStorage.setItem(
+      'vv_progress',
+      JSON.stringify({ xp: 320, level: 3, title: '对话能手', base: 250, next: 500 }),
+    )
     await router.push('/m/learn')
     await router.isReady()
     const wrapper = mount(MobileLearnView, { global: { plugins: [router] } })
     const text = wrapper.text()
+    localStorage.removeItem('vv_progress')
     expect(text).toContain('Hi') // 欢迎定位行
     expect(text).toContain('LV3')
     expect(text).toContain('XP')
@@ -166,24 +194,19 @@ describe('MobileLearnView（我的学习 · v4 画像总览 2026-09-09）', () =
   })
 })
 
-describe('MobileNotesView（笔记 · 词汇速记演示）', () => {
-  it('渲染笔记列表；分类切换；收藏 toggle', async () => {
+describe('MobileNotesView（笔记接真 · docs/53 P5）', () => {
+  it('渲染跨章批注；分类切换走服务端 kind 过滤', async () => {
     await router.push('/m/notes')
     await router.isReady()
     const wrapper = mount(MobileNotesView, { global: { plugins: [router] } })
-    expect(wrapper.text()).toContain('pick up')
-    expect(wrapper.text()).toContain('影子跟读法')
+    await flushPromises()
+    expect(wrapper.text()).toContain('过去式')
+    expect(wrapper.text()).toContain('Demo Book · Chapter 1')
+    expect(wrapper.text()).not.toContain('pick up') // 演示数据已删除
 
-    // 分类切换 → 文化
-    await wrapper.findAll('.u-x-tab')[3].trigger('click' as never)
-    expect(wrapper.text()).toContain('kyushoku')
-    expect(wrapper.text()).not.toContain('pick up')
-
-    // 收藏 toggle（序号 1 = run out of，初始未收藏 → 点击收藏）
-    await wrapper.findAll('.u-x-tab')[0].trigger('click' as never)
-    const stars = wrapper.findAll('.u-notes__star')
-    expect(stars[1].classes()).not.toContain('is-starred')
-    await stars[1].trigger('click')
-    expect(stars[1].classes()).toContain('is-starred')
+    await wrapper.findAll('.u-x-tab')[2].trigger('click' as never)
+    await flushPromises()
+    const { fetchNotes } = await import('@/api/reading')
+    expect(fetchNotes).toHaveBeenLastCalledWith('note')
   })
 })
