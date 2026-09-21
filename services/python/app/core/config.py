@@ -83,8 +83,9 @@ class Settings(BaseSettings):
     tts_omnivoice_voice: str = "anchor-en"  # anchor-en（英文男声）| podcaster-en（英文女声）
     tts_omnivoice_seed: int | None = None  # None = 用清单里的 seed
     tts_omnivoice_timeout_s: float = 120.0  # GPU 冷合成可达 10s+，给足余量
-    # 音色参考件目录（OmniVoice 参考件 + VOICES.json 所在目录；留空 = 不启用克隆音色，
-    # auto 链跳过该引擎回落 kitten/edge）
+    # 音色参考件目录（含 VOICES.json + wav）。**留空 = 自动用仓库内 data/seed/voices**
+    # （随仓库分发，队友 clone 下来零配置可用）；显式填则以此为准。目录不存在即视为
+    # 不启用克隆音色，auto 链跳过本引擎回落 kitten/edge。
     voice_refs_dir: str = ""
     # 读书域 · 听书（docs/45 §5 · docs/46 B-3/B-4）：
     # - provider：留空 = 跟随 APP_TTS_PROVIDER；auto（探测可用本地引擎→否则 edge）/

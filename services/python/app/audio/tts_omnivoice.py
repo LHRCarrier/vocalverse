@@ -109,6 +109,21 @@ def normalize_voice(voice: str) -> str:
     return _ALIASES.get(key, key)
 
 
+def default_refs_dir() -> str:
+    """参考件目录的兜底：仓库内 `data/seed/voices`（随仓库分发，见 `core.paths.voices_dir`）。
+
+    显式配置（`APP_VOICE_REFS_DIR`）永远优先；这里只解决"队友 clone 下来不用配任何东西
+    就能用"的问题。目录不存在则返回空串（= 不启用克隆音色，auto 链跳过本引擎）。
+    """
+    try:
+        from app.core.paths import voices_dir
+
+        path = voices_dir()
+        return str(path) if path.is_dir() else ""
+    except Exception:  # noqa: BLE001 — 路径解析失败不该炸掉引擎构造
+        return ""
+
+
 @dataclass(frozen=True)
 class RefVoice:
     """清单里的一条音色（参考件 + 参考文本 + seed）。"""
@@ -270,17 +285,21 @@ class OmniVoiceTTSClient(TTSClient):
                 )
         return data
 
-    async def synthesize(self, text: str, voice: str = "anchor-en", rate: str = "+0%") -> bytes:
-        import httpx
+    def build_request(self, text: str, voice: str = "anchor-en") -> dict[str, Any]:
+        """构造 `/synthesize` 请求体（**独立成方法**，好让契约测试直接喂边车校验）。
 
+        形状与边车 `services/omnivoice-sidecar/server.py:validate()` 一一对应：
+        clone 模式 + `ref{audioBase64,text}` + seed + `format=wav`，**不含 instruct**
+        （边车对 clone+instruct 直接 400）。
+        """
         item = self.resolve_voice(voice)
         if item is None:
             raise RuntimeError(f"OmniVoice 无可用音色（请求 voice={voice!r}）")
         ref_bytes = self._reference_bytes(item)
-        payload = {
+        return {
             "text": text,
             "language": item.lang,
-            "mode": "clone",  # clone 模式：不下发 instruct（上游给了就 400）
+            "mode": "clone",
             "ref": {
                 "audioBase64": base64.b64encode(ref_bytes).decode("ascii"),
                 "text": item.ref_text,
@@ -288,6 +307,11 @@ class OmniVoiceTTSClient(TTSClient):
             "seed": self._seed_override if self._seed_override is not None else item.seed,
             "format": "wav",
         }
+
+    async def synthesize(self, text: str, voice: str = "anchor-en", rate: str = "+0%") -> bytes:
+        import httpx
+
+        payload = self.build_request(text, voice)
         url = f"{self._endpoint}/synthesize"
         try:
             async with httpx.AsyncClient(timeout=self._timeout_s) as client:
@@ -305,7 +329,7 @@ class OmniVoiceTTSClient(TTSClient):
 
 #: 供音色目录使用：本引擎暴露的音色（只读清单，不构造客户端、不触网）
 def supported_voices(settings: Any) -> list[dict[str, Any]]:
-    refs_dir = getattr(settings, "voice_refs_dir", "")
+    refs_dir = getattr(settings, "voice_refs_dir", "") or default_refs_dir()
     if not refs_dir:
         return []
     return [
@@ -327,7 +351,7 @@ register(
         label="OmniVoice 参考件音色（本地 GPU 边车 · 零样本克隆）",
         factory=lambda settings: OmniVoiceTTSClient(
             endpoint=getattr(settings, "tts_omnivoice_endpoint", ""),
-            refs_dir=getattr(settings, "voice_refs_dir", ""),
+            refs_dir=getattr(settings, "voice_refs_dir", "") or default_refs_dir(),
             voice=getattr(settings, "tts_omnivoice_voice", "") or "anchor-en",
             seed=getattr(settings, "tts_omnivoice_seed", None),
             timeout_s=getattr(settings, "tts_omnivoice_timeout_s", 120.0),

@@ -84,6 +84,12 @@ Thumbs.db
 *.m4a
 # 在豁免区下方重复豁免 fixture 目录，确保优先级
 !**/tests/fixtures/**
+# 音色参考件（data/seed/voices/，2026-09-21）：OmniVoice 零样本克隆的**音色身份本体**
+# —— 音色 = 参考件字节 + 参考文本 + seed，缺了它边车合成不出任何声音，队友 clone 下来
+# 也跑不通。合计约 1.9 MB（4 个 wav + VOICES.json），随仓库分发。
+# 注意：**模型权重（约 3.3 GB）仍然不入库**（红线），只在运行时按路径引用。
+!data/seed/voices/
+!data/seed/voices/**
 
 # HF 模型下载缓存（构建上下文预下载用；红线禁止提交，2026-09-07）
 services/python/.models-cache/
