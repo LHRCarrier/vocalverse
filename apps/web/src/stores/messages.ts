@@ -50,6 +50,8 @@ export const useMessagesStore = defineStore('messages', () => {
 
   let streamAbort: AbortController | null = null
   let pollTimer: ReturnType<typeof setInterval> | null = null
+  /** 未读合计最近拉取时刻（角标节流；`loadUnreadTotal` 用）。 */
+  let lastTotalAt = 0
   /** SSE 已投递的消息 id（防「SSE + 轮询/回放」双通道重复渲染）。 */
   const seenIds = new Set<number>()
 
@@ -95,6 +97,22 @@ export const useMessagesStore = defineStore('messages', () => {
       listError.value = e instanceof Error ? e.message : '私信加载失败'
     } finally {
       loadingList.value = false
+    }
+  }
+
+  /**
+   * 全局未读合计（角标用 · docs/49 §4.1 ②）：轻量单请求，不拉会话列表。
+   *
+   * <p>节流 10s：Tab 栏每次导航都会调用，避免同一屏内连续打点；SSE 已连时增量由流维护，
+   * 但导航到非通知页会断流，仍需重新对齐。
+   */
+  async function loadUnreadTotal(force = false) {
+    if (!force && Date.now() - lastTotalAt < 10_000) return
+    lastTotalAt = Date.now()
+    try {
+      unreadTotal.value = await fetchUnreadTotal()
+    } catch {
+      // 角标失败静默（网络抖动不该弹错）；下次导航/进通知页会再取
     }
   }
 
@@ -204,29 +222,41 @@ export const useMessagesStore = defineStore('messages', () => {
   function applyIncoming(payload: MessageStreamPayload) {
     const msg = payload.message
     if (seenIds.has(msg.id)) return
-    // 只有当前打开的会话才插入消息流；其他会话只更新列表未读（避免串会话）
+    // 只有当前打开的会话才插入消息流；其他会话只更新列表未读（避免串会话）。
+    // 非当前会话的消息也登记 id：SSE 每次重连会按 since 回放，不登记就会反复计数
+    // （「看完回来还是新消息」的根因之一，2026-09-21）。
     if (threadPeerId.value != null && msg.peerId === threadPeerId.value) {
       mergeMessages([msg])
       void markRead(msg.peerId)
+    } else {
+      seenIds.add(msg.id)
     }
-    bumpConversation(msg)
+    bumpConversation(msg, payload.unreadCount)
   }
 
-  /** 列表增量：更新对应会话的最后一条与未读（未读以服务端回带的 per-peer 计数为准）。 */
-  function bumpConversation(msg: DirectMessageView) {
+  /**
+   * 列表增量：更新对应会话的最后一条与未读。
+   *
+   * <p>未读一律以服务端回带的 per-peer 计数为准（含断线回放/已读水位），**不做本地求和**——
+   * 回放重复到达时不会把已读数再加一遍；服务端未回带时才退回本地 +1。
+   */
+  function bumpConversation(msg: DirectMessageView, serverUnread?: number) {
     const row = conversations.value.find((c) => c.peer.id === msg.peerId)
-    if (row) {
-      row.lastMessageId = msg.id
-      row.lastBody = msg.body
-      row.lastMine = msg.mine
-      row.lastCreatedAt = msg.createdAt
-      row.unreadCount = msg.mine ? row.unreadCount : row.unreadCount + 1
-      conversations.value = [...conversations.value].sort((a, b) => b.lastMessageId - a.lastMessageId)
-      unreadTotal.value += 1
-    } else {
+    if (!row) {
       // 新会话（此前无往来）：整表重拉（低频，一次请求换正确性）
       void loadConversations()
+      return
     }
+    row.lastMessageId = msg.id
+    row.lastBody = msg.body
+    row.lastMine = msg.mine
+    row.lastCreatedAt = msg.createdAt
+    if (!msg.mine) {
+      const next = serverUnread == null ? row.unreadCount + 1 : Number(serverUnread)
+      unreadTotal.value = Math.max(0, unreadTotal.value + (next - row.unreadCount))
+      row.unreadCount = next
+    }
+    conversations.value = [...conversations.value].sort((a, b) => b.lastMessageId - a.lastMessageId)
   }
 
   function stopStream() {
@@ -318,6 +348,7 @@ export const useMessagesStore = defineStore('messages', () => {
     lastIncomingId,
     // actions
     loadConversations,
+    loadUnreadTotal,
     openThread,
     loadMoreThread,
     send,

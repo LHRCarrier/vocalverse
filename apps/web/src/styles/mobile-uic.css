@@ -2104,6 +2104,7 @@ body.is-login {
 }
 
 .u-tab {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3353,6 +3354,7 @@ body.is-login {
 
 /* icon-only 无底线性按钮（与底部 tab 同风格；Tabler 图标 20px + 44px 触控区） */
 .u-topbar__act {
+  position: relative;
   width: 44px;
   height: 44px;
   flex: none;
@@ -3671,9 +3673,16 @@ body.is-login {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
-  font-weight: 700;
+  border: none;
+  background: none;
+  padding: 4px 2px;
+  font: 700 12px var(--u-font);
   color: var(--u-ink);
+  cursor: pointer;
+}
+
+.u-learn-id__streak svg {
+  color: var(--u-star);
 }
 
 /* ---- ③ 热力图（信息图 · 只图 + 右下角经验） ---- */
@@ -4922,4 +4931,232 @@ body.is-login {
 .u-pf__link-go {
   margin-left: auto;
   color: var(--u-weak);
+}
+
+/* ============================================================
+ * 未读角标 + 打卡（2026-09-21 组长反馈批次）
+ * ============================================================ */
+
+/* 未读数字角标（docs/49 §4.1：>0 才显示、>99 → 99+；--u-accent，红是错误语义） */
+.u-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--u-r-pill);
+  background: var(--u-accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* 通知中心「私信」tab 角标：行内 pill（不是浮在图标上） */
+.u-notif-tab__badge {
+  position: static;
+  display: inline-block;
+  height: 15px;
+  min-width: 15px;
+  margin-left: 5px;
+  line-height: 15px;
+  vertical-align: 1px;
+}
+
+/* ---------- 打卡页（/m/checkin） ---------- */
+.u-checkin {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 14px calc(28px + env(safe-area-inset-bottom));
+}
+
+.u-checkin-hero {
+  padding: 22px 18px 18px;
+  background: var(--u-card);
+  border-radius: var(--u-r-card);
+  box-shadow: var(--u-shadow-card);
+  text-align: center;
+}
+
+.u-checkin-hero__date {
+  margin: 0;
+  font-size: 13px;
+  color: var(--u-sub);
+}
+
+.u-checkin-hero__status {
+  margin: 10px 0 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--u-ink);
+}
+
+.u-checkin-hero__streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--u-ink);
+}
+
+.u-checkin-hero__streak svg {
+  color: var(--u-star);
+}
+
+.u-checkin-hero__streak strong {
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.u-checkin-hero__btn {
+  display: block;
+  width: 100%;
+  margin-top: 18px;
+  padding: 14px 0;
+  border: none;
+  border-radius: var(--u-r-pill);
+  background: var(--u-ink);
+  color: var(--u-paper);
+  font: 800 16px var(--u-font);
+  cursor: pointer;
+  transition: background-color 150ms ease-out, transform 150ms ease-out;
+}
+
+.u-checkin-hero__btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.u-checkin-hero__btn:disabled {
+  background: var(--u-track);
+  color: var(--u-weak);
+  cursor: default;
+}
+
+.u-checkin-hero__rule {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--u-sub);
+}
+
+.u-checkin-list {
+  margin-top: 18px;
+}
+
+.u-checkin-list__title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--u-ink);
+}
+
+.u-checkin-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 2px;
+  border-top: 1px solid var(--u-paper-grid);
+  color: var(--u-ink);
+  text-decoration: none;
+}
+
+.u-checkin-row:active {
+  background: var(--u-track);
+}
+
+.u-checkin-row__date {
+  flex: none;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.u-checkin-row__meta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--u-sub);
+}
+
+.u-checkin-row__time {
+  flex: none;
+  font-size: 11px;
+  color: var(--u-weak);
+}
+
+.u-checkin-row__go {
+  flex: none;
+  color: var(--u-weak);
+}
+
+/* ---------- 今日打卡 · 侧边提示（当天首次进入 App） ---------- */
+.u-checkin-prompt {
+  position: fixed;
+  right: max(10px, calc(50% - 240px + 10px));
+  top: 42%;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 250px;
+  padding: 6px 6px 6px 12px;
+  background: var(--u-card);
+  border: 1.5px solid var(--u-ink);
+  border-radius: var(--u-r-pill);
+  box-shadow: var(--u-shadow-float);
+}
+
+.u-checkin-prompt__go {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  padding: 4px 2px;
+  font: 600 12px var(--u-font);
+  color: var(--u-ink);
+  cursor: pointer;
+}
+
+.u-checkin-prompt__go svg {
+  color: var(--u-star);
+}
+
+.u-checkin-prompt__cta {
+  color: var(--u-accent);
+  font-weight: 800;
+}
+
+.u-checkin-prompt__close {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: var(--u-track);
+  color: var(--u-sub);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.u-checkin-prompt-enter-active,
+.u-checkin-prompt-leave-active {
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+.u-checkin-prompt-enter-from,
+.u-checkin-prompt-leave-to {
+  opacity: 0;
+  transform: translateX(12px);
 }

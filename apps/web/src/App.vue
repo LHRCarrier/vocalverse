@@ -3,6 +3,7 @@ import { NConfigProvider, NDialogProvider, NMessageProvider } from 'naive-ui'
 import { useRouter } from 'vue-router'
 
 import MobileAccountDrawer from '@/components/mobile/MobileAccountDrawer.vue'
+import MobileCheckinPrompt from '@/components/mobile/MobileCheckinPrompt.vue'
 import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
 import { useNativeBack } from '@/composables/useNativeBack'
 import { useAuthStore } from '@/stores/auth'
@@ -43,6 +44,9 @@ function onDrawerLogout() {
 
         <!-- 全局底部 Tab 栏（路由显隐规则在组件内；二级页自动隐藏） -->
         <MobileTabBar />
+
+        <!-- 今日打卡侧边提示（当天首次进入 App 出现一次；点一下进打卡页） -->
+        <MobileCheckinPrompt />
 
         <!-- 全局账户抽屉 + 全局 toast（2026-09-05：任意页面头像可开；各页不再自建 toast） -->
         <MobileAccountDrawer

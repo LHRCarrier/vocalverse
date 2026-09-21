@@ -7,7 +7,7 @@
  * 场景归属：社区 = home/search/notifications(含会话)/report；学习 = learn(含 :module 详情)/notes/chat(含场景)/free-chat/sing；
  * 沉浸页 compose 无底部栏。2026-09-05 晚 8：练习 → 学习更名（路由 /m/learn）；09-09 /m/me 舍弃（收敛进抽屉）；私信收敛进通知中心。
  */
-import { computed } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import IconBell from '~icons/tabler/bell'
@@ -19,9 +19,20 @@ import IconMicrophone from '~icons/tabler/microphone'
 import IconMusic from '~icons/tabler/music'
 import IconPlus from '~icons/tabler/plus'
 import IconSearch from '~icons/tabler/search'
+
+import MobileUnreadBadge from '@/components/mobile/MobileUnreadBadge.vue'
+import { useMessagesStore } from '@/stores/messages'
 import '@/styles/mobile-uic.css'
 
 const route = useRoute()
+const messages = useMessagesStore()
+
+/* 未读角标（docs/49 §4.1 ② 的落地）：进入/切换页面时对齐一次全局未读（节流在 store 内） */
+onMounted(() => void messages.loadUnreadTotal())
+watch(
+  () => route.path,
+  () => void messages.loadUnreadTotal(),
+)
 
 const group = computed<null | 'community' | 'learn'>(() => {
   const p = route.path
@@ -37,6 +48,7 @@ const group = computed<null | 'community' | 'learn'>(() => {
   if (
     p === '/m/learn' ||
     p.startsWith('/m/learn/') ||
+    p === '/m/checkin' ||
     p === '/m/notes' ||
     p.startsWith('/m/chat') ||
     p === '/m/free-chat' ||
@@ -87,6 +99,7 @@ const group = computed<null | 'community' | 'learn'>(() => {
       aria-label="通知"
     >
       <IconBell />
+      <MobileUnreadBadge :count="messages.unreadTotal" />
     </RouterLink>
   </nav>
 

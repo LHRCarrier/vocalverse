@@ -28,6 +28,7 @@ import {
 } from '@/api/community'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import MobileUnreadBadge from '@/components/mobile/MobileUnreadBadge.vue'
 import { useMessagesStore } from '@/stores/messages'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
@@ -197,14 +198,13 @@ const hasFollows = computed(() => followList.value.length > 0)
       <template #actions>
         <button class="u-topbar__act" type="button" title="新消息（演示）" aria-label="新消息" @click="newMessage">
           <IconMail />
+          <MobileUnreadBadge :count="messages.unreadTotal" />
         </button>
         <button class="u-topbar__act" type="button" title="通知设置（演示）" aria-label="通知设置" @click="messageSettings">
           <IconSettings />
         </button>
       </template>
     </MobileTopBar>
-
-    <p class="u-note u-notif__demo">私信/通知/关注均为真实流（docs/49）；实时推送走长连，弱网自动降级。</p>
 
     <!-- X 式 tab（均分整行 · 激活加粗 + 下划线） -->
     <nav class="u-notif-tabs" aria-label="通知分类">
@@ -218,6 +218,7 @@ const hasFollows = computed(() => followList.value.length > 0)
         @click="activeTab = t"
       >
         {{ t }}
+        <MobileUnreadBadge v-if="t === '私信'" class="u-notif-tab__badge" :count="messages.unreadTotal" />
       </button>
     </nav>
 

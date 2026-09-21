@@ -63,12 +63,15 @@ function openDetail() {
 
     <!-- 整卡可点 → 详情页（互动按钮各自 @click.stop，避免误跳） -->
     <div class="u-comm-item__tap" role="button" tabindex="0" :aria-label="`查看内容：${props.post.title ?? props.post.body ?? ''}`" @click="openDetail" @keydown.enter="openDetail">
-      <!-- 打卡卡（当日聚合：整体分 + 次数 + 日期） -->
+      <!-- 打卡卡（手动打卡：有练习才显示分数行，否则只显示已打卡 + 日期） -->
       <template v-if="props.post.kind === 'checkin'">
         <h3 class="u-comm-item__title">今日打卡</h3>
         <p class="u-comm-item__desc">
-          完成 {{ checkinCount }} 次口语练习 · 今日综合分
-          <strong class="u-comm-item__score">{{ checkinScore == null ? '—' : checkinScore.toFixed(0) }}</strong>
+          <template v-if="checkinCount > 0">
+            完成 {{ checkinCount }} 次口语练习 · 今日综合分
+            <strong class="u-comm-item__score">{{ checkinScore == null ? '—' : checkinScore.toFixed(0) }}</strong>
+          </template>
+          <template v-else>今日已打卡</template>
           <time class="u-comm-item__time">{{ props.post.checkinDate }}</time>
         </p>
       </template>

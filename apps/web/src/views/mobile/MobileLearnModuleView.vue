@@ -222,7 +222,7 @@ const words = [
       <!-- 社区足迹：收藏/点赞 + 偏好占比（M3 埋点；演示帧） -->
       <template v-else>
         <section class="u-learn-detail__card">
-          <div class="u-learn-detail__sub">内容偏好（点赞/收藏/浏览 · 演示帧 M3 埋点）</div>
+          <div class="u-learn-detail__sub">内容偏好（点赞/收藏/浏览）</div>
           <ul class="u-learn-pref">
             <li
               v-for="p in communityPref"
@@ -248,8 +248,6 @@ const words = [
           </ul>
         </section>
       </template>
-
-      <p class="u-learn-foot-note">数据为演示帧，M3 接入真实聚合（attempts · 埋点 · 词汇本）。</p>
     </div>
   </div>
 </template>

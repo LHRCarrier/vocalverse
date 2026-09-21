@@ -10,17 +10,19 @@
  *   ④ 模块列表（4 行：我的单词 / 社区足迹 / 我的发音 / 练习情况——每行一句摘要，要细节点进去）
  * 数据口径：progress/auth 真实；热力图/摘要演示帧（M3 接 attempts/埋点聚合）。
  */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useCheckinStore } from '@/stores/checkin'
 import { useProgressStore } from '@/stores/progress'
 import '@/styles/mobile-uic.css'
 
 const progress = useProgressStore()
 const auth = useAuthStore()
+const checkin = useCheckinStore()
 const router = useRouter()
 
 const displayName = computed(() => auth.me?.nickname ?? auth.me?.username ?? '学习者')
@@ -29,7 +31,12 @@ const displayName = computed(() => auth.me?.nickname ?? auth.me?.username ?? '�
 const profileLine = '你本周练了 6 次，发音进步 +4 分——表达越来越自然了。'
 
 /* ---------- 识别行 ---------- */
-const streak = 12 // 连续天数（演示；M3 打卡聚合）
+/* 连续天数 = 真实打卡卡聚合（stores/checkin）；未加载时为 0，不写死演示值 */
+const streak = computed(() => checkin.streak)
+
+onMounted(() => {
+  void checkin.refresh()
+})
 
 /* ---------- 学习热力图（12 周 × 7 天 · 自绘零依赖 · 演示确定性数据） ---------- */
 type HeatCell = { date: Date; level: 0 | 1 | 2 | 3; xp: number }
@@ -149,9 +156,15 @@ function openModule(path: string) {
         <span class="u-learn-id__bar" role="progressbar" :aria-valuenow="progress.progressPct" aria-valuemin="0" aria-valuemax="100">
           <span class="u-learn-id__fill" :style="{ width: `${progress.progressPct}%` }" />
         </span>
-        <span class="u-learn-id__streak">
+        <button
+          class="u-learn-id__streak"
+          type="button"
+          title="打卡"
+          aria-label="打开打卡页"
+          @click="openModule('/m/checkin')"
+        >
           <MobileIcon name="flame" :size="15" />{{ streak }} 天
-        </span>
+        </button>
       </section>
 
       <!-- ③ 学习热力图（信息图 · 只图 + 右下角经验） -->
@@ -193,8 +206,6 @@ function openModule(path: string) {
           <MobileIcon name="chevron" :size="16" class="u-learn-module__go" />
         </button>
       </section>
-
-      <p class="u-learn-foot-note">热力图/摘要为演示帧，M3 接入 attempts 与埋点聚合。</p>
     </div>
   </div>
 </template>

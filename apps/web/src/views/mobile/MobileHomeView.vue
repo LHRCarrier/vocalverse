@@ -17,8 +17,10 @@ import MobileCommentsSheet from '@/components/mobile/MobileCommentsSheet.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobilePostCard from '@/components/mobile/MobilePostCard.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import MobileUnreadBadge from '@/components/mobile/MobileUnreadBadge.vue'
 import { shareDemoLink } from '@/composables/share'
 import { useCommunityStore } from '@/stores/community'
+import { useMessagesStore } from '@/stores/messages'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
@@ -27,6 +29,7 @@ import type { CommunityPostView } from '@/types/community'
 const router = useRouter()
 const ui = useUiStore()
 const community = useCommunityStore()
+const messages = useMessagesStore()
 
 const tabs = COMMUNITY_TABS
 const activeTab = ref<string | null>(null)
@@ -102,6 +105,7 @@ function tintGradient(tint: string | null | undefined): string {
         </button>
         <button class="u-topbar__act" type="button" title="写消息" aria-label="写消息" @click="openMessages">
           <IconMail />
+          <MobileUnreadBadge :count="messages.unreadTotal" />
         </button>
       </template>
     </MobileTopBar>
@@ -170,8 +174,6 @@ function tintGradient(tint: string | null | undefined): string {
       >
         {{ community.loadingMore ? '加载中…' : '加载更多' }}
       </button>
-
-      <p class="u-comm__note">内容为社区真实数据：三领域 Tab 服务端过滤；为你推荐=全量混排（含打卡卡）。</p>
     </div>
 
     <!-- 评论面板（真实流：服务端列表 + 发表；嵌套楼 S3；v-if 守卫下的可选链兜底） -->

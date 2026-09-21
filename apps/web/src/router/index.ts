@@ -47,6 +47,11 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '学习模块', requiresAuth: true },
   },
   {
+    path: '/m/checkin',
+    component: () => import('@/views/mobile/MobileCheckinView.vue'),
+    meta: { title: '打卡', requiresAuth: true },
+  },
+  {
     path: '/m/notifications',
     component: () => import('@/views/mobile/MobileNotificationsView.vue'),
     meta: { title: '通知', requiresAuth: true },
