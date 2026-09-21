@@ -9,6 +9,8 @@ import type {
   LibraryBookRow,
   LibraryChapterRow,
   MediaAssetRow,
+  ScenarioCardRow,
+  ScenarioCardUpsert,
   MetricCatalogItem,
   MetricQuery,
   MetricQueryResult,
@@ -134,6 +136,24 @@ export const opsApi = {
   /** 章节清单（不分页，返回 `{items}`；library.py:154-174） */
   listChapters: (bookId: number) =>
     opsHttp.get<{ items: LibraryChapterRow[] }>(`${P}/library/books/${bookId}/chapters`),
+
+  // ── 运营：酒馆场景卡（Python 写方，`console/trpg/cards/**`，docs/52 §12.1） ──
+  listScenarioCards: (query: { page?: number; page_size?: number; q?: string; status?: string }) =>
+    opsHttp.get<PageView<ScenarioCardRow>>(`${P}/trpg/cards`, { query }),
+
+  createScenarioCard: (body: ScenarioCardUpsert) =>
+    opsHttp.post<ScenarioCardRow>(`${P}/trpg/cards`, body),
+
+  updateScenarioCard: (id: number, body: ScenarioCardUpsert) =>
+    opsHttp.put<ScenarioCardRow>(`${P}/trpg/cards/${id}`, body),
+
+  /** 上/下架（draft|published|archived）；校验失败 → 46011 + data.violations[] */
+  publishScenarioCard: (id: number, status: PublishStatus) =>
+    opsHttp.post<ScenarioCardRow>(`${P}/trpg/cards/${id}/publish`, { status }),
+
+  /** 随机生成草稿（keywords 空 = 主题池轮换）；**不落库**，确认后 create/update */
+  generateScenarioCard: (body: { keywords?: string; lang?: string }) =>
+    opsHttp.post<ScenarioCardUpsert>(`${P}/trpg/cards/generate`, body),
 
   /** 章节上/下架返回**章节**行，不是 null（library.py:180-200） */
   publishChapter: (id: number, status: PublishStatus) =>

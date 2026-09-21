@@ -156,4 +156,28 @@ describe('opsApi 契约（权威：console/api/routes/ops.py）', () => {
     expect(captured[0].body).toBe(JSON.stringify({ hidden: true }))
     expect(media.status).toBe('hidden')
   })
+
+  it('trpg cards：列表/保存/上下架/随机生成的路径与请求体（trpg_cards.py）', async () => {
+    stub({ id: 3, title: '迷雾酒馆', status: 'draft', language: 'zh', tags: [], source: 'admin', owner_user_id: null })
+    await opsApi.createScenarioCard({ title: '迷雾酒馆', scene: '酒馆', opening_line: '推门。' })
+    expect(captured[0].url).toContain('/console/trpg/cards')
+    expect(captured[0].method).toBe('POST')
+
+    stub({ id: 3, title: '迷雾酒馆', status: 'published', language: 'zh', tags: [], source: 'admin', owner_user_id: null })
+    const published = await opsApi.publishScenarioCard(3, 'published')
+    expect(captured[0].url).toContain('/console/trpg/cards/3/publish')
+    expect(captured[0].body).toBe(JSON.stringify({ status: 'published' }))
+    expect(published.status).toBe('published')
+
+    stub({ title: '草稿', template: { tasks: ['a'] } })
+    const draft = await opsApi.generateScenarioCard({ keywords: '海盗 灯塔', lang: 'zh' })
+    expect(captured[0].url).toContain('/console/trpg/cards/generate')
+    expect(captured[0].body).toBe(JSON.stringify({ keywords: '海盗 灯塔', lang: 'zh' }))
+    expect(draft.title).toBe('草稿')
+
+    stub({ items: [], total: 0, page: 1, page_size: 20 })
+    await opsApi.listScenarioCards({ page: 1, page_size: 20, status: 'draft' })
+    expect(captured[0].url).toContain('/console/trpg/cards')
+    expect(query(captured[0].url).get('status')).toBe('draft')
+  })
 })

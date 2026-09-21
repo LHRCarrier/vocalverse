@@ -109,6 +109,51 @@ export type TicketStatus = 'open' | 'processing' | 'resolved' | 'closed'
 /** 工单类型：反馈 / 报错 / 内容纠误（content_correction 时才有 targetType/targetId） */
 export type TicketKind = 'feedback' | 'bug' | 'content_correction'
 
+// ── Python 写方：酒馆场景卡（`/api/v1/console/trpg/cards/**`，docs/52 §12.1） ──
+// 权威：`services/python/app/console/api/routes/trpg_cards.py` 与 `app/trpg/cards.py::card_view`。
+
+export type ScenarioCardStatus = 'draft' | 'published' | 'archived'
+export type ScenarioCardLang = 'zh' | 'en'
+
+/** 开局模板（card_view().template；服务端归一后落库的形状） */
+export interface ScenarioCardTemplate {
+  pc_name?: string
+  pc?: Record<string, string>
+  facts?: Array<{ key: string; value: string; modality?: string; speaker?: string | null }>
+  tasks?: string[]
+  clues?: Array<{ title: string; content?: string | null; scene?: string | null }>
+}
+
+/** 平台场景卡行（trpg_cards.py：owner_user_id 恒 null） */
+export interface ScenarioCardRow {
+  id: number
+  owner_user_id: number | null
+  source: 'admin' | 'user'
+  status: ScenarioCardStatus
+  title: string
+  summary?: string | null
+  language: ScenarioCardLang
+  tags: string[]
+  scene?: string | null
+  opening_line?: string | null
+  template?: ScenarioCardTemplate | null
+  keywords?: string | null
+  generated_by?: string | null
+  published_at?: string | null
+  created_at?: string | null
+}
+
+/** 新建/编辑请求体（与 CardUpsert 对齐） */
+export interface ScenarioCardUpsert {
+  title: string
+  summary?: string | null
+  language?: string | null
+  tags?: string[] | null
+  scene?: string | null
+  opening_line?: string | null
+  template?: ScenarioCardTemplate | null
+}
+
 // ── Python 写方：书籍 / 章节 / 媒体（`/api/v1/console/library/**`） ────────
 // 权威：`services/python/app/console/api/routes/library.py` 的
 // `_book_view`(:285) / `_chapter_view`(:298) / `_media_view`(:311)。
