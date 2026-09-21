@@ -13,10 +13,14 @@ const mocks = vi.hoisted(() => ({
   fetchItems: vi.fn(),
   track: vi.fn(),
   refreshCheckin: vi.fn(),
+  fetchLearn: vi.fn(),
 }))
 
 vi.mock('@/api/reco', () => ({ fetchItemsRecommendations: mocks.fetchItems }))
 vi.mock('@/api/events', () => ({ track: mocks.track }))
+vi.mock('@/api/stats', () => ({
+  fetchLearnOverview: mocks.fetchLearn,
+}))
 vi.mock('@/stores/checkin', () => ({
   useCheckinStore: () => ({ streak: 0, refresh: mocks.refreshCheckin }),
 }))
@@ -45,6 +49,17 @@ async function mountView() {
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.clearAllMocks()
+  mocks.fetchLearn.mockResolvedValue({
+    profile_line: '近 30 天练了 2 次',
+    heatmap: [],
+    modules: {
+      words: { summary: 'w' },
+      community: { summary: 'c' },
+      speaking: { summary: 's' },
+      practice: { summary: 'p' },
+    },
+    generated_at: '2026-09-21T00:00:00+00:00',
+  })
 })
 
 describe('学习页 · 为你推荐（docs/53 P3）', () => {

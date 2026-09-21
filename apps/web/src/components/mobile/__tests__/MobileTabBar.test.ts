@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -7,6 +7,32 @@ import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
 import { useMessagesStore } from '@/stores/messages'
 import MobileLearnView from '@/views/mobile/MobileLearnView.vue'
 import MobileNotesView from '@/views/mobile/MobileNotesView.vue'
+
+/** 学习画像接口桩（docs/53 P4：热力图改真实聚合；旧用例断言点格交互 → 提供两格数据） */
+const today = new Date()
+const key = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const yesterday = new Date(today)
+yesterday.setDate(today.getDate() - 1)
+
+vi.mock('@/api/stats', () => ({
+  fetchLearnOverview: vi.fn(async () => ({
+    profile_line: '近 30 天练了 3 次',
+    heatmap: [
+      { date: key(yesterday), count: 3, level: 1 },
+      { date: key(today), count: 7, level: 2 },
+    ],
+    modules: {
+      words: { summary: 'w' },
+      community: { summary: 'c' },
+      speaking: { summary: 's' },
+      practice: { summary: 'p' },
+    },
+    generated_at: '2026-09-21T00:00:00+00:00',
+  })),
+}))
+vi.mock('@/api/reco', () => ({ fetchItemsRecommendations: vi.fn(async () => ({ items: [] })) }))
+vi.mock('@/api/events', () => ({ track: vi.fn() }))
 
 const routes = [
   { path: '/m/home', component: { template: '<div/>' } },
@@ -129,12 +155,13 @@ describe('MobileLearnView（我的学习 · v4 画像总览 2026-09-09）', () =
     expect(router.currentRoute.value.path).toBe('/m/vocab')
   })
 
-  it('热力图：点格 → 右下角经验更新', async () => {
+  it('热力图：点格 → 右下角经验更新（真实聚合：接口两格数据）', async () => {
     await router.push('/m/learn')
     await router.isReady()
     const wrapper = mount(MobileLearnView, { global: { plugins: [router] } })
+    await flushPromises()
     const before = wrapper.find('.u-learn-heat__xp').text()
-    await wrapper.findAll('.u-learn-heat__cell:not(.future)')[0].trigger('click')
+    await wrapper.findAll('.u-learn-heat__cell:not(.future):not(.lv0)')[0].trigger('click')
     expect(wrapper.find('.u-learn-heat__xp').text()).not.toBe(before)
   })
 })
