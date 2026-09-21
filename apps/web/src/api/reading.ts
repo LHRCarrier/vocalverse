@@ -4,6 +4,7 @@
  * - 整章预合成为 SSE 流（openSseFetch + FormData；事件类型见 ReadingStreamEvent）。
  */
 import { openSseFetch } from '@/audio/sse'
+import { DEFAULT_TTS_VOICE } from '@/audio/tts-config'
 import { PYTHON_BASE, loadAudioBlob, request } from '@/api/client'
 
 /**
@@ -212,7 +213,7 @@ export async function deleteVocab(id: number): Promise<void> {
 }
 
 /** 查词词卡「读词音」（缓存命中 0 扣；返回音频 blob） */
-export function wordAudioUrl(word: string, voice = 'en-US-JennyNeural'): string {
+export function wordAudioUrl(word: string, voice = DEFAULT_TTS_VOICE): string {
   return `/api/v1/reading/tts/word/${encodeURIComponent(word)}?voice=${voice}`
 }
 

@@ -2,6 +2,7 @@
  * M2 练习 API 封装（docs/14 §6.2）：会话/回合/报告/场景/答辩。
  * SSE 回合流经 openSseFetch（POST 音频 → 事件流），不走 request() 的 JSON 路径。
  */
+import { DEFAULT_TTS_RATE, DEFAULT_TTS_VOICE } from '@/audio/tts-config'
 import { openSseFetch } from '@/audio/sse'
 import type { SseStreamEvent } from '@/audio/sse-types'
 import { authHeaders, request } from './client'
@@ -152,16 +153,25 @@ export async function createDefenseProfile(payload: Record<string, unknown>) {
   return resp.data
 }
 
-export async function tts(text: string, rate = '+0%'): Promise<Blob> {
+export async function tts(text: string, rate = DEFAULT_TTS_RATE): Promise<Blob> {
   const form = new FormData()
   form.append('text', text)
-  form.append('voice', 'en-US-JennyNeural')
+  form.append('voice', DEFAULT_TTS_VOICE)
   form.append('rate', rate)
-  const resp = await request<{ audio_bytes: string; length: number }>('/api/v1/tts', {
+  const resp = await request<{
+    audio_bytes: string
+    length: number
+    /** 后端自报的输出容器（2026-09 契约增补）；旧后端无此字段时回落 audio/mpeg */
+    media_type?: string
+  }>('/api/v1/tts', {
     method: 'POST',
     body: form,
   })
-  return new Blob([hexToBytes(resp.data.audio_bytes)], { type: 'audio/mpeg' })
+  // ⚠️ 不能一律写死 'audio/mpeg'：本地引擎（KittenTTS/OmniVoice）出的是 24kHz WAV，
+  // Blob type 标错会让 <audio> 解码失败（docs/46 B-3 同类问题）。
+  return new Blob([hexToBytes(resp.data.audio_bytes)], {
+    type: resp.data.media_type || 'audio/mpeg',
+  })
 }
 
 function hexToBytes(hex: string): Uint8Array {

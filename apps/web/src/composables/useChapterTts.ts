@@ -10,6 +10,7 @@ import { computed, onBeforeUnmount, ref, shallowRef } from 'vue'
 import { loadSegmentAudio } from '@/api/reading'
 import { useBlobAudio } from '@/composables/useBlobAudio'
 import { RATES } from '@/audio/tts-player'
+import { DEFAULT_TTS_VOICE } from '@/audio/tts-config'
 import type { ReadingSentence } from '@/api/reading'
 
 export function useChapterTts(chapterId: number, getSentences: () => ReadonlyArray<ReadingSentence>) {
@@ -141,8 +142,8 @@ export function useChapterTts(chapterId: number, getSentences: () => ReadonlyArr
     releaseAll()
   })
 
-  // 音色在视图层绑定（Mounted 后加载 voices，默认 Jenny）
-  const voice = ref('en-US-JennyNeural')
+  // 音色在视图层绑定（Mounted 后加载 voices，默认取 tts-config 单一真源）
+  const voice = ref(DEFAULT_TTS_VOICE)
   function setVoice(v: string) {
     voice.value = v
   }
