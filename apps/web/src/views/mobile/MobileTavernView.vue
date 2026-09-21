@@ -164,7 +164,10 @@ async function onCreateCard(payload: { title: string; scene: string; opening_lin
       :aria-label="status === 'busy' ? 'DM 处理中' : status === 'error' ? '出错了' : '空闲'"
     />
     <MobileTopBar title="酒馆" back @back="router.push('/m/learn')">
-      <template #actions>
+      <!-- 左侧功能项（2026-09-21 组长反馈：标题居中 + 功能项可放左）：
+           设置常驻左侧；场景卡随阶段换边——游玩态在左（左 2 钮 vs 右 3 钮 → 标题居中），
+           开局引导/加载/出错态右侧只剩离开钮，星标回右保持两侧等宽（左 1 vs 右 2）。 -->
+      <template #left>
         <button
           class="u-topbar__act"
           type="button"
@@ -175,6 +178,19 @@ async function onCreateCard(payload: { title: string; scene: string; opening_lin
           <IconSettings />
         </button>
         <button
+          v-if="stage === 'play'"
+          class="u-topbar__act"
+          type="button"
+          title="场景卡"
+          aria-label="场景卡"
+          @click="openCards"
+        >
+          <MobileIcon name="star" :size="20" />
+        </button>
+      </template>
+      <template #actions>
+        <button
+          v-if="stage !== 'play'"
           class="u-topbar__act"
           type="button"
           title="场景卡"

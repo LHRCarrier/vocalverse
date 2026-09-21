@@ -3286,6 +3286,9 @@ body.is-login {
  *   改为左右轨道 min = min-content（头像/右侧按钮永不被压缩），
  *   中间轨道 minmax(0, auto)（长标题可收缩到 0 走省略号，短标题仍按内容居中）。
  *   实测 390px 视口：长标题 title=[62,320] / ava=[16,52] → overlap=false（修复前 overlap=true）。
+ * 2026-09-21（组长反馈「标题居中 + 功能项可放左侧」）：三列均为内容宽度驱动 ——
+ *   左右两组宽度差的一半就是标题偏移量（如酒馆右侧 5 钮时偏左 ≈96px）。
+ *   修法 = 用 left 插槽把部分功能项挪到左侧配平（见 .u-topbar__leftacts），差值 ≤4px 即视为居中。
  * ============================================================ */
 .u-topbar {
   display: grid;
@@ -3301,6 +3304,20 @@ body.is-login {
   gap: 8px;
   justify-content: flex-start;
   min-width: 0; /* 轨道 min-content 已保证头像不被压缩（见 .u-topbar 注）；此处仅防内部溢出 */
+}
+
+/* 顶栏左侧功能项组（2026-09-21 组长反馈「功能项可放左侧」）：
+ * 头像之后的按钮组，规格与右侧 .u-topbar__acts 一致（44px 触控 + 4px 间距）。
+ * 用途 = 配平左右两组宽度让标题居中（见 .u-topbar 三列注释）；不传 left 插槽时整组不渲染。 */
+.u-topbar__leftacts {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.u-topbar__leftacts:empty {
+  display: none;
 }
 
 /* 离开钮（右侧 actions 位 · 2026-09-09 组长反馈：放左侧破坏 X「左身份右操作」范式 →

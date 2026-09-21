@@ -9,6 +9,11 @@
  * 2026-09-21（组长反馈：改语言/切领域要滑回顶部）：顶栏吸顶常驻 + 社交 App 惯例的方向感知
  * （下滚收起、上滚出现）——滚动逻辑在 useAutoHideOnScroll；宿主 = 包在 `.u-head` 吸顶区里时
  * 收起整块（顶栏 + 页首控制行），否则收起顶栏自身（见 mobile-uic.css「页首吸顶区」段）。
+ *
+ * 2026-09-21（组长反馈：标题居中 + 功能项可放左侧）：新增 left 插槽（头像之后）——
+ * 标题在 grid 中列，左右两组宽度越接近越居中（左右差值一半 = 标题偏移量）；
+ * 按钮多的页面（酒馆 5 钮）把部分功能项放左侧配平，标题即回正中（见 MobileTavernView）。
+ * 头像仍是左侧第一位（不动这条定规）。
  */
 import { ref } from 'vue'
 import IconLogout from '~icons/tabler/logout'
@@ -51,6 +56,10 @@ useAutoHideOnScroll(() => barEl.value?.closest<HTMLElement>('.u-head') ?? barEl.
           size="sm"
         />
       </button>
+      <!-- 左侧功能项（可选；2026-09-21 组长反馈「功能项可放左侧」）：用于配平左右两组宽度、让标题真居中 -->
+      <div v-if="$slots.left" class="u-topbar__leftacts">
+        <slot name="left" />
+      </div>
     </div>
     <h1 class="u-topbar__title">{{ props.title }}</h1>
     <div class="u-topbar__acts">
