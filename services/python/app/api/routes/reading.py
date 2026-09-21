@@ -169,6 +169,20 @@ class PagedItems(BaseModel):
     has_more: bool = False
 
 
+class NoteView(AnnotationView):
+    """「我的笔记」跨章行（docs/53 P5）：附章节/书名供列表展示与跳回阅读器。"""
+
+    chapter_id: int
+    book_id: int
+    chapter_title: str
+    book_title: str
+
+
+class NotesView(BaseModel):
+    items: list[NoteView] = []
+    has_more: bool = False
+
+
 def _progress_dict(row) -> dict[str, Any] | None:
     if row is None:
         return None
@@ -430,6 +444,23 @@ async def delete_vocab(
 # ---------------------------------------------------------------------------
 # 批注
 # ---------------------------------------------------------------------------
+
+
+@router.get("/notes", response_model=Envelope[NotesView])
+async def list_notes(
+    kind: str | None = Query(default=None, pattern="^(highlight|note)$"),
+    limit: int = Query(default=50, ge=1, le=100),
+    user_id: int = Depends(get_current_user_id),
+) -> Envelope:
+    """我的笔记（docs/53 P5）：跨章批注列表（join 章节/书名），章节内列表仍走 /annotations。"""
+
+    def _q():
+        items, has_more = service.list_notes_sync(db, user_id, kind=kind, limit=limit)
+        return {"items": items, "has_more": has_more}
+
+    async with _db() as db:
+        data = await _thread(_q)
+    return ok(data)
 
 
 @router.get("/annotations", response_model=Envelope[PagedItems])

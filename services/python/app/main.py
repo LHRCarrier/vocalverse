@@ -30,6 +30,7 @@ from app.api.routes import (
     reading,
     reading_tts,
     recommendations,
+    search,
     singing,
     stats,
     trpg,
@@ -251,6 +252,7 @@ app.include_router(placement.router)
 app.include_router(events.router)
 app.include_router(recommendations.router)
 app.include_router(stats.router)  # 学习指标（docs/53 P2：四指标 + 个人报表）
+app.include_router(search.router)  # C 端搜索（docs/53 P5：帖子/用户/教程三 tab 真源）
 app.include_router(reading.router)  # 读书域（docs/45：书架/查词/生词/批注/进度/音色）
 app.include_router(reading_tts.router)  # 听书（单句音频/预合成 SSE/任务）
 app.include_router(media.router)  # 媒体（社区 S3 · docs/47 §4.1：图片/视频/头像上传与读取）

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { NConfigProvider, NDialogProvider, NMessageProvider } from 'naive-ui'
 import { useRouter } from 'vue-router'
 
@@ -7,12 +8,19 @@ import MobileCheckinPrompt from '@/components/mobile/MobileCheckinPrompt.vue'
 import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
 import { useNativeBack } from '@/composables/useNativeBack'
 import { useAuthStore } from '@/stores/auth'
+import { useProgressStore } from '@/stores/progress'
 import { useUiStore } from '@/stores/ui'
 import { themeOverrides } from '@/styles/theme'
 
 const router = useRouter()
 const auth = useAuthStore()
+const progress = useProgressStore()
 const ui = useUiStore()
+
+/* 全局 LV/XP 由服务端聚合（docs/53 P5 ③）：冷启动拉一次，练习完成各页再 refresh() */
+onMounted(() => {
+  if (auth.token) void progress.refresh()
+})
 
 /** Android 返回手势/按键：抽屉开着就先关抽屉（阅读器弹层由各页自己注册，见 useNativeBack） */
 useNativeBack(() => {

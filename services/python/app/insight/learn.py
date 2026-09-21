@@ -10,7 +10,7 @@
 - 模块摘要（学习主页 4 行）：words（生词本）/ community（埋点足迹）/ speaking（三维均分）/
   practice（会话分钟 + 酒馆剧本数）；
 - 模块详情：speaking（三维趋势 + 薄弱音素 Top3，来自 `scores`）/ practice（热力图 + 剧本强度）/
-  words（生词本列表）/ community（足迹分布 + 常逛页面）。
+  words（生词本列表，join 词典取首义）/ community（足迹分布 + 常逛页面）。
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from app.models.analytics import Event
 from app.models.base import SessionKinds
 from app.models.practice import Attempt, Score
 from app.models.practice import Session as PracticeSession
-from app.models.reading import UserVocabulary
+from app.models.reading import DictionaryEntry, UserVocabulary
 from app.models.trpg import TrpgCampaign, TrpgMessage
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
@@ -186,13 +186,10 @@ def learn_module(db: Session, user_id: int, key: str, *, days: int = 30) -> dict
     """模块详情聚合（key ∈ words/community/speaking/practice）。"""
     since = datetime.now(UTC) - timedelta(days=days)
     if key == "words":
+        # 词典子集未收录的词也展示（translation 回退空，与 `reading.service.list_vocab` 同口径）
         rows = db.execute(
-            select(
-                UserVocabulary.word,
-                UserVocabulary.status,
-                UserVocabulary.scene,
-                UserVocabulary.created_at,
-            )
+            select(UserVocabulary, DictionaryEntry)
+            .outerjoin(DictionaryEntry, DictionaryEntry.word == UserVocabulary.word)
             .where(UserVocabulary.user_id == user_id)
             .order_by(UserVocabulary.created_at.desc())
             .limit(50)
@@ -201,12 +198,14 @@ def learn_module(db: Session, user_id: int, key: str, *, days: int = 30) -> dict
             "key": key,
             "items": [
                 {
-                    "word": w,
-                    "status": s,
-                    "scene": sc,
-                    "created_at": _iso(c) if c else None,
+                    "word": v.word,
+                    "status": v.status,
+                    "scene": v.scene,
+                    "created_at": _iso(v.created_at) if v.created_at else None,
+                    "translation": (e.translation.split("\n")[0] if e and e.translation else None),
+                    "phonetic": e.phonetic if e else None,
                 }
-                for w, s, sc, c in rows
+                for v, e in rows
             ],
         }
     if key == "community":

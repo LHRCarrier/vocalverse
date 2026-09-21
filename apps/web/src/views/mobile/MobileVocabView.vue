@@ -2,13 +2,15 @@
 /**
  * 移动端 · 生词本（docs/45 §6 · /m/vocab）：阅读中查词「加入生词本」收集；唯一入口
  * （UI 拷问 U-5：学习页「我的单词」模块行摘要+CTA 收敛到本页，不另建重复页面）。
+ * 状态循环（docs/53 P5）：new → learning → known → new 走 PATCH /vocab/{id} 落库，
+ * 失败回滚本地状态（不假装成功）。
  */
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
-import { deleteVocab, fetchVocab } from '@/api/reading'
+import { deleteVocab, fetchVocab, patchVocab } from '@/api/reading'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 import '@/styles/reader-uic.css'
@@ -19,8 +21,11 @@ const router = useRouter()
 const ui = useUiStore()
 const items = ref<VocabItem[]>([])
 const loading = ref(true)
+const loadingMore = ref(false)
 const error = ref('')
-const hasMore = ref(false)
+const nextCursor = ref<string | null>(null)
+const hasMore = computed(() => nextCursor.value !== null)
+const savingIds = ref<Set<number>>(new Set())
 
 async function load() {
   loading.value = true
@@ -28,7 +33,7 @@ async function load() {
   try {
     const res = await fetchVocab()
     items.value = res.items
-    hasMore.value = res.has_more
+    nextCursor.value = res.next_cursor
   } catch (e) {
     error.value = (e as Error).message
   } finally {
@@ -36,6 +41,20 @@ async function load() {
   }
 }
 onMounted(load)
+
+async function loadMore() {
+  if (loadingMore.value || !nextCursor.value) return
+  loadingMore.value = true
+  try {
+    const res = await fetchVocab(undefined, nextCursor.value)
+    items.value = [...items.value, ...res.items]
+    nextCursor.value = res.next_cursor
+  } catch {
+    ui.showToast('加载更多失败')
+  } finally {
+    loadingMore.value = false
+  }
+}
 
 async function remove(item: VocabItem) {
   try {
@@ -48,11 +67,27 @@ async function remove(item: VocabItem) {
   }
 }
 
-/** 状态切换学习循环：new → learning → known → new（demo 语义） */
+const STATUS_LABELS: Record<string, string> = { new: '新词', learning: '学习中', known: '已掌握' }
+
+/** 状态切换学习循环：new → learning → known → new（PATCH 落库，失败回滚） */
 async function cycleStatus(item: VocabItem) {
-  const next = item.status === 'new' ? 'learning' : item.status === 'learning' ? 'known' : 'new'
+  if (savingIds.value.has(item.id)) return
+  const prev = item.status
+  const next = prev === 'new' ? 'learning' : prev === 'learning' ? 'known' : 'new'
   item.status = next
-  ui.showToast(`状态：${next}`)
+  savingIds.value = new Set(savingIds.value).add(item.id)
+  try {
+    const saved = await patchVocab(item.id, { status: next })
+    item.status = saved.status
+    ui.showToast(`状态：${STATUS_LABELS[saved.status] ?? saved.status}`)
+  } catch {
+    item.status = prev
+    ui.showToast('状态保存失败，请重试')
+  } finally {
+    const set = new Set(savingIds.value)
+    set.delete(item.id)
+    savingIds.value = set
+  }
 }
 
 /** 回到原文：有 chapter_id 直接进阅读器 */
@@ -97,8 +132,14 @@ function dateLabel(iso?: string | null): string {
           <div class="u-vb-card__row">
             <span class="u-vb-card__word">{{ item.word }}</span>
             <span class="u-vb-card__phonetic">{{ item.phonetic ?? '' }}</span>
-            <button class="u-vb-card__status" type="button" @click="cycleStatus(item)">
-              {{ item.status === 'new' ? '新词' : item.status === 'learning' ? '学习中' : '已掌握' }}
+            <button
+              class="u-vb-card__status"
+              type="button"
+              :disabled="savingIds.has(item.id)"
+              :aria-busy="savingIds.has(item.id)"
+              @click="cycleStatus(item)"
+            >
+              {{ savingIds.has(item.id) ? '保存中…' : (STATUS_LABELS[item.status] ?? item.status) }}
             </button>
           </div>
           <p class="u-vb-card__meaning">
@@ -116,7 +157,9 @@ function dateLabel(iso?: string | null): string {
           </div>
         </li>
       </ul>
-      <button v-if="hasMore" class="u-comm-more" type="button" disabled>加载更多（演示 len ≤ 50）</button>
+      <button v-if="hasMore" class="u-comm-more" type="button" :disabled="loadingMore" @click="loadMore">
+        {{ loadingMore ? '加载中…' : '加载更多' }}
+      </button>
     </div>
   </div>
 </template>

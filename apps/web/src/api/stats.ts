@@ -89,13 +89,28 @@ export async function fetchLearnOverview(): Promise<LearnOverview> {
 export interface LearnModuleDetail {
   key: string
   dims?: { pron: number | null; flu: number | null; gram: number | null }
-  trend?: { date: string; pron: number | null; flu: number | null; gram: number | null }[]
+  /** speaking = 三维按日趋势；community = 按日事件量（count） */
+  trend?: {
+    date: string
+    pron?: number | null
+    flu?: number | null
+    gram?: number | null
+    count?: number
+  }[]
   weak_phonemes?: { phoneme: string; count: number; avg: number | null }[]
   minutes?: number
   by_kind?: { kind: string; count: number; minutes: number }[]
   campaigns?: { id: number; name: string; turns: number; user_turns: number; last_active_at: string | null }[]
   heatmap?: { date: string; count: number; level: number }[]
-  items?: { word: string; status: string; scene: string; created_at: string | null }[]
+  items?: {
+    word: string
+    status: string
+    scene: string
+    created_at: string | null
+    /** 词典首义（未收录为 null；docs/45 §6 词典子集） */
+    translation?: string | null
+    phonetic?: string | null
+  }[]
   pages?: { page: string; count: number }[]
   events?: { event_type: string; count: number }[]
 }
@@ -106,6 +121,22 @@ export async function fetchLearnModule(key: string, days = 30): Promise<LearnMod
     undefined,
     PYTHON_BASE,
   )
+  return res.data
+}
+
+/** XP/等级（docs/53 P5）：服务端聚合，前端不再写死初始 320 / 升级规则 */
+export interface ProgressSummary {
+  xp: number
+  level: number
+  title: string
+  base: number
+  next: number | null
+  breakdown: Record<string, number>
+  rules: { key: string; xp: number }[]
+}
+
+export async function fetchProgressSummary(): Promise<ProgressSummary> {
+  const res = await request<ProgressSummary>('/api/v1/stats/progress', undefined, PYTHON_BASE)
   return res.data
 }
 

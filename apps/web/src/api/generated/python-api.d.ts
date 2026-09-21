@@ -547,9 +547,123 @@ export interface paths {
         };
         /**
          * Recommendations
-         * @description 推荐列表（type=shadow 影子跟读素材；limit 缺省按配置）。
+         * @description 推荐列表：shadow = 影子跟读素材；items = 跨类内容推荐（歌/书/场景卡）。
          */
         get: operations["recommendations_api_v1_recommendations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stats Overview */
+        get: operations["stats_overview_api_v1_stats_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/learn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stats Learn
+         * @description 学习主页画像（docs/53 P4）：一句话画像 + 热力图 + 四模块摘要。
+         */
+        get: operations["stats_learn_api_v1_stats_learn_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/learn/{module}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stats Learn Module
+         * @description 模块详情（words/community/speaking/practice）——未知模块 40001。
+         */
+        get: operations["stats_learn_module_api_v1_stats_learn__module__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stats Progress
+         * @description XP/等级（docs/53 P5）：服务端从 attempts/sing_attempts/events 聚合，前端不再写死。
+         */
+        get: operations["stats_progress_api_v1_stats_progress_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stats Me */
+        get: operations["stats_me_api_v1_stats_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search
+         * @description 三 tab 统一入口（docs/53 P5）：``?type=posts|users|tutorials&q=``。
+         */
+        get: operations["search_api_v1_search_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -687,6 +801,26 @@ export interface paths {
         head?: never;
         /** Patch Vocab */
         patch: operations["patch_vocab_api_v1_reading_vocab__vocab_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/reading/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notes
+         * @description 我的笔记（docs/53 P5）：跨章批注列表（join 章节/书名），章节内列表仍走 /annotations。
+         */
+        get: operations["list_notes_api_v1_reading_notes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/reading/annotations": {
@@ -1792,6 +1926,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/console/insight/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Insight Overview */
+        get: operations["insight_overview_api_v1_console_insight_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2293,6 +2444,20 @@ export interface components {
             message: string;
             data?: components["schemas"]["MediaView"] | null;
         };
+        /** Envelope[NotesView] */
+        Envelope_NotesView_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["NotesView"] | null;
+        };
         /** Envelope[PagedItems] */
         Envelope_PagedItems_: {
             /**
@@ -2517,6 +2682,16 @@ export interface components {
             target_id?: number | null;
             /** Scene Id */
             scene_id?: number | null;
+            /** Song Id */
+            song_id?: number | null;
+            /** Session Id */
+            session_id?: number | null;
+            /** Browse Session Id */
+            browse_session_id?: string | null;
+            /** Recommend Group Id */
+            recommend_group_id?: string | null;
+            /** Channel */
+            channel?: string | null;
             /**
              * Payload
              * @default {}
@@ -2617,6 +2792,55 @@ export interface components {
             height?: number | null;
             /** Durations */
             durationS?: number | null;
+        };
+        /**
+         * NoteView
+         * @description 「我的笔记」跨章行（docs/53 P5）：附章节/书名供列表展示与跳回阅读器。
+         */
+        NoteView: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Start Offset */
+            start_offset: number;
+            /** End Offset */
+            end_offset: number;
+            /** Content Version */
+            content_version: number;
+            /** Sentence Idx */
+            sentence_idx?: number | null;
+            /** Text Snippet */
+            text_snippet?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Chapter Id */
+            chapter_id: number;
+            /** Book Id */
+            book_id: number;
+            /** Chapter Title */
+            chapter_title: string;
+            /** Book Title */
+            book_title: string;
+        };
+        /** NotesView */
+        NotesView: {
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["NoteView"][];
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
         };
         /** PagedItems */
         PagedItems: {
@@ -4147,6 +4371,211 @@ export interface operations {
             query?: {
                 type?: string;
                 limit?: number | null;
+                kind?: string | null;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stats_overview_api_v1_stats_overview_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stats_learn_api_v1_stats_learn_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stats_learn_module_api_v1_stats_learn__module__get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                module: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stats_progress_api_v1_stats_progress_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stats_me_api_v1_stats_me_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_api_v1_search_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                type?: string;
+                limit?: number;
             };
             header?: {
                 authorization?: string;
@@ -4484,6 +4913,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_VocabView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notes_api_v1_reading_notes_get: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_NotesView_"];
                 };
             };
             /** @description Validation Error */
@@ -6922,6 +7386,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    insight_overview_api_v1_console_insight_overview_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

@@ -465,6 +465,44 @@ def delete_annotation(session: Session, user_id: int, annotation_id: int) -> boo
     return True
 
 
+def list_notes_sync(
+    session: Session, user_id: int, *, kind: str | None = None, limit: int = 50
+) -> tuple[list[dict[str, Any]], bool]:
+    """「我的笔记」跨章列表（docs/53 P5）：批注 join 章节/书名，按创建时间倒序。
+
+    批注锚定章内 offset，列表行给出 chapter_id 供前端跳回阅读器；kind 过滤
+    highlight（高亮）/ note（带笔记批注）。``limit`` 上限 100，返回 has_more。
+    """
+    cap = min(max(limit, 1), 100)
+    stmt = (
+        select(ReadingAnnotation, BookChapter.title, Book.title, Book.id)
+        .join(BookChapter, BookChapter.id == ReadingAnnotation.chapter_id)
+        .join(Book, Book.id == ReadingAnnotation.book_id)
+        .where(ReadingAnnotation.user_id == user_id)
+    )
+    if kind:
+        stmt = stmt.where(ReadingAnnotation.kind == kind)
+    rows = list(
+        session.execute(
+            stmt.order_by(ReadingAnnotation.created_at.desc(), ReadingAnnotation.id.desc()).limit(
+                cap + 1
+            )
+        ).all()
+    )
+    has_more = len(rows) > cap
+    out = [
+        {
+            **annotation_to_dict(a),
+            "chapter_id": a.chapter_id,
+            "book_id": int(book_id),
+            "chapter_title": chapter_title,
+            "book_title": book_title,
+        }
+        for a, chapter_title, book_title, book_id in rows[:cap]
+    ]
+    return out, has_more
+
+
 def annotation_to_dict(row: ReadingAnnotation) -> dict[str, Any]:
     return {
         "id": row.id,

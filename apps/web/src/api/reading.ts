@@ -262,6 +262,21 @@ export async function deleteAnnotation(id: number): Promise<void> {
   await request(`/api/v1/reading/annotations/${id}`, { method: 'DELETE' })
 }
 
+/** 「我的笔记」跨章列表行（docs/53 P5）：批注 + 章节/书名，供 /m/notes 展示与跳回阅读器 */
+export interface NoteItem extends AnnotationItem {
+  chapter_id: number
+  book_id: number
+  chapter_title: string
+  book_title: string
+}
+
+export async function fetchNotes(kind?: 'highlight' | 'note'): Promise<{ items: NoteItem[]; has_more: boolean }> {
+  const res = await request<{ items: NoteItem[]; has_more: boolean }>(
+    `/api/v1/reading/notes${kind ? `?kind=${kind}` : ''}`,
+  )
+  return res.data
+}
+
 // ---------------------------------------------------------------- 进度/音色
 
 export async function fetchProgress(bookId: number): Promise<ReadingProgress | null> {

@@ -3,6 +3,7 @@
 - ``GET /api/v1/stats/overview``：平台四指标（CTR/完成率/互动率/跳出率）+ 趋势 + 维度 TopN
   —— 口径见 ``app/insight/service.py``（docs/06 §9.1 修订）；demo 产品内 `/stats` 报表页消费；
 - ``GET /api/v1/stats/me``：个人报表（概览/趋势/五维雷达）——同一页面的「我的学习」区。
+- ``GET /api/v1/stats/progress``：XP/等级（docs/53 P5 后端化；前端 ``stores/progress`` 消费）。
 
 两者均要求学习者登录（``get_current_user_id``）；管理端看板走控制台端点
 ``/api/v1/console/insight/overview``（Python 控制台令牌 + 权限码，见
@@ -19,6 +20,7 @@ from app.core.response import ok
 from app.db import get_session_factory
 from app.insight import learn as learn_insight
 from app.insight import service as insight
+from app.insight import xp as xp_insight
 from app.rec.level_model import forecast
 
 router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
@@ -66,6 +68,18 @@ async def stats_learn_module(
     db = _db()
     try:
         return ok(learn_insight.learn_module(db, user_id, module, days=days))
+    finally:
+        db.close()
+
+
+@router.get("/progress")
+async def stats_progress(
+    user_id: int = Depends(get_current_user_id),
+):
+    """XP/等级（docs/53 P5）：服务端从 attempts/sing_attempts/events 聚合，前端不再写死。"""
+    db = _db()
+    try:
+        return ok(xp_insight.xp_summary(db, user_id))
     finally:
         db.close()
 

@@ -3558,6 +3558,33 @@ body.is-login {
   border-top: 1px solid var(--u-paper-grid);
 }
 
+/* 帖子行可点击（docs/53 P5 接真后跳详情）——按钮形态需重置浏览器默认样式 */
+button.u-search__row {
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--u-paper-grid);
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.u-search__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.u-search__clear {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--u-weak);
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .u-search__ava {
   width: 40px;
   height: 40px;
@@ -3673,6 +3700,34 @@ body.is-login {
 }
 
 .u-notes__star.is-starred {
+  color: var(--u-star);
+}
+
+/* 笔记卡片可点击（docs/53 P5 接真后跳回原文）——按钮形态重置 */
+button.u-notes__card {
+  width: 100%;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.u-notes__badge {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: var(--u-r-pill);
+  padding: 3px 8px;
+  background: var(--u-track);
+  color: var(--u-sub);
+}
+
+.u-notes__badge.is-note {
+  color: var(--u-accent);
+}
+
+.u-notes__badge.is-hl {
   color: var(--u-star);
 }
 
@@ -4237,6 +4292,19 @@ body.is-login {
   font-weight: 800;
   color: var(--u-ink);
   font-variant-numeric: tabular-nums;
+}
+
+/* 玩家回合 / 总回合（如 12/40）需要更宽 */
+.u-learn-scenes__score--wide {
+  width: 56px;
+}
+
+/* 卡片首行摘要（练习分布「共 N 分钟 · M 次会话」） */
+.u-learn-detail__note--lead {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--u-ink);
 }
 
 /* ============================================================
@@ -6203,4 +6271,171 @@ body.is-login {
   padding: 10px 14px;
   line-height: 1.6;
   resize: vertical;
+}
+
+/* ============================================================
+ * 设置与隐私三页（docs/53 P5 ④ · /m/settings/:section）
+ * ============================================================ */
+.u-set {
+  padding: 6px 16px 96px;
+}
+
+.u-set__card {
+  background: var(--u-card);
+  border-radius: var(--u-r-inner);
+  box-shadow: var(--u-shadow-float);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.u-set__sub {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--u-ink);
+  margin-bottom: 10px;
+}
+
+.u-set__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.u-set__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.u-set__label {
+  font-size: 12px;
+  color: var(--u-sub);
+}
+
+.u-set__input,
+.u-set__textarea {
+  width: 100%;
+  border: none;
+  background: var(--u-track);
+  border-radius: var(--u-r-inner);
+  padding: 10px 12px;
+  font: 400 14px var(--u-font);
+  color: var(--u-ink);
+  box-sizing: border-box;
+}
+
+.u-set__textarea {
+  min-height: 96px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.u-set__ok {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--u-success);
+}
+
+.u-set__err {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--u-error);
+}
+
+.u-set__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--u-weak);
+}
+
+.u-set__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.u-set__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.u-set__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.u-set__rowtitle {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--u-ink);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.u-set__meta {
+  font-size: 11px;
+  color: var(--u-weak);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.u-set__status {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--u-sub);
+  background: var(--u-track);
+  border-radius: var(--u-r-pill);
+  padding: 3px 8px;
+}
+
+.u-set__status.is-resolved {
+  color: var(--u-success);
+}
+
+.u-set__status.is-processing {
+  color: var(--u-accent);
+}
+
+.u-set__p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--u-sub);
+}
+
+.u-set__p:last-child {
+  margin-bottom: 0;
+}
+
+.u-set__faq summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--u-ink);
+  padding: 10px 0;
+  cursor: pointer;
+}
+
+.u-set__faq {
+  border-bottom: 1px solid var(--u-track);
+}
+
+.u-set__faq:last-child {
+  border-bottom: none;
 }

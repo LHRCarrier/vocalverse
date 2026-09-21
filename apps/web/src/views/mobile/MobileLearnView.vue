@@ -20,6 +20,8 @@ import { fetchItemsRecommendations } from '@/api/reco'
 import type { RecoItem } from '@/api/reco'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import { buildHeatmapWeeks, heatCellKey, isFutureCell, isTodayCell } from '@/composables/useLearnHeatmap'
+import type { HeatCell } from '@/composables/useLearnHeatmap'
 import { useAuthStore } from '@/stores/auth'
 import { useCheckinStore } from '@/stores/checkin'
 import { useProgressStore } from '@/stores/progress'
@@ -99,47 +101,10 @@ onMounted(() => {
 })
 
 /* ---------- 学习热力图（12 周 × 7 天 · 真实聚合：events 按日计数，docs/53 P4） ---------- */
-type HeatCell = { date: Date; level: 0 | 1 | 2 | 3; xp: number }
-
-/** 接口按日返回 [{date, count, level}]；无事件的日子补 0（前端补空格） */
-const heatMap = computed(() => {
-  const map = new Map<string, { count: number; level: 0 | 1 | 2 | 3 }>()
-  for (const cell of learn.value?.heatmap ?? []) {
-    map.set(cell.date, { count: cell.count, level: cell.level as 0 | 1 | 2 | 3 })
-  }
-  return map
-})
-
-const localKey = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-
-/** 近 12 周网格（列=周 · 行=周一~周日）；今天位于末列 */
-function buildWeeks(weeks: number): HeatCell[][] {
-  const today = new Date()
-  const monday = new Date(today)
-  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7))
-  const start = new Date(monday)
-  start.setDate(monday.getDate() - (weeks - 1) * 7)
-  const cols: HeatCell[][] = []
-  for (let w = 0; w < weeks; w++) {
-    const col: HeatCell[] = []
-    for (let d = 0; d < 7; d++) {
-      const date = new Date(start)
-      date.setDate(start.getDate() + w * 7 + d)
-      const hit = heatMap.value.get(localKey(date))
-      col.push({ date, level: hit?.level ?? 0, xp: hit?.count ?? 0 })
-    }
-    cols.push(col)
-  }
-  return cols
-}
-
-const weeks = computed(() => buildWeeks(12))
-const heatCells = computed(() => weeks.value.flat())
-const isToday = (c: HeatCell) => c.date.toDateString() === new Date().toDateString()
-const isFuture = (c: HeatCell) => c.date.getTime() > new Date().getTime()
-const dateKey = (c: HeatCell) =>
-  `${c.date.getFullYear()}-${String(c.date.getMonth() + 1).padStart(2, '0')}-${String(c.date.getDate()).padStart(2, '0')}`
+const heatCells = computed(() => buildHeatmapWeeks(learn.value?.heatmap, 12).flat())
+const isToday = isTodayCell
+const isFuture = isFutureCell
+const dateKey = heatCellKey
 
 /** 选中格 → 右下角显示该日经验（演示帧详情；默认今天） */
 const selected = ref<HeatCell | null>(null)

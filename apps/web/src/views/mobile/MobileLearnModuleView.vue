@@ -2,13 +2,25 @@
 /**
  * 学习模块详情页（/m/learn/:module · 2026-09-09 组长拍板 v4：数据细节下沉到详情层）
  * 主页只给一句话结论，这里才是数据展示：单词 / 社区足迹 / 我的发音 / 冒险进度。
- * 演示帧数据为主（M3 接 attempts/词级/埋点聚合）；布局 X 式（顶部标题 + 内容区）。
+ * 数据源（docs/53 P4）：`GET /api/v1/stats/learn/{key}`（Python `app/insight/learn.py`）；
+ * 空数据与接口失败均有显式空态（不再硬编码演示帧，DoD ①/③）。
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import { fetchLearnModule } from '@/api/stats'
+import type { LearnModuleDetail } from '@/api/stats'
+import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import {
+  buildHeatmapWeeks,
+  heatCellKey,
+  isFutureCell,
+  isTodayCell,
+} from '@/composables/useLearnHeatmap'
 import '@/styles/mobile-uic.css'
+
+import type { HeatCell } from '@/composables/useLearnHeatmap'
 
 const route = useRoute()
 const router = useRouter()
@@ -34,96 +46,134 @@ function backToLearn() {
   void router.push('/m/learn')
 }
 
-/* ---------- 我的发音（attempts 三维 · 演示帧） ---------- */
-const speakingTrend = { pron: [78, 80, 82, 84, 81, 85, 82], flu: [70, 72, 75, 77, 79, 78, 78], gram: [85, 86, 84, 88, 90, 87, 85] }
-const speakingAvg = computed(() => ({
-  pron: Math.round(speakingTrend.pron.reduce((a, b) => a + b, 0) / 7),
-  flu: Math.round(speakingTrend.flu.reduce((a, b) => a + b, 0) / 7),
-  gram: Math.round(speakingTrend.gram.reduce((a, b) => a + b, 0) / 7),
-}))
-const weakPhonemes = ['/θ/', '/ð/', '/r/']
-/** 柱高：60~95 → 0~100% 可视范围 */
-function barH(v: number) {
-  return Math.max(10, Math.min(100, ((v - 60) / 35) * 100))
-}
+/* ---------- 数据加载（docs/53 P4；模块切换重拉） ---------- */
+const detail = ref<LearnModuleDetail | null>(null)
+const loading = ref(true)
+const error = ref('')
 
-/* ---------- 冒险进度（酒馆剧本 · 12 周热力图复用主页逻辑 · 演示帧） ---------- */
-type HeatCell = { date: Date; level: 0 | 1 | 2 | 3; xp: number }
-function dayLevel(d: Date): { level: 0 | 1 | 2 | 3; xp: number } {
-  const today = new Date()
-  if (d.getTime() > today.getTime()) return { level: 0, xp: 0 }
-  if (d.toDateString() === today.toDateString()) return { level: 3, xp: 75 }
-  const h = (d.getFullYear() * 372 + (d.getMonth() + 1) * 31 + d.getDate() * 7) % 10
-  if (h < 5) return { level: 0, xp: 0 }
-  if (h < 7) return { level: 1, xp: 25 }
-  if (h < 9) return { level: 2, xp: 50 }
-  return { level: 3, xp: 75 }
-}
-function buildWeeks(weeks: number): HeatCell[][] {
-  const today = new Date()
-  const monday = new Date(today)
-  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7))
-  const start = new Date(monday)
-  start.setDate(monday.getDate() - (weeks - 1) * 7)
-  const cols: HeatCell[][] = []
-  for (let w = 0; w < weeks; w++) {
-    const col: HeatCell[] = []
-    for (let d = 0; d < 7; d++) {
-      const date = new Date(start)
-      date.setDate(start.getDate() + w * 7 + d)
-      const { level, xp } = dayLevel(date)
-      col.push({ date, level, xp })
-    }
-    cols.push(col)
+async function load() {
+  loading.value = true
+  error.value = ''
+  detail.value = null
+  try {
+    detail.value = await fetchLearnModule(moduleKey.value)
+  } catch (e) {
+    error.value = (e as Error).message || '加载失败'
+  } finally {
+    loading.value = false
   }
-  return cols
 }
-const heatCells = buildWeeks(12).flat()
-const isToday = (c: HeatCell) => c.date.toDateString() === new Date().toDateString()
-const isFuture = (c: HeatCell) => c.date.getTime() > new Date().getTime()
-const dateKey = (c: HeatCell) =>
-  `${c.date.getFullYear()}-${String(c.date.getMonth() + 1).padStart(2, '0')}-${String(c.date.getDate()).padStart(2, '0')}`
-const selected = ref<HeatCell>(heatCells.find(isToday) ?? heatCells[heatCells.length - 2])
+watch(moduleKey, () => void load(), { immediate: true })
+
+/* ---------- 我的发音（attempts 三维 + 薄弱音素 · 真实聚合） ---------- */
+const fmt = (v?: number | null) => (v == null ? '—' : String(v))
+const speakingTrend = computed(() => (detail.value?.trend ?? []).slice(-7))
+const trendSeries = computed(() => ({
+  pron: speakingTrend.value.map((r) => r.pron ?? null),
+  flu: speakingTrend.value.map((r) => r.flu ?? null),
+  gram: speakingTrend.value.map((r) => r.gram ?? null),
+}))
+/** 柱高：60~95 → 0~100% 可视范围（该日无此维度 → 0） */
+function barH(v: number | null) {
+  if (v == null) return 0
+  return Math.max(6, Math.min(100, ((v - 60) / 35) * 100))
+}
+const weakPhonemes = computed(() => detail.value?.weak_phonemes ?? [])
+
+/* ---------- 冒险进度（热力图 + 会话分布 + 酒馆剧本 · 真实聚合） ---------- */
+const heatCells = computed(() => buildHeatmapWeeks(detail.value?.heatmap, 12).flat())
+const dateKey = heatCellKey
+const isToday = isTodayCell
+const isFuture = isFutureCell
+const selected = ref<HeatCell | null>(null)
+watch(
+  heatCells,
+  (cells) => {
+    if (selected.value && selected.value.level > 0) return
+    selected.value = cells.find(isTodayCell) ?? cells[cells.length - 2] ?? null
+  },
+  { immediate: true },
+)
 function pick(cell: HeatCell) {
   selected.value = cell
 }
-const selectedXpLabel = computed(() =>
-  isFuture(selected.value) || selected.value.level === 0 ? '未练习' : `+${selected.value.xp} XP`,
-)
+const selectedXpLabel = computed(() => {
+  const cell = selected.value
+  if (!cell || isFuture(cell) || cell.level === 0) return '未练习'
+  return `+${cell.xp} XP`
+})
 
-const scenes = [
-  { name: '迷雾酒馆 · 打听怪谈', score: 78 },
-  { name: '酒馆地下室 · 暗门', score: 54 },
-  { name: '镇口哨站 · 盘问', score: 82 },
-  { name: '荒野驿道 · 遭遇', score: 47 },
-  { name: '地城入口 · 交涉', score: 85 },
-  { name: '地城深处 · 判定', score: 38 },
-] as const
-function band(score: number) {
-  return score >= 80 ? 'high' : score >= 60 ? 'mid' : 'low'
+const KIND_LABELS: Record<string, string> = {
+  sing: '唱吧跟唱',
+  defense: '答辩练习',
+  shadow: '影子跟读',
+  free_chat: '自由对话',
+}
+const byKind = computed(() => detail.value?.by_kind ?? [])
+const practiceMinutes = computed(() => detail.value?.minutes ?? 0)
+const practiceCount = computed(() => byKind.value.reduce((sum, k) => sum + k.count, 0))
+
+const campaigns = computed(() => detail.value?.campaigns ?? [])
+function turnRatio(c: { turns: number; user_turns: number }) {
+  return c.turns ? Math.round((c.user_turns / c.turns) * 100) : 0
+}
+function band(pct: number) {
+  return pct >= 50 ? 'high' : pct >= 25 ? '' : 'low'
 }
 
-/* ---------- 社区足迹（演示帧：收藏/点赞列表 + 偏好占比） ---------- */
-const communityLikes = [
-  { title: "'AI learning' is taking over China's classrooms", when: '今天 · 英语新闻' },
-  { title: '6 Minute English: Why do we procrastinate?', when: '昨天 · 英语新闻' },
-  { title: 'How I memorize 100 new words a month', when: '3 天前 · 学习分享' },
-  { title: 'Dorm life at MIT: my morning in 60 seconds', when: '上周 · 海外生活' },
-]
-const communityPref = [
-  { label: '英语新闻', pct: 46 },
-  { label: '学习分享', pct: 32 },
-  { label: '海外生活', pct: 22 },
-]
+/* ---------- 我的单词（生词本 + 词典首义） ---------- */
+const STATUS_LABELS: Record<string, string> = { new: '新词', learning: '学习中', known: '已掌握' }
+const SCENE_LABELS: Record<string, string> = { reading: '阅读', community: '社区', manual: '手动' }
+const words = computed(() => detail.value?.items ?? [])
+function wordMeta(w: { status: string; scene: string; created_at: string | null }) {
+  const scene = SCENE_LABELS[w.scene] ?? w.scene
+  const date = w.created_at ? w.created_at.slice(0, 10) : ''
+  return [scene, date].filter(Boolean).join(' · ')
+}
 
-/* ---------- 我的单词（演示帧：收藏词 + 薄弱词） ---------- */
-const words = [
-  { word: 'pick up', meaning: '学会 / 顺便买 / 接人', score: 92 },
-  { word: 'run out of', meaning: '用光，耗尽', score: 60 },
-  { word: 'comfortable', meaning: '舒适的', score: 41 },
-  { word: 'world', meaning: '世界', score: 38 },
-  { word: 'interesting', meaning: '有趣的', score: 35 },
-]
+/* ---------- 社区足迹（埋点分布 + 常逛页面） ---------- */
+const EVENT_LABELS: Record<string, string> = {
+  page_view: '页面浏览',
+  word_lookup: '划词查词',
+  vocab_add: '加入生词本',
+  annotation_add: '笔记批注',
+  practice_complete: '完成练习',
+  score_event: '评分事件',
+  recording_start: '开始录音',
+  recording_complete: '完成录音',
+  tts_play: '听书播放',
+  tts_prepare: '整章预合成',
+  scene_start: '开始场景',
+  recommend_impression: '推荐曝光',
+  recommend_click: '推荐点击',
+  free_chat_open: '打开自由对话',
+  free_chat_turn: '自由对话回合',
+  free_chat_reset: '重置自由对话',
+}
+const PAGE_LABELS: Record<string, string> = {
+  '/m/home': '首页',
+  '/m/learn': '学习',
+  '/m/sing': '唱吧',
+  '/m/tavern': '酒馆',
+  '/m/bookshelf': '书房',
+  '/m/vocab': '生词本',
+  '/m/notes': '笔记',
+  '/m/checkin': '打卡',
+  '/m/search': '搜索',
+}
+function pageLabel(path: string) {
+  if (PAGE_LABELS[path]) return PAGE_LABELS[path]
+  if (path.startsWith('/m/reader/')) return '阅读器'
+  if (path.startsWith('/m/books/')) return '书籍详情'
+  if (path.startsWith('/m/post/')) return '帖子详情'
+  return path
+}
+const pages = computed(() => detail.value?.pages ?? [])
+const pageMax = computed(() => Math.max(1, ...pages.value.map((p) => p.count)))
+const events = computed(() => detail.value?.events ?? [])
+const communityTotal = computed(() =>
+  (detail.value?.trend ?? []).reduce((sum, d) => sum + (d.count ?? 0), 0),
+)
 </script>
 
 <template>
@@ -131,120 +181,161 @@ const words = [
     <MobileTopBar :title="title" back @back="backToLearn" />
 
     <div class="u-learn-detail">
-      <!-- 我的发音：三维均分 + 趋势柱 + 薄弱音素 -->
-      <template v-if="moduleKey === 'speaking'">
-        <section class="u-learn-detail__scores">
-          <div class="u-learn-detail__score">
-            <b>{{ speakingAvg.pron }}</b><i>发音</i>
-          </div>
-          <div class="u-learn-detail__score">
-            <b>{{ speakingAvg.flu }}</b><i>流利度</i>
-          </div>
-          <div class="u-learn-detail__score">
-            <b>{{ speakingAvg.gram }}</b><i>语法</i>
-          </div>
-        </section>
+      <!-- 加载中 -->
+      <section v-if="loading" class="u-comm-skel" aria-label="加载中" aria-busy="true">
+        <div v-for="i in 3" :key="i" class="u-comm-skel__card"><span class="u-comm-skel__lines" /></div>
+      </section>
 
-        <section class="u-learn-detail__card">
-          <div class="u-learn-detail__sub">近 7 次练习 · 三维评分</div>
-          <div class="u-learn-detail__trend" aria-label="发音/流利度/语法近 7 次趋势">
-            <div class="u-learn-detail__tel">
-              <span v-for="(v, i) in speakingTrend.pron" :key="`p${i}`" class="u-learn-detail__pr" :style="{ height: `${barH(v)}%` }" />
-              <span v-for="(v, i) in speakingTrend.flu" :key="`f${i}`" class="u-learn-detail__fl" :style="{ height: `${barH(v)}%` }" />
-              <span v-for="(v, i) in speakingTrend.gram" :key="`g${i}`" class="u-learn-detail__gr" :style="{ height: `${barH(v)}%` }" />
+      <!-- 接口失败：显式错误 + 重试（DoD ③） -->
+      <div v-else-if="error" class="u-comm-empty" role="status">
+        <span class="u-comm-empty__title">加载失败</span>
+        <p class="u-comm-empty__sub">{{ error }}</p>
+        <button class="u-comm-empty__btn" type="button" @click="load">重试</button>
+      </div>
+
+      <template v-else-if="detail">
+        <!-- 我的发音：三维均分 + 趋势柱 + 薄弱音素 -->
+        <template v-if="moduleKey === 'speaking'">
+          <section class="u-learn-detail__scores">
+            <div class="u-learn-detail__score">
+              <b>{{ fmt(detail.dims?.pron) }}</b><i>发音</i>
             </div>
-            <div class="u-learn-detail__legend">
-              <span><i class="dot dot--pr" />发音</span>
-              <span><i class="dot dot--fl" />流利度</span>
-              <span><i class="dot dot--gr" />语法</span>
+            <div class="u-learn-detail__score">
+              <b>{{ fmt(detail.dims?.flu) }}</b><i>流利度</i>
             </div>
-          </div>
-        </section>
+            <div class="u-learn-detail__score">
+              <b>{{ fmt(detail.dims?.gram) }}</b><i>语法</i>
+            </div>
+          </section>
 
-        <section class="u-learn-detail__card">
-          <div class="u-learn-detail__sub">薄弱音素（M3 讯飞词级替换）</div>
-          <div class="u-learn-detail__chips">
-            <span v-for="p in weakPhonemes" :key="p" class="u-chip u-chip--warm">{{ p }}</span>
-          </div>
-          <p class="u-learn-detail__note">词级错误沉淀自每次练习的发音评测（attempts.details.word_level）。</p>
-        </section>
-      </template>
+          <section class="u-learn-detail__card">
+            <div class="u-learn-detail__sub">近 7 次练习 · 三维评分</div>
+            <div v-if="speakingTrend.length" class="u-learn-detail__trend" aria-label="发音/流利度/语法近 7 次趋势">
+              <div class="u-learn-detail__tel">
+                <span v-for="(v, i) in trendSeries.pron" :key="`p${i}`" class="u-learn-detail__pr" :style="{ height: `${barH(v)}%` }" />
+                <span v-for="(v, i) in trendSeries.flu" :key="`f${i}`" class="u-learn-detail__fl" :style="{ height: `${barH(v)}%` }" />
+                <span v-for="(v, i) in trendSeries.gram" :key="`g${i}`" class="u-learn-detail__gr" :style="{ height: `${barH(v)}%` }" />
+              </div>
+              <div class="u-learn-detail__legend">
+                <span><i class="dot dot--pr" />发音</span>
+                <span><i class="dot dot--fl" />流利度</span>
+                <span><i class="dot dot--gr" />语法</span>
+              </div>
+            </div>
+            <p v-else class="u-learn-detail__note">还没有练习记录——完成一次答辩或跟唱后，这里会出现三维趋势。</p>
+          </section>
 
-      <!-- 冒险进度：热力图 + 酒馆剧本推进度 -->
-      <template v-else-if="moduleKey === 'practice'">
-        <section class="u-learn-detail__card">
-          <div class="u-learn-detail__sub">近 12 周练习热力图</div>
-          <div class="u-learn-heat__grid">
-            <button
-              v-for="cell in heatCells"
-              :key="dateKey(cell)"
-              type="button"
-              class="u-learn-heat__cell"
-              :class="[`lv${cell.level}`, { today: isToday(cell), future: isFuture(cell), picked: dateKey(cell) === dateKey(selected) }]"
-              :disabled="isFuture(cell)"
-              :aria-label="`${dateKey(cell)} · ${isFuture(cell) ? '还没到' : cell.level === 0 ? '未练习' : `+${cell.xp} XP`}`"
-              @click="pick(cell)"
-            />
-          </div>
-          <div class="u-learn-heat__xp" aria-live="polite">{{ selectedXpLabel }}</div>
-        </section>
-
-        <section class="u-learn-detail__card">
-          <div class="u-learn-detail__sub">酒馆剧本推进度（Demo 帧 · 舞台完成度）</div>
-          <ul class="u-learn-scenes">
-            <li v-for="s in scenes" :key="s.name" class="u-learn-scenes__row">
-              <span class="u-learn-scenes__name">{{ s.name }}</span>
-              <span class="u-learn-scenes__track" aria-hidden="true">
-                <span class="u-learn-scenes__fill" :class="band(s.score)" :style="{ width: `${s.score}%` }" />
+          <section class="u-learn-detail__card">
+            <div class="u-learn-detail__sub">薄弱音素（近 30 天错误 Top3）</div>
+            <div v-if="weakPhonemes.length" class="u-learn-detail__chips">
+              <span v-for="p in weakPhonemes" :key="p.phoneme" class="u-chip u-chip--warm">
+                /{{ p.phoneme }}/ · {{ p.count }} 次
               </span>
-              <span class="u-learn-scenes__score">{{ s.score }}</span>
-            </li>
-          </ul>
-        </section>
-      </template>
+            </div>
+            <p v-else class="u-learn-detail__note">暂无薄弱音素记录——有词级评测数据后自动统计。</p>
+            <p class="u-learn-detail__note">词级错误沉淀自每次练习的发音评测（scores.error_type）。</p>
+          </section>
+        </template>
 
-      <!-- 我的单词：收藏词 + 薄弱词（数据源：笔记页 + 词级错误） -->
-      <template v-else-if="moduleKey === 'words'">
-        <section class="u-learn-detail__card">
-          <div class="u-learn-detail__sub">收藏单词（演示；M3 词汇速记接入）</div>
-          <ul class="u-learn-words">
-            <li v-for="w in words" :key="w.word" class="u-learn-words__row">
-              <span class="u-learn-words__word">{{ w.word }}</span>
-              <span class="u-learn-words__meaning">{{ w.meaning }}</span>
-              <span class="u-learn-words__score" :class="w.score < 60 ? 'low' : ''">{{ w.score }}</span>
-            </li>
-          </ul>
-        </section>
-      </template>
+        <!-- 冒险进度：热力图 + 练习分布 + 酒馆剧本推进度 -->
+        <template v-else-if="moduleKey === 'practice'">
+          <section class="u-learn-detail__card">
+            <div class="u-learn-detail__sub">近 12 周练习热力图</div>
+            <div class="u-learn-heat__grid">
+              <button
+                v-for="cell in heatCells"
+                :key="dateKey(cell)"
+                type="button"
+                class="u-learn-heat__cell"
+                :class="[`lv${cell.level}`, { today: isToday(cell), future: isFuture(cell), picked: selected != null && dateKey(cell) === dateKey(selected) }]"
+                :disabled="isFuture(cell)"
+                :aria-label="`${dateKey(cell)} · ${isFuture(cell) ? '还没到' : cell.level === 0 ? '未练习' : `+${cell.xp} XP`}`"
+                @click="pick(cell)"
+              />
+            </div>
+            <div class="u-learn-heat__xp" aria-live="polite">{{ selectedXpLabel }}</div>
+          </section>
 
-      <!-- 社区足迹：收藏/点赞 + 偏好占比（M3 埋点；演示帧） -->
-      <template v-else>
-        <section class="u-learn-detail__card">
-          <div class="u-learn-detail__sub">内容偏好（点赞/收藏/浏览）</div>
-          <ul class="u-learn-pref">
-            <li
-              v-for="p in communityPref"
-              :key="p.label"
-              class="u-learn-pref__row"
-            >
-              <span class="u-learn-pref__label">{{ p.label }}</span>
-              <span class="u-learn-pref__track" aria-hidden="true">
-                <span class="u-learn-pref__fill" :style="{ width: `${p.pct}%` }" />
-              </span>
-              <span class="u-learn-pref__pct">{{ p.pct }}%</span>
-            </li>
-          </ul>
-        </section>
+          <section class="u-learn-detail__card">
+            <div class="u-learn-detail__sub">近 30 天练习分布</div>
+            <p class="u-learn-detail__note u-learn-detail__note--lead">
+              共 {{ practiceMinutes }} 分钟 · {{ practiceCount }} 次会话
+            </p>
+            <ul v-if="byKind.length" class="u-learn-posts">
+              <li v-for="k in byKind" :key="k.kind" class="u-learn-posts__row">
+                <span class="u-learn-posts__title">{{ KIND_LABELS[k.kind] ?? k.kind }} · {{ k.count }} 次</span>
+                <span class="u-learn-posts__when">{{ k.minutes }} 分钟</span>
+              </li>
+            </ul>
+            <p v-else class="u-learn-detail__note">近 30 天还没有练习会话。</p>
+          </section>
 
-        <section class="u-learn-detail__card">
-          <div class="u-learn-detail__sub">最近互动</div>
-          <ul class="u-learn-posts">
-            <li v-for="p in communityLikes" :key="p.title" class="u-learn-posts__row">
-              <span class="u-learn-posts__title">{{ p.title }}</span>
-              <span class="u-learn-posts__when">{{ p.when }}</span>
-            </li>
-          </ul>
-        </section>
+          <section class="u-learn-detail__card">
+            <div class="u-learn-detail__sub">酒馆剧本推进度</div>
+            <ul v-if="campaigns.length" class="u-learn-scenes">
+              <li v-for="c in campaigns" :key="c.id" class="u-learn-scenes__row">
+                <span class="u-learn-scenes__name">{{ c.name }}</span>
+                <span class="u-learn-scenes__track" aria-hidden="true">
+                  <span class="u-learn-scenes__fill" :class="band(turnRatio(c))" :style="{ width: `${turnRatio(c)}%` }" />
+                </span>
+                <span class="u-learn-scenes__score u-learn-scenes__score--wide">{{ c.user_turns }}/{{ c.turns }}</span>
+              </li>
+            </ul>
+            <p v-else class="u-learn-detail__note">还没有酒馆剧本——去酒馆开一局吧。</p>
+            <p class="u-learn-detail__note">进度 = 玩家发起回合数 / 总回合数；最多展示最近 8 个剧本。</p>
+          </section>
+        </template>
+
+        <!-- 我的单词：生词本（词典首义）+ 管理入口 -->
+        <template v-else-if="moduleKey === 'words'">
+          <section class="u-learn-detail__card">
+            <div class="u-learn-detail__sub">生词本 · 最近 50 词</div>
+            <ul v-if="words.length" class="u-learn-words">
+              <li v-for="w in words" :key="w.word" class="u-learn-words__row">
+                <span class="u-learn-words__word">{{ w.word }}</span>
+                <span class="u-learn-words__meaning">{{ w.translation ?? wordMeta(w) }}</span>
+                <span class="u-learn-words__score" :class="w.status === 'new' ? 'low' : ''">
+                  {{ STATUS_LABELS[w.status] ?? w.status }}
+                </span>
+              </li>
+            </ul>
+            <p v-else class="u-learn-detail__note">生词本还是空的——阅读时点词即收，就会出现在这里。</p>
+            <p v-if="words.length" class="u-learn-detail__note">释义取词典首义；未收录词显示来源与日期（scene · created_at）。</p>
+          </section>
+
+          <button class="u-btn u-btn--secondary u-btn--block" type="button" @click="router.push('/m/vocab')">
+            <MobileIcon name="bookmark" :size="16" /> 去生词本管理（改状态 / 删除）
+          </button>
+        </template>
+
+        <!-- 社区足迹：常逛页面 + 互动类型 -->
+        <template v-else>
+          <section class="u-learn-detail__card">
+            <div class="u-learn-detail__sub">常逛页面（近 30 天）</div>
+            <ul v-if="pages.length" class="u-learn-pref">
+              <li v-for="p in pages" :key="p.page" class="u-learn-pref__row">
+                <span class="u-learn-pref__label">{{ pageLabel(p.page) }}</span>
+                <span class="u-learn-pref__track" aria-hidden="true">
+                  <span class="u-learn-pref__fill" :style="{ width: `${Math.round((p.count / pageMax) * 100)}%` }" />
+                </span>
+                <span class="u-learn-pref__pct">{{ p.count }}</span>
+              </li>
+            </ul>
+            <p v-else class="u-learn-detail__note">近 30 天还没有浏览记录。</p>
+          </section>
+
+          <section class="u-learn-detail__card">
+            <div class="u-learn-detail__sub">互动类型（共 {{ communityTotal }} 次）</div>
+            <ul v-if="events.length" class="u-learn-posts">
+              <li v-for="e in events" :key="e.event_type" class="u-learn-posts__row">
+                <span class="u-learn-posts__title">{{ EVENT_LABELS[e.event_type] ?? e.event_type }}</span>
+                <span class="u-learn-posts__when">{{ e.count }} 次</span>
+              </li>
+            </ul>
+            <p v-else class="u-learn-detail__note">还没有社区足迹——看看英语新闻，或去社区逛逛吧。</p>
+            <p class="u-learn-detail__note">来自埋点事实表 events；发帖/点赞数据由社区服务单独统计。</p>
+          </section>
+        </template>
       </template>
     </div>
   </div>
