@@ -25,8 +25,9 @@ def build_dm_system_prompt(
     ]
     if lang == "en":
         lines.append(
-            "Output language: narrate and role-play in natural English (the player may type in "
-            "any language; keep NPC lines in the form 'Name: ...' with a colon)."
+            "【语言规则·最高优先级】你的全部输出——旁白、NPC 台词、判定说明、系统提示——必须使用"
+            "自然的英文，**无论玩家用何种语言输入**（玩家的中文只是行动描述，不代表要切回中文；"
+            "上文历史里出现中文也不改变本规则）。NPC 台词写作 'Name: ...'（英文冒号，一行一句）。"
         )
     else:
         lines.append("输出语言：用中文叙述与扮演 NPC（玩家可用任意语言输入）。")

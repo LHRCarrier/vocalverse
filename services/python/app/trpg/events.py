@@ -43,11 +43,17 @@ class TrpgStatus(pydantic.BaseModel):
 
 
 class AudioChunk(pydantic.BaseModel):
-    """DM 回复逐句 TTS 音频（前端排队播放；与练习域同字段 shape）。"""
+    """DM 回复逐句 TTS 音频（前端排队播放 + 卡拉OK式逐词高亮）。
+
+    ``text``/``offset``（2026-09-21 加）：本句原文与它在 DM 整段 content 里的字符偏移——
+    前端据此把播放进度映射到具体词（``text`` 长度 + ``offset`` 定界，避免前端二次分句漂移）。
+    """
 
     type: Literal["audio_chunk"] = "audio_chunk"
     url: str
     duration: float | None = None
+    text: str | None = None
+    offset: int | None = None
 
 
 class SystemCard(pydantic.BaseModel):

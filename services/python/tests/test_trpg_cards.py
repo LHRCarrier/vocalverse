@@ -111,8 +111,25 @@ def test_dm_prompt_language_switch():
     zh = build_dm_system_prompt("迷雾酒馆", None, "zh")
     en = build_dm_system_prompt("迷雾酒馆", None, "en")
     assert "输出语言：用中文叙述" in zh
-    assert "Output language: narrate and role-play in natural English" in en
+    assert "必须使用自然的英文" in en and "无论玩家用何种语言输入" in en
     assert "中文冒号" in en  # NPC 段协议不随语言变（前端分段依赖）
+
+
+def test_en_turn_appends_language_reminder(client, auth_headers):
+    """语言兜底：en 时在生成点最近的用户输入尾部补提醒（只进 prompt，不落库）。"""
+    from app.trpg.service import _build_dm_context
+
+    campaign_id = client.post(
+        "/api/v1/trpg/campaigns", json={"name": "语言兜底"}, headers=auth_headers
+    ).json()["data"]["id"]
+    en_messages = _build_dm_context(campaign_id, "语言兜底", "I look around", None, "en")
+    assert en_messages[-1]["content"].endswith("(Respond in English only.)")
+    assert "I look around" in en_messages[-1]["content"]
+    assert en_messages[-2]["role"] == "system"
+    assert "必须使用 English" in en_messages[-2]["content"]
+
+    zh_messages = _build_dm_context(campaign_id, "语言兜底", "我仔细观察", None, "zh")
+    assert zh_messages[-1]["content"] == "我仔细观察"
 
 
 def test_turn_language_and_voice_switch(client, auth_headers):

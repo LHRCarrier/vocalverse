@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -49,6 +50,50 @@ from app.trpg.snapshot import (
 from app.trpg.turn import DmTurnRunner
 
 logger = logging.getLogger("vocalverse")
+
+#: CJK 字符（判断玩家输入是否需要为英文回合做语言归一）
+_CJK_RE = re.compile(r"[一-鿿]")
+
+
+def _has_cjk(text: str) -> bool:
+    return bool(_CJK_RE.search(text or ""))
+
+
+async def _to_english(llm: LLMClient, text: str) -> str:
+    """把玩家行动译成英文（仅 lang=en 且输入含中文时；失败回退原文，绝不阻塞回合）。
+
+    为什么需要（2026-09-21 实测）：DeepSeek 会镜像**最后一条用户消息的语言**——中文输入时
+    即使 system 里写明英文规则、并在历史后追加近因提醒，仍稳定输出中文；把输入本身换成英文
+    是唯一可靠的开关（英文输入实测必回英文）。原文仍按原样落库与展示。
+    """
+    try:
+        translated = await llm.chat(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "Translate the player's TRPG action into natural English. "
+                        "Output only the translation, no quotes, no explanation."
+                    ),
+                },
+                {"role": "user", "content": text},
+            ],
+            temperature=0.2,
+            max_tokens=200,
+        )
+        cleaned = (translated or "").strip().strip('"')
+        return cleaned or text
+    except Exception as exc:  # noqa: BLE001 - 归一失败按原文继续（语言不切换好过回合失败）
+        logger.warning("trpg lang normalize failed: %s", exc)
+        return text
+
+
+#: 英文回合的近因强化指令（放在历史之后、用户消息之前——对抗中文上下文/输入的镜像效应）
+ENGLISH_ONLY_DIRECTIVE = (
+    "IMPORTANT / 重要：本回合的所有输出必须使用 English，禁止中文——"
+    "无论玩家用什么语言输入、无论上文历史与状态里出现多少中文，都只输出英文。"
+    "NPC 台词写作 'Name: ...'（英文冒号，一行一句）。"
+)
 
 #: fire-and-forget 任务引用（防 GC；进程退出即弃）
 _background_tasks: set[asyncio.Task] = set()
@@ -128,13 +173,18 @@ async def stream_turn(
         except Exception as exc:  # noqa: BLE001 - 校验失败不阻塞回合
             logger.warning("酒馆恢复校验失败：%s", exc)
 
+    # 英文回合：中文输入先译成英文再进 DM 上下文（语言开关的可靠实现，见 _to_english）
+    question_for_dm = text
+    llm = llm or _default_llm()
+    if lang == "en" and _has_cjk(text):
+        question_for_dm = await _to_english(llm, text)
+
     messages = await asyncio.to_thread(
-        _build_dm_context, campaign_id, campaign.name, text, restore_patch, lang
+        _build_dm_context, campaign_id, campaign.name, question_for_dm, restore_patch, lang
     )
     events_before = await asyncio.to_thread(st.count_events, campaign_id)
     scene_before = await asyncio.to_thread(st.get_scene, campaign_id)
 
-    llm = llm or _default_llm()
     tts = tts or get_tts_client()
     runner = DmTurnRunner(llm)
     try:
@@ -308,7 +358,15 @@ def _build_dm_context(
     # 历史排除本回合刚落的用户消息（最后一条），避免重复
     for m in history[:-1]:
         messages.append({"role": m["role"], "content": m["content"]})
-    messages.append({"role": "user", "content": question})
+    # 语言兜底（2026-09-21 实测）：中文历史 + 中文输入会压过 system 里的语言指令 →
+    # 在**生成点最近的输入尾部**再补一句显式提醒（只进 prompt，不落库）
+    content = question
+    if lang == "en":
+        # 近因强化（2026-09-21 实测）：中文历史 + 中文输入会压过 system 里的语言指令，
+        # 故在历史之后、用户消息之前再插一条 system 提醒（只进 prompt，不落库）
+        messages.append({"role": "system", "content": ENGLISH_ONLY_DIRECTIVE})
+        content = question + "\n\n(Respond in English only.)"
+    messages.append({"role": "user", "content": content})
     return messages
 
 
@@ -345,13 +403,23 @@ async def _tts_chunks(
     sentences = [s for s in sentences if any(c.isalnum() for c in s)][:TTS_MAX_SENTENCES]
     if not sentences:
         return
+    # 句子 → 内容内字符偏移（顺序 find；供前端卡拉OK逐词高亮）
+    located: list[tuple[str, int]] = []
+    cursor = 0
+    for sentence in sentences:
+        idx = content.find(sentence, cursor)
+        if idx < 0:
+            idx = cursor
+        located.append((sentence, idx))
+        cursor = idx + len(sentence)
+
     tasks: dict[int, asyncio.Task] = {}
-    for i, sentence in enumerate(sentences):
+    for i, (sentence, _) in enumerate(located):
         tasks[i] = asyncio.create_task(_tts_one(tts, sentence, voice, settings.tts_rate))
-    for i in range(len(sentences)):
+    for i, (sentence, offset) in enumerate(located):
         url, duration = await tasks[i]
         if url:
-            yield ev.AudioChunk(url=url, duration=duration)
+            yield ev.AudioChunk(url=url, duration=duration, text=sentence, offset=offset)
 
 
 async def _tts_one(
