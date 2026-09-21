@@ -15,8 +15,7 @@ const routes = [
   { path: '/m/learn/:module', component: { template: '<div/>' } },
   { path: '/m/checkin', component: { template: '<div/>' } },
   { path: '/m/notes', component: MobileNotesView },
-  { path: '/m/chat', component: { template: '<div/>' } },
-  { path: '/m/chat/:sceneId?', component: { template: '<div/>' } },
+  { path: '/m/tavern', component: { template: '<div/>' } },
   { path: '/m/free-chat', component: { template: '<div/>' } },
   { path: '/m/sing', component: { template: '<div/>' } },
   { path: '/m/messages', component: { template: '<div/>' } },
@@ -48,20 +47,20 @@ describe('MobileTabBar（双场景分组）', () => {
     expect(links[2].attributes('aria-label')).toBe('发帖') // 中央对称
   })
 
-  it('学习组：5 位（Home 出口/场景对话/笔记中央/唱吧/自由对话）', async () => {
+  it('学习组：5 位（Home 出口/酒馆中央/笔记/唱吧/自由对话）', async () => {
     const wrapper = await mountAt('/m/learn')
     expect(wrapper.find('.u-tabbar').exists()).toBe(true)
     const links = wrapper.findAll('a')
     expect(links).toHaveLength(5)
     expect(wrapper.find('a[aria-label="返回社区"]').exists()).toBe(true) // Home 出口
-    expect(wrapper.find('a[aria-label="场景对话"]').exists()).toBe(true)
+    expect(wrapper.find('a[aria-label="酒馆"]').exists()).toBe(true)
     expect(wrapper.find('a[aria-label="唱吧"]').exists()).toBe(true)
     expect(wrapper.find('a[aria-label="自由对话"]').exists()).toBe(true)
     expect(links[2].attributes('aria-label')).toBe('笔记') // 中央对称
   })
 
-  it('学习场景内全部显示学习组（chat/场景直入/free-chat/sing/notes/learn:module）', async () => {
-    for (const p of ['/m/chat', '/m/chat/3', '/m/free-chat', '/m/sing', '/m/notes', '/m/learn/speaking']) {
+  it('学习场景内全部显示学习组（tavern/free-chat/sing/notes/learn:module）', async () => {
+    for (const p of ['/m/tavern', '/m/free-chat', '/m/sing', '/m/notes', '/m/learn/speaking']) {
       const wrapper = await mountAt(p)
       expect(wrapper.find('.u-tabbar').exists(), p).toBe(true)
       expect(wrapper.find('a[aria-label="返回社区"]').exists(), p).toBe(true)
@@ -107,7 +106,7 @@ describe('MobileLearnView（我的学习 · v4 画像总览 2026-09-09）', () =
     expect(text).toContain('LV3')
     expect(text).toContain('XP')
     // 6 个模块（我的单词/书房 为读书域入口，docs/45）
-    for (const m of ['我的单词', '书房', '社区足迹', '我的发音', '练习情况']) {
+    for (const m of ['我的单词', '书房', '社区足迹', '我的发音', '冒险进度']) {
       expect(text).toContain(m)
     }
     expect(text).toContain('阅读查词即收')
