@@ -66,10 +66,11 @@ logger.addFilter(RequestIdLogFilter())  # 每条日志带 request_id（docs/06 �
 
 
 async def _prewarm_asr() -> None:
-    """预热 whisper（首个请求免 30s 卡顿）；失败仅告警不阻塞启动（docs/06 §8）。
+    """预热 ASR 引擎（首个请求免 30s 卡顿）；失败仅告警不阻塞启动（docs/06 §8）。
 
     vasr-09：模型加载是 CPU 重活 → 必须进线程（旧实现同步 `_get_model()` 跑在事件循环，
-    阻塞就绪探测 10~30s）；显式 `warm()` 替代 `getattr(client, '_get_model')` 脆弱探针。
+    阻塞就绪探测 10~30s）。2026-09 重构：预热接口统一为 ``ASRClient.ensure_ready()``
+    （与 ``TTSClient`` 对齐），不再鸭子类型调 ``warm()``——引擎换了也不会静默不预热。
     """
     import asyncio
 
@@ -81,10 +82,10 @@ async def _prewarm_asr() -> None:
 
         client = get_asr_client()
         if client is not None:
-            await asyncio.to_thread(client.warm)
-            logger.info("whisper 模型预热完成")
+            await asyncio.to_thread(client.ensure_ready)
+            logger.info("ASR 引擎预热完成（%s）", getattr(client, "provider_id", "unknown"))
     except Exception as exc:
-        logger.warning("whisper 预热失败（不阻塞启动）: %s", exc)
+        logger.warning("ASR 预热失败（不阻塞启动）: %s", exc)
 
 
 @asynccontextmanager

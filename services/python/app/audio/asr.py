@@ -17,6 +17,8 @@ from pathlib import Path
 
 from app.audio.base import ASRClient, ASRResult
 from app.audio.ffmpeg_utils import run_ffmpeg
+from app.audio.registry import ASR as _ASR
+from app.audio.registry import ProviderSpec, register
 
 # docs/06 §8：模型侧信号量（whisper 并发 2）；多请求排队不雪崩
 _ASR_CONCURRENCY = 2
@@ -49,12 +51,27 @@ def _span(name: str, **attrs):
 
 
 class FasterWhisperClient(ASRClient):
+    """faster-whisper 本地引擎（CTranslate2 + PyAV，无需 ffmpeg 解码）。"""
+
+    provider_id = "whisper"
+    is_local = True
+
     def __init__(self, model: str = "small", device: str = "cpu", compute_type: str = "int8"):
         self._model_name = model
         self._device = device
         self._compute_type = compute_type
         self._model = None  # 延迟加载（首次调用 ≈10~30s；lifespan 预热见 main.py）
         self._load_lock = threading.Lock()  # vasr-09：并发首请求只加载一次（双重检查）
+
+    def is_available(self) -> tuple[bool, str]:
+        """包是否可导入（模型权重按需下载/缓存，不在探测里做 IO）。"""
+        try:
+            import faster_whisper  # noqa: F401
+        except Exception as exc:  # pragma: no cover - 轻量测试环境走 Fake
+            return False, f"faster-whisper 未安装: {exc}"
+        if not self._model_name:
+            return False, "APP_ASR_MODEL 为空（未指定 whisper 规格）"
+        return True, "ready"
 
     def _get_model(self):
         if self._model is None:
@@ -67,9 +84,21 @@ class FasterWhisperClient(ASRClient):
                     )
         return self._model
 
-    def warm(self) -> None:
-        """显式预热（vasr-09：替代 getattr(client, '_get_model', None) 的脆弱探针）。"""
+    def ensure_ready(self) -> None:
+        """显式预热（vasr-09：替代 getattr(client, '_get_model', None) 的脆弱探针）。
+
+        生命周期接口统一为 ``ensure_ready()``（与 :class:`TTSClient` 对齐）；``warm()``
+        作为历史别名保留，避免外部脚本/旧调用点立即失效。
+        """
         self._get_model()
+
+    def warm(self) -> None:
+        """``ensure_ready()`` 的兼容别名（deprecated）。"""
+        self.ensure_ready()
+
+    def unload(self) -> None:
+        """释放模型引用（进程内单例；幂等）。"""
+        self._model = None
 
     def transcribe_sync(self, wav_path: str, language: str = "en") -> ASRResult:
         model = self._get_model()
@@ -158,3 +187,21 @@ async def _run_ffmpeg_async(src: str, wav: str, timeout_s: float = 15.0) -> None
         ["-y", "-i", src, "-ar", "16000", "-ac", "1", "-f", "wav", wav],
         timeout_s=timeout_s,
     )
+
+
+# ── 注册表登记 ────────────────────────────────────────────────────────────────
+register(
+    ProviderSpec(
+        name="whisper",
+        kind=_ASR,
+        label="faster-whisper（本地 · small/int8/CPU）",
+        factory=lambda settings: FasterWhisperClient(
+            model=settings.asr_model,
+            device=getattr(settings, "asr_device", "cpu"),
+            compute_type=getattr(settings, "asr_compute_type", "int8"),
+        ),
+        priority=10,
+        is_local=True,
+        aliases=("faster-whisper", "faster_whisper"),
+    )
+)

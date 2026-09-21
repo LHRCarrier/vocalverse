@@ -21,6 +21,8 @@ from pathlib import Path
 from typing import Any
 
 from app.audio.base import TTSClient
+from app.audio.registry import TTS as _TTS
+from app.audio.registry import ProviderSpec, register
 
 logger = logging.getLogger("vocalverse.tts.local")
 
@@ -59,6 +61,11 @@ def _numpy_to_wav_bytes(audio: Any) -> bytes:
 
 class KittenTTSClient(TTSClient):
     """KittenTTS 本地引擎客户端（TTSClient 契约：is_available 先行探测 + 生命周期幂等）。"""
+
+    provider_id = "kitten"
+    media_type = "audio/wav"
+    ext = "wav"
+    is_local = True
 
     def __init__(self, model_dir: str = "", voice: str = "Jasper") -> None:
         self._model_dir = model_dir
@@ -109,3 +116,22 @@ class KittenTTSClient(TTSClient):
 
 
 __all__ = ["KittenTTSClient", "KITTEN_VOICES", "KITTEN_SAMPLE_RATE"]
+
+
+# ── 注册表登记 ────────────────────────────────────────────────────────────────
+register(
+    ProviderSpec(
+        name="kitten",
+        kind=_TTS,
+        label="KittenTTS mini（本地 ONNX · 8 英文音色）",
+        factory=lambda settings: KittenTTSClient(
+            model_dir=getattr(settings, "voice_models_dir", ""),
+            voice=getattr(settings, "kitten_voice", "Jasper"),
+        ),
+        priority=20,  # auto 链：omnivoice 之后、edge 之前的本地档
+        is_local=True,
+        ext="wav",
+        media_type="audio/wav",
+        aliases=("kittentts",),
+    )
+)

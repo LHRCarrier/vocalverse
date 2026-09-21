@@ -39,9 +39,9 @@ _SERVICE_DIR = Path(__file__).resolve().parents[2] / "services" / "python"
 if str(_SERVICE_DIR) not in sys.path:
     sys.path.insert(0, str(_SERVICE_DIR))
 
+from app.audio.duration import audio_duration_seconds  # noqa: E402
 from app.audio.ffmpeg_utils import ffmpeg_bin, run_ffmpeg  # noqa: E402
 from app.audio.textproc.sentence_splitter import StreamSentenceSplitter  # noqa: E402
-from app.audio.tts import mp3_duration_seconds  # noqa: E402
 
 with contextlib.suppress(Exception):  # Windows cp936 控制台：中文输出可读（失败不影响运行）
     sys.stdout.reconfigure(encoding="utf-8")
@@ -139,11 +139,11 @@ async def stage_llm_ttfa(client, messages: list[dict[str, str]]) -> tuple[float,
 
 
 async def stage_tts(client, text: str) -> tuple[float, dict]:
-    """TTS 首声/单句：合成时延 + 音频时长（MP3 帧头估算）。"""
+    """TTS 首声/单句：合成时延 + 音频时长（按实际容器：MP3 帧头 / WAV RIFF 头）。"""
     t0 = time.perf_counter()
     data = await client.synthesize(text)
     el = time.perf_counter() - t0
-    dur = mp3_duration_seconds(data) or 0.0
+    dur = audio_duration_seconds(data) or 0.0
     return el, {"audio_s": dur, "bytes": len(data)}
 
 

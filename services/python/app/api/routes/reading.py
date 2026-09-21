@@ -21,6 +21,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app.audio.voices import list_voices as list_audio_voices
 from app.core.auth import get_current_user_id
 from app.core.paths import book_cover_dir
 from app.core.response import BizError, Envelope, ok
@@ -577,46 +578,10 @@ async def put_progress(
 async def list_voices(
     user_id: int = Depends(get_current_user_id),
 ) -> Envelope:
+    """可选音色 = edge 在线档 + 已就绪的本地引擎档（app/audio/voices.py 单一真源）。
+
+    本节此前自己硬编码 edge 清单并直接 ``import KittenTTSClient`` 探测——加一个本地
+    引擎要改路由层；现在只做「领域模型 → 响应模型」的搬运。
+    """
     del user_id
-    voices = list_edge_voices()
-    from app.audio.tts_local import KITTEN_VOICES, KittenTTSClient
-    from app.core.config import get_settings
-
-    kitten = KittenTTSClient(get_settings().voice_models_dir)
-    available, _ = kitten.is_available()
-    if available:
-        voices += [
-            {"id": v, "label": f"{v} · 本地音色", "engine": "kitten", "langs": ["en"]}
-            for v in KITTEN_VOICES
-        ]
-    return ok(voices)
-
-
-def list_edge_voices() -> list[dict[str, Any]]:
-    return [
-        {
-            "id": "en-US-JennyNeural",
-            "label": "Jenny · 美式女声",
-            "engine": "edge",
-            "langs": ["en-US"],
-        },
-        {
-            "id": "en-US-AriaNeural",
-            "label": "Aria · 美式女声",
-            "engine": "edge",
-            "langs": ["en-US"],
-        },
-        {"id": "en-US-GuyNeural", "label": "Guy · 美式男声", "engine": "edge", "langs": ["en-US"]},
-        {
-            "id": "en-GB-SoniaNeural",
-            "label": "Sonia · 英式女声",
-            "engine": "edge",
-            "langs": ["en-GB"],
-        },
-        {
-            "id": "en-GB-RyanNeural",
-            "label": "Ryan · 英式男声",
-            "engine": "edge",
-            "langs": ["en-GB"],
-        },
-    ]
+    return ok([VoiceView(**spec.as_dict()) for spec in list_audio_voices()])

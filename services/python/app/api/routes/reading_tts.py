@@ -21,10 +21,12 @@ from fastapi import APIRouter, Depends, Form, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
-from app.audio.base import TTSClient
+from app.audio.base import TTSClient, resolve_tts_client
+from app.audio.registry import ProviderUnavailable, tts_format
 from app.audio.textproc.normalize import normalize_for_tts
-from app.audio.tts import cache_is_fresh
-from app.audio.tts_local import KittenTTSClient
+from app.audio.tts_cache import cache_is_fresh, provider_of, tts_cache_path
+from app.audio.tts_cache import tts_synth_cached_detailed as _synth_detailed
+from app.audio.voices import DEFAULT_VOICE
 from app.core.auth import get_current_user_id
 from app.core.config import Settings, get_settings
 from app.core.ratelimit import bucket_limits, consume
@@ -36,8 +38,6 @@ from app.reading import orchestrator
 from app.reading.events import ReadingStreamEvent, TaskDone, TaskStart, sse_payload
 from app.reading.normalize import is_lookupable, normalize_word
 from app.reading.service import get_chapter_split
-from app.reading.tts_cache import provider_format, reading_tts_cache_path, reading_tts_cached
-from app.reading.tts_client import get_reading_tts_client
 
 router = APIRouter(prefix="/api/v1/reading", tags=["reading-tts"])
 
@@ -55,13 +55,23 @@ async def _thread(fn):
     return await asyncio.to_thread(fn)
 
 
-def _provider_of(tts: TTSClient) -> str:
-    return "kitten" if isinstance(tts, KittenTTSClient) else "edge"
-
-
 def _resolve_tts() -> tuple[TTSClient, str]:
-    tts = get_reading_tts_client()
-    return tts, _provider_of(tts)
+    """听书域 provider 解析（走统一注册表，**不再有第二套选择逻辑**）。
+
+    - ``APP_READING_TTS_PROVIDER`` 留空 → 跟随 ``APP_TTS_PROVIDER``（全站一致）；
+    - 非空即 ``strict=True``：显式引擎不可用、或 ``auto`` 链全不可用 → 抛
+      ``ProviderUnavailable`` → 路由 503，**绝不静默换引擎**（docs/46 B-7 语义保留）；
+    - 引擎身份取自 ``tts.provider_id`` 属性，不再是 ``isinstance(KittenTTSClient)``
+      反推（旧写法在新增第三个引擎时必然漏判，并把缓存目录/扩展名一起带错）。
+    """
+    setting = (get_settings().reading_tts_provider or "").strip()
+    try:
+        client = resolve_tts_client(setting, strict=True) if setting else resolve_tts_client()
+    except ProviderUnavailable as exc:
+        # 显式指定本地引擎但不具备条件（未装/无模型/无参考件）→ 503 可读原因，
+        # 不静默换云引擎（用户以为在用本地音色却听到 edge 是最坏的失败模式）。
+        raise HTTPException(status_code=503, detail=f"tts unavailable: {exc}") from exc
+    return client, provider_of(client)
 
 
 async def _chapter_split(chapter_id: int):
@@ -78,7 +88,7 @@ async def _chapter_split(chapter_id: int):
 async def tts_segment(
     chapter_id: int,
     sentence_idx: int,
-    voice: str = "en-US-JennyNeural",
+    voice: str = DEFAULT_VOICE,
     rate: str = "+0%",
     user_id: int = Depends(get_current_user_id),
     settings: Settings = Depends(get_settings),
@@ -104,7 +114,7 @@ async def tts_segment(
 @router.get("/tts/word/{word}")
 async def tts_word(
     word: str,
-    voice: str = "en-US-JennyNeural",
+    voice: str = DEFAULT_VOICE,
     rate: str = "+0%",
     user_id: int = Depends(get_current_user_id),
     settings: Settings = Depends(get_settings),
@@ -132,12 +142,12 @@ async def _read_or_synthesize(
     user_id: int,
 ) -> tuple[bytes, str, bool]:
     """命中缓存直返（0 扣）；未命中：先扣后合成（docs/46 B-4 口径）。"""
-    path = reading_tts_cache_path(provider, voice, rate, text)
+    path = tts_cache_path(provider, voice, rate, text)
     if path.exists() and cache_is_fresh(path, settings.tts_cache_ttl_s):
-        return path.read_bytes(), provider_format(provider)[1], True
+        return path.read_bytes(), tts_format(provider)[1], True
     limits = bucket_limits(settings)
     await consume("reading_tts", limits["reading_tts"], user_id)
-    return await reading_tts_cached(tts, text, voice, rate, provider=provider)
+    return await _synth_detailed(tts, text, voice, rate, provider=provider)
 
 
 # ---------------------------------------------------------------------------

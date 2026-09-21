@@ -22,7 +22,7 @@ from collections.abc import Sequence
 from sqlalchemy import select
 
 from app.audio.base import get_tts_client
-from app.audio.tts import warm_tts_cache
+from app.audio.tts_cache import warm_tts_cache
 from app.core.config import get_settings
 from app.db import get_session_factory
 from app.models import Scenario

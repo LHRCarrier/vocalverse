@@ -30,7 +30,6 @@ from app.reading.events import (
     TaskStart,
 )
 from app.reading.split import ChapterSplit
-from app.reading.tts_cache import reading_tts_cached
 
 logger = logging.getLogger("vocalverse.reading.tts")
 
@@ -165,8 +164,9 @@ async def _run(
         async with sem:
             try:
                 from app.audio.textproc.normalize import normalize_for_tts
+                from app.audio.tts_cache import tts_synthesize_cached
 
-                await reading_tts_cached(
+                await tts_synthesize_cached(
                     tts, normalize_for_tts(text, language="en"), voice, rate, provider=provider
                 )
                 return "cached"

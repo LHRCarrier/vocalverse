@@ -21,10 +21,11 @@ from app.agent.domains.usage import log_usage
 from app.agent.runtime.meta_executor import MetaExecutor, compensate_meta
 from app.agent.runtime.turn_runner import TurnRunner
 from app.audio.base import ASRClient, LLMClient, ScorerClient, TTSClient
+from app.audio.duration import audio_duration_seconds
 from app.audio.fluency import compute_fluency_features
 from app.audio.textproc.normalize import normalize_for_tts
 from app.audio.textproc.sentence_splitter import StreamSentenceSplitter
-from app.audio.tts import mp3_duration_seconds, tts_synthesize_cached
+from app.audio.tts_cache import tts_synthesize_cached
 from app.console.trace.recorder import span, trace
 from app.core.config import get_settings
 from app.db import get_session_factory
@@ -73,23 +74,23 @@ async def _tts_url_from_bytes(
     """逐句合成并落盘，返回 ``(鉴权 URL, 时长估算秒)``；失败 ``(None, None)``。
 
     失败不再静默（docs/44 P1-C / vtts-04）：结构化日志 ``sentence no audio`` 记录
-    句文本与原因（字幕继续，docs/14 §3.2）；时长取自缓存/新合成音频的 MP3 帧头估算
-    （``mp3_duration_seconds``，纯函数绝不抛错）。
+    句文本与原因（字幕继续，docs/14 §3.2）；时长按**实际容器**估算
+    （``audio_duration_seconds``：MP3 帧头 / WAV RIFF 头，纯函数绝不抛错）——
+    重构前只认 MP3，换本地 WAV 引擎后时长恒为 None，前端 gap-less 排播静默退化。
 
     缓存（docs/44 P1-B）：统一走 ``tts_synthesize_cached`` —— 键含 provider/引擎版本/
     voice/rate/文本，TTL + 容量裁剪（默认 24h / 512MB）；与 /tts 路由同一出入口。
+    provider 由客户端自报（``tts.provider_id``），不再读 settings 猜测。
     """
     # 文本前处理（docs/44 P1-A）：归一化在**缓存键前**，保证缓存键与合成文本一致；
     # 幂等、绝不抛错（异常回退原文）。
     text = normalize_for_tts(text, language="en")
     try:
-        data = await tts_synthesize_cached(
-            tts, text, voice, rate, provider=(get_settings().tts_provider or "edge")
-        )
+        data = await tts_synthesize_cached(tts, text, voice, rate)
     except Exception as exc:  # edge-tts 断网/缓存写盘失败等
         logger.warning("sentence no audio: %r (reason: %s)", text, exc)
         return None, None
-    return save_tts_audio_bytes(data), mp3_duration_seconds(data)
+    return save_tts_audio_bytes(data), audio_duration_seconds(data)
 
 
 def save_audio_bytes(data: bytes) -> str:
@@ -115,18 +116,25 @@ def save_audio_bytes(data: bytes) -> str:
 
 
 def save_tts_audio_bytes(data: bytes) -> str:
-    """AI TTS 输出（非用户录音）→ data/audio/tts/{sha1}.mp3，返回 /api/v1/audio/tts/{sha1}.mp3。
+    """AI TTS 输出（非用户录音）→ data/audio/tts/{sha1}.{ext}，返回对应鉴权 URL。
 
     2026-09-07（用户实测 403）：流式多句音频只有首句落库（attempt/message 引用），
     其余 chunk 无归属引用 → get_audio 归属校验 403。TTS 输出放 tts/ 前缀，路由对该前缀
     只校验登录+过期（见 routes/practice.py get_audio），用户录音仍走严格归属校验。
+
+    2026-09 重构：扩展名**按魔数嗅探**（与 :func:`save_audio_bytes` 同口径）——
+    此前硬编码 `.mp3`，本地引擎（KittenTTS/OmniVoice）出的 WAV 会被写成 .mp3，
+    回放端 Content-Type 与内容不符。旧文件无需迁移：``resolve_media_type`` 嗅探优先。
     """
     import os
+
+    from app.audio.upload import DEFAULT_AUDIO_EXT, sniff_audio_ext
 
     settings = get_settings()
     tts_dir = os.path.join(settings.audio_dir, "tts")
     os.makedirs(tts_dir, exist_ok=True)
-    name = hashlib.sha1(data).hexdigest()[:32] + ".mp3"
+    ext = sniff_audio_ext(data) or DEFAULT_AUDIO_EXT
+    name = hashlib.sha1(data).hexdigest()[:32] + f".{ext}"
     path = os.path.join(tts_dir, name)
     if not os.path.exists(path):
         with open(path, "wb") as f:
