@@ -36,6 +36,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: '运维',
     items: [
       { label: '服务总览', path: '/ops', icon: 'activity', permission: 'ops:overview:read' },
+      { label: '学习指标', path: '/insight', icon: 'chart-dots', permission: 'ops:metric:read' },
       { label: '性能指标', path: '/ops/metrics', icon: 'chart-line', permission: 'ops:metric:read' },
       { label: '预警中心', path: '/ops/alerts', icon: 'alert-triangle', permission: 'ops:alert:read' },
       { label: 'LLM Trace', path: '/ops/traces', icon: 'route', permission: 'ops:trace:read' },

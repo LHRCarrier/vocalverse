@@ -14,6 +14,7 @@
 import IconActivity from '~icons/tabler/activity'
 import IconAlertTriangle from '~icons/tabler/alert-triangle'
 import IconBook from '~icons/tabler/book'
+import IconChartDots from '~icons/tabler/chart-dots'
 import IconChartLine from '~icons/tabler/chart-line'
 import IconClipboardList from '~icons/tabler/clipboard-list'
 import IconDice from '~icons/tabler/dice'
@@ -36,6 +37,7 @@ export const NAV_ICONS: Record<string, unknown> = {
   activity: IconActivity,
   'alert-triangle': IconAlertTriangle,
   book: IconBook,
+  'chart-dots': IconChartDots,
   'chart-line': IconChartLine,
   'clipboard-list': IconClipboardList,
   dice: IconDice,

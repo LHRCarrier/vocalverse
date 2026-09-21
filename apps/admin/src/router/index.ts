@@ -51,6 +51,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '服务总览', permission: 'ops:overview:read' },
       },
       {
+        path: 'insight',
+        name: 'insight',
+        component: () => import('@/views/insight/InsightView.vue'),
+        meta: { title: '学习指标', permission: 'ops:metric:read' },
+      },
+      {
         path: 'ops/metrics',
         name: 'ops-metrics',
         component: () => import('@/views/ops/OpsMetricsView.vue'),
