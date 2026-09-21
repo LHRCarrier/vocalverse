@@ -158,6 +158,30 @@ async def get_current_user_id(
     return int(uid)
 
 
+async def get_optional_user_id(
+    authorization: str = Header(default=""),
+    x_test_user_id: str | None = Header(default=None),
+) -> int | None:
+    """FastAPI 依赖：可选登录（无令牌/令牌无效 → None，不抛 401）。
+
+    用途 = 游客埋点（docs/53 P1）：``events.user_id`` 本可为 NULL（未登录 page_view），
+    而原实现强制登录导致游客访问**静默丢事件**。除 page_view 外的事件仍走
+    ``get_current_user_id``（强鉴权），避免匿名污染学习行为数据。
+    """
+    settings = get_settings()
+    if settings.testing and x_test_user_id:
+        return int(x_test_user_id)
+    if not authorization.startswith("Bearer "):
+        return None
+    try:
+        payload = decode_jwt(authorization[7:], settings.jwt_secret)
+        _reject_foreign_token(payload)
+    except ValueError:
+        return None
+    uid = payload.get("sub") or payload.get("user_id")
+    return int(uid) if uid is not None else None
+
+
 def _reject_foreign_token(payload: dict[str, Any]) -> None:
     """拒绝非学习者令牌（docs/50 §4.1 C-4 口径：**只拒携带外来 aud 的令牌**）。
 

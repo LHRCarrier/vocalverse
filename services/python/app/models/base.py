@@ -134,6 +134,27 @@ class Channels:
     OTHER = "other"
 
 
+class TargetTypes:
+    """埋点 ``target_type`` 枚举（2026-09-21 扩展）。
+
+    四处同步：本常量 + ``analytics`` CHECK + 迁移 0020 + 前端 ``api/events.ts``。
+    - 退役保留：``SCENE``（英语场景对话已下线，历史行兼容，不再新上报）；
+    - 现役：``SONG``（唱吧/听书素材）、``HOME``（首页/学习页）、``DEFENSE``（答辩导师）、
+      ``TRPG``（酒馆剧本/回合）、``BOOK``（书房/阅读器）、``CARD``（酒馆场景卡推荐）、
+      ``VOCAB``（生词本）、``POST``（社区帖子）。
+    """
+
+    SCENE = "scene"  # 退役：英语场景对话
+    SONG = "song"
+    HOME = "home"
+    DEFENSE = "defense"
+    TRPG = "trpg"
+    BOOK = "book"
+    CARD = "card"
+    VOCAB = "vocab"
+    POST = "post"
+
+
 class PitchRefStatus:
     MISSING = "missing"
     BUILDING = "building"
@@ -208,9 +229,11 @@ class MasteryStatus:
 
 
 class EventTypes:
-    """埋点事件类型（docs/06 §9.1 定稿 9 类 + corpus_hit 共 10 类）。
+    """埋点事件类型（docs/06 §9.1；2026-09-21 修订：20 类中 2 类退役）。
 
-    新增须改本常量 + 迁移 + docs/06。
+    **退役（保留枚举兼容历史行，不再新上报）**：``FUN_ACTION``（原场景对话救场语义）、
+    ``CORPUS_HIT``（语言点覆盖度随对话下线）。
+    **新增须四处同步**：本常量 + analytics CHECK + 迁移扩 CHECK + 前端 EventName + docs/06 §9.1。
     """
 
     PAGE_VIEW = "page_view"
@@ -221,8 +244,8 @@ class EventTypes:
     RECOMMEND_IMPRESSION = "recommend_impression"
     RECOMMEND_CLICK = "recommend_click"
     PRACTICE_COMPLETE = "practice_complete"
-    FUN_ACTION = "fun_action"
-    CORPUS_HIT = "corpus_hit"  # 语言点覆盖度命中（docs/14 §6.3，2026-09 拍板）
+    FUN_ACTION = "fun_action"  # 退役：原场景对话救场动作（demo/hint/retry）
+    CORPUS_HIT = "corpus_hit"  # 退役：语言点覆盖度命中（docs/14 §6.3）
     FREE_CHAT_OPEN = "free_chat_open"  # 自由对话进页（docs/14 §12.3，2026-09-05）
     FREE_CHAT_TURN = "free_chat_turn"  # 自由对话每回合（payload audio: bool；docs/14 §12.3）
     FREE_CHAT_SWITCH = "free_chat_switch"  # 功能行切场景（payload to: scene；docs/14 §12.3）

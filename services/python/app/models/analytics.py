@@ -91,7 +91,8 @@ class Event(CreatedAtMixin, Base):
             name="channel",
         ),
         CheckConstraint(
-            "target_type IN ('scene', 'song', 'home') OR target_type IS NULL",
+            "target_type IN ('scene', 'song', 'home', 'defense', 'trpg', 'book', "
+            "'card', 'vocab', 'post') OR target_type IS NULL",
             name="target_type",
         ),
         # 幂等去重：client_event_id 可空；NULL 在唯一索引中互不冲突，无需部分索引
