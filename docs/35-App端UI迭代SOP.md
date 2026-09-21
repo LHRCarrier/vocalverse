@@ -32,6 +32,7 @@
 | 6 | **全局件只挂 App.vue** | 账户抽屉（ui store drawerOpen）· 全局 toast（ui store showToast）· 底栏；**页面禁止自建 toast/抽屉** |
 | 7 | **等级/经验与社交联动同一数据源** | `stores/progress.ts`（xp + 等级表 + addXp）；展示面 = 学习页画像卡/我的档案卡/抽屉/社区帖子 meta/私信列表·会话头，全部 `progress`/`level` 字段驱动 |
 | 8 | 标题中文 0 字距；触控 ≥44px；过渡只动 transform/opacity/box-shadow；`prefers-reduced-motion` 全降级 | 沿用 docs/31 硬规则 3/4 |
+| 9 | **顶栏吸顶 + 方向感知收起**（2026-09-21 组长反馈：酒馆改语言 / 社区切领域要滑回顶部） | 顶栏常驻吸顶；**下滚收起、上滚出现**（社交 App 惯例）；距顶 56px 内恒显示；页首控制行（社区领域 / 通知分类 / 搜索条 / 笔记分类）与顶栏同区吸顶（`.u-head`）；实现 `useAutoHideOnScroll`，样式 `.u-phone > .u-topbar` / `.u-head`（mobile-uic.css） |
 
 ## 2. 验证体系（自检必做，缺一不可）
 

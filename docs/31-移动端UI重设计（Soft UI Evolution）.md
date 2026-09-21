@@ -58,6 +58,7 @@
 | 统计卡 `.s-stats` | 3 列 metric 22px；成绩绿/激励黄按语义着色 |
 | 列表行 `.s-row` | ≥72px 高；图标块 44px 圆角 14；press 60ms + 底色切换 |
 | 徽章 `.s-badge` | success/star/neutral 三变体；只表状态不重复数值 |
+| 顶栏 `.u-topbar` / 吸顶区 `.u-head` | **吸顶常驻 + 方向感知**（2026-09-21 组长反馈）：顶栏滚动时不消失；**下滚收起、上滚出现**（社交 App 惯例，距顶 56px 内恒显示）；页首控制行（社区领域 / 通知分类 / 搜索条 / 笔记分类）与顶栏同区吸顶；收起逻辑 `useAutoHideOnScroll`，样式 `.u-phone > .u-topbar` / `.u-head`（`mobile-uic.css`）；`prefers-reduced-motion` 关过渡 |
 
 ## 5. 页面落地顺序
 
