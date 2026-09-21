@@ -258,9 +258,9 @@ app.include_router(trpg.router)  # 酒馆（TRPG 跑团 · docs/52：剧本/主�
 # 管理端控制台 · Python 侧端点（docs/50 §10.3）：运维/遥测 + 内容治理（library）。
 # 鉴权走独立的控制台令牌（get_console_admin），与学习者 JWT 双密钥双 audience；
 # 端点内部各自做功能位闸门（APP_OPS_TELEMETRY_ENABLED / APP_LLM_TRACE_ENABLED → 46014）。
+from app.console.api.routes import insight as console_insight  # noqa: E402
 from app.console.api.routes import library as console_library  # noqa: E402
 from app.console.api.routes import ops as console_ops  # noqa: E402
-from app.console.api.routes import insight as console_insight  # noqa: E402
 from app.console.api.routes import trpg_cards as console_trpg_cards  # noqa: E402
 
 app.include_router(console_ops.router)

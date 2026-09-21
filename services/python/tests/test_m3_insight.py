@@ -11,9 +11,11 @@ from app.db import get_session_factory
 from app.models.analytics import Event
 from app.models.base import SessionKinds, SessionStatus
 from app.models.content import Song
-from app.models.practice import Attempt, Session as PracticeSession, SingAttempt
+from app.models.practice import Attempt, SingAttempt
+from app.models.practice import Session as PracticeSession
 from app.models.trpg import TrpgCampaign, TrpgMessage
 from app.models.user import Placement, User, UserProfile
+
 from tests.console.helpers import console_headers
 
 
