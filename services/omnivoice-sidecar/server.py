@@ -577,21 +577,80 @@ def detect_device(want: str) -> str:
         return "cpu"
 
 
-def default_model_dir() -> str:
-    """优先用本机已下好的快照（离线可跑），否则回落到仓库 id（首次会自动下载）。
+def repo_root() -> Optional[str]:
+    """仓库根（本文件位于 `<root>/services/omnivoice-sidecar/server.py`）。
 
-    搜索顺序：`OMNIVOICE_MODEL_DIR` → `OMNIVOICE_HF_CACHE` 下最新 snapshot → 仓库 id。
+    ⚠️ 本服务刻意只用标准库，因此不能 import `app.core.paths`（那是主服务的模块）。
+    这里按固定层级回推：裸跑与容器都一样（`services/omnivoice-sidecar/` 这段路径是仓库结构）。
+    """
+    try:
+        return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _looks_like_model(snap: str) -> bool:
+    """快照是否**看起来完整**：至少有 config.json + 一个根级 *.safetensors。
+
+    为什么要判：下载可能中断（3.3 GB，断点续传前就是个半成品目录）。只看"目录存在"
+    会把这种半成品当成可用权重，结果是启动后 `loadError` 而调用方只看到"边车没就绪"。
+    """
+    if not os.path.isfile(os.path.join(snap, "config.json")):
+        return False
+    try:
+        return any(name.endswith(".safetensors") for name in os.listdir(snap))
+    except OSError:
+        return False
+
+
+def _snapshot_under(cache_root: str, repo_id: str) -> Optional[str]:
+    """`<cache_root>/models--<org>--<name>/snapshots/<rev>` 里最新的**完整**快照；没有则 None。"""
+    if not cache_root or not os.path.isdir(cache_root):
+        return None
+    snaps = os.path.join(cache_root, "models--" + repo_id.replace("/", "--"), "snapshots")
+    if not os.path.isdir(snaps):
+        return None
+    revs = sorted(
+        (d for d in os.listdir(snaps) if os.path.isdir(os.path.join(snaps, d))), reverse=True
+    )
+    for rev in revs:
+        candidate = os.path.join(snaps, rev)
+        if _looks_like_model(candidate):
+            return candidate
+    return None
+
+
+def default_model_dir() -> str:
+    """权重目录解析顺序（先本机、先本仓，最后才联网）。
+
+    1. `OMNIVOICE_MODEL_DIR`：直接指定快照目录（最高优先，显式覆盖）；
+    2. `OMNIVOICE_HF_CACHE`：指定的 HF 缓存根；
+    3. **`<仓库根>/data/models`**：本仓约定位置 —— `scripts/fetch-omnivoice-weights.ps1`
+       默认就下载到这里，因此**用该脚本下完即零配置**（`data/models/` 已在 .gitignore）；
+    4. `~/.cache/huggingface/hub`、`%LOCALAPPDATA%/huggingface/hub`：HF 客户端默认缓存；
+    5. 都找不到 → 回落仓库 id，交给上游首次自动下载（需联网，通常不适用于内网）。
     """
     env = os.environ.get("OMNIVOICE_MODEL_DIR")
     if env:
         return env
+
+    candidates: list[str] = []
     cache = os.environ.get("OMNIVOICE_HF_CACHE")
-    if cache and os.path.isdir(cache):
-        snaps = os.path.join(cache, "models--k2-fsa--OmniVoice", "snapshots")
-        if os.path.isdir(snaps):
-            revs = sorted(d for d in os.listdir(snaps) if os.path.isdir(os.path.join(snaps, d)))
-            if revs:
-                return os.path.join(snaps, revs[-1])
+    if cache:
+        candidates.append(cache)
+    root = repo_root()
+    if root:
+        candidates.append(os.path.join(root, "data", "models"))
+    home = os.path.expanduser("~")
+    candidates.append(os.path.join(home, ".cache", "huggingface", "hub"))
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    if local_appdata:
+        candidates.append(os.path.join(local_appdata, "huggingface", "hub"))
+
+    for candidate in candidates:
+        found = _snapshot_under(candidate, "k2-fsa/OmniVoice")
+        if found:
+            return found
     return "k2-fsa/OmniVoice"
 
 

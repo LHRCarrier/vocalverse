@@ -97,11 +97,21 @@ $cacheRoot = $null
 if ($HfCache) { $cacheRoot = $HfCache }
 elseif ($env:OMNIVOICE_HF_CACHE) { $cacheRoot = $env:OMNIVOICE_HF_CACHE }
 else {
+  # 顺序与边车/ dev-up.ps1 一致：**先本仓** data\models（fetch 脚本的默认落点，下完即零配置），
+  # 再本机 HF 默认缓存。判据含 *.safetensors，避免把"下载到一半"当成可用权重。
   foreach ($c in @(
+      (Join-Path $root 'data/models'),
       (Join-Path $env:USERPROFILE '.cache/huggingface/hub'),
       (Join-Path $env:LOCALAPPDATA 'huggingface/hub')
     )) {
-    if ($c -and (Test-Path (Join-Path $c 'models--k2-fsa--OmniVoice'))) { $cacheRoot = $c; break }
+    if (-not $c) { continue }
+    $snaps = Join-Path $c 'models--k2-fsa--OmniVoice/snapshots'
+    if (-not (Test-Path $snaps)) { continue }
+    $ok = Get-ChildItem $snaps -Directory -ErrorAction SilentlyContinue | Where-Object {
+      (Test-Path (Join-Path $_.FullName 'config.json')) -and
+      (Get-ChildItem $_.FullName -Filter '*.safetensors' -ErrorAction SilentlyContinue)
+    }
+    if ($ok) { $cacheRoot = $c; break }
   }
 }
 if (-not $Fake) {
@@ -110,7 +120,9 @@ if (-not $Fake) {
     Write-Host "[4/4] 权重缓存：$cacheRoot"
   } else {
     Write-Host "[4/4] ⚠️ 没找到本机 OmniVoice 快照 —— 将回落到仓库 id `k2-fsa/OmniVoice`（首次自动下载，需联网）"
-    Write-Host "      离线/内网机器请用 -HfCache <目录> 或 `$env:OMNIVOICE_HF_CACHE 指向已下好的缓存根。"
+    Write-Host "      一键下载（默认走 hf-mirror.com 镜像，下到 <仓库>\data\models）："
+    Write-Host "        pwsh -File scripts/fetch-omnivoice-weights.ps1"
+    Write-Host "      本机已有缓存可直接复制：-FromLocal <HF 缓存根>；离线机器用 -HfCache <目录>。"
   }
 } else {
   Write-Host "[4/4] --Fake：不需要权重"
