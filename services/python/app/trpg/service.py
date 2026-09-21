@@ -67,8 +67,15 @@ async def stream_turn(
     *,
     llm: LLMClient | None = None,
     tts: TTSClient | None = None,
+    lang: str = "zh",
+    voice_enabled: bool = True,
+    voice_name: str | None = None,
 ) -> AsyncIterator[ev.TrpgEvent]:
-    """一次酒馆回合的 SSE 事件流（路由层预检归属/限流后调用）。"""
+    """一次酒馆回合的 SSE 事件流（路由层预检归属/限流后调用）。
+
+    ``lang``：DM 输出语言（来自用户偏好或本回合显式传参）；``voice_enabled`` 关时不逐句 TTS
+    （省配额，前端设置里的「语音开关」）；``voice_name`` 为音色预留（NULL = 服务端默认）。
+    """
     campaign_id = campaign.id
     is_first = not await asyncio.to_thread(st.has_messages, campaign_id)
     yield ev.TrpgReady(campaign_id=campaign_id, campaign_name=campaign.name, is_first=is_first)
@@ -122,7 +129,7 @@ async def stream_turn(
             logger.warning("酒馆恢复校验失败：%s", exc)
 
     messages = await asyncio.to_thread(
-        _build_dm_context, campaign_id, campaign.name, text, restore_patch
+        _build_dm_context, campaign_id, campaign.name, text, restore_patch, lang
     )
     events_before = await asyncio.to_thread(st.count_events, campaign_id)
     scene_before = await asyncio.to_thread(st.get_scene, campaign_id)
@@ -179,9 +186,10 @@ async def stream_turn(
         await _post_system_row(campaign_id, "dice", payload)
         yield ev.SystemCard(trpg_sys="dice", payload=payload)
 
-    # DM 回复逐句 TTS（前端排队播放；失败逐句降级为无音频）
-    async for chunk in _tts_chunks(tts, content):
-        yield chunk
+    # DM 回复逐句 TTS（前端排队播放；失败逐句降级为无音频；用户关闭语音则不合成）
+    if voice_enabled:
+        async for chunk in _tts_chunks(tts, content, voice_name):
+            yield chunk
 
     await asyncio.to_thread(st.touch_campaign, campaign_id)
     # 叙事摘要增量刷新（P2-45：状态渲染零 LLM 成本；修复 ai4u「只手动刷新」的欠账）
@@ -236,7 +244,11 @@ def _restore_verify(campaign_id: int) -> str | None:
 
 
 def _build_dm_context(
-    campaign_id: int, campaign_name: str, question: str, restore_patch: str | None
+    campaign_id: int,
+    campaign_name: str,
+    question: str,
+    restore_patch: str | None,
+    lang: str = "zh",
 ) -> list[dict]:
     """DM 上下文：固定 system → 叙事摘要 → 快照 → 恢复补丁 → 历史 → 本回合输入。
 
@@ -285,7 +297,7 @@ def _build_dm_context(
     )
 
     messages: list[dict] = [
-        {"role": "system", "content": build_dm_system_prompt(campaign_name, restore_patch)}
+        {"role": "system", "content": build_dm_system_prompt(campaign_name, restore_patch, lang)}
     ]
     if narrative_summary:
         messages.append({"role": "system", "content": f"【当前冒险状态】\n{narrative_summary}"})
@@ -322,9 +334,12 @@ async def _post_system_row(campaign_id: int, trpg_sys: str, payload: dict) -> No
         logger.warning("酒馆系统卡落库失败（%s）：%s——降级为无卡片", trpg_sys, exc)
 
 
-async def _tts_chunks(tts: TTSClient, content: str) -> AsyncIterator[ev.AudioChunk]:
+async def _tts_chunks(
+    tts: TTSClient, content: str, voice_name: str | None = None
+) -> AsyncIterator[ev.AudioChunk]:
     """DM 回复逐句 TTS（并发合成、按序下发；逐句失败静默跳过，绝不阻塞回合）。"""
     settings = get_settings()
+    voice = (voice_name or "").strip() or settings.tts_voice
     splitter = StreamSentenceSplitter()
     sentences = splitter.push(content) + splitter.flush()
     sentences = [s for s in sentences if any(c.isalnum() for c in s)][:TTS_MAX_SENTENCES]
@@ -332,9 +347,7 @@ async def _tts_chunks(tts: TTSClient, content: str) -> AsyncIterator[ev.AudioChu
         return
     tasks: dict[int, asyncio.Task] = {}
     for i, sentence in enumerate(sentences):
-        tasks[i] = asyncio.create_task(
-            _tts_one(tts, sentence, settings.tts_voice, settings.tts_rate)
-        )
+        tasks[i] = asyncio.create_task(_tts_one(tts, sentence, voice, settings.tts_rate))
     for i in range(len(sentences)):
         url, duration = await tasks[i]
         if url:

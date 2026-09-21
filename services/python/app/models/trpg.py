@@ -40,9 +40,12 @@ from .base import (
     Base,
     CreatedAtMixin,
     TimestampMixin,
+    TrpgCardSources,
+    TrpgCardStatuses,
     TrpgEntityKinds,
     TrpgFactKinds,
     TrpgFactModalities,
+    TrpgLangs,
     TrpgMessageKinds,
     TrpgMessageRoles,
     TrpgTaskStatuses,
@@ -252,6 +255,89 @@ class TrpgMessage(CreatedAtMixin, Base):
     )
 
 
+class TrpgScenarioCard(TimestampMixin, Base):
+    """场景卡（开局模板；docs/52 §12）。
+
+    - ``owner_user_id`` NULL = 平台固定卡（管理端维护、上架后所有用户可选）；非 NULL = 用户私有卡
+      （按关键词 LLM 生成，仅本人可见/管理）；
+    - ``template``（JSONB）：开局应用的初始模板 ``{pc:{hp,location,inventory}, facts:[…],
+      tasks:[…], clues:[…]}``；应用时经服务器白名单校验后落 campaign 事实/任务/线索；
+    - ``status``：draft（仅管理端）/ published（可用）/ archived（归档，不再可选）；
+    - ``keywords``：用户卡的生成输入（留痕）；``generated_by``：llm / manual。
+    """
+
+    __tablename__ = "trpg_scenario_cards"
+
+    id: Mapped[int] = bigint_pk()
+    owner_user_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"))
+    source: Mapped[str] = mapped_column(
+        String(8), nullable=False, server_default=text(f"'{TrpgCardSources.ADMIN}'")
+    )
+    status: Mapped[str] = mapped_column(
+        String(12), nullable=False, server_default=text(f"'{TrpgCardStatuses.DRAFT}'")
+    )
+    title: Mapped[str] = mapped_column(String(60), nullable=False)
+    summary: Mapped[str | None] = mapped_column(String(300))
+    language: Mapped[str] = mapped_column(
+        String(8), nullable=False, server_default=text(f"'{TrpgLangs.ZH}'")
+    )
+    tags: Mapped[list | None] = mapped_column(jsonb())
+    scene: Mapped[str | None] = mapped_column(String(40))
+    opening_line: Mapped[str | None] = mapped_column(Text)
+    template: Mapped[dict | None] = mapped_column(jsonb())
+    keywords: Mapped[str | None] = mapped_column(String(200))
+    generated_by: Mapped[str | None] = mapped_column(String(12))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint(
+            f"source IN ('{TrpgCardSources.ADMIN}', '{TrpgCardSources.USER}')", name="source"
+        ),
+        CheckConstraint(
+            f"status IN ('{TrpgCardStatuses.DRAFT}', '{TrpgCardStatuses.PUBLISHED}', "
+            f"'{TrpgCardStatuses.ARCHIVED}')",
+            name="status",
+        ),
+        CheckConstraint(
+            f"language IN ('{TrpgLangs.ZH}', '{TrpgLangs.EN}')",
+            name="language",
+        ),
+        CheckConstraint("length(title) > 0", name="title_not_empty"),
+        Index("ix_trpg_scenario_cards_owner_status", "owner_user_id", "status"),
+        Index("ix_trpg_scenario_cards_status_id", "status", "id"),
+    )
+
+
+class TrpgUserPref(TimestampMixin, Base):
+    """酒馆用户偏好（跨设备；docs/52 §12.2）。
+
+    - ``lang``：DM 输出语言（zh/en；只影响 DM 叙述，不切界面文案）；
+    - ``voice_enabled``：是否自动朗读 DM 回复（关 = 服务端不再逐句 TTS，省配额）；
+    - ``voice_name``：TTS 音色（预留；NULL = 跟随服务端默认 `APP_TTS_VOICE`）。
+    """
+
+    __tablename__ = "trpg_user_prefs"
+
+    id: Mapped[int] = bigint_pk()
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id"), nullable=False, unique=True
+    )
+    lang: Mapped[str] = mapped_column(
+        String(8), nullable=False, server_default=text(f"'{TrpgLangs.ZH}'")
+    )
+    voice_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+    voice_name: Mapped[str | None] = mapped_column(String(40))
+
+    __table_args__ = (
+        CheckConstraint(
+            f"lang IN ('{TrpgLangs.ZH}', '{TrpgLangs.EN}')",
+            name="lang",
+        ),
+    )
+
+
 __all__ = [
     "TrpgCampaign",
     "TrpgClue",
@@ -259,5 +345,7 @@ __all__ = [
     "TrpgEvent",
     "TrpgFact",
     "TrpgMessage",
+    "TrpgScenarioCard",
     "TrpgTask",
+    "TrpgUserPref",
 ]

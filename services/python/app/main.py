@@ -258,9 +258,11 @@ app.include_router(trpg.router)  # 酒馆（TRPG 跑团 · docs/52：剧本/主�
 # 端点内部各自做功能位闸门（APP_OPS_TELEMETRY_ENABLED / APP_LLM_TRACE_ENABLED → 46014）。
 from app.console.api.routes import library as console_library  # noqa: E402
 from app.console.api.routes import ops as console_ops  # noqa: E402
+from app.console.api.routes import trpg_cards as console_trpg_cards  # noqa: E402
 
 app.include_router(console_ops.router)
 app.include_router(console_library.router)
+app.include_router(console_trpg_cards.router)  # 酒馆场景卡（docs/52 §12.1：平台固定卡治理）
 # 流利度特征测试台（test-only 前端联调；默认关闭，开启才注册 → 404；删除无影响，
 # 见 fluency_preview.py 删除清单）
 if get_settings().fluency_preview_enabled:

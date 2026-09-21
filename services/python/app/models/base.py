@@ -284,3 +284,28 @@ class TrpgMessageRoles:
 class TrpgMessageKinds:
     TEXT = "text"
     SYSTEM = "system"  # 系统卡（开卡/过场/判定），payload.trpgSys 协议
+
+
+class TrpgCardSources:
+    """场景卡来源：admin=平台固定卡（owner NULL，管理端维护上架）；user=用户私有卡（按词汇生成）。"""  # noqa: E501
+
+    ADMIN = "admin"
+    USER = "user"
+
+
+class TrpgCardStatuses:
+    """场景卡状态：draft=草稿（仅管理端可见）；published=可用；archived=归档（不再可选）。"""
+
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
+
+
+class TrpgLangs:
+    """酒馆语言（只作用于 DM 输出；前端界面文案不随之切换）。"""
+
+    ZH = "zh"
+    EN = "en"
+
+
+TRPG_LANGS = (TrpgLangs.ZH, TrpgLangs.EN)

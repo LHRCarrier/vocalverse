@@ -71,7 +71,9 @@ from .trpg import (
     TrpgEvent,
     TrpgFact,
     TrpgMessage,
+    TrpgScenarioCard,
     TrpgTask,
+    TrpgUserPref,
 )
 from .usage import UsageLog
 from .user import Placement, RefreshToken, User, UserProfile
@@ -157,6 +159,8 @@ __all__ = [
     "TrpgEntity",
     "TrpgEvent",
     "TrpgMessage",
+    "TrpgScenarioCard",
+    "TrpgUserPref",
     # 分析/支持域
     "Event",
     "Report",
