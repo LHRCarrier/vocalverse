@@ -3,6 +3,36 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-21 M3 收口 P4 尾项 + P5/P6（后端与契约）：搜索/XP/笔记三端点 + 契约刷新 + 死代码清理 · 1 op
+
+> 归属：Python 后端 + 契约 + Web 全局（App UI 部分见 `worklog/安卓开发日志.md` 同日条）。计划与 DoD 见 `docs/53`。
+
+- **搜索接口（docs/53 P5 ①）**：新增 `app/api/routes/search.py` —— `GET /api/v1/search?type=posts|users|tutorials&q=`。
+  数据源 = Java 写、Python **只读**映射（docs/10 §3.1 写方矩阵）：可见帖（`posts`）/ active 用户
+  （`users`+`user_profiles`，命中 username/nickname/@handle）/ published 听力素材（`listening_materials`，「教程」tab）。
+  关键词大小写不敏感子串匹配，`%`/`_`/`\` 显式转义（防通配注入）；空关键词返回空列表不扫全表；未知 type → 400。
+  本期 PG LIKE（docs/42 §14：ES/Meilisearch 后置）。
+- **XP 后端化（P5 ③）**：新增 `app/insight/xp.py` + `GET /api/v1/stats/progress` —— 规则 = attempt +15 /
+  sing_attempt +15 / free_chat_turn +5 / practice_complete +15（docs/35 §5 演示规则后端化），返回
+  `breakdown`（各规则计数 × 权重）可复算；等级表 LV1~LV5 服务端为唯一真源。前端 store 改造见安卓日志。
+- **笔记列表端点（P5 ②）**：`reading/service.list_notes_sync` + `GET /api/v1/reading/notes?kind=&limit=` ——
+  跨章批注 join 章节/书名（列表页展示 + 跳回阅读器），章节内列表仍走 `/annotations`。
+- **P4 尾项后端**：`learn_module` words 分支 join `dictionary_entries` 取词典首义（未收录词回退空，与
+  `reading.service.list_vocab` 同口径）。
+- **P6 清理**：删除死代码 `apps/web/src/stores/follows.ts`（全仓 grep 零引用）；`useECharts` 保留（StatsView 在用）；
+  Web 壳 `/sing`→`/m/sing`、`/community`→`/m/home`（占位页删除，`/stats` 本已真实）。
+- **契约**：Python OpenAPI 快照（`apps/web/src/api/specs/python-openapi.json`）与 `python-api.d.ts` 重新导出
+  （新增 search / stats.progress / reading.notes；CI 对账口径不变）。
+- **测试**：Python 新增 `tests/test_m3_search.py`（5 例：可见性过滤/大小写/handle 命中/通配转义/未知 type 400）、
+  `tests/test_m3_xp.py`（2 例：聚合复算 + 空态与等级边界）、`test_reading_routes.py` +1（跨章笔记 join/kind/倒序）、
+  `test_m3_learn.py` 增词典 join 断言。
+- **门禁**：pytest **769 passed, 4 skipped**；ruff check + format --check 绿；web `lint`/`typecheck`/**356 passed**/
+  `build`/`check-bundle` 绿。
+- **Playwright 回归（真后端 · Edge 390×844）**：**20/20 通过**（脚本 `local/ui-check/m3-p4p5-verify.cjs`，
+  截图 `local/ui-check/m3-p4-{practice,speaking-empty,words,community}.png`、`m3-p5-{learn-xp,vocab-status,settings-*,search-*,notes}.png`）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-21
+
 ## 2026-09-21 M3 收口 P4（部分）：学习主页画像接真 + 模块详情接口就绪 · 1 op
 
 > 归属：Python 后端 + Web 移动端。计划见 `docs/53`。
