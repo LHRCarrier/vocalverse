@@ -28,6 +28,7 @@ from app.models import Attempt, Report, ScenarioMessage
 from app.models import Session as DbSession
 from app.models.base import SessionStatus
 from app.practice import events as ev
+from app.practice.checkin import parse_practice_date, perform_checkin
 from app.practice.orchestrator import (
     OrchestratorError,
     get_orchestrator,
@@ -56,6 +57,12 @@ class SessionCreate(BaseModel):
     turn_limit: int | None = None
     shadow_material_id: int | None = None  # kind=shadow（DoD ④，2026-09-04）
     song_id: int | None = None  # kind=sing（M3 唱歌 P0 D7；published+ready 校验 40905）
+
+
+class CheckinBody(BaseModel):
+    """手动打卡入参：date = 客户端本地日期（YYYY-MM-DD），缺省 UTC 当天。"""
+
+    date: str | None = None
 
 
 @router.get("/scenarios")
@@ -127,6 +134,16 @@ async def post_session(
             "assigned_turns": session.assigned_turns,
         }
     )
+
+
+@router.post("/checkin")
+async def post_checkin(
+    body: CheckinBody | None = None,
+    user_id: int = Depends(get_current_user_id),
+):
+    """手动打卡：聚合当日练习并物化当日打卡卡；同一天重复打卡幂等（只刷新快照）。"""
+    day = parse_practice_date(body.date if body else None)
+    return ok(await asyncio.to_thread(perform_checkin, user_id, day))
 
 
 @router.get("/sessions/{session_id}")
