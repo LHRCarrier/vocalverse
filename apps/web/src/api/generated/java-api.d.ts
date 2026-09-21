@@ -1296,6 +1296,8 @@ export interface components {
             turns?: number;
             /** Format: int32 */
             durationS?: number;
+            /** Format: int32 */
+            practiceCount?: number;
         };
         RegisterRequest: {
             username: string;

@@ -146,6 +146,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/checkin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Checkin
+         * @description 手动打卡：聚合当日练习并物化当日打卡卡；同一天重复打卡幂等（只刷新快照）。
+         */
+        post: operations["post_checkin_api_v1_checkin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}": {
         parameters: {
             query?: never;
@@ -1616,6 +1636,14 @@ export interface components {
             /** Reply */
             reply: string;
         };
+        /**
+         * CheckinBody
+         * @description 手动打卡入参：date = 客户端本地日期（YYYY-MM-DD），缺省 UTC 当天。
+         */
+        CheckinBody: {
+            /** Date */
+            date?: string | null;
+        };
         /** Envelope[ASRResult] */
         Envelope_ASRResult_: {
             /**
@@ -2705,6 +2733,42 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SessionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_checkin_api_v1_checkin_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CheckinBody"] | null;
             };
         };
         responses: {

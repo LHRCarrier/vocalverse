@@ -452,6 +452,81 @@
         }
       }
     },
+    "/api/v1/checkin": {
+      "post": {
+        "tags": [
+          "practice"
+        ],
+        "summary": "Post Checkin",
+        "description": "手动打卡：聚合当日练习并物化当日打卡卡；同一天重复打卡幂等（只刷新快照）。",
+        "operationId": "post_checkin_api_v1_checkin_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-test-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/CheckinBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sessions/{session_id}": {
       "get": {
         "tags": [
@@ -6279,6 +6354,24 @@
         ],
         "title": "ChatResult",
         "description": "LLM 场景扮演单轮回复。M2 多轮/流式扩展时更新契约（docs/06 §8）。"
+      },
+      "CheckinBody": {
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          }
+        },
+        "type": "object",
+        "title": "CheckinBody",
+        "description": "手动打卡入参：date = 客户端本地日期（YYYY-MM-DD），缺省 UTC 当天。"
       },
       "Envelope_ASRResult_": {
         "properties": {

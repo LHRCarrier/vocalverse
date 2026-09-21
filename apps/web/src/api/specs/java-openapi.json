@@ -3811,6 +3811,10 @@
           "durationS" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "practiceCount" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
