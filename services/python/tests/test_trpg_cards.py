@@ -334,3 +334,51 @@ def test_console_card_generate(client, monkeypatch):
     resp = client.post("/api/v1/console/trpg/cards/generate", json={}, headers=headers)
     assert resp.status_code == 200
     assert resp.json()["data"]["title"] == GOOD_CARD["title"]
+
+
+# ---------------------------------------------------------------------------
+# 消息翻译（X 式「翻译」按钮）
+# ---------------------------------------------------------------------------
+def test_translate_auto_direction_and_scripted_llm(client, auth_headers, monkeypatch):
+    calls: list[str] = []
+
+    class ScriptedLLM:
+        async def chat(self, messages, temperature=0.7, max_tokens=512):
+            calls.append(messages[0]["content"])
+            return "TRANSLATED"
+
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: ScriptedLLM())
+
+    # 中文 → 英文
+    resp = client.post("/api/v1/trpg/translate", json={"text": "你推开门。"}, headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["data"] == {"text": "TRANSLATED", "target": "en"}
+    assert "English" in calls[0] and "你推开门。" in calls[0]
+
+    # 英文 → 中文
+    resp = client.post(
+        "/api/v1/trpg/translate", json={"text": "You push the door open."}, headers=auth_headers
+    )
+    assert resp.json()["data"]["target"] == "zh"
+    assert "中文" in calls[1]
+
+    # 显式指定目标
+    resp = client.post(
+        "/api/v1/trpg/translate",
+        json={"text": "You push the door open.", "target": "en"},
+        headers=auth_headers,
+    )
+    assert resp.json()["data"]["target"] == "en"
+
+
+def test_translate_validation(client, auth_headers):
+    empty = client.post("/api/v1/trpg/translate", json={"text": "  "}, headers=auth_headers)
+    assert empty.status_code == 422 and empty.json()["code"] == 47001
+    too_long = client.post(
+        "/api/v1/trpg/translate", json={"text": "x" * 2001}, headers=auth_headers
+    )
+    assert too_long.status_code == 422 and too_long.json()["code"] == 47001
+    bad_target = client.post(
+        "/api/v1/trpg/translate", json={"text": "hello", "target": "fr"}, headers=auth_headers
+    )
+    assert bad_target.status_code == 422 and bad_target.json()["code"] == 47001

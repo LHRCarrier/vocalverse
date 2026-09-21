@@ -437,6 +437,35 @@ def publish_violations(row: TrpgScenarioCard) -> list[dict]:
 # ---------------------------------------------------------------------------
 # LLM 生成
 # ---------------------------------------------------------------------------
+async def translate_text(llm, text: str, target: str) -> str:
+    """把一段 DM 文本译成目标语言（X 式「翻译」按钮；原文不动）。
+
+    - ``target``：``zh`` | ``en``（前端按内容自动判定方向，保证是「中英互切」）；
+    - 失败语义：LLM 异常上抛（路由转 50001），空结果返回原文；
+    - 长度守卫由路由层做（≤2000 字），此处只做 strip。
+    """
+    source = (text or "").strip()
+    if not source:
+        raise ValueError("text required")
+    lang_name = "中文" if target == TrpgLangs.ZH else "English"
+    prompt = (
+        f"Translate the following text into {lang_name}. "
+        "Keep the tone, paragraph breaks, and any 'Name: ...' dialogue format. "
+        "Output only the translation, no quotes, no explanation.\n\n" + source
+    )
+    translated = await llm.chat(
+        [{"role": "user", "content": prompt}], temperature=0.2, max_tokens=1200
+    )
+    return (translated or "").strip() or source
+
+
+def detect_target(text: str) -> str:
+    """中英互切方向：含 CJK → 译成英文；否则译成中文。"""
+    import re
+
+    return TrpgLangs.EN if re.search(r"[\u4e00-\u9fff]", text or "") else TrpgLangs.ZH
+
+
 async def generate_card(llm, keywords: str, lang: str) -> dict:
     """按关键词（管理端可为空=随机主题）生成卡片草稿；**不落库**（草稿由调用方决定存否）。
 
@@ -609,6 +638,7 @@ def update_prefs(user_id: int, patch: dict) -> dict:
 
 __all__ = [
     "RANDOM_THEMES",
+    "detect_target",
     "archive_user_card",
     "card_view",
     "create_platform_card",
@@ -622,6 +652,7 @@ __all__ = [
     "publish_platform_card",
     "publish_violations",
     "start_campaign_from_card",
+    "translate_text",
     "update_platform_card",
     "update_prefs",
     "update_user_card",

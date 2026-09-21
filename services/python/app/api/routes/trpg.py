@@ -100,6 +100,13 @@ class CardGenerate(BaseModel):
     lang: str | None = None
 
 
+class TranslateBody(BaseModel):
+    """DM 消息翻译（X 式「翻译」按钮）：text ≤2000 字；target 缺省按内容自动判方向。"""
+
+    text: str
+    target: str | None = None
+
+
 class PrefsUpdate(BaseModel):
     lang: str | None = None
     voice_enabled: bool | None = None
@@ -480,3 +487,27 @@ async def put_preferences(body: PrefsUpdate, user_id: int = Depends(get_current_
     except ValueError as exc:
         raise BizError(http_status=422, code=47001, message=str(exc)) from exc
     return ok(prefs)
+
+
+@router.post("/translate")
+async def translate_message(body: TranslateBody, user_id: int = Depends(get_current_user_id)):
+    """把一条 DM 消息译成另一种语言（中英互切；原文不动，前端切换展示）。
+
+    限流：扣 llm 桶（与回合共享）；失败 → 47003（可重试）。
+    """
+    text = body.text.strip()
+    if not (1 <= len(text) <= 2000):
+        raise BizError(http_status=422, code=47001, message="text 需 1-2000 字")
+    if body.target is not None and body.target not in ("zh", "en"):
+        raise BizError(http_status=422, code=47001, message="target 需为 zh|en")
+    target = body.target or card_domain.detect_target(text)
+    limits = bucket_limits()
+    await consume_all([("llm", limits["llm"])], user_id)
+    try:
+        translated = await card_domain.translate_text(get_llm_client(), text, target)
+    except ValueError as exc:
+        raise BizError(http_status=422, code=47003, message=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("trpg translate failed: %s", exc)
+        raise BizError(http_status=500, code=50001, message="翻译失败，请稍后重试") from exc
+    return ok({"text": translated, "target": target})
