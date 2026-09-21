@@ -31,6 +31,18 @@ export interface StatsOverview {
   generated_at: string
 }
 
+export interface LevelForecast {
+  available: boolean
+  model_version: string
+  predicted_overall?: number
+  current_avg?: number
+  delta?: number
+  direction?: 'up' | 'flat' | 'down'
+  basis?: { attempts: number; slope: number; active_days: number; window_days: number }
+  note?: string
+  reason?: string
+}
+
 export interface StatsMe {
   period: { days: number; start: string; end: string }
   summary: {
@@ -44,6 +56,7 @@ export interface StatsMe {
   trend: { date: string; attempts: number; avg_overall: number | null; sing: number }[]
   radar: { axes: string[]; values: number[] }
   by_kind: { kind: string; count: number; avg_overall: number | null }[]
+  forecast?: LevelForecast
   generated_at: string
 }
 

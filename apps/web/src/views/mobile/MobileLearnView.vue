@@ -13,6 +13,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { track } from '@/api/events'
+import { fetchItemsRecommendations } from '@/api/reco'
+import type { RecoItem } from '@/api/reco'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -34,8 +37,45 @@ const profileLine = '你本周练了 6 次，发音进步 +4 分——表达越�
 /* 连续天数 = 真实打卡卡聚合（stores/checkin）；未加载时为 0，不写死演示值 */
 const streak = computed(() => checkin.streak)
 
+/* ---------- 为你推荐（docs/53 P3：内容型推荐；曝光服务端落库，点击前端上报） ---------- */
+const recoItems = ref<RecoItem[]>([])
+const recoGroupId = ref('')
+
+const RECO_KIND_LABEL: Record<RecoItem['kind'], string> = {
+  song: '歌曲',
+  book: '读物',
+  card: '场景卡',
+}
+
+function recoTargetPath(item: RecoItem): string {
+  if (item.kind === 'song') return '/m/sing'
+  if (item.kind === 'book') return `/m/books/${item.id}`
+  return '/m/tavern'
+}
+
+function openReco(item: RecoItem) {
+  void track('recommend_click', {
+    recommendGroupId: recoGroupId.value || undefined,
+    targetType: item.kind === 'song' ? 'song' : item.kind === 'book' ? 'book' : 'card',
+    targetId: item.id,
+    payload: { kind: item.kind, rank: recoItems.value.indexOf(item) },
+  })
+  void router.push(recoTargetPath(item))
+}
+
+async function loadReco() {
+  try {
+    const data = await fetchItemsRecommendations(3)
+    recoItems.value = data.items
+    recoGroupId.value = data.recommend_group_id
+  } catch {
+    /* 推荐非关键路径：失败静默（卡片不渲染） */
+  }
+}
+
 onMounted(() => {
   void checkin.refresh()
+  void loadReco()
 })
 
 /* ---------- 学习热力图（12 周 × 7 天 · 自绘零依赖 · 演示确定性数据） ---------- */
@@ -164,6 +204,28 @@ function openModule(path: string) {
           @click="openModule('/m/checkin')"
         >
           <MobileIcon name="flame" :size="15" />{{ streak }} 天
+        </button>
+      </section>
+
+      <!-- ②′ 为你推荐（真实推荐流：内容型基线，docs/53 P3；无数据时不渲染） -->
+      <section v-if="recoItems.length" class="u-learn-reco" aria-label="为你推荐">
+        <div class="u-learn-reco__head">
+          <h2 class="u-learn-reco__title">为你推荐</h2>
+          <span class="u-learn-reco__sub">按你的水平与兴趣挑选</span>
+        </div>
+        <button
+          v-for="item in recoItems"
+          :key="`${item.kind}-${item.id}`"
+          class="u-learn-reco__row"
+          type="button"
+          @click="openReco(item)"
+        >
+          <span class="u-learn-reco__kind">{{ RECO_KIND_LABEL[item.kind] }}</span>
+          <span class="u-learn-reco__body">
+            <span class="u-learn-reco__name">{{ item.title }}</span>
+            <span class="u-learn-reco__meta">{{ item.subtitle }} · {{ item.reason }}</span>
+          </span>
+          <MobileIcon name="arrow" :size="14" />
         </button>
       </section>
 
