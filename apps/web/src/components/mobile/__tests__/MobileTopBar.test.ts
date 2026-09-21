@@ -7,7 +7,10 @@ import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 
 describe('MobileTopBar', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    window.scrollTo(0, 0)
+  })
 
   it('渲染标题；点击全局头像打开账户抽屉', async () => {
     const wrapper = mount(MobileTopBar, { props: { title: '私信' } })
@@ -56,5 +59,39 @@ describe('MobileTopBar', () => {
       slots: { actions: '<button class="u-topbar__act">x</button>' },
     })
     expect(wrapper.find('.u-topbar__acts button.u-topbar__act').exists()).toBe(true)
+  })
+
+  /**
+   * 2026-09-21 组长反馈：改语言/切领域要滑回顶部 → 顶栏吸顶 + 下滚收起、上滚出现。
+   * 接线断言：顶栏单独用时收起自身；包在 .u-head 吸顶区时收起整块（顶栏 + 页首控制行）。
+   */
+  it('顶栏单独使用：下滚收起自身、上滚恢复', () => {
+    const wrapper = mount(MobileTopBar, { props: { title: '酒馆' }, attachTo: document.body })
+    const bar = wrapper.get('header.u-topbar').element
+
+    window.scrollTo(0, 400)
+    window.dispatchEvent(new Event('scroll'))
+    expect(bar.classList.contains('is-hidden')).toBe(true)
+
+    window.scrollTo(0, 300)
+    window.dispatchEvent(new Event('scroll'))
+    expect(bar.classList.contains('is-hidden')).toBe(false)
+  })
+
+  it('包在 .u-head 吸顶区：收起的是整块（顶栏自身不加 is-hidden）', () => {
+    const wrapper = mount(
+      {
+        components: { MobileTopBar },
+        template: '<div class="u-head"><MobileTopBar title="社区" /></div>',
+      },
+      { attachTo: document.body },
+    )
+    const head = wrapper.get('.u-head').element
+    const bar = wrapper.get('header.u-topbar').element
+
+    window.scrollTo(0, 400)
+    window.dispatchEvent(new Event('scroll'))
+    expect(head.classList.contains('is-hidden')).toBe(true)
+    expect(bar.classList.contains('is-hidden')).toBe(false)
   })
 })
