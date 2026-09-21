@@ -24,16 +24,30 @@ services/python/app/audio/tts_omnivoice.py ──HTTP──> 本服务 ──GPU
 ## 2. 怎么起
 
 ```powershell
-# 仓库根；启动前会自检依赖、探一下端口上是不是已经有一个在跑
+# ① 下权重（约 3.28 GB，不入库）。默认走 HF 镜像下到 <仓库>/data/models
+pwsh -File scripts/fetch-omnivoice-weights.ps1
+#    本机已有缓存就别下了，直接复制：-FromLocal <HF 缓存根>
+#    只验链路/试网速：              -Only "config.json"
+
+# ② 起边车（启动前会自检依赖、探端口、探权重）
 pwsh -File scripts/start-omnivoice-sidecar.ps1
+#    无 GPU / 只想验链路：          -Fake
 
-# 无 GPU 机器 / CI：占位引擎，不加载权重，只出静音 WAV（验证链路用）
-pwsh -File scripts/start-omnivoice-sidecar.ps1 -Fake
+# ③ 或者：随三端一起起（一键启动默认就会尝试边车，起不来只提示不阻塞）
+pwsh -File scripts/dev-up.ps1 start          # 含边车；不想起加 -NoVoice
+```
 
-# 手工起（想自己控制参数时）
+**权重查找顺序**（边车与 `dev-up.ps1` 同一套）：`OMNIVOICE_MODEL_DIR` →
+`OMNIVOICE_HF_CACHE` → **`<仓库>/data/models`**（即上面 ① 的默认落点，**下完即零配置**）
+→ `~/.cache/huggingface/hub` 等 HF 默认缓存 → 仓库 id（首次自动下载，内网通常不通）。
+判据是「快照里要有 `config.json` + 至少一个 `*.safetensors`」——**下载到一半的目录不会被当成可用权重**。
+
+手工起（想自己控制参数时）：
+
+```powershell
 <python> services/omnivoice-sidecar/server.py --port 8765 --dtype float16
 #   --host 127.0.0.1 --port 8765
-#   --model-dir <HF 快照目录或仓库 id>   默认先找 OMNIVOICE_HF_CACHE 下最新快照，找不到回落 k2-fsa/OmniVoice
+#   --model-dir <HF 快照目录或仓库 id>
 #   --device cuda|cpu   --dtype float16|float32   --preload   --fake
 # 环境变量：OMNIVOICE_HOST / _PORT / _MODEL_DIR / _HF_CACHE / _DEVICE / _DTYPE / _PYTHON
 ```
@@ -44,17 +58,18 @@ pwsh -File scripts/start-omnivoice-sidecar.ps1 -Fake
 主服务侧不需要额外配置：`APP_TTS_PROVIDER` 默认 `auto`，链首就是本引擎；
 它**探测 `/health`** 决定是否可用（10s TTL 缓存），边车没起就自动回落 kitten/edge。
 
-## 3. 依赖与权重（**都不入库**）
+## 3. 依赖与权重（**权重不入库**）
 
 | 项 | 说明 |
 |---|---|
 | Python 环境 | OmniVoice + torch + soundfile，**不装在 `services/python/.venv`**（那是 CPU 运行时）。单独建一个环境，用 `-Python` 或 `OMNIVOICE_PYTHON` 指过来 |
-| 模型权重 | 约 **3.28 GB**（`model.safetensors` 2.45 GB + `audio_tokenizer/model.safetensors` 806 MB 等）；放 HF 缓存结构 `models--k2-fsa--OmniVoice/snapshots/<rev>/`，用 `-HfCache` 指缓存根 |
-| 音色参考件 | `data/seed/voices/`（`VOICES.json` + 4 个 wav，合计约 1.9 MB，**随仓库入库**）；主服务侧用 `APP_VOICE_REFS_DIR` 指向它 |
+| 模型权重 | 约 **3.28 GB**（`model.safetensors` 2.45 GB + `audio_tokenizer/model.safetensors` 806 MB 等）；用 `scripts/fetch-omnivoice-weights.ps1` 下到 `<仓库>/data/models`（gitignored），或 `-FromLocal` 从别人机器拷 |
+| 音色参考件 | `data/seed/voices/`（`VOICES.json` + 4 个 wav，合计约 1.9 MB，**随仓库入库**）；主服务侧 `APP_VOICE_REFS_DIR` **留空即自动用它** |
 
 > ⚠️ **欠账**：没有"一键装好环境"的脚本。换机器要自己让 `import omnivoice` 成立
-> （建 venv + `pip install omnivoice torch soundfile`）。`-Fake` 可以在没有环境的机器上
-> 先把链路跑通，但**不能**验证音质。
+> （建 venv + `pip install omnivoice torch soundfile`）。**权重**已经有一键脚本
+> （`scripts/fetch-omnivoice-weights.ps1`，镜像默认 `hf-mirror.com`，本机实测 huggingface.co 直连超时）。
+> `-Fake` 可以在没有环境的机器上先把链路跑通，但**不能**验证音质。
 
 ## 4. HTTP 接口
 

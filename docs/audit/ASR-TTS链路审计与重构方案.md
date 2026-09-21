@@ -330,17 +330,27 @@ APP_ASR_SHERPA_MODEL_DIR=<sherpa sense-voice 模型目录>
   「客户端 `build_request()`」与「服务端 `validate()`」，两端漂移即红（无需 GPU）；
 - **`--fake` 模式**：占位引擎只出可解析的静音 WAV，用于没有 GPU 的机器与 CI 冒烟整条链路。
 
-**启用（两步，零代码改动）**：
+**启用（三步，零代码改动）**：
 
 ```powershell
-# 1) 起边车（模型权重约 3.3 GB 需自备，不入库；脚本会自检依赖并打印权重探测结果）
-pwsh -File scripts/start-omnivoice-sidecar.ps1
-#    无 GPU / 只想验链路：pwsh -File scripts/start-omnivoice-sidecar.ps1 -Fake
+# 1) 下权重（约 3.28 GB，不入库）：默认走 hf-mirror.com 镜像下到 <仓库>/data/models
+pwsh -File scripts/fetch-omnivoice-weights.ps1
+#    本机已有缓存就别下了：-FromLocal <HF 缓存根>；只验链路：-Only "config.json"
 
-# 2) 什么都不用配：音色参考件已随仓库分发在 data/seed/voices/（VOICES.json + 4 个 wav，约 1.9 MB），
-#    APP_VOICE_REFS_DIR 留空即自动指向它；auto 链会自动优先用 omnivoice。
-#    要改用别处的参考件再显式设 APP_VOICE_REFS_DIR=<目录>。
+# 2) 建独立环境装 omnivoice + torch + soundfile，并用 OMNIVOICE_PYTHON 指过来
+#    （不装在 services/python/.venv —— 那是 CPU 运行时）
+
+# 3) 起边车：一键启动**默认就带上它**（起不来只提示不阻塞）
+pwsh -File scripts/dev-up.ps1 start        # 不想起加 -NoVoice
+#    也可单独起：pwsh -File scripts/start-omnivoice-sidecar.ps1（无 GPU 加 -Fake）
+
+# 音色参考件已随仓库分发在 data/seed/voices/，APP_VOICE_REFS_DIR 留空即自动指向它。
 ```
+
+**权重查找顺序**（边车 / `dev-up.ps1` / 启动器三者一致）：`OMNIVOICE_MODEL_DIR` →
+`OMNIVOICE_HF_CACHE` → **`<仓库>/data/models`**（fetch 脚本落点，下完即零配置）→ HF 默认缓存 →
+仓库 id。判据含「快照需有 `config.json` + 至少一个 `*.safetensors`」——
+**下载到一半的目录不会被当成可用权重**（否则表现成"边车起了但 loadError"）。
 
 > 边车默认监听 `127.0.0.1:8765`（`APP_TTS_OMNIVOICE_ENDPOINT` 默认同值）。容器形态下
 > `127.0.0.1` 指容器自己，需要边车时把该键指向宿主（如 `http://host.docker.internal:8765`）；
