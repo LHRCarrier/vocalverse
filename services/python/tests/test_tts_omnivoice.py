@@ -21,6 +21,7 @@ from app.audio import tts_omnivoice as omni
 from app.audio.tts_omnivoice import (
     MANIFEST_NAME,
     OmniVoiceTTSClient,
+    default_refs_dir,
     normalize_voice,
     read_manifest,
     supported_voices,
@@ -112,8 +113,28 @@ def test_supported_voices_returns_api_shape(tmp_path) -> None:
     assert set(rows[0]) == {"id", "label", "engine", "langs"}
 
 
-def test_supported_voices_empty_without_dir() -> None:
-    assert supported_voices(SimpleNamespace(voice_refs_dir="")) == []
+def test_repo_seeded_voices_dir_is_default(tmp_path) -> None:
+    """`APP_VOICE_REFS_DIR` 留空 → 回落仓库内 `data/seed/voices`（队友 clone 即可用）。
+
+    这两条一起描述「零配置可用」：配置为空时仍能找到随仓库分发的参考件，
+    且能找到就说明目录确实在版本库里。
+    """
+    discovered = default_refs_dir()
+    assert discovered, "data/seed/voices 应随仓库分发（见 .gitignore 豁免）"
+    assert Path(discovered).name == "voices"
+    assert (Path(discovered) / MANIFEST_NAME).is_file()
+    assert (Path(discovered) / "male-en.wav").is_file()
+
+
+def test_supported_voices_falls_back_to_seeded_dir() -> None:
+    """未显式配置时，音色目录也应能从仓库内参考件列出来（否则前端选不到克隆音色）。"""
+    rows = supported_voices(SimpleNamespace(voice_refs_dir=""))
+    assert any(r["id"] == "anchor-en" for r in rows)
+
+
+def test_supported_voices_empty_when_dir_has_no_manifest(tmp_path) -> None:
+    """目录存在但没有清单 → 空表（参考文本必须给死，缺清单就不算有音色）。"""
+    assert supported_voices(SimpleNamespace(voice_refs_dir=str(tmp_path))) == []
 
 
 # ---------------------------------------------------------------------------
