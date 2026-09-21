@@ -3824,6 +3824,100 @@ button.u-notes__card {
   color: var(--u-star);
 }
 
+/* ---- ②′ 为你推荐（docs/53 P3 卡；2026-09-21 补样式） ----
+ * 此前只有模板没有 CSS：三行 button 裸渲染（默认边框 + 行内 span），标题/品类/副题挤成一行且互相压叠。
+ * 规格对齐卡内列表：白卡 + 发丝分隔线 + 品类 chip + 两行省略文本 + 箭头。 */
+.u-learn-reco {
+  background: var(--u-card);
+  border-radius: var(--u-r-inner);
+  box-shadow: var(--u-shadow-float);
+  padding: 14px 16px 4px;
+  margin: 0 0 12px;
+}
+
+.u-learn-reco__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.u-learn-reco__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--u-ink);
+}
+
+.u-learn-reco__sub {
+  font-size: 12px;
+  color: var(--u-weak);
+}
+
+.u-learn-reco__row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  border: none;
+  border-top: 1px solid var(--u-paper-grid);
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: opacity 120ms ease-out;
+}
+
+.u-learn-reco__row:first-of-type {
+  border-top: none;
+}
+
+.u-learn-reco__row:active {
+  opacity: 0.7;
+}
+
+.u-learn-reco__kind {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: var(--u-r-chip);
+  background: var(--u-track);
+  color: var(--u-sub);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.u-learn-reco__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.u-learn-reco__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--u-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.u-learn-reco__meta {
+  font-size: 12px;
+  color: var(--u-sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.u-learn-reco__row svg {
+  flex: none;
+  color: var(--u-weak);
+}
+
 /* ---- ③ 热力图（信息图 · 只图 + 右下角经验） ---- */
 .u-learn-heat {
   background: var(--u-card);
