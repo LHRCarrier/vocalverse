@@ -3,6 +3,19 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-21 OmniVoice 边车落成**本仓独立服务**（`services/omnivoice-sidecar/`）+ 音色参考件随仓库分发 · 1 op
+
+- **背景（组长的实话）**：上一轮 ASR/TTS 重构只写了**调用方**（`app/audio/tts_omnivoice.py`），边车指向的是 `F:\WorkingL\HainnuP\xiaohaishi` 里的那个进程 —— 组长直接指出「**你单独指向 xiaohaishi 仓库的话我组员用不了**」。属实：队友 clone 本仓拿不到边车代码、也拿不到音色参考件，本地克隆音色这条链路等于没落地。
+- **落地（4 件）**：① **`services/omnivoice-sidecar/server.py`** —— 按组长指示直接移植 xiaohaishi 的边车（纯标准库 `http.server`，无 fastapi/uvicorn，理由：主服务要能在 CPU 容器里起，而引擎是 torch+GPU，两者只能走进程边界），改动仅限：去本项目无关的叙事、`SERVER_NAME`/版本、**新增 `--fake` 模式**、`stdout.reconfigure` 加保护（pytest 捕获 stdout 时无该方法）；② **`services/omnivoice-sidecar/README.md`** 运维口径（依赖/权重/契约/设计取舍/验收）；③ **`scripts/start-omnivoice-sidecar.ps1`** 启动器（依赖自检 + 端口占用探测 + 权重探测 + GPU 显存提示）；④ **`data/seed/voices/`**（`VOICES.json` + 4 个 wav，共 1.9 MB）。
+- **零配置可用（关键）**：`APP_VOICE_REFS_DIR` 留空时**自动回落仓库内 `data/seed/voices`**（`app/core/paths.py` 新增 `voices_dir()`，复用既有「向上找含 data/seed 的祖先」口径，裸跑与容器都对）。为此在 `.gitignore` 的 `*.wav` 规则**之后**开了一条窄豁免 `!data/seed/voices/**` —— 否则参考件会被 `*.wav` 吞掉，队友 clone 下来边车合成不出任何声音。**模型权重（约 3.3 GB）仍不入库**，只在运行时按路径引用（边车 `-HfCache` / `OMNIVOICE_HF_CACHE`）。
+- **契约对账测试（本轮的真正价值）**：新增 `tests/test_omnivoice_sidecar.py`。边车是独立进程，它的风险全在「两端漂移」—— 真机上只会表现成「克隆请求被 400」或「静默按设计模式随机抽了一把嗓子」。故：① 用 `importlib` 按文件路径加载边车模块（它不在 python 包内），全量测 `validate()` 的各类失败语义；② **把客户端 `build_request()` 造出的请求体直接喂服务端 `validate()`** —— 同一份体过两端才算契约一致。为此把构造请求体的逻辑从 `synthesize()` 抽成 `build_request()`。全部不需要 GPU，CI 可跑。
+- **端到端实测（`--fake`，真跑不是"应该能跑"）**：起边车 `--fake --port 8799` → `GET /health` 返回 `{"ok":true,"device":"fake","sampleRate":24000,...}` → 主服务侧 `resolve_tts_client()` 解析为 **omnivoice**（`media_type=audio/wav`）→ `synthesize()` 拿到 **144,044 B** 合法 RIFF/WAVE → `audio_duration_seconds()` 得 **3.0 s**（44 字符 ÷ 15 字/秒 ≈ 2.93 s，与帧数 24000×2.93 自洽）。另用随仓库分发的参考件跑 `ensure_ready()`：4 把嗓子（male-zh/female-zh/anchor-en/podcaster-en）**逐条 sha256 与 `VOICES.json` 一致**。
+- **测试抓到的两个真问题（不是"测试全绿"）**：① 边车里 `REF_EMPTY` 是**死分支** —— 空串被前面的 `not raw` 拦成 `REF_REQUIRED`，于是「没给字段」与「给了一个空的」报同一个码、少一条排查线索；改为只对「非字符串」报 `REF_REQUIRED`，空串落到 `REF_EMPTY`，两个码都在测试里有断言。② 参考件入库后，`test_audio_voices` 的两条用例前提失效（原先「不配 refs dir → 只有 edge 音色」，现在会回落仓库内参考件）—— 不是 bug，是**行为按预期变了**；把这两条改为显式指向不存在的目录以确定地测"未就绪"分支，另加一条「留空即暴露 anchor-en/podcaster-en」锁住零配置行为。
+- **门禁**：`ruff check` 全绿 / `ruff format --check app tests` 221 文件已格式化 / **`pytest -q -m "not gpu"` 742 passed · 4 skipped**（较上轮 +16 例）。
+- **产出**：`services/omnivoice-sidecar/{server.py,README.md}`、`scripts/start-omnivoice-sidecar.ps1`、`data/seed/voices/`（5 文件）、`services/python/tests/test_omnivoice_sidecar.py`；改 `app/core/paths.py`（`voices_dir()`）、`app/audio/tts_omnivoice.py`（`default_refs_dir()` / `build_request()`）、`app/core/config.py`、`.gitignore`、两份 `.env.example`、`README`（技术栈 + 仓库结构）、`docs/06 §20`、`docs/audit/ASR-TTS链路审计与重构方案.md`（§7.2.1 新增 + §6.1/§9.1 更新）。
+- **遗留**：① 没有"一键装好 OmniVoice 环境"的脚本，换机器要自己 `pip install omnivoice torch soundfile`（`-Fake` 可先验链路）；② 容器形态下 `127.0.0.1:8765` 指容器自己，要用边车需把 `APP_TTS_OMNIVOICE_ENDPOINT` 指向宿主（不指也能跑，探测失败即回落 edge）；③ GPU 侧的音质判据（与定稿参考件是否等价、跨文本是否同一把嗓子）需在有 GPU 的机器上单独验，CI 只覆盖契约与链路形状。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-21
 ## 2026-09-21 ASR/TTS 链路可插拔重构：引擎注册表 / 统一缓存 / 容器元数据 / 本地 ASR·TTS（含开源调研与现状审计）· 5 op
 
 - **背景（先审计后动手）**：应组长要求先做「主流开源/论文/工具调研 + 本仓零散代码审计」，再重构。**病根不是缺功能，而是同一个真相有三份**：① 「有哪些引擎」同时写在 `base.get_tts_client`（edge\|azure）与 `reading/tts_client`（auto\|edge\|kitten）两套实现里（连枚举都不一致）；② 「这个实例是谁」靠 `isinstance(tts, KittenTTSClient)` 反推（新增第三个引擎必漏判）；③ 「音频是什么容器」在落盘（`.mp3` 写死）、时长估算（只认 MP3）、`/tts` 响应（只回 hex）三处各自假设 MP3。审计出 **14 处** 相关零散代码，四类耦合：装配与接口同文件 / 身份靠类型反推 / 容器假设泄漏到调用点 / 领域边界倒置（`provider→扩展名` 表放在读书域）。

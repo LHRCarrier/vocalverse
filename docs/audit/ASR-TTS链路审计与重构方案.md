@@ -257,7 +257,7 @@ register(ProviderSpec(
 | `APP_TTS_OMNIVOICE_VOICE` | `anchor-en` | `anchor-en`（英文男声）/ `podcaster-en`（英文女声） |
 | `APP_TTS_OMNIVOICE_SEED` | 空 | 空 = 用 `VOICES.json` 里的 seed |
 | `APP_TTS_OMNIVOICE_TIMEOUT_S` | `120` | GPU 冷合成可达 10s+，给足余量 |
-| `APP_VOICE_REFS_DIR` | 空 | 音色参考件目录（含 `VOICES.json` + wav）；配好即被 `auto` 优先选中 |
+| `APP_VOICE_REFS_DIR` | 空 | 音色参考件目录；**空 = 自动用仓库内 `data/seed/voices`**（随仓库分发，零配置可用） |
 | `APP_READING_TTS_PROVIDER` | `auto` | **空 = 跟随 `APP_TTS_PROVIDER`**；非空 = 读书域覆盖 |
 
 > `APP_TTS_PROVIDER` 与 `APP_READING_TTS_PROVIDER` **保留两个键但共用一套机制与同一枚举**
@@ -320,20 +320,31 @@ APP_ASR_SHERPA_MODEL_DIR=<sherpa sense-voice 模型目录>
 6. **可用性包含连通性**：`is_available()` 额外探测 `GET {endpoint}/health`（10s TTL 缓存），
    边车不在就让位给 kitten/edge —— 这是它能安全放在 `auto` 链首位的前提。
 
-**启用（两步，均不涉及代码改动；本机已按此配好 `.env`）**：
+### 7.2.1 边车服务（`services/omnivoice-sidecar/`，本仓自带）
+
+边车**不是**外部依赖，而是本仓的一个独立服务（纯标准库 `http.server`，无 fastapi/uvicorn）：
+主服务是 CPU 运行时（要能在 CI/演示容器里起），OmniVoice 是 torch + GPU，两者只能走进程边界。
+细节与运维口径见 `services/omnivoice-sidecar/README.md`；两条关键事实：
+
+- **契约一致性由测试锁住**：`tests/test_omnivoice_sidecar.py` 用同一份请求体同时喂
+  「客户端 `build_request()`」与「服务端 `validate()`」，两端漂移即红（无需 GPU）；
+- **`--fake` 模式**：占位引擎只出可解析的静音 WAV，用于没有 GPU 的机器与 CI 冒烟整条链路。
+
+**启用（两步，零代码改动）**：
 
 ```powershell
-# 1) 准备参考件目录（3 个小文件，~750KB；**不入库**——*.wav 已被 .gitignore 命中）
-#    也可以直接指向 xiaohaishi 仓库里的原目录，无需复制
-mkdir D:\vv-voices
-copy F:\WorkingL\HainnuP\xiaohaishi\apps\server\assets\voices\male-en.wav   D:\vv-voices\
-copy F:\WorkingL\HainnuP\xiaohaishi\apps\server\assets\voices\female-en.wav D:\vv-voices\
-copy F:\WorkingL\HainnuP\xiaohaishi\apps\server\assets\voices\VOICES.json   D:\vv-voices\
-# 2) 起本地 GPU 边车（OmniVoice 权重 ≈3.28GB，另行准备，不入库）
-#    参考 xiaohaishi 的 services/omnivoice-sidecar/server.py 与 scripts/start-omnivoice-sidecar.ps1
-# 3) 只需在 .env 指向参考件目录；`auto` 链会**自动优先**用 omnivoice，无需写死 provider
-#    APP_VOICE_REFS_DIR=D:\vv-voices
+# 1) 起边车（模型权重约 3.3 GB 需自备，不入库；脚本会自检依赖并打印权重探测结果）
+pwsh -File scripts/start-omnivoice-sidecar.ps1
+#    无 GPU / 只想验链路：pwsh -File scripts/start-omnivoice-sidecar.ps1 -Fake
+
+# 2) 什么都不用配：音色参考件已随仓库分发在 data/seed/voices/（VOICES.json + 4 个 wav，约 1.9 MB），
+#    APP_VOICE_REFS_DIR 留空即自动指向它；auto 链会自动优先用 omnivoice。
+#    要改用别处的参考件再显式设 APP_VOICE_REFS_DIR=<目录>。
 ```
+
+> 边车默认监听 `127.0.0.1:8765`（`APP_TTS_OMNIVOICE_ENDPOINT` 默认同值）。容器形态下
+> `127.0.0.1` 指容器自己，需要边车时把该键指向宿主（如 `http://host.docker.internal:8765`）；
+> 不指也能跑 —— 探测失败即回落 edge。
 
 ### 7.3 默认档位与回退
 
@@ -347,7 +358,9 @@ copy F:\WorkingL\HainnuP\xiaohaishi\apps\server\assets\voices\VOICES.json   D:\v
 > 边车不在即让位给 kitten/edge。这条已由 `tests/test_tts_omnivoice.py` 的两个用例锁住
 > （边车在线 → 选 omnivoice；边车离线 → 落 edge）。
 
-权重与参考件一律**不入库**（红线：模型权重 / 原始音频），只做运行时路径引用。
+权重**不入库**（红线：模型权重，约 3.3 GB），只做运行时路径引用；
+**参考件入库**（`data/seed/voices/`，约 1.9 MB，`.gitignore` 开了窄豁免）—— 音色 = 参考件字节
++ 参考文本 + seed，参考件就是音色身份本体，不入库则队友 clone 下来边车合成不出任何声音。
 
 ---
 
@@ -388,7 +401,12 @@ copy F:\WorkingL\HainnuP\xiaohaishi\apps\server\assets\voices\VOICES.json   D:\v
 | `app/audio/duration.py` | 容器时长纯函数（MP3 帧头 / WAV RIFF 头 / 按容器分派） |
 | `app/audio/voices.py` | 音色目录单一真源（`DEFAULT_VOICE` + edge 清单 + 本地引擎聚合） |
 | `app/audio/asr_sherpa.py` | sherpa-onnx 本地 ASR 引擎 |
-| `app/audio/tts_omnivoice.py` | 参考件零样本克隆引擎（英语音色来源，含 sha256 校验） |
+| `app/audio/tts_omnivoice.py` | 参考件零样本克隆引擎（英语音色来源，含 sha256 校验、边车 health 探测、`build_request()` 契约出口） |
+| `services/omnivoice-sidecar/server.py` | **本地 GPU 合成边车**（纯标准库 `http.server`；`--fake` 支持无 GPU 冒烟） |
+| `services/omnivoice-sidecar/README.md` | 边车运维口径（依赖、权重、契约、设计取舍、验收） |
+| `scripts/start-omnivoice-sidecar.ps1` | 边车启动器（依赖自检 + 端口占用探测 + 权重探测） |
+| `data/seed/voices/` | 音色参考件（`VOICES.json` + 4 个 wav，约 1.9 MB，随仓库分发） |
+| `tests/test_omnivoice_sidecar.py` | 边车校验逻辑 + **客户端↔服务端契约对账**（无需 GPU） |
 
 ### 9.2 修改（要点）
 

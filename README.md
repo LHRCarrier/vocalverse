@@ -52,7 +52,10 @@ VocalVerse 面向不同年龄段英语学习者，产品形态 = **「练」+「
 - ✅ **能测**：注册/登录（Java JWT，演示账号 `demoadult`/`demoteen`/`demosenior`，密码 `demo123456`）→ 移动端全流程：**社区首页（S1 真实流：三领域 Tab + 为你推荐混排（含每日打卡卡）+ 发帖/评论/点赞/支持/分享，Java 社区接口）** → **口语**（先选场景 → 播放开场白 → 录音 ≤15s → 三维评分 + 语言点覆盖 + 教练笔记 → 8 轮收尾 → 评分报告）→ **AI 自由说**（麦克风或打字 → DeepSeek 流式 + TTS 播报）→ **英文小说阅读**（学习页「书房」→ 书架 → 书详情 → 阅读器：点词查义/生词本/划词批注/听书句级高亮/字号主题设置，docs/45；种子：`uv run python -m app.db.seed_reading`）→ **我的**；自定义答辩导师（粘贴论文 → AI 评委英文提问 → 等级反馈）；埋点 15 类事件；SSE 流式（音频为时间轴权威、文本字幕）。
 - ✅ **唱歌（M3 P0 · 2026-09-09 落地）**：`/m/sing` 唱吧全链路——选歌（参考旋律就绪门禁，未就绪/提取中/失败徽标）→ 整首跟唱（≤180s，保持前台；停止或 3min 自动收）→ 上传 → 异步评分（轮询 queued→processing→done|failed）→ 逐句音准/节奏/发音 + 综合（`0.5·音准+0.2·节奏+0.3·发音`）+ **D3 对齐图**（参考旋律线 + 用户曲线 + 逐句分柱）→ 报告（未评测句标注，发音=抽样句）。**演示曲目**：`python scripts/setup-assets.py` 合成 3 首公有领域童谣旋律（音频落 `data/audio/`，gitignored，不入库）→ Java `SongSeeder` 启动播种元数据/逐句 LRC → Python 离线 pyin 提取自动置 `pitch_ref_status=ready`（实测 6/4/4 句全部就绪）。**联调测试页**：`/preview/singing`（dev-only）。
 - ⏳ 真实语音链路需 `.env` 密钥（DeepSeek/讯飞）+ ffmpeg + whisper 模型；缺省时全链路走 Fake（`APP_TESTING=true`），联调冒烟脚本：`python scripts/poc/demo_smoke.py`。
-- ⏳ **听书引擎**：默认 edge（联网即可）；本地 KittenTTS（Apache-2.0 · CPU 实时 · 8 英文音色）可选启用——`services/python` 下 `uv sync --extra local-tts` + `.env` 置 `APP_VOICE_MODELS_DIR=<VoiceStudio 模型目录>`（模型权重不入库，docs/45 §5.1）。
+- ⏳ **TTS 引擎**：默认 `APP_TTS_PROVIDER=auto`，**本地优先**——omnivoice（本地克隆音色，需起边车）→ kitten（本地 ONNX）→ edge（联网即可），任一环不可用自动回落，不阻塞链路。启用本地档：
+  - **OmniVoice（英语用 The Anchor / The Podcaster）**：`pwsh -File scripts/start-omnivoice-sidecar.ps1` 起边车（音色参考件已随仓库分发在 `data/seed/voices/`，**零配置**；模型权重约 3.3 GB 不入库，需自备）；无 GPU 机器加 `-Fake` 可先验链路。详见 `services/omnivoice-sidecar/README.md`。
+  - **KittenTTS**（CPU 实时 · 8 英文音色）：`services/python` 下 `uv sync --extra local-tts` + `.env` 置 `APP_VOICE_MODELS_DIR=<VoiceStudio 模型目录>`（模型权重不入库）。
+  - 引擎清单/优先级/扩展方式见 `docs/audit/ASR-TTS链路审计与重构方案.md`。
 - ⏳ 推荐/报表仍按 M3 排期推进；社区 S1 真实流已上线（发帖开关 `VOICEVERSE_COMMUNITY_POST_ENABLED=true` 演示开启、生产默认关）；**S2 关注 + 互动通知已真实化**（通知中心「通知/关注」两 tab = 真实流）；**私信 IM 已真实化**（会话列表/会话页/未读 + **SSE 长连实时推送**，弱网自动降级轮询；种子 `demoadult ↔ demoteen/demosenior`，docs/49）；搜索/嵌套楼/视频播放器（S3）后置。
 
 ### 1. 一次性准备（工具链）
@@ -218,8 +221,9 @@ apps/admin/       管理端控制台（独立 SPA：Vue3+TS+Vite6+naive-ui；运
 apps/mobile/      Capacitor 手机壳（Android 首发；server.url 型加载线上全栈，详见 apps/mobile/README.md）
 services/python/  语音管线 + LLM Agent + 推荐（FastAPI；Alembic 唯一 schema 真源）
 services/java/    薄服务端（Spring Boot；JWT 签发；社区 C 端；`com.vocalverse.console` 管理端控制台模块）
+services/omnivoice-sidecar/  本地 GPU 合成边车（纯标准库 `http.server`；本地克隆音色的唯一合成入口）
 infra/            部署与 nginx 配置
-scripts/          dev.ps1 / bootstrap.ps1（Windows 一键）
+scripts/          dev.ps1 / bootstrap.ps1（Windows 一键）+ start-omnivoice-sidecar.ps1（边车启动器）
 docs/             00~05 规划文档 + 06 技术框架决策（ADR 唯一权威）+ 07/08 拷问报告 + 09 框架评审 + 10/11 数据库 + 12 同构Monorepo对比裁决 + 13 前端设计系统 + 14 功能规格（v2 拍板）+ 15/16 双子拷问报告 + 17 合流与拍板记录 + 18 实施计划 + 19 六路拷问报告 + 20/21 系统设计说明书（架构/接口）+ 42 App功能说明书 + 44 TTS整改计划 + 45/46 英文小说阅读（设计/拷问）+ 47~49 社区 S3/私信 + 50/51 管理端后台（设计/拷问）+ api/ 契约
 worklog/          团队工作日志（主线 VocalVerse工作日志.md + App 线 安卓开发日志.md，按日追加）
 ```
