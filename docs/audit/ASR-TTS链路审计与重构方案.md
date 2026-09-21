@@ -316,7 +316,9 @@ APP_ASR_SHERPA_MODEL_DIR=<sherpa sense-voice 模型目录>
 3. clone 模式**不下发 instruct**（上游对 clone+instruct 直接 400）；
 4. **语速不走引擎**：`rate` 被忽略，倍速由前端 `playbackRate` 承担（与 KittenTTS 同口径）；
 5. 合成走边车 `POST {endpoint}/synthesize`，body
-   `{text, language, mode:"clone", ref:{audioBase64,text}, seed, format:"wav"}`；返回 24kHz WAV。
+   `{text, language, mode:"clone", ref:{audioBase64,text}, seed, format:"wav"}`；返回 24kHz WAV；
+6. **可用性包含连通性**：`is_available()` 额外探测 `GET {endpoint}/health`（10s TTL 缓存），
+   边车不在就让位给 kitten/edge —— 这是它能安全放在 `auto` 链首位的前提。
 
 **启用（两步，均不涉及代码改动；本机已按此配好 `.env`）**：
 
@@ -336,10 +338,16 @@ copy F:\WorkingL\HainnuP\xiaohaishi\apps\server\assets\voices\VOICES.json   D:\v
 ### 7.3 默认档位与回退
 
 `APP_TTS_PROVIDER` 默认 `auto`，`auto` 链顺序 **omnivoice(10) → kitten(20) → edge(30) → azure(90)**：
-本地引擎优先，任一环缺条件（边车未起 / 模型目录或参考件目录未配）时 `is_available()`
-返回可读原因并被跳过，自动回落到下一档，**不阻塞任何链路**；显式写死引擎名则严格按该引擎
-（不可用 → 503，不静默换引擎）。权重与参考件一律**不入库**（红线：模型权重 / 原始音频），
-只做运行时路径引用。
+本地引擎优先，任一环缺条件时 `is_available()` 返回可读原因并被跳过，自动回落到下一档，
+**不阻塞任何链路**；显式写死引擎名则严格按该引擎（不可用 → 503，不静默换引擎）。
+
+> **omnivoice 的可用性不只查配置**：它在链首，若只看「参考件目录配了没」，
+> 就会出现「配了目录但边车没起 → 被选中 → 每次合成都失败」。故 `is_available()` 额外做
+> `GET {endpoint}/health` 探测（结果按 **10s TTL 缓存**，避免每个请求打一次网络）；
+> 边车不在即让位给 kitten/edge。这条已由 `tests/test_tts_omnivoice.py` 的两个用例锁住
+> （边车在线 → 选 omnivoice；边车离线 → 落 edge）。
+
+权重与参考件一律**不入库**（红线：模型权重 / 原始音频），只做运行时路径引用。
 
 ---
 
@@ -457,7 +465,7 @@ pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
 | 门禁 | 结果 |
 |---|---|
 | `ruff check .` / `ruff format --check app tests` | 全绿 / 220 文件已格式化 |
-| `pytest -q -m "not gpu"` | **721 passed, 4 skipped**（4 skipped = 需 Docker 的 PG/Redis 集成测试） |
+| `pytest -q -m "not gpu"` | **726 passed, 4 skipped**（4 skipped = 需 Docker 的 PG/Redis 集成测试） |
 | `pipeline_bench.py --fake --runs 3 --check-budget` | 通过（各阶段均在预算内） |
 | `check_single_writer.py` / `check_feature_flags.py` | ok / 12 项全 ok |
 | 契约快照 == `app.openapi()` | True |

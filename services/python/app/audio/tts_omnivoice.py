@@ -19,9 +19,10 @@
 4. 语速不走引擎：``rate`` 参数被忽略，倍速由前端 ``playbackRate`` 承担
    （与本仓 KittenTTS 同一口径，docs/45 §5 拍板：免多档重合成）。
 
-本引擎在 ``auto`` 链中**排在首位**（本地优先）：边车未起或参考件目录未配时
-``is_available()`` 返回可读原因，自动回落到 kitten / edge，不阻塞任何链路。
-权重与参考件**一律不入库**（红线：模型权重 / 原始音频），只按运行时路径引用。
+本引擎在 ``auto`` 链中**排在首位**（本地优先），因此 ``is_available()`` 不只查配置，
+还以 ``GET {endpoint}/health``（结果按 10s TTL 缓存）确认边车真的在跑——否则参考件目录
+配好而边车没起时，``auto`` 会选中它并让每次合成失败。边车不在就自动回落 kitten / edge，
+不阻塞任何链路。权重与参考件**一律不入库**（红线：模型权重 / 原始音频），只按运行时路径引用。
 """
 
 from __future__ import annotations
@@ -43,6 +44,44 @@ logger = logging.getLogger("vocalverse.tts.omnivoice")
 
 #: 音色清单文件名（上游真相表；参考文本/指令/seed/sha256 都在这里）
 MANIFEST_NAME = "VOICES.json"
+
+# ── 边车连通性探测 ────────────────────────────────────────────────────────────
+# 为什么必须探测：本引擎在 auto 链**首位**。若只看「配置齐了没」，参考件目录配好
+# 而边车没起时，auto 会选中它 → 每次合成都失败。把连通性纳入 is_available() 后，
+# 边车没起就自动跳到 kitten/edge，链路不受影响。
+# 探测结果按 TTL 缓存：auto 链每次解析都会问一遍 is_available()，不能每请求打网络。
+_HEALTH_TTL_S = 10.0
+_HEALTH_TIMEOUT_S = 2.0
+_health_cache: dict[str, tuple[float, bool]] = {}
+_health_lock = threading.Lock()
+
+
+def reset_health_cache() -> None:
+    """清空连通性缓存（测试与配置热变更后调用）。"""
+    with _health_lock:
+        _health_cache.clear()
+
+
+def _probe_health(endpoint: str, timeout_s: float = _HEALTH_TIMEOUT_S) -> bool:
+    """``GET {endpoint}/health`` 是否 200；结果按 TTL 缓存，绝不抛错。"""
+    import time
+
+    now = time.monotonic()
+    with _health_lock:
+        hit = _health_cache.get(endpoint)
+        if hit is not None and hit[0] > now:
+            return hit[1]
+    ok = False
+    try:
+        import httpx
+
+        ok = httpx.get(f"{endpoint}/health", timeout=timeout_s).status_code == 200
+    except Exception:  # noqa: BLE001 — 连接失败/超时/协议错一律视为未就绪
+        ok = False
+    with _health_lock:
+        _health_cache[endpoint] = (now + _HEALTH_TTL_S, ok)
+    return ok
+
 
 #: 对用户可见的音色 id ↔ 清单里的 ``personaId-lang`` ↔ 口碑别名
 _VOICE_IDS: dict[str, tuple[str, str]] = {
@@ -205,6 +244,8 @@ class OmniVoiceTTSClient(TTSClient):
             return False, "清单里没有可用音色条目"
         if not (Path(self._refs_dir) / default.file).exists():
             return False, f"参考件缺失：{Path(self._refs_dir) / default.file}"
+        if not _probe_health(self._endpoint):
+            return False, f"OmniVoice 边车未就绪（{self._endpoint}/health 无响应）"
         return True, "ready"
 
     def ensure_ready(self) -> None:

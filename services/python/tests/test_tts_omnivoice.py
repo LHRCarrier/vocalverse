@@ -17,6 +17,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from app.audio import tts_omnivoice as omni
 from app.audio.tts_omnivoice import (
     MANIFEST_NAME,
     OmniVoiceTTSClient,
@@ -27,6 +28,20 @@ from app.audio.tts_omnivoice import (
 
 _REF_TEXT = "Good evening. Topping our broadcast tonight."
 _WAV = b"RIFF____fake_reference_wav____"
+
+
+@pytest.fixture(autouse=True)
+def _clear_health_cache():
+    """连通性探测有 10s TTL 缓存：用例间必须隔离，否则结论互相污染。"""
+    omni.reset_health_cache()
+    yield
+    omni.reset_health_cache()
+
+
+@pytest.fixture()
+def sidecar_up(monkeypatch):
+    """把「边车在线」作为测试前提（真实探测见 test_unavailable_when_sidecar_down）。"""
+    monkeypatch.setattr(omni, "_probe_health", lambda *a, **kw: True)
 
 
 def _write_refs(tmp_path: Path, *, sha: str | None = None, voice_id: str = "male-en") -> Path:
@@ -123,10 +138,41 @@ def test_unavailable_without_manifest(tmp_path) -> None:
     assert ok is False and "清单" in reason
 
 
-def test_available_when_endpoint_and_refs_ready(tmp_path) -> None:
+def test_available_when_endpoint_refs_and_sidecar_ready(tmp_path, sidecar_up) -> None:
     c = OmniVoiceTTSClient(endpoint="http://x/", refs_dir=str(_write_refs(tmp_path)))
     assert c.is_available() == (True, "ready")
     assert c._endpoint == "http://x"  # 尾斜杠被规整，避免拼出 //synthesize
+
+
+def test_unavailable_when_sidecar_down(tmp_path, monkeypatch) -> None:
+    """参考件齐、边车没起 → 必须判不可用（否则 auto 选中它，每次合成都失败）。"""
+    monkeypatch.setattr(omni, "_probe_health", lambda *a, **kw: False)
+    c = OmniVoiceTTSClient(endpoint="http://127.0.0.1:9", refs_dir=str(_write_refs(tmp_path)))
+    ok, reason = c.is_available()
+    assert ok is False and "边车未就绪" in reason
+
+
+def test_probe_health_is_false_for_dead_endpoint() -> None:
+    """真实探测：连不上的地址必须返回 False 且不抛错（绝不炸 auto 链）。"""
+    assert omni._probe_health("http://127.0.0.1:9", timeout_s=0.2) is False
+
+
+def test_probe_health_caches_result(monkeypatch) -> None:
+    """探测结果按 TTL 缓存：auto 链每次解析都会问，不能每请求打一次网络。"""
+    calls: list[str] = []
+
+    class _Resp:
+        status_code = 200
+
+    def _fake_get(url, timeout=None):  # noqa: ARG001
+        calls.append(url)
+        return _Resp()
+
+    monkeypatch.setattr(httpx, "get", _fake_get)
+    omni.reset_health_cache()
+    assert omni._probe_health("http://cached") is True
+    assert omni._probe_health("http://cached") is True
+    assert calls == ["http://cached/health"]  # 第二次命中缓存
 
 
 # ---------------------------------------------------------------------------
@@ -260,3 +306,37 @@ async def test_synthesize_raises_readable_when_sidecar_down(tmp_path, monkeypatc
     with pytest.raises(RuntimeError) as ei:
         await c.synthesize("hi")
     assert "边车不可达" in str(ei.value)
+
+
+# ---------------------------------------------------------------------------
+# 默认 auto 档的安全性（本引擎在 auto 链首位，必须能自己让位）
+# ---------------------------------------------------------------------------
+
+
+def _auto_settings(refs_dir: Path) -> SimpleNamespace:
+    return SimpleNamespace(
+        testing=False,
+        tts_provider="auto",
+        tts_voice="en-US-JennyNeural",
+        tts_rate="+0%",
+        voice_models_dir="",
+        voice_refs_dir=str(refs_dir),
+        tts_omnivoice_endpoint="http://127.0.0.1:8765",
+    )
+
+
+def test_auto_falls_back_to_edge_when_sidecar_down(tmp_path, monkeypatch) -> None:
+    """**默认档位的安全底线**：参考件配好但边车没起 → 落到 edge，而不是选中后每次都失败。"""
+    from app.audio.base import resolve_tts_client
+
+    monkeypatch.setattr(omni, "_probe_health", lambda *a, **kw: False)
+    assert resolve_tts_client(settings=_auto_settings(_write_refs(tmp_path))).provider_id == "edge"
+
+
+def test_auto_picks_omnivoice_when_sidecar_up(tmp_path, monkeypatch) -> None:
+    from app.audio.base import resolve_tts_client
+
+    monkeypatch.setattr(omni, "_probe_health", lambda *a, **kw: True)
+    client = resolve_tts_client(settings=_auto_settings(_write_refs(tmp_path)))
+    assert client.provider_id == "omnivoice"
+    assert client.media_type == "audio/wav"  # 容器元数据随引擎走
