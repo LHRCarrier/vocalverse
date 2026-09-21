@@ -1,15 +1,20 @@
 <script setup lang="ts">
 /**
- * 酒馆 · 开局引导（迁移自 ai4u Onboarding）：
- * 无剧本时展示「开局三步」——示例剧本「迷雾酒馆」一键开局，或自建剧本（名称 + 场景）。
+ * 酒馆 · 开局引导（迁移自 ai4u Onboarding，2026-09-21 扩场景卡）：
+ * 无剧本时展示「开局三步」——选择场景卡开局（平台精选 + 我的卡）、自建剧本（名称 + 场景）；
+ * 没有任何卡时回退到内置示例剧本「迷雾酒馆」。
  */
 import { ref } from 'vue'
 
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 
-withDefaults(defineProps<{ busy?: boolean }>(), { busy: false })
+withDefaults(defineProps<{ busy?: boolean; hasCards?: boolean }>(), {
+  busy: false,
+  hasCards: false,
+})
 
 const emit = defineEmits<{
+  'open-cards': []
   demo: []
   create: [payload: { name: string; scene: string }]
 }>()
@@ -39,7 +44,21 @@ function submit() {
       <li><span>3</span>主持台里可查看事实表 / 任务线索 / 掷骰</li>
     </ol>
 
-    <button class="u-btn u-btn--primary u-btn--block" type="button" :disabled="busy" @click="emit('demo')">
+    <button
+      class="u-btn u-btn--primary u-btn--block"
+      type="button"
+      :disabled="busy"
+      @click="emit('open-cards')"
+    >
+      选择场景卡开局
+    </button>
+    <button
+      v-if="!hasCards"
+      class="u-btn u-btn--primary u-btn--block"
+      type="button"
+      :disabled="busy"
+      @click="emit('demo')"
+    >
       开始示例剧本「迷雾酒馆」
     </button>
     <button

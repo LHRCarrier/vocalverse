@@ -115,6 +115,15 @@ export function useTavernSession(audio: TavernAudio) {
     }
   }
 
+  /** 仅刷新剧本列表（卡片开局/新建后同步侧栏，不重挂会话） */
+  async function refreshCampaigns() {
+    try {
+      campaigns.value = await fetchCampaigns()
+    } catch {
+      /* 列表刷新失败保留旧值 */
+    }
+  }
+
   async function createAndOpen(options: { name: string; scene: string; demo: boolean }) {
     stage.value = 'loading'
     bootError.value = null
@@ -298,6 +307,7 @@ export function useTavernSession(audio: TavernAudio) {
     danglingCount,
     npcNames,
     boot,
+    refreshCampaigns,
     selectCampaign,
     startDemo,
     startCustom,

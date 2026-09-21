@@ -100,6 +100,50 @@ export interface TrpgRollResult {
   state: TrpgState
 }
 
+/** 场景卡（docs/52 §12）：平台固定卡 + 我的私有卡 */
+export interface TrpgCardTemplate {
+  pc_name?: string
+  pc?: Record<string, string>
+  facts?: Array<{ key: string; value: string; modality?: string; speaker?: string | null }>
+  tasks?: string[]
+  clues?: Array<{ title: string; content?: string | null; scene?: string | null }>
+}
+
+export interface TrpgCard {
+  id: number
+  owner_user_id: number | null
+  source: 'admin' | 'user'
+  status: 'draft' | 'published' | 'archived'
+  title: string
+  summary?: string | null
+  language: 'zh' | 'en'
+  tags: string[]
+  scene?: string | null
+  opening_line?: string | null
+  template?: TrpgCardTemplate | null
+  keywords?: string | null
+  generated_by?: string | null
+  published_at?: string | null
+  created_at?: string | null
+}
+
+export interface TrpgCardUpsert {
+  title: string
+  summary?: string | null
+  language?: string | null
+  tags?: string[] | null
+  scene?: string | null
+  opening_line?: string | null
+  template?: TrpgCardTemplate | null
+}
+
+export interface TrpgPrefs {
+  lang: 'zh' | 'en'
+  voice_enabled: boolean
+  voice_name: string | null
+  persisted?: boolean
+}
+
 export async function fetchCampaigns(): Promise<TrpgCampaignItem[]> {
   const resp = await request<TrpgCampaignItem[]>('/api/v1/trpg/campaigns')
   return resp.data
@@ -206,4 +250,54 @@ export function refreshNarrative(campaignId: number) {
   return post<{ narrative_summary: string }>(
     `/api/v1/trpg/campaigns/${campaignId}/narrative/refresh`,
   )
+}
+
+// ---------------------------------------------------------------------------
+// 场景卡（开局模板）
+// ---------------------------------------------------------------------------
+export async function fetchCards(): Promise<TrpgCard[]> {
+  const resp = await request<{ items: TrpgCard[] }>('/api/v1/trpg/cards')
+  return resp.data.items
+}
+
+export function createCard(body: TrpgCardUpsert) {
+  return post<TrpgCard>('/api/v1/trpg/cards', body)
+}
+
+export function updateCard(cardId: number, body: TrpgCardUpsert) {
+  return request<TrpgCard>(`/api/v1/trpg/cards/${cardId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then((r) => r.data)
+}
+
+export async function deleteCard(cardId: number): Promise<void> {
+  await request(`/api/v1/trpg/cards/${cardId}`, { method: 'DELETE' })
+}
+
+/** 按关键词生成草稿（不落库；确认后 createCard 保存、startCard 开局） */
+export function generateCard(keywords: string, lang?: 'zh' | 'en') {
+  return post<TrpgCardUpsert>('/api/v1/trpg/cards/generate', { keywords, lang })
+}
+
+export async function startCard(cardId: number): Promise<number> {
+  const resp = await post<{ campaign_id: number }>(`/api/v1/trpg/cards/${cardId}/start`)
+  return resp.campaign_id
+}
+
+// ---------------------------------------------------------------------------
+// 偏好（跨设备）
+// ---------------------------------------------------------------------------
+export async function fetchPrefs(): Promise<TrpgPrefs> {
+  const resp = await request<TrpgPrefs>('/api/v1/trpg/preferences')
+  return resp.data
+}
+
+export function updatePrefs(patch: Partial<TrpgPrefs>) {
+  return request<TrpgPrefs>('/api/v1/trpg/preferences', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  }).then((r) => r.data)
 }

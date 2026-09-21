@@ -953,6 +953,8 @@ export interface paths {
         /**
          * Post Turn
          * @description 回合主入口：multipart（text / audio 至少其一）→ SSE 事件流（docs/52 §4.2）。
+         *
+         *     ``lang``：可选覆盖 DM 输出语言（zh|en）；缺省用用户偏好（服务端跨设备保存）。
          */
         post: operations["post_turn_api_v1_trpg_campaigns__campaign_id__turns_post"];
         delete?: never;
@@ -1131,6 +1133,117 @@ export interface paths {
          * @description 重新渲染叙事摘要（P2-45 状态模板渲染；零 LLM 成本）。
          */
         post: operations["refresh_narrative_api_v1_trpg_campaigns__campaign_id__narrative_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Cards
+         * @description 可用场景卡 = 我的卡（未归档）+ 平台已上架卡（我的在前）。
+         */
+        get: operations["list_cards_api_v1_trpg_cards_get"];
+        put?: never;
+        /**
+         * Create Card
+         * @description 新建用户私有卡（手工或保存生成草稿）。
+         */
+        post: operations["create_card_api_v1_trpg_cards_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/cards/{card_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Card */
+        put: operations["update_card_api_v1_trpg_cards__card_id__put"];
+        post?: never;
+        /**
+         * Delete Card
+         * @description 归档用户私有卡（软删；不影响已开局的 campaign）。
+         */
+        delete: operations["delete_card_api_v1_trpg_cards__card_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/cards/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Card
+         * @description 按关键词让 LLM 生成卡片草稿（**不落库**；用户确认后走 POST /cards 保存并开局）。
+         *
+         *     限流：扣 llm 桶（与回合共享 30/时）；生成失败 → 47003（可重试/换词）。
+         */
+        post: operations["generate_card_api_v1_trpg_cards_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/cards/{card_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Card
+         * @description 从卡片开局：建剧本 + 应用模板（场景/初始事实/任务/线索）+ 开场叙述落库。
+         */
+        post: operations["start_card_api_v1_trpg_cards__card_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Preferences
+         * @description 酒馆偏好（lang/voice_enabled/voice_name）；未设置过返回默认值（persisted=false）。
+         */
+        get: operations["get_preferences_api_v1_trpg_preferences_get"];
+        /**
+         * Put Preferences
+         * @description 更新偏好（部分字段；未提供的字段保持不变）。
+         */
+        put: operations["put_preferences_api_v1_trpg_preferences_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1576,6 +1689,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/console/trpg/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Cards
+         * @description 平台卡列表（只列 owner NULL；用户私有卡不属管理端内容）。
+         */
+        get: operations["list_cards_api_v1_console_trpg_cards_get"];
+        put?: never;
+        /**
+         * Create Card
+         * @description 新建平台卡（草稿态；编辑好再上架）。
+         */
+        post: operations["create_card_api_v1_console_trpg_cards_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/trpg/cards/{card_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Card */
+        put: operations["update_card_api_v1_console_trpg_cards__card_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/trpg/cards/{card_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Card
+         * @description 上/下架（draft|published|archived）；上架校验失败 → 46011 + violations。
+         */
+        post: operations["publish_card_api_v1_console_trpg_cards__card_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/trpg/cards/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Card
+         * @description 随机生成卡片草稿（keywords 空 = 主题池轮换）；**不落库**，人工编辑后保存/上架。
+         */
+        post: operations["generate_card_api_v1_console_trpg_cards_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1737,6 +1931,8 @@ export interface components {
             text?: string | null;
             /** Audio */
             audio?: string | null;
+            /** Lang */
+            lang?: string | null;
         };
         /** Body_score_api_v1_score_post */
         Body_score_api_v1_score_post: {
@@ -1832,6 +2028,16 @@ export interface components {
         CampaignCreate: {
             /** Name */
             name?: string | null;
+        };
+        /**
+         * CardGenerate
+         * @description 按关键词生成卡片草稿（keywords 2-200 字；lang=DM 输出语言兼卡片语言）。
+         */
+        CardGenerate: {
+            /** Keywords */
+            keywords: string;
+            /** Lang */
+            lang?: string | null;
         };
         /** ChapterMetaView */
         ChapterMetaView: {
@@ -2331,6 +2537,13 @@ export interface components {
             /** Attempts */
             attempts: number[];
         };
+        /** GenerateBody */
+        GenerateBody: {
+            /** Keywords */
+            keywords?: string | null;
+            /** Lang */
+            lang?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2412,6 +2625,15 @@ export interface components {
             /** Onsets Ms */
             onsets_ms?: number[] | null;
         };
+        /** PrefsUpdate */
+        PrefsUpdate: {
+            /** Lang */
+            lang?: string | null;
+            /** Voice Enabled */
+            voice_enabled?: boolean | null;
+            /** Voice Name */
+            voice_name?: string | null;
+        };
         /** ProfileIn */
         ProfileIn: {
             /** Title */
@@ -2445,6 +2667,11 @@ export interface components {
             content_version: number;
             /** Updated At */
             updated_at?: string | null;
+        };
+        /** PublishBody */
+        PublishBody: {
+            /** Status */
+            status: string;
         };
         /** RollBody */
         RollBody: {
@@ -2810,6 +3037,47 @@ export interface components {
              * @default []
              */
             langs: string[];
+        };
+        /**
+         * CardUpsert
+         * @description 用户私有卡写入（title 必填；其余可选，服务端宽容归一）。
+         */
+        app__api__routes__trpg__CardUpsert: {
+            /** Title */
+            title: string;
+            /** Summary */
+            summary?: string | null;
+            /** Language */
+            language?: string | null;
+            /** Tags */
+            tags?: string[] | null;
+            /** Scene */
+            scene?: string | null;
+            /** Opening Line */
+            opening_line?: string | null;
+            /** Template */
+            template?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** CardUpsert */
+        app__console__api__routes__trpg_cards__CardUpsert: {
+            /** Title */
+            title: string;
+            /** Summary */
+            summary?: string | null;
+            /** Language */
+            language?: string | null;
+            /** Tags */
+            tags?: string[] | null;
+            /** Scene */
+            scene?: string | null;
+            /** Opening Line */
+            opening_line?: string | null;
+            /** Template */
+            template?: {
+                [key: string]: unknown;
+            } | null;
         };
     };
     responses: never;
@@ -5319,6 +5587,284 @@ export interface operations {
             };
         };
     };
+    list_cards_api_v1_trpg_cards_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_card_api_v1_trpg_cards_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__routes__trpg__CardUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_card_api_v1_trpg_cards__card_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                card_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__routes__trpg__CardUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_card_api_v1_trpg_cards__card_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                card_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_card_api_v1_trpg_cards_generate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CardGenerate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_card_api_v1_trpg_cards__card_id__start_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                card_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_preferences_api_v1_trpg_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_preferences_api_v1_trpg_preferences_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrefsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     overview_api_v1_console_ops_overview_get: {
         parameters: {
             query?: never;
@@ -6118,6 +6664,186 @@ export interface operations {
                 "application/json": {
                     [key: string]: unknown;
                 };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_cards_api_v1_console_trpg_cards_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                status?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_card_api_v1_console_trpg_cards_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__console__api__routes__trpg_cards__CardUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_card_api_v1_console_trpg_cards__card_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                card_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__console__api__routes__trpg_cards__CardUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_card_api_v1_console_trpg_cards__card_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                card_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_card_api_v1_console_trpg_cards_generate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateBody"];
             };
         };
         responses: {

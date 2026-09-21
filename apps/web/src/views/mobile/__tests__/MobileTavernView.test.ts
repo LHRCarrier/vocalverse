@@ -35,6 +35,8 @@ const mocks = vi.hoisted(() => ({
   setTaskStatus: {} as ReturnType<typeof vi.fn>,
   setClueRecovered: {} as ReturnType<typeof vi.fn>,
   tts: {} as ReturnType<typeof vi.fn>,
+  fetchCards: {} as ReturnType<typeof vi.fn>,
+  fetchPrefs: {} as ReturnType<typeof vi.fn>,
 }))
 
 vi.mock('@/api/trpg', () => {
@@ -66,6 +68,8 @@ vi.mock('@/api/trpg', () => {
   mocks.refreshNarrative = vi.fn()
   mocks.setTaskStatus = vi.fn()
   mocks.setClueRecovered = vi.fn()
+  mocks.fetchCards = vi.fn(async () => [])
+  mocks.fetchPrefs = vi.fn(async () => ({ lang: 'zh', voice_enabled: true, voice_name: null }))
   return {
     fetchCampaigns: mocks.fetchCampaigns,
     createCampaign: mocks.createCampaign,
@@ -81,6 +85,14 @@ vi.mock('@/api/trpg', () => {
     refreshNarrative: mocks.refreshNarrative,
     setTaskStatus: mocks.setTaskStatus,
     setClueRecovered: mocks.setClueRecovered,
+    fetchCards: mocks.fetchCards,
+    fetchPrefs: mocks.fetchPrefs,
+    createCard: vi.fn(),
+    updateCard: vi.fn(),
+    deleteCard: vi.fn(),
+    generateCard: vi.fn(),
+    startCard: vi.fn(),
+    updatePrefs: vi.fn(),
   }
 })
 

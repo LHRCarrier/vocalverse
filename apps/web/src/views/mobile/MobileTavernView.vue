@@ -2,26 +2,31 @@
 /**
  * 移动端 · 酒馆（TRPG 跑团）——ai4u 酒馆模块迁移版（docs/52）
  *
- * 玩法闭环：选/建剧本 → 打字或语音说行动 → DM 流式叙述（服务端逐句 TTS 排队播放）
- * → 系统卡（开场/过场/判定）→ 主持台抽屉（状态/事实表/任务线索/桌骰）。
- * 状态全在服务端（campaign 事实表）；本页只做渲染与动作转发（编排见 useTavernSession）。
+ * 玩法闭环：场景卡开局（平台精选/关键词生成/自建）→ 打字或语音说行动 → DM 流式叙述
+ * （逐句 TTS 排队播放）→ 系统卡（开场/过场/判定）→ 主持台抽屉（状态/事实表/任务线索/桌骰）。
+ * 右上角：设置（语言/语音）+ 场景卡 + 切换剧本 + 主持台。
+ * 状态全在服务端（campaign 事实表）；本页只做渲染与动作转发（编排见 useTavern* composables）。
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useTavernAudio } from '@/composables/useTavernAudio'
+import { useTavernCards } from '@/composables/useTavernCards'
 import { useTavernSession } from '@/composables/useTavernSession'
 import { useAuthStore } from '@/stores/auth'
 
 import IconAdjustments from '~icons/tabler/adjustments'
+import IconSettings from '~icons/tabler/settings'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import TrpgActionDock from '@/components/mobile/trpg/TrpgActionDock.vue'
+import TrpgCardSheet from '@/components/mobile/trpg/TrpgCardSheet.vue'
 import TrpgConsoleSheet from '@/components/mobile/trpg/TrpgConsoleSheet.vue'
 import TrpgMessageItem from '@/components/mobile/trpg/TrpgMessageItem.vue'
 import TrpgOnboarding from '@/components/mobile/trpg/TrpgOnboarding.vue'
+import TrpgSettingsSheet from '@/components/mobile/trpg/TrpgSettingsSheet.vue'
 import TrpgStageHeader from '@/components/mobile/trpg/TrpgStageHeader.vue'
 import '@/styles/mobile-uic.css'
 
@@ -33,6 +38,26 @@ const avatarLetter = computed(() =>
 
 const audio = useTavernAudio()
 const session = useTavernSession(audio)
+const tavernCards = useTavernCards()
+const {
+  cards: cardList,
+  cardsLoading,
+  prefs,
+  prefsSaving,
+  generating: cardGenerating,
+  draft: cardDraft,
+  error: cardError,
+  loadCards,
+  loadPrefs,
+  savePrefs,
+  generateFromKeywords,
+  saveDraft,
+  createManual,
+  updateCardFields,
+  removeCard,
+  startFromCard,
+  clearDraft,
+} = tavernCards
 const {
   stage,
   campaigns,
@@ -55,10 +80,14 @@ const {
 
 const consoleOpen = ref(false)
 const pickerOpen = ref(false)
+const settingsOpen = ref(false)
+const cardsOpen = ref(false)
 const scrollBox = ref<HTMLElement | null>(null)
 
 onMounted(() => {
   void session.boot()
+  void loadPrefs()
+  void loadCards()
 })
 
 onUnmounted(() => {
@@ -82,6 +111,36 @@ async function onRestart() {
   pickerOpen.value = false
   await session.restartCampaign()
 }
+
+/* ---- 设置 ---- */
+async function onPrefsUpdate(patch: Parameters<typeof savePrefs>[0]) {
+  if (patch.voice_enabled === false) audio.flush() // 关语音即时静音（服务端随后不再合成）
+  await savePrefs(patch)
+}
+
+/* ---- 场景卡 ---- */
+function openCards() {
+  cardsOpen.value = true
+  void loadCards()
+}
+
+async function onStartCard(id: number) {
+  const newCampaignId = await startFromCard(id)
+  if (newCampaignId == null) return
+  cardsOpen.value = false
+  await session.refreshCampaigns()
+  await session.selectCampaign(newCampaignId)
+}
+
+async function onSaveDraftAndStart() {
+  const card = await saveDraft()
+  if (card) await onStartCard(card.id)
+}
+
+async function onCreateCard(payload: { title: string; scene: string; opening_line: string }) {
+  const card = await createManual(payload)
+  if (card) await onStartCard(card.id)
+}
 </script>
 
 <template>
@@ -95,30 +154,54 @@ async function onRestart() {
     <MobileTopBar title="酒馆" back @back="router.push('/m/learn')">
       <template #actions>
         <button
-          v-if="stage === 'play'"
           class="u-topbar__act"
           type="button"
-          title="切换剧本"
-          aria-label="切换剧本"
-          @click="pickerOpen = true"
+          title="酒馆设置"
+          aria-label="酒馆设置"
+          @click="settingsOpen = true"
         >
-          <MobileIcon name="book" :size="20" />
+          <IconSettings />
         </button>
         <button
-          v-if="stage === 'play'"
           class="u-topbar__act"
           type="button"
-          title="主持台"
-          aria-label="主持台"
-          @click="consoleOpen = true"
+          title="场景卡"
+          aria-label="场景卡"
+          @click="openCards"
         >
-          <IconAdjustments />
+          <MobileIcon name="star" :size="20" />
         </button>
+        <template v-if="stage === 'play'">
+          <button
+            class="u-topbar__act"
+            type="button"
+            title="切换剧本"
+            aria-label="切换剧本"
+            @click="pickerOpen = true"
+          >
+            <MobileIcon name="book" :size="20" />
+          </button>
+          <button
+            class="u-topbar__act"
+            type="button"
+            title="主持台"
+            aria-label="主持台"
+            @click="consoleOpen = true"
+          >
+            <IconAdjustments />
+          </button>
+        </template>
       </template>
     </MobileTopBar>
 
     <div class="u-content u-content--dock">
-      <TrpgOnboarding v-if="stage === 'onboarding'" @demo="session.startDemo" @create="session.startCustom" />
+      <TrpgOnboarding
+        v-if="stage === 'onboarding'"
+        :has-cards="cardList.length > 0"
+        @open-cards="openCards"
+        @demo="session.startDemo"
+        @create="session.startCustom"
+      />
 
       <div
         v-else-if="stage === 'loading'"
@@ -210,6 +293,32 @@ async function onRestart() {
       @refresh-narrative="session.onRefreshNarrative"
     />
 
+    <TrpgSettingsSheet
+      :open="settingsOpen"
+      :prefs="prefs"
+      :saving="prefsSaving"
+      @close="settingsOpen = false"
+      @update="onPrefsUpdate"
+    />
+
+    <TrpgCardSheet
+      :open="cardsOpen"
+      :cards="cardList"
+      :loading="cardsLoading"
+      :generating="cardGenerating"
+      :draft="cardDraft"
+      :error="cardError"
+      :lang="prefs.lang"
+      @close="cardsOpen = false"
+      @start="onStartCard"
+      @generate="generateFromKeywords"
+      @save-draft="onSaveDraftAndStart"
+      @clear-draft="clearDraft"
+      @create="onCreateCard"
+      @update="updateCardFields"
+      @remove="removeCard"
+    />
+
     <div v-if="pickerOpen" class="t-sheet">
       <div class="t-sheet__backdrop" role="presentation" @click="pickerOpen = false" />
       <section class="t-sheet__panel t-sheet__panel--short" role="dialog" aria-label="选择剧本">
@@ -239,9 +348,9 @@ async function onRestart() {
           <button
             class="u-btn u-btn--secondary u-btn--block"
             type="button"
-            @click="pickerOpen = false; stage = 'onboarding'"
+            @click="pickerOpen = false; openCards()"
           >
-            ＋ 新建剧本
+            ＋ 用场景卡开新局
           </button>
           <button class="u-btn u-btn--outline u-btn--block" type="button" @click="onRestart">
             重开本剧本（清空对话）
