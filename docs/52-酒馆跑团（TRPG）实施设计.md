@@ -224,10 +224,33 @@ RBAC 三码 `content:scenario:{read,write,publish}` 在 Java `PermissionCatalog`
 | `PUT /api/v1/trpg/preferences` | 部分更新（只改传入字段）；lang 非 zh|en → 47001 |
 
 **作用面**：
-- `lang` **只切 DM 输出语言**（`build_dm_system_prompt` 追加语言指令；NPC 台词协议保持中文冒号以兼容前端分段）；
-  界面文案不切换（全 App i18n 不在本期）；
+- `lang` **只切 DM 输出语言**（NPC 台词协议保持中文冒号以兼容前端分段）；界面文案不切换（全 App i18n 不在本期）；
 - `voice_enabled=false` → 回合**服务端不再逐句 TTS**（省配额；前端也即时 flush 播放队列）；
 - `voice_name` 暂时只读展示（音色少，选择器禁用，等音色库扩充后开放）。
+
+**语言生效的可靠实现（2026-09-21 实测修订）**：DeepSeek 会**镜像最后一条用户消息的语言**——中文输入时，
+仅在 system 里写语言规则、乃至在历史后追加近因提醒，都仍稳定输出中文（三次实测均失败）。故：
+1. `lang=en` 且玩家输入含 CJK 时，服务端先做一次轻量翻译（`_to_english`，temperature 0.2，失败回退原文）
+   **把输入换成英文**再进 DM 上下文（原文仍按原样落库/展示）；
+2. system 里的语言规则 + 历史后的 `ENGLISH_ONLY_DIRECTIVE`（近因 system 提醒）保留为双保险。
+实测：中文输入 + `lang=en` → 输出 0 个中文字符；英文输入本就正常。
+
+### 12.3 语音朗读（逐词高亮）与消息长按操作（2026-09-21 组长反馈）
+
+**逐词高亮（卡拉OK，QQ 音乐歌词式）**：
+- 服务端 `audio_chunk` 增 `text`（本句原文）与 `offset`（该句在 DM 整段 content 内的字符偏移）；
+- 前端 `useTavernAudio` 单元素串行播放器按句推进，`ontimeupdate` 里用
+  `currentTime / duration` 换算句内进度，经 `text`+`offset` 映射为**字符位置**，点亮该位置之前的词；
+- token 化规则：拉丁词/数字为一个 token、CJK 逐字、标点与空白并入前一 token；
+  **按原始字符偏移切分**（渲染层只过滤 markdown 标记字符，不动偏移）；
+- 关闭语音开关：即时 flush 播放队列并清除高亮（服务端也不再合成）。
+
+**消息长按操作菜单**（替代原「气泡尾重播按钮」）：
+- 长按（450ms，移动手指取消；桌面右键同效）DM/玩家消息 → 底部动作条：
+  **听这句 / 停止朗读**（该条 TTS）、**标注这条 / 取消标注**（本地标记，刷新保留）、**复制文本**、取消；
+- 标注存储：`localStorage` 按剧本分键（`vv_trpg_marks_<campaignId>`，值为内容哈希数组——
+  流式行无稳定 message_id，内容哈希可同时覆盖历史重建与流式新增）；
+- 气泡改为 `user-select: none` + `-webkit-touch-callout: none`（避免与原生选择菜单打架，复制走菜单）。
 
 **App 入口**（mobile 惯例：每页右上角放本页功能）：酒馆页右上角 `⚙️ 设置` + `⭐ 场景卡` +
 `📖 切换剧本` + `⚙ 主持台`（后两者仅游玩态）。
