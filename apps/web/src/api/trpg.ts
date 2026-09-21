@@ -287,6 +287,13 @@ export async function startCard(cardId: number): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
+// 消息翻译（X 式「翻译」按钮；中英互切）
+// ---------------------------------------------------------------------------
+export function translateMessage(text: string, target?: 'zh' | 'en') {
+  return post<{ text: string; target: 'zh' | 'en' }>('/api/v1/trpg/translate', { text, target })
+}
+
+// ---------------------------------------------------------------------------
 // 偏好（跨设备）
 // ---------------------------------------------------------------------------
 export async function fetchPrefs(): Promise<TrpgPrefs> {

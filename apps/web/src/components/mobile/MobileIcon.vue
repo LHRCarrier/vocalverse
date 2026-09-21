@@ -53,6 +53,7 @@ const props = withDefaults(
       | 'pencil'
       | 'bookmark'
       | 'x'
+      | 'copy'
     size?: number
   }>(),
   { size: 20 },
@@ -81,6 +82,14 @@ const props = withDefaults(
     <template v-else-if="props.name === 'mic'">
       <path d="M9 5a3 3 0 0 1 3-3a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3a3 3 0 0 1-3-3z" />
       <path d="M5 10a7 7 0 0 0 14 0M8 21h8m-4-4v4" />
+    </template>
+
+    <!-- 复制 (tabler: copy) -->
+    <template v-else-if="props.name === 'copy'">
+      <path
+        d="M8 8m0 2a2 2 0 0 1 2 -2h7a2 2 0 0 1 2 2v7a2 2 0 0 1 -2 2h-7a2 2 0 0 1 -2 -2z"
+      />
+      <path d="M4 15v-9a2 2 0 0 1 2 -2h9" />
     </template>
 
     <!-- 音符 (tabler: music) -->

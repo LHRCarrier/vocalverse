@@ -5458,6 +5458,74 @@
         }
       }
     },
+    "/api/v1/trpg/translate": {
+      "post": {
+        "tags": [
+          "trpg"
+        ],
+        "summary": "Translate Message",
+        "description": "把一条 DM 消息译成另一种语言（中英互切；原文不动，前端切换展示）。\n\n限流：扣 llm 桶（与回合共享）；失败 → 47003（可重试）。",
+        "operationId": "translate_message_api_v1_trpg_translate_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-test-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/console/ops/overview": {
       "get": {
         "tags": [
@@ -10658,6 +10726,31 @@
           "status"
         ],
         "title": "TaskStatus"
+      },
+      "TranslateBody": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "TranslateBody",
+        "description": "DM 消息翻译（X 式「翻译」按钮）：text ≤2000 字；target 缺省按内容自动判方向。"
       },
       "ValidationError": {
         "properties": {

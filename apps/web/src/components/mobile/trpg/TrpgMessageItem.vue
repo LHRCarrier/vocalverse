@@ -8,7 +8,7 @@
  *   （token 按原始字符偏移切分，渲染层只做标记字符过滤，不动偏移）；
  * - **长按消息卡 → 弹出操作菜单**（听这句/标注/复制；替代旧气泡尾重播按钮）。
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = withDefaults(
   defineProps<{
@@ -23,6 +23,10 @@ const props = withDefaults(
     avatarLetter?: string
     /** 已标注（长按菜单切换；展示左侧标记） */
     marked?: boolean
+    /** 该条为长按选中项（动作条打开期间高亮描边） */
+    active?: boolean
+    /** 译文状态（X 式「翻译」按钮）：null = 未翻译 */
+    translation?: { status: 'loading' | 'done' | 'error'; text: string; showing: boolean } | null
     /** 朗读高亮（仅 role=assistant；未在播为 null） */
     highlight?: { offset: number | null; length: number | null; progress: number } | null
   }>(),
@@ -33,11 +37,13 @@ const props = withDefaults(
     npcNames: () => new Set<string>(),
     avatarLetter: '我',
     marked: false,
+    active: false,
+    translation: null,
     highlight: null,
   },
 )
 
-const emit = defineEmits<{ actions: [] }>()
+const emit = defineEmits<{ actions: []; translate: [] }>()
 
 const isSystem = computed(() => props.kind === 'system')
 const sysType = computed(() => String(props.payload?.trpg_sys ?? ''))
@@ -56,22 +62,47 @@ const diceOutcome = computed<'success' | 'failure' | null>(() => {
 })
 
 /* ---------------- 长按 → 操作菜单 ---------------- */
-const LONG_PRESS_MS = 450
+const LONG_PRESS_MS = 420
+/** 手指抖动阈值（px）：小位移不取消长按（此前任何 touchmove 都取消 → 手机上几乎按不出来） */
+const MOVE_TOLERANCE = 14
+const pressing = ref(false)
 let pressTimer: ReturnType<typeof setTimeout> | null = null
+let pressOrigin: { x: number; y: number } | null = null
 
 function cancelPress() {
   if (pressTimer != null) {
     clearTimeout(pressTimer)
     pressTimer = null
   }
+  pressing.value = false
+  pressOrigin = null
 }
-function startPress() {
+
+function startPress(event: TouchEvent) {
   if (isSystem.value) return
   cancelPress()
+  const touch = event.touches?.[0]
+  pressOrigin = touch ? { x: touch.clientX, y: touch.clientY } : null
   pressTimer = setTimeout(() => {
     pressTimer = null
+    pressing.value = false
+    pressOrigin = null
+    navigator.vibrate?.(12) // 轻震反馈（不支持的设备静默）
     emit('actions')
   }, LONG_PRESS_MS)
+  // 按压视觉反馈（180ms 后仍按住 → 轻微缩放，让用户知道长按被识别）
+  setTimeout(() => {
+    if (pressTimer != null) pressing.value = true
+  }, 180)
+}
+
+function movePress(event: TouchEvent) {
+  if (!pressOrigin) return
+  const touch = event.touches?.[0]
+  if (!touch) return
+  const dx = Math.abs(touch.clientX - pressOrigin.x)
+  const dy = Math.abs(touch.clientY - pressOrigin.y)
+  if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) cancelPress()
 }
 
 /* ---------------- 逐词高亮（卡拉OK） ---------------- */
@@ -201,9 +232,14 @@ const lines = computed<Line[]>(() => {
   <div
     v-else
     class="u-chat t-msg"
-    :class="{ 'u-chat--user': role === 'user', 'is-marked': marked }"
+    :class="{
+      'u-chat--user': role === 'user',
+      'is-marked': marked,
+      'is-active': active,
+      'is-pressing': pressing,
+    }"
     @touchstart.passive="startPress"
-    @touchmove="cancelPress"
+    @touchmove.passive="movePress"
     @touchend="cancelPress"
     @touchcancel="cancelPress"
     @contextmenu.prevent="isSystem || emit('actions')"
@@ -220,16 +256,39 @@ const lines = computed<Line[]>(() => {
       </svg>
     </span>
     <div class="u-bubble" :class="role === 'user' ? 'u-bubble--user' : 'u-bubble--ai'">
+      <!-- 翻译（X 式：右上角文字按钮；点击翻译 → 再点看原文） -->
+      <button
+        v-if="role === 'assistant' && content.trim()"
+        class="t-tr"
+        type="button"
+        :class="{ 'is-on': translation?.showing }"
+        :title="translation?.showing ? '查看原文' : '翻译这段'"
+        @click.stop="emit('translate')"
+      >
+        {{ translation?.status === 'loading' ? '翻译中…' : translation?.showing ? '原文' : '翻译' }}
+      </button>
       <template v-if="role === 'assistant'">
-        <p v-for="(line, i) in lines" :key="i" class="t-seg" :class="{ 't-seg--npc': line.npc }">
-          <span v-if="line.npc" class="t-seg__npc">{{ line.npc }}</span>
-          <span
-            v-for="(tok, j) in line.tokens"
-            :key="j"
-            class="t-tok"
-            :class="{ 'is-lit': litThrough >= 0 && tok.idx <= litThrough }"
-          >{{ tok.plain }}</span>
+        <!-- 展示译文：原文保留在服务端/本地，点击「原文」切回 -->
+        <p v-if="translation?.showing" class="t-seg t-seg--translated">{{ translation.text }}</p>
+        <p v-else-if="translation?.status === 'error'" class="t-seg t-seg--error">
+          翻译失败，点击「翻译」重试
         </p>
+        <template v-else>
+          <p
+            v-for="(line, i) in lines"
+            :key="i"
+            class="t-seg"
+            :class="{ 't-seg--npc': line.npc }"
+          >
+            <span v-if="line.npc" class="t-seg__npc">{{ line.npc }}</span>
+            <span
+              v-for="(tok, j) in line.tokens"
+              :key="j"
+              class="t-tok"
+              :class="{ 'is-lit': litThrough >= 0 && tok.idx <= litThrough }"
+            >{{ tok.plain }}</span>
+          </p>
+        </template>
         <span v-if="live" class="t-caret" aria-hidden="true">▍</span>
         <span v-if="marked" class="t-mark" title="已标注">🔖 已标注</span>
       </template>

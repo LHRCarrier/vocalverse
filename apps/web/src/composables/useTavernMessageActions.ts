@@ -8,11 +8,13 @@ import { computed, ref, type Ref } from 'vue'
 import type { TavernAudio } from '@/composables/useTavernAudio'
 import type { TavernMarks } from '@/composables/useTavernMarks'
 import type { TavernRow } from '@/composables/useTavernSession'
+import type { TavernTranslations } from '@/composables/useTavernTranslations'
 
 export function useTavernMessageActions(
   rows: Ref<TavernRow[]>,
   audio: TavernAudio,
   marks: TavernMarks,
+  translations: TavernTranslations,
 ) {
   /** 长按操作菜单对应的行下标（null = 未打开） */
   const actionIndex = ref<number | null>(null)
@@ -30,6 +32,27 @@ export function useTavernMessageActions(
     const index = actionIndex.value!
     actionIndex.value = null
     void audio.replay(index, row.content)
+  }
+
+  /** 所选消息预览（首 48 字，换行折成空格） */
+  const preview = computed(() => {
+    const row = actionRow.value
+    if (!row) return ''
+    return row.content.replace(/\s+/g, ' ').trim().slice(0, 48)
+  })
+
+  /** 译文是否正在展示（菜单项文案「看原文」） */
+  const translated = computed(() => {
+    if (actionIndex.value == null) return false
+    return translations.stateFor(actionIndex.value)?.showing === true
+  })
+
+  function translate() {
+    const row = actionRow.value
+    const index = actionIndex.value
+    if (!row || index == null || !row.content.trim()) return
+    actionIndex.value = null
+    void translations.toggle(index, row.content)
   }
 
   function toggleMark() {
@@ -60,5 +83,17 @@ export function useTavernMessageActions(
     actionIndex.value = null
   }
 
-  return { actionIndex, actionRow, open, listen, toggleMark, copy, highlightFor, close }
+  return {
+    actionIndex,
+    actionRow,
+    preview,
+    translated,
+    open,
+    listen,
+    translate,
+    toggleMark,
+    copy,
+    highlightFor,
+    close,
+  }
 }

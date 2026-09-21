@@ -1250,6 +1250,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/trpg/translate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Translate Message
+         * @description 把一条 DM 消息译成另一种语言（中英互切；原文不动，前端切换展示）。
+         *
+         *     限流：扣 llm 桶（与回合共享）；失败 → 47003（可重试）。
+         */
+        post: operations["translate_message_api_v1_trpg_translate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/console/ops/overview": {
         parameters: {
             query?: never;
@@ -2977,6 +2999,16 @@ export interface components {
         TaskStatus: {
             /** Status */
             status: string;
+        };
+        /**
+         * TranslateBody
+         * @description DM 消息翻译（X 式「翻译」按钮）：text ≤2000 字；target 缺省按内容自动判方向。
+         */
+        TranslateBody: {
+            /** Text */
+            text: string;
+            /** Target */
+            target?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -5842,6 +5874,42 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PrefsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    translate_message_api_v1_trpg_translate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranslateBody"];
             };
         };
         responses: {

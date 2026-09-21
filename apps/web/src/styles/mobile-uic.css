@@ -5542,12 +5542,58 @@ body.is-login {
   font-size: 12px;
 }
 
+/* ---- 消息翻译（X 式右上角文字按钮）---- */
+.t-msg .u-bubble {
+  position: relative;
+}
+
+.t-tr {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  padding: 2px 6px;
+  border: none;
+  border-radius: var(--u-r-chip);
+  background: transparent;
+  color: var(--u-sub);
+  font-family: var(--u-font);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.t-tr.is-on {
+  color: var(--u-accent);
+  font-weight: 700;
+}
+
+.t-seg--translated {
+  color: var(--u-ink);
+}
+
+.t-seg--error {
+  color: var(--u-sub);
+  font-size: 13px;
+}
+
+/* DM 气泡为翻译按钮让出右上角空间 */
+.t-msg:not(.u-chat--user) .u-bubble--ai {
+  padding-top: 22px;
+}
+
 /* ---- 逐词高亮（卡拉OK：语音朗读时按进度点亮）+ 长按操作 ---- */
-.t-msg {
+.t-msg,
+.t-msg .u-bubble,
+.t-msg .t-seg,
+.t-msg .t-tok {
   /* 长按弹菜单（替代原生选择菜单）：禁掉文本选择/系统 callout，避免手势冲突 */
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+}
+
+.t-msg {
+  /* 减少双击缩放/延迟点击判定对长按的干扰 */
+  touch-action: manipulation;
 }
 
 .t-tok {
@@ -5563,11 +5609,35 @@ body.is-login {
   box-shadow: inset 3px 0 0 var(--u-star), var(--u-shadow-float);
 }
 
+/* 长按按压中（180ms 后）：轻微缩放，给出「按到了」的反馈 */
+.u-chat.is-pressing .u-bubble {
+  transform: scale(0.98);
+}
+
+/* 长按选中的消息（动作条打开期间）：描边高亮 */
+.u-chat.is-active .u-bubble {
+  box-shadow: 0 0 0 2px var(--u-accent), var(--u-shadow-float);
+}
+
 .t-mark {
   display: inline-block;
   margin-top: 8px;
   font-size: 11px;
   color: var(--u-sub);
+}
+
+/* 动作条头部：所选消息预览（「长按了不知道选哪条」的可见性修复） */
+.t-sheet__head-main {
+  min-width: 0;
+}
+
+.t-act__quote {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--u-sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 长按动作条行 */

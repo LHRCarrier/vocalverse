@@ -14,6 +14,7 @@ import { useTavernAudio } from '@/composables/useTavernAudio'
 import { useTavernCards } from '@/composables/useTavernCards'
 import { useTavernMarks } from '@/composables/useTavernMarks'
 import { useTavernMessageActions } from '@/composables/useTavernMessageActions'
+import { useTavernTranslations } from '@/composables/useTavernTranslations'
 import { useTavernSession } from '@/composables/useTavernSession'
 import { useAuthStore } from '@/stores/auth'
 
@@ -83,18 +84,15 @@ const {
 } = session
 
 const marks = useTavernMarks()
-const msgActions = useTavernMessageActions(rows, audio, marks)
+const translations = useTavernTranslations()
+const msgActions = useTavernMessageActions(rows, audio, marks, translations)
 const consoleOpen = ref(false)
 const pickerOpen = ref(false)
 const settingsOpen = ref(false)
 const cardsOpen = ref(false)
 const scrollBox = ref<HTMLElement | null>(null)
 
-watch(
-  campaignId,
-  (id) => marks.load(id),
-  { immediate: true },
-)
+watch(campaignId, (id) => { marks.load(id); translations.clear() }, { immediate: true })
 
 onMounted(() => {
   void session.boot()
@@ -276,8 +274,11 @@ async function onCreateCard(payload: { title: string; scene: string; opening_lin
             :npc-names="npcNames"
             :avatar-letter="avatarLetter"
             :marked="marks.has(m.content)"
+            :active="msgActions.actionIndex.value === i"
+            :translation="translations.stateFor(i)"
             :highlight="msgActions.highlightFor(i)"
             @actions="msgActions.open(i)"
+            @translate="translations.toggle(i, m.content)"
           />
           <div v-if="rows.length === 0" class="u-empty u-empty--center">
             <div class="u-empty__art"><MobileArt name="wave" :size="96" /></div>
@@ -327,7 +328,9 @@ async function onCreateCard(payload: { title: string; scene: string; opening_lin
     <TrpgMessageActions
       :open="msgActions.actionIndex.value != null"
       :role="msgActions.actionRow.value?.role ?? 'assistant'"
+      :preview="msgActions.preview.value"
       :marked="msgActions.actionRow.value ? marks.has(msgActions.actionRow.value.content) : false"
+      :translated="msgActions.translated.value"
       :playing="msgActions.actionIndex.value != null && audio.playingIndex.value === msgActions.actionIndex.value"
       :speakable="
         !!msgActions.actionRow.value &&
@@ -336,6 +339,7 @@ async function onCreateCard(payload: { title: string; scene: string; opening_lin
       "
       @close="msgActions.close"
       @listen="msgActions.listen"
+      @translate="msgActions.translate"
       @toggle-mark="msgActions.toggleMark"
       @copy="msgActions.copy"
     />
