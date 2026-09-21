@@ -3,6 +3,35 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-21 M3 收口 P3：内容型推荐接真 + 水平预测模型（后端 + 学习页推荐位）· 1 op
+
+> 归属：Python 后端 + Web 移动端。计划见 `docs/53`；算法借用说明见 docs/53 §3。
+
+- **算法选择（先调研后实现）**：demo 账号 3~5 个，协同过滤无数据可学 → 采用**内容型冷启动基线**
+  （TF-IDF + 余弦相似度 + 侧信息匹配；依据 = arXiv 2504.02288 EASE-with-side-features / SEMCo 系冷启动研究
+  与「冷启动用启发式内容基线」的业界结论，已写入 docs/53 §3 借用清单）。
+- **后端**：`app/rec/items.py` —— 候选 = published 歌曲/书籍 + 平台固定场景卡；打分 = 0.55·水平匹配 +
+  0.30·内容相似（sklearn TF-IDF char n-gram，用户 interest_tags 为 query）+ 0.15·新鲜度；
+  返回 `recommend_group_id` 并**服务端写 `recommend_impression`**（CTR 曝光分母，docs/11 Q-B01 口径）。
+  路由 `GET /api/v1/recommendations?type=items&kind=`（保留 shadow）；`type` 白名单收紧为 `^(shadow|items)$`。
+- **水平预测**：`app/rec/level_model.py` —— sklearn Ridge + joblib 持久化（**训练一次、启动加载**，
+  docs/06 §9.5 硬要求）；训练集为确定性合成样本（docs/06 §9.5 明文 demo 验证口径）；
+  特征 [均分/趋势斜率/录音数/活跃天数] → 预测下一窗综合分；无数据返回空态（不伪造）；
+  挂到 `/api/v1/stats/me` 的 `forecast`（学习页进步趋势展示，不参与判档——docs/15 B 口径）。
+- **前端**：学习页新增「为你推荐」卡（3 条：品类 chip + 标题 + 副题·理由 + 箭头），
+  点击上报 `recommend_click`（带 recommend_group_id + rank）并跳转（song→/m/sing、book→/m/books/:id、
+  card→/m/tavern）；接口失败静默不渲染（推荐非关键路径）。
+- **测试**：Python `tests/test_m3_reco_items.py` 6 例（L3 优先排序 / 曝光落库 / kind 过滤 /
+  forecast 空态与上升 / joblib 持久化 / type 白名单 422）；前端 `MobileLearnReco.test.ts` 3 例。
+- **门禁**：pytest **756 passed, 4 skipped**；ruff check/format 绿；web `lint`/`typecheck`/**340 passed**/
+  `build`/`check-bundle` 绿。
+- **Playwright 自检（Edge · 390×844）**：推荐卡渲染 3 条（歌曲/读物/场景卡 + 理由）；
+  点击第一条 → `recommend_click` 载荷 `{group: grp-check-1, target: song, id: 1, rank: 0}` 且跳转 `/m/sing`；
+  截图 `local/ui-check/m3-learn-reco.png`。
+- **效果**：报表页 CTR 从本阶段起有真实分母（此前 0/0 属预期）；`/stats` 的「我的」区将显示预测分（P4 接页面）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-21
+
 ## 2026-09-21 M3 收口 P2：指标聚合与看板（Python 四指标 + Web /stats + 管理端 /insight）· 1 op
 
 > 归属：后端 + Web + 管理端。计划见 `docs/53`；口径 = `docs/06 §9.1`（同日 P1 修订）。
