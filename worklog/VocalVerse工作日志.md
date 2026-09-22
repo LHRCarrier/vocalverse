@@ -3,6 +3,49 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 PR #39 解冲突：两轮合并 main（合计 132 提交）+ 原型归档就地取代 · 3 op
+
+> 归属：仓库全局（合并/归档/门禁）。PR：https://github.com/LHRCarrier/vocalverse/pull/39
+> （base main ← head `chore/sync-2026-09-18`，此前 GitHub 判 `CONFLICTING / DIRTY`）。
+
+- **第一轮**（`origin/main` = `cc198c3`，落后 92 提交）：13 处冲突，逐条定档——
+  - **并集**（两侧各自新增，互不覆盖）：`app/core/paths.py`（`song_cover_dir()` + `voices_dir()`）、
+    `App.vue`（动效分级/页面转场 + 全局 XP 冷启动）、`composables/sing.ts`（store 委派 + 埋点 `track`）、
+    `mobile-uic.css`（`--u-paper-dots` + 动效时长变量）、三个移动视图（未读角标 + 骨架防抖 import）。
+  - **取 main**（本分支是占位/mock 版，main 已接真）：`api/stats.ts`、`views/StatsView.vue`（docs/53 P2）、
+    `views/mobile/MobileSearchView.vue`（搜索三 tab 接真 + 250ms 防抖 + 请求序号防串）。
+  - **各取一半**：`views/mobile/MobileHomeView.vue` —— 结构取 main（`.u-head` 吸顶 + 未读角标），
+    加载态取本分支（`useDelayedLoading` 防抖骨架，替代 main 的裸骨架块）。
+  - **worklog**：两份都并集 + 日期倒序；顺带修 2 处「签名行与 `## 标题` 粘连」。
+- **第二轮**（main 期间又前进 40 提交到 `4dc67f4`：TRPG 工具/审核判据/酒馆页内三入口/社区规范页…）：
+  仅两份 worklog 冲突，仍按并集 + 日期倒序解；其余自动合并。**教训：分支落后期间 main 在动，
+  解完一轮要 `git fetch` 复看，别按旧 `origin/main` 收尾。**
+- **原型归档（PR owner 裁定）**：本分支的 `原型备份/` 是 main `web-prototypes/` 的**路径超集**
+  （0 个 main 独有路径）且 21 个同名文件更新（showcase.html +31% / showcase-interactions.js +51% /
+  feature-blocks.css +42% / theme.js +29%，另含 main 没有的 app-shots 截图与演示视频）→
+  **整体取代** `web-prototypes/**`（目录名不变），并删除 `原型备份/`、`worklog/原型备份/` 两套重复副本。
+  例外两条：① 8 个回滚脚手架（`starter-rollback/` `showcase-rollback/`）**不恢复**（依 2026-09-20 组长
+  「归档只收原型内容」口径）；② `web-prototypes/README.md` 保留 main 版——本分支那份实为另一份
+  设计 skill 文档（其引用的 `SKILL.md`/`references/`/`tokens/` 并不在库内），放回会指向不存在的文件。
+- **队友在制品保护（关键操作纪律）**：工作区原有 8 个未提交的 `web-prototypes/*` 改动（页脚换内联
+  GitHub 图标 + 真邮箱等），合并前用 `git stash push -- <paths>` 暂存、合并后 `stash pop` 就地还原；
+  其中 7 个文件的编辑**留在工作区不入库**（`git update-index --cacheinfo` 把索引回落到归档内容），
+  README 的备注同理；原 stash 条目保留兜底。**"解冲突"不能顺手把队友未提交内容带进提交。**
+- **门禁（复跑，含 main 全部新提交）**：Python `ruff check` / `format --check` 全过、
+  `pytest -q` **769 passed, 4 skipped**、契约快照与 `app.openapi()` 一致（**100 op**）；
+  Web `pnpm gen:api` 后 `src/api/generated/` **零漂移**、`vitest run` **670 passed（101 文件）**、
+  `vite build` + `check-bundle`（fe-09）通过。`web-prototypes/` 按该目录 README 声明不参与门禁。
+- **踩坑（本次新增）**：① **`git merge-tree` 预览的冲突清单 ≠ 实际冲突**——main 在你解冲突期间继续前进，
+  必须 `fetch` 后再合一轮（本轮实测：预览 2 处、实际 2 处，但上一轮预览的 13 处在 main 前进后已变）；②
+  **`git stash pop` 会连带把内容放回索引**——若该内容属队友在制品，须显式把索引回落到入库版本，
+  否则会被 merge commit 一并带走；③ 判定「哪边更新」不要只看提交时间（main 的 `web-prototypes` 最后
+  触碰时间更晚，但内容是旧版），要看**路径集合 + 逐文件字节/行数**。
+- **遗留（转告）**：① 未入仓的队友 WIP `apps/web/src/api/community.test.ts` 引用了尚不存在的
+  `applyLikeMutation` → `vitest` 3 例红（该文件不在本次提交内，属库外状态）；② 分支合并历史为两个
+  merge commit（`fdcb1b5` / `3d49b19`），若组长要求单条，可在合入时用 squash 口径记录。
+
+—— 执行人：xiaoqing-one（AI 代工），2026-09-22
+
 ## 2026-09-22 歌曲封面公开路由 + 种子封面资产 + Python 契约快照刷新 · 1 op
 
 > 归属：后端/契约/种子资产（**前端 UI 部分见同日`安卓开发日志.md`**——按 2026-09-08 拆分规矩）。需求由「歌单行图标换成本曲封面」触发的数据侧缺口。
