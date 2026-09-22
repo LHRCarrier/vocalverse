@@ -26,6 +26,9 @@ AUDIO_MEDIA_TYPE: dict[str, str] = {
     "m4a": "audio/mp4",
     "ogg": "audio/ogg",
     "webm": "audio/webm",
+    # 2026-09-22：本地演示曲库有 5 首 flac（`local/_import_demo_songs.py` 导入）——
+    # 回放白名单与 MIME 表都要认，否则「听参考旋律」400（见 worklog 同日条目）
+    "flac": "audio/flac",
 }
 DEFAULT_AUDIO_EXT = "mp3"
 
@@ -44,12 +47,13 @@ def validate_audio_bytes(data: bytes | None, *, min_bytes: int, max_bytes: int) 
 
 
 def sniff_audio_ext(data: bytes | None) -> str | None:
-    """魔数嗅探容器类型 → 扩展名（mp3/webm/ogg/wav/m4a）；无法识别 → None。
+    """魔数嗅探容器类型 → 扩展名（mp3/webm/ogg/wav/m4a/flac）；无法识别 → None。
 
     纯函数（可单测）。只认**容器/帧同步**层面的确定特征，不做编解码判断：
     - ``1A 45 DF A3`` EBML → webm（Matroska；浏览器 MediaRecorder 默认容器）
     - ``OggS`` → ogg；``RIFF....WAVE`` → wav；``ID3`` 或 MPEG 帧同步 ``FF Ex`` → mp3
     - ``....ftyp`` ISO BMFF → m4a（Safari MediaRecorder 的 audio/mp4）
+    - ``fLaC`` → flac（本地演示曲库导入的曲目；2026-09-22）
     """
     if not data:
         return None
@@ -60,6 +64,8 @@ def sniff_audio_ext(data: bytes | None) -> str | None:
         return "ogg"
     if head.startswith(b"RIFF") and head[8:12] == b"WAVE":
         return "wav"
+    if head.startswith(b"fLaC"):
+        return "flac"
     if head.startswith(b"ID3"):
         return "mp3"
     if len(head) >= 2 and head[0] == 0xFF and (head[1] & 0xE0) == 0xE0:

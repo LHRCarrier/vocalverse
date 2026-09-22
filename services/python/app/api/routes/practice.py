@@ -42,9 +42,11 @@ from app.practice.state import get_state_store
 router = APIRouter(prefix="/api/v1", tags=["practice"])
 logger = logging.getLogger("vocalverse")
 
-# 音频文件名白名单：用户录音（32 位 sha1 + 嗅探扩展名）+ 歌曲参考旋律（song_*.wav 等演示素材）；
-# 仅白名单字符 + 音频扩展名（防路径穿越；目录拼接用 Path(settings.audio_dir) / name）
-_SAFE_NAME = re.compile(r"^[0-9a-zA-Z_-]{1,64}\.(mp3|wav|m4a|ogg|webm)$")
+# 音频文件名白名单：用户录音（32 位 sha1 + 嗅探扩展名）+ 歌曲参考旋律（song_*.wav /
+# demo_*.flac 等素材）；仅白名单字符 + 音频扩展名（防路径穿越；目录拼接用
+# Path(settings.audio_dir) / name）。
+# 2026-09-22：补 `flac`（本地演示曲库 5 首 flac，漏了它「听参考旋律」直接 400 bad audio name）。
+_SAFE_NAME = re.compile(r"^[0-9a-zA-Z_-]{1,64}\.(mp3|wav|m4a|ogg|webm|flac)$")
 # 扩展名 → MIME 单一真源在 app/audio/upload.py（BUG-5：回放按内容嗅探优先）
 
 #: R-13 恢复端点回带最近消息条数（UI 重建够用；完整历史以 scenario_messages 为准）
@@ -458,7 +460,10 @@ def _is_published_song_asset(name: str) -> bool:
             db.execute(
                 select(Song.id).where(
                     Song.status == ContentStatus.PUBLISHED,
-                    Song.audio_url.like(f"%/{name}"),
+                    # 2026-09-22：伴奏轨（instrumental_url）与参考旋律同属平台素材，
+                    # 跟唱录音期间要由前端取来播放（原口径只认 audio_url → 伴奏会 403）
+                    (Song.audio_url.like(f"%/{name}"))
+                    | (Song.instrumental_url.like(f"%/{name}")),
                 )
             ).first()
             is not None
