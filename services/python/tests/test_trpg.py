@@ -572,7 +572,8 @@ def test_turn_with_portrait_tool(client, auth_headers, monkeypatch):
     assert len(portraits) == 1  # 同回合重复调用去重；未登记实体不发展示信号
     assert portraits[0]["entity"] == "老陈"
     assert portraits[0]["kind"] == "npc" and portraits[0]["mood"] == "戒备"
-    assert portraits[0].get("media_id") is None and portraits[0].get("url") is None  # 图源未接（P1）
+    # 实体未挂立绘 → media_id/url 为 null（前端按实体名命中内置素材）
+    assert portraits[0].get("media_id") is None and portraits[0].get("url") is None
     assert any(e["type"] == "turn_end" for e in events)
     text = "".join(e["text"] for e in events if e["type"] == "text_delta")
     assert "老陈从柜台后抬起头" in text
@@ -602,3 +603,384 @@ def test_narrative_refresh_and_clear_messages(client, auth_headers):
     assert client.get(base, headers=auth_headers).json()["data"]["messages"] == []
     # 事实/任务保留
     assert client.get(base, headers=auth_headers).json()["data"]["scene"] == "酒馆"
+
+
+# ---------------------------------------------------------------------------
+# 闭环端到端（docs/56 §7）：进度钟 → 结算 / 人物进出场 / 攻击 / 道具 / 遭遇
+# ---------------------------------------------------------------------------
+
+
+def _tool_call(name: str, call_id: str, **args) -> dict:
+    return {"id": call_id, "name": name, "arguments": json.dumps(args, ensure_ascii=False)}
+
+
+class ScriptedRounds:
+    """脚本化 LLM：按调用次序消费「轮」脚本（沿用 test_turn_with_tool_calls 模式）。
+
+    ``rounds`` 每项是一轮 stream_with_tools 的事件列表；``tool_texts`` 记录回填给模型的
+    工具结果文本（断言错误文本用）。
+    """
+
+    def __init__(self, rounds: list[list[tuple]]) -> None:
+        self._rounds = list(rounds)
+        self.tool_texts: list[str] = []
+
+    async def stream_with_tools(self, messages, *, tools=None, tool_choice="auto", **kwargs):
+        for message in messages:
+            if message.get("role") == "tool" and message.get("content"):
+                self.tool_texts.append(str(message["content"]))
+        events = self._rounds.pop(0) if self._rounds else [("delta", "（脚本用尽）")]
+        for item in events:
+            yield item
+        yield ("usage", {"model": "scripted", "prompt_tokens": 1, "completion_tokens": 1})
+
+    async def chat(self, messages, temperature=0.7, max_tokens=512):
+        return "[]"
+
+
+def _facts(client, campaign_id: int, auth_headers) -> dict[str, str]:
+    state = client.get(f"/api/v1/trpg/campaigns/{campaign_id}", headers=auth_headers).json()["data"]
+    return {f["key"]: f["value"] for f in state["facts"]}
+
+
+def test_turn_tick_clock_full_and_ending_card(client, auth_headers, monkeypatch):
+    """tick_clock → quest 事件 + 事实落表；满格 → complete_quest → ending 事件 + 系统卡持久化。"""
+    campaign_id = _create_campaign(client, auth_headers)
+    base = f"/api/v1/trpg/campaigns/{campaign_id}"
+    quest = "寻找失落的戒指"
+    rounds = [
+        [
+            ("delta", "你推开暗门——"),
+            (
+                "tool_calls",
+                [_tool_call("tick_clock", "t1", quest=quest, delta=3, reason="破解暗门机关")],
+            ),
+        ],
+        [("delta", "石门在轰鸣中开启。")],
+        [
+            (
+                "tool_calls",
+                [_tool_call("tick_clock", "t2", quest=quest, delta=3, reason="祭坛解开封印")],
+            )
+        ],
+        [("delta", "封印在光中崩解。")],
+        [("tool_calls", [_tool_call("complete_quest", "t3", quest=quest)])],
+        [("delta", "戒指落入你的掌心，这一段故事在这里收束。")],
+    ]
+    llm = ScriptedRounds(rounds)
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: llm)
+
+    events = _sse_events(client, campaign_id, auth_headers, text="我推开暗门")
+    quests = [e for e in events if e["type"] == "quest"]
+    assert len(quests) == 1
+    assert quests[0]["quest"] == quest and quests[0]["progress"] == "3/6"
+    assert quests[0]["segments"] == 6 and quests[0]["kind"] == "positive"
+    assert quests[0]["reason"] == "破解暗门机关" and quests[0]["full"] is False
+
+    facts = _facts(client, campaign_id, auth_headers)
+    assert facts[f"quest.{quest}.progress"] == "3/6"
+    assert facts[f"quest.{quest}.kind"] == "positive"
+    state = client.get(base, headers=auth_headers).json()["data"]
+    assert any(t["title"] == quest for t in state["tasks"])  # 事实写同步任务行
+
+    events = _sse_events(client, campaign_id, auth_headers, text="我继续破解封印")
+    quests = [e for e in events if e["type"] == "quest"]
+    assert quests and quests[-1]["progress"] == "6/6" and quests[-1]["full"] is True
+
+    events = _sse_events(client, campaign_id, auth_headers, text="我迎接结局")
+    endings = [e for e in events if e["type"] == "ending"]
+    assert len(endings) == 1
+    ending = endings[0]
+    assert ending["quest"] == quest and ending["outcome"] == "strong"  # 6/6 自动判强
+    assert ending["title"] and ending["text"] and ending["epilogue"]
+
+    # ending 系统卡落库：刷新（重新 GET 全量状态）后仍在
+    state = client.get(base, headers=auth_headers).json()["data"]
+    cards = [
+        m
+        for m in state["messages"]
+        if m["kind"] == "system" and m["payload"].get("trpg_sys") == "ending"
+    ]
+    assert len(cards) == 1
+    assert cards[0]["payload"]["quest"] == quest and cards[0]["payload"]["outcome"] == "strong"
+    facts = _facts(client, campaign_id, auth_headers)
+    assert facts[f"quest.{quest}.status"] == "done"
+
+    from app.trpg import state as st
+
+    assert st.get_campaign_owned(campaign_id, 1).finished_at is not None
+
+
+def test_turn_character_enter_and_exit(client, auth_headers, monkeypatch):
+    """enter_character → character arriving + 实体 pending；exit_character → departed/cleared。"""
+    campaign_id = _create_campaign(client, auth_headers)
+    base = f"/api/v1/trpg/campaigns/{campaign_id}"
+    rounds = [
+        [
+            (
+                "tool_calls",
+                [_tool_call("enter_character", "c1", entity="老陈", note="酒馆老板")],
+            )
+        ],
+        [("delta", "老陈从后厨探出头来。")],
+        [
+            (
+                "tool_calls",
+                [_tool_call("exit_character", "c2", entity="老陈", reason="打烊离开")],
+            )
+        ],
+        [("delta", "老陈披上外套，走进雨里。")],
+    ]
+    llm = ScriptedRounds(rounds)
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: llm)
+
+    events = _sse_events(client, campaign_id, auth_headers, text="我环顾酒馆")
+    characters = [e for e in events if e["type"] == "character"]
+    assert len(characters) == 1
+    assert characters[0]["name"] == "老陈" and characters[0]["status"] == "arriving"
+    assert characters[0]["kind"] == "npc" and characters[0]["note"] == "酒馆老板"
+
+    entities = client.get(base, headers=auth_headers).json()["data"]["entities"]
+    chen = next(e for e in entities if e["name"] == "老陈")
+    assert chen["pending"] is True and chen["status"] == "active"  # arriving↔pending=True
+
+    events = _sse_events(client, campaign_id, auth_headers, text="我目送他离开")
+    characters = [e for e in events if e["type"] == "character"]
+    assert characters and characters[-1]["status"] == "departed"
+    entities = client.get(base, headers=auth_headers).json()["data"]["entities"]
+    chen = next(e for e in entities if e["name"] == "老陈")
+    assert chen["pending"] is False and chen["status"] == "cleared"  # departed↔cleared
+
+
+def test_turn_attack_hit_miss_and_hp_writeback(client, auth_headers, monkeypatch):
+    """attack：命中写 HP（含 target_hp 建档）；未命中绝不写状态。"""
+    from app.trpg import state as st
+
+    campaign_id = _create_campaign(client, auth_headers)
+    st.ensure_entity(campaign_id, "pc", "主角")
+    st.ensure_entity(campaign_id, "npc", "地精")
+    rounds = [
+        [
+            (
+                "tool_calls",
+                [
+                    _tool_call(
+                        "attack",
+                        "a1",
+                        target="地精",
+                        target_hp=10,
+                        damage=3,
+                        modifier=50,
+                        weapon="短剑",
+                    ),
+                    _tool_call("attack", "a2", target="地精", damage=3, modifier=-50, vs=100),
+                ],
+            )
+        ],
+        [("delta", "你一剑劈中地精，追击的一下却落了空。")],
+    ]
+    llm = ScriptedRounds(rounds)
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: llm)
+
+    events = _sse_events(client, campaign_id, auth_headers, text="我攻击地精")
+    attacks = [e for e in events if e["type"] == "encounter" and e["kind"] == "attack"]
+    assert len(attacks) == 2
+    assert attacks[0]["attacker"] == "pc.主角" and attacks[0]["target"] == "npc.地精"
+    assert attacks[0]["hit"] is True and attacks[0]["damage"] == 3
+    assert attacks[0]["target_hp"] == 7  # 10 - 3，target_hp 建档后写回
+    assert attacks[1]["hit"] is False and attacks[1]["damage"] == 0
+    assert attacks[1]["target_hp"] == 7  # 未命中不写状态
+    assert _facts(client, campaign_id, auth_headers)["npc.地精.hp"] == "7"
+
+
+def test_turn_use_item_decrement_and_exhausted(client, auth_headers, monkeypatch):
+    """use_item：consumable 扣减 + hp 效果写回；数量耗尽 → 错误文本、状态不动。"""
+    from app.trpg import state as st
+
+    campaign_id = _create_campaign(client, auth_headers)
+    base = f"/api/v1/trpg/campaigns/{campaign_id}"
+    st.set_item_facts(
+        campaign_id, "治疗药水", qty=2, owner="pc.主角", effect="hp+5", consumable=True
+    )
+    client.post(
+        f"{base}/facts/edit", json={"key": "pc.主角.hp", "value": "3"}, headers=auth_headers
+    )
+    rounds = [
+        [("tool_calls", [_tool_call("use_item", "i1", item="治疗药水")])],
+        [("delta", "你把药水一饮而尽。")],
+        [("tool_calls", [_tool_call("use_item", "i2", item="治疗药水")])],
+        [("delta", "你喝下最后一瓶。")],
+        [("tool_calls", [_tool_call("use_item", "i3", item="治疗药水")])],
+        [("delta", "瓶子已经空了。")],
+    ]
+    llm = ScriptedRounds(rounds)
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: llm)
+
+    _sse_events(client, campaign_id, auth_headers, text="我喝一瓶药水")
+    facts = _facts(client, campaign_id, auth_headers)
+    assert facts["item.治疗药水.qty"] == "1" and facts["pc.主角.hp"] == "8"
+
+    _sse_events(client, campaign_id, auth_headers, text="我再喝一瓶")
+    facts = _facts(client, campaign_id, auth_headers)
+    assert facts["item.治疗药水.qty"] == "0" and facts["pc.主角.hp"] == "13"
+
+    _sse_events(client, campaign_id, auth_headers, text="我还想再喝")
+    facts = _facts(client, campaign_id, auth_headers)
+    assert facts["item.治疗药水.qty"] == "0" and facts["pc.主角.hp"] == "13"
+    assert any("已经用完" in text for text in llm.tool_texts)  # 校验失败 = 可读错误文本
+
+    unknown = ScriptedRounds(
+        [[("tool_calls", [_tool_call("use_item", "i4", item="不存在的圣杯")])], [("delta", "…")]]
+    )
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: unknown)
+    _sse_events(client, campaign_id, auth_headers, text="我找圣杯")
+    assert any("没有" in text and "圣杯" in text for text in unknown.tool_texts)
+
+
+def test_turn_encounter_start_turn_end(client, auth_headers, monkeypatch):
+    """遭遇闭环：start（系统排先攻）→ next_turn（回绕 round+1）→ end（status=done）。"""
+    from app.trpg import encounter as encounter_rules
+    from app.trpg import state as st
+
+    campaign_id = _create_campaign(client, auth_headers)
+    st.ensure_entity(campaign_id, "pc", "主角")
+    rounds = [
+        [
+            (
+                "tool_calls",
+                [_tool_call("start_encounter", "e1", participants=["pc.主角", "地精"])],
+            )
+        ],
+        [("delta", "地精从阴影里扑出！")],
+        [("tool_calls", [_tool_call("next_turn", "e2"), _tool_call("next_turn", "e3")])],
+        [("delta", "攻守交换。")],
+        [("tool_calls", [_tool_call("end_encounter", "e4", outcome="击退地精")])],
+        [("delta", "地精溃逃进夜色。")],
+    ]
+    llm = ScriptedRounds(rounds)
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: llm)
+
+    events = _sse_events(client, campaign_id, auth_headers, text="我迎战地精")
+    starts = [e for e in events if e["type"] == "encounter" and e["kind"] == "start"]
+    assert len(starts) == 1
+    assert set(starts[0]["order"]) == {"pc.主角", "npc.地精"} and len(starts[0]["order"]) == 2
+    assert starts[0]["turn"] == 0 and starts[0]["round"] == 1
+    facts = _facts(client, campaign_id, auth_headers)
+    assert facts["encounter.main.status"] == "active"
+    assert encounter_rules.decode_order(facts["encounter.main.order"]) == starts[0]["order"]
+    assert facts["encounter.main.turn"] == "0" and facts["encounter.main.round"] == "1"
+
+    events = _sse_events(client, campaign_id, auth_headers, text="轮到我了")
+    turns = [e for e in events if e["type"] == "encounter" and e["kind"] == "turn"]
+    assert [(e["turn"], e["round"]) for e in turns] == [(1, 1), (0, 2)]  # 第二位后回绕
+
+    events = _sse_events(client, campaign_id, auth_headers, text="我结束战斗")
+    ends = [e for e in events if e["type"] == "encounter" and e["kind"] == "end"]
+    assert ends and ends[0]["outcome"] == "击退地精"
+    facts = _facts(client, campaign_id, auth_headers)
+    assert facts["encounter.main.status"] == "done"
+
+
+# ---------------------------------------------------------------------------
+# 实体立绘（docs/56 §4）
+# ---------------------------------------------------------------------------
+
+
+def _upload_png(client, headers) -> str:
+    import io
+
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 4096
+    resp = client.post(
+        "/api/v1/media",
+        headers=headers,
+        files={"file": ("a.png", io.BytesIO(png), "application/octet-stream")},
+        data={"kind": "image"},
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()["data"]["id"]
+
+
+def test_entity_portrait_attach_expose_and_show_portrait(client, auth_headers, monkeypatch):
+    """挂载（owner+媒体归属校验）→ 实体列表带 portrait → show_portrait 带 media_id/url → 卸下。"""
+    from app.trpg import state as st
+
+    campaign_id = _create_campaign(client, auth_headers)
+    base = f"/api/v1/trpg/campaigns/{campaign_id}"
+    entity_id = st.ensure_entity(campaign_id, "npc", "老陈")
+
+    # 未上传媒体 → 40403（不泄露存在性）
+    missing = client.post(
+        f"{base}/entities/{entity_id}/portrait",
+        json={"media_id": "deadbeefdeadbeef"},
+        headers=auth_headers,
+    )
+    assert missing.status_code == 404 and missing.json()["code"] == 40403
+
+    media_id = _upload_png(client, auth_headers)
+    attached = client.post(
+        f"{base}/entities/{entity_id}/portrait", json={"media_id": media_id}, headers=auth_headers
+    )
+    data = attached.json()["data"]
+    assert data["ok"] is True and data["url"] == f"/api/v1/media/{media_id}"
+
+    entities = client.get(base, headers=auth_headers).json()["data"]["entities"]
+    chen = next(e for e in entities if e["name"] == "老陈")
+    assert chen["id"] == entity_id  # 前端持 id 调立绘挂载端点
+    assert chen["portrait_media_id"] == media_id
+    assert chen["portrait"]["url"] == f"/api/v1/media/{media_id}"
+
+    # show_portrait：事件回带 media_id + url
+    monkeypatch.setattr(
+        "app.api.routes.trpg.get_llm_client",
+        lambda: ScriptedRounds(
+            [
+                [("tool_calls", [_tool_call("show_portrait", "p1", entity="老陈", mood="戒备")])],
+                [("delta", "老陈从柜台后抬起头。")],
+            ]
+        ),
+    )
+    events = _sse_events(client, campaign_id, auth_headers, text="我看向柜台")
+    portraits = [e for e in events if e["type"] == "portrait"]
+    assert len(portraits) == 1
+    assert portraits[0]["media_id"] == media_id
+    assert portraits[0]["url"] == f"/api/v1/media/{media_id}"
+
+    # 卸下 → 实体列表 portrait 清空
+    assert (
+        client.delete(f"{base}/entities/{entity_id}/portrait", headers=auth_headers).json()["data"][
+            "ok"
+        ]
+        is True
+    )
+    entities = client.get(base, headers=auth_headers).json()["data"]["entities"]
+    chen = next(e for e in entities if e["name"] == "老陈")
+    assert chen["portrait_media_id"] is None and chen["portrait"] is None
+
+
+def test_entity_portrait_ownership_guards(client, auth_headers):
+    """媒体非本人 → 40403；campaign/实体越权或不存在 → 404。"""
+    from app.trpg import state as st
+
+    campaign_id = _create_campaign(client, auth_headers)
+    base = f"/api/v1/trpg/campaigns/{campaign_id}"
+    entity_id = st.ensure_entity(campaign_id, "npc", "老陈")
+    mine = _upload_png(client, auth_headers)
+
+    other = {"X-Test-User-Id": "2"}
+    other_media = _upload_png(client, other)
+    not_mine = client.post(
+        f"{base}/entities/{entity_id}/portrait",
+        json={"media_id": other_media},
+        headers=auth_headers,
+    )
+    assert not_mine.status_code == 404 and not_mine.json()["code"] == 40403
+
+    cross_campaign = client.post(
+        f"{base}/entities/{entity_id}/portrait", json={"media_id": mine}, headers=other
+    )
+    assert cross_campaign.status_code == 404
+
+    ghost = client.post(
+        f"{base}/entities/99999/portrait", json={"media_id": mine}, headers=auth_headers
+    )
+    assert ghost.status_code == 404 and ghost.json()["code"] == 40401
