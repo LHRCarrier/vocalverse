@@ -4356,7 +4356,7 @@
           "trpg"
         ],
         "summary": "List Campaigns",
-        "description": "我的剧本列表（按最近活跃倒序）。",
+        "description": "我的剧本列表（按最近活跃倒序；``finished``/``finished_at`` 供大堂页显示「已完结」）。",
         "operationId": "list_campaigns_api_v1_trpg_campaigns_get",
         "parameters": [
           {
@@ -4596,6 +4596,83 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trpg/campaigns/{campaign_id}/quests/settle": {
+      "post": {
+        "tags": [
+          "trpg"
+        ],
+        "summary": "Settle Quest",
+        "description": "结算任务（owner 校验）。已 done/failed → 幂等返回既有结局（不再落卡）。\n\n响应 ``data={quest, outcome, title, text, epilogue, finished}``。",
+        "operationId": "settle_quest_api_v1_trpg_campaigns__campaign_id__quests_settle_post",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-test-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestSettle"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -5298,6 +5375,166 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trpg/campaigns/{campaign_id}/entities/{entity_id}/portrait": {
+      "post": {
+        "tags": [
+          "trpg"
+        ],
+        "summary": "Attach Entity Portrait",
+        "description": "给实体挂立绘（媒体必须是调用者本人 ready 资产；缺失/非本人 → 40403）。",
+        "operationId": "attach_entity_portrait_api_v1_trpg_campaigns__campaign_id__entities__entity_id__portrait_post",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Entity Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-test-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntityPortrait"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "trpg"
+        ],
+        "summary": "Detach Entity Portrait",
+        "description": "卸下实体立绘（前端回退内置素材/占位）。",
+        "operationId": "detach_entity_portrait_api_v1_trpg_campaigns__campaign_id__entities__entity_id__portrait_delete",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Entity Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "x-test-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -9064,6 +9301,20 @@
         ],
         "title": "ClueRecover"
       },
+      "EntityPortrait": {
+        "properties": {
+          "media_id": {
+            "type": "string",
+            "title": "Media Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "media_id"
+        ],
+        "title": "EntityPortrait",
+        "description": "实体立绘挂载（media_id = ``media_assets.public_id``；docs/56 §4）。"
+      },
       "Envelope_ASRResult_": {
         "properties": {
           "code": {
@@ -10546,6 +10797,31 @@
           "status"
         ],
         "title": "PublishBody"
+      },
+      "QuestSettle": {
+        "properties": {
+          "quest": {
+            "type": "string",
+            "title": "Quest"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          }
+        },
+        "type": "object",
+        "required": [
+          "quest"
+        ],
+        "title": "QuestSettle",
+        "description": "确定性结算（docs/57 §3.1）：quest 必填；outcome 可省 → 按进度自动判定。"
       },
       "RollBody": {
         "properties": {

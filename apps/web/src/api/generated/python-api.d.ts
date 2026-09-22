@@ -1020,7 +1020,7 @@ export interface paths {
         };
         /**
          * List Campaigns
-         * @description 我的剧本列表（按最近活跃倒序）。
+         * @description 我的剧本列表（按最近活跃倒序；``finished``/``finished_at`` 供大堂页显示「已完结」）。
          */
         get: operations["list_campaigns_api_v1_trpg_campaigns_get"];
         put?: never;
@@ -1070,6 +1070,28 @@ export interface paths {
          * @description 清空对话流水（重开本剧本；事实/任务/线索保留）——前端「重新开始」用。
          */
         delete: operations["clear_messages_api_v1_trpg_campaigns__campaign_id__messages_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/quests/settle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Settle Quest
+         * @description 结算任务（owner 校验）。已 done/failed → 幂等返回既有结局（不再落卡）。
+         *
+         *     响应 ``data={quest, outcome, title, text, epilogue, finished}``。
+         */
+        post: operations["settle_quest_api_v1_trpg_campaigns__campaign_id__quests_settle_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1228,6 +1250,30 @@ export interface paths {
         /** Set Campaign Scene */
         post: operations["set_campaign_scene_api_v1_trpg_campaigns__campaign_id__scene_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/entities/{entity_id}/portrait": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach Entity Portrait
+         * @description 给实体挂立绘（媒体必须是调用者本人 ready 资产；缺失/非本人 → 40403）。
+         */
+        post: operations["attach_entity_portrait_api_v1_trpg_campaigns__campaign_id__entities__entity_id__portrait_post"];
+        /**
+         * Detach Entity Portrait
+         * @description 卸下实体立绘（前端回退内置素材/占位）。
+         */
+        delete: operations["detach_entity_portrait_api_v1_trpg_campaigns__campaign_id__entities__entity_id__portrait_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2289,6 +2335,14 @@ export interface components {
             /** Recovered */
             recovered: boolean;
         };
+        /**
+         * EntityPortrait
+         * @description 实体立绘挂载（media_id = ``media_assets.public_id``；docs/56 §4）。
+         */
+        EntityPortrait: {
+            /** Media Id */
+            media_id: string;
+        };
         /** Envelope[ASRResult] */
         Envelope_ASRResult_: {
             /**
@@ -2918,6 +2972,16 @@ export interface components {
         PublishBody: {
             /** Status */
             status: string;
+        };
+        /**
+         * QuestSettle
+         * @description 确定性结算（docs/57 §3.1）：quest 必填；outcome 可省 → 按进度自动判定。
+         */
+        QuestSettle: {
+            /** Quest */
+            quest: string;
+            /** Outcome */
+            outcome?: string | null;
         };
         /** RollBody */
         RollBody: {
@@ -5667,6 +5731,44 @@ export interface operations {
             };
         };
     };
+    settle_quest_api_v1_trpg_campaigns__campaign_id__quests_settle_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestSettle"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     post_turn_api_v1_trpg_campaigns__campaign_id__turns_post: {
         parameters: {
             query?: never;
@@ -5990,6 +6092,80 @@ export interface operations {
                 "application/json": components["schemas"]["SceneBody"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attach_entity_portrait_api_v1_trpg_campaigns__campaign_id__entities__entity_id__portrait_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+                entity_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntityPortrait"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detach_entity_portrait_api_v1_trpg_campaigns__campaign_id__entities__entity_id__portrait_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+                entity_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
