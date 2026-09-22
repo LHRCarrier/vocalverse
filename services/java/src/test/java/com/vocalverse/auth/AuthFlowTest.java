@@ -191,9 +191,9 @@ class AuthFlowTest {
     String access2 = loginData.path("accessToken").asText();
     String refresh2 = loginData.path("refreshToken").asText();
 
-    // 无令牌调用 logout → 403（匿名访问受保护端点：Spring Security 6 默认 AccessDenied → 403；
-    // 401 仅来自 ServiceTokenFilter 显式 sendError 与 ResponseStatusException，见既有用例）
-    mockMvc.perform(post("/auth/logout")).andExpect(status().isForbidden());
+    // 无令牌调用 logout → 401（2026-09-22：SecurityConfig 补 AuthenticationEntryPoint → 匿名 = 401 + 40101；
+    // 此前退回默认 Http403ForbiddenEntryPoint 是 403）
+    mockMvc.perform(post("/auth/logout")).andExpect(status().isUnauthorized());
 
     // 带 access token 登出 → 吊销全部
     mockMvc

@@ -485,10 +485,12 @@ class CommunityApiTest extends AbstractAdminApiTest {
   }
 
   @Test
-  void unauth_403() throws Exception {
-    // SecurityConfig 无 AuthenticationEntryPoint：匿名访问受保护端点 → 403（非 401）
+  void unauth_401() throws Exception {
+    // 2026-09-22：SecurityConfig 补 AuthenticationEntryPoint → 匿名访问受保护端点 = 401 + Envelope{40101}
+    // （此前 403，导致前端「401 静默续期」钩子失效——access token 过期后页面「加载失败 HTTP 403」）
     MvcResult r = mockMvc.perform(get("/api/v1/community/posts")).andReturn();
-    assertEquals(403, r.getResponse().getStatus());
+    assertEquals(401, r.getResponse().getStatus());
+    assertEquals(40101, json(r).path("code").asInt());
   }
 
   private long seedCheckin(String authorName) throws Exception {

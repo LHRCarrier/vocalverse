@@ -45,16 +45,15 @@ class TicketApiTest extends AbstractAdminApiTest {
         .andExpect(jsonPath("$.data.length()").value(1))
         .andExpect(jsonPath("$.data[0].id").value(ticketId));
 
-    // 未带令牌 → **403**（不是 401）
+    // 未带令牌 → **401 + Envelope{40101}**（2026-09-22 起）
     //
-    // 这是本服务的既有约定，不是笔误：SecurityConfig **没有配置 authenticationEntryPoint**，
-    // 因此 ExceptionTranslationFilter 退回到默认的 Http403ForbiddenEntryPoint —— 匿名请求得到 403。
-    // 对照：AuthFlowTest 里 401 用于「带了令牌但令牌无效/过期」（JwtAuthFilter 显式写 401 + 40101），
-    // 而匿名（完全不带 Authorization 头）是 403。同类先例还有 AuthFlowTest.java:196 的匿名 logout。
-    //
-    // ⚠️ 本断言曾在控制台改造中被误改成 isUnauthorized()，导致该用例红（docs/51 §1.6 同类：改测试容易引入假绿/假红）。
-    // 改这里的期望值前，先确认 SecurityConfig 是否补了 entry point —— 补了才应该是 401。
-    mockMvc.perform(get("/api/v1/tickets/mine")).andExpect(status().isForbidden());
+    // 口径变更：SecurityConfig 此前**没有配置 authenticationEntryPoint**，ExceptionTranslationFilter
+    // 退回默认 Http403ForbiddenEntryPoint → 匿名请求得到 403（且前端「401 静默续期」钩子失效，见
+    // apps/web/src/api/client.ts）。2026-09-22 补上 entry point（401 + 40101）：
+    //   - 匿名 / 令牌无效或过期 → 401（JwtAuthFilter 的 40101 与本 entry point 同码同形）；
+    //   - 已认证但无权（角色/业务拒绝）→ 仍 403。
+    // 对照：AuthFlowTest 的匿名 logout 同步改为 401。
+    mockMvc.perform(get("/api/v1/tickets/mine")).andExpect(status().isUnauthorized());
   }
 
   /** 内容纠误必须保留 targetType/targetId（运营要据此定位到具体内容）。 */

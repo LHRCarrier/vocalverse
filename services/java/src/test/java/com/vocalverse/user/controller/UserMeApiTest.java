@@ -120,9 +120,9 @@ class UserMeApiTest extends AbstractAdminApiTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"nickname\":\"x\"}".getBytes(StandardCharsets.UTF_8)))
             .andReturn();
-    // 匿名访问受保护端点：Spring Security 6 默认 AccessDenied → 403（401 仅来自 JwtAuthFilter，
-    // 见 AuthFlowTest:194 既有约定）
-    assertEquals(403, r.getResponse().getStatus());
+    // 匿名访问受保护端点：2026-09-22 起 = 401 + Envelope{40101}（SecurityConfig 补了 entry point；
+    // 此前退回默认 Http403ForbiddenEntryPoint → 403，见 AuthFlowTest 匿名 logout 同批变更）
+    assertEquals(401, r.getResponse().getStatus());
   }
 
   @Test
