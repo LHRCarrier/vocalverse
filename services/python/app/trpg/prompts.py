@@ -41,6 +41,10 @@ def build_dm_system_prompt(
     if restore_patch:
         lines.append("5. 【待记住】中的剧情状态本回合必须自然提起或推进，不得跳过。")
     lines.append("6. 保持剧情一致性：玩家说过的关键信息、你对玩家的承诺都要后续兑现。")
+    lines.append(
+        "7. 关键节点（角色首次登场、重要剧情转折）可调用 show_portrait 让角色立绘出场；"
+        "同一场景对同一角色至多一次，不要每回合调用。"
+    )
     return "\n".join(lines)
 
 

@@ -196,6 +196,8 @@ async def stream_turn(
                     yield ev.TextDelta(text=str(item["text"]))
                 elif item["type"] == "status":
                     yield ev.TrpgStatus(stage=str(item["stage"]))
+                elif item["type"] == "portrait":
+                    yield ev.PortraitShow(**(item.get("portrait") or {}))
     except Exception as exc:  # noqa: BLE001 - 流内错误交给前端（节奏优先）
         logger.exception("酒馆 DM 生成失败：%s", exc)
         fallback = "（DM 似乎走神了，请把你的行动再说一遍。）"

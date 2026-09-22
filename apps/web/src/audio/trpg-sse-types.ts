@@ -48,6 +48,19 @@ export interface TrpgSystemCardEvent {
   payload: Record<string, unknown>
 }
 
+/**
+ * 角色立绘展示（关键节点信号，docs/54 P1 骨架）。
+ * 图源未接：media_id/url 暂为 null → 前端按名字命中内置素材（art.ts），无命中降级占位。
+ */
+export interface TrpgPortraitEvent {
+  type: 'portrait'
+  entity: string
+  kind: string
+  mood?: string | null
+  media_id?: string | null
+  url?: string | null
+}
+
 export interface TrpgTurnEndEvent {
   type: 'turn_end'
   message_id: number
@@ -67,5 +80,6 @@ export type TrpgSseEvent =
   | TrpgStatusEvent
   | TrpgAudioChunkEvent
   | TrpgSystemCardEvent
+  | TrpgPortraitEvent
   | TrpgTurnEndEvent
   | TrpgStreamErrorEvent

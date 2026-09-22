@@ -6,7 +6,8 @@
 - 正文逐轮累积为一条 DM 消息；工具文本回填后继续生成（模型只拿文本讲故事）；
 - 无工具能力的 LLM（Fake/降级）→ 退化为纯文本流式（不调工具，回合仍可玩）。
 
-产出事件：``{"type": "delta", "text": ...}`` / ``{"type": "status", "stage": ...}``；
+产出事件：``{"type": "delta", "text": ...}`` / ``{"type": "status", "stage": ...}`` /
+``{"type": "portrait", "portrait": {...}}``（同回合同角色去重）；
 结果经 :attr:`DmTurnRunner.result` 领取（单次使用；与练习域 TurnRunner 同姿势）。
 """
 
@@ -65,6 +66,8 @@ class DmTurnRunner:
         tool_rounds = 0
         statuses: list[str] = []
         tools = build_trpg_tools()
+        # 立绘展示去重（同回合同角色只发展示信号一次；跨回合频控由 prompt 规则约束）
+        seen_portraits: set[str] = set()
 
         for round_index in range(TOOL_MAX_ROUNDS + 1):
             force_answer = round_index == TOOL_MAX_ROUNDS
@@ -115,6 +118,12 @@ class DmTurnRunner:
                 if outcome.get("status_stage"):
                     statuses.append(str(outcome["status_stage"]))
                     yield {"type": "status", "stage": str(outcome["status_stage"])}
+                portrait = outcome.get("portrait")
+                if isinstance(portrait, dict):
+                    key = str(portrait.get("entity") or "")
+                    if key and key not in seen_portraits:
+                        seen_portraits.add(key)
+                        yield {"type": "portrait", "portrait": portrait}
                 messages.append(
                     {
                         "role": "tool",

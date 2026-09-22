@@ -64,6 +64,21 @@ class SystemCard(pydantic.BaseModel):
     payload: dict[str, Any]
 
 
+class PortraitShow(pydantic.BaseModel):
+    """角色立绘展示（关键节点信号；骨架 2026-09-22）。
+
+    图源未接：``media_id``/``url`` 暂为 null，前端按实体名命中内置素材（无命中降级占位）；
+    docs/54 §4 的 P1 落 ``portrait_media_id`` 后由后端回填。
+    """
+
+    type: Literal["portrait"] = "portrait"
+    entity: str
+    kind: str
+    mood: str | None = None
+    media_id: str | None = None
+    url: str | None = None
+
+
 class TurnEnd(pydantic.BaseModel):
     type: Literal["turn_end"] = "turn_end"
     message_id: int
@@ -83,6 +98,7 @@ TrpgEvent = (
     | TrpgStatus
     | AudioChunk
     | SystemCard
+    | PortraitShow
     | TurnEnd
     | StreamError
 )

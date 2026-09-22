@@ -46,6 +46,16 @@ export function useTavernSession(audio: TavernAudio) {
   const sending = ref(false)
   const recording = ref(false)
   const statusHint = ref<string | null>(null)
+  /**
+   * 最近一次立绘展示信号（关键节点，docs/54 P1 骨架）：
+   * 页面消费后调用 dismissPortrait()；图源未接时 url 为 null（页面按名字命中内置素材）。
+   */
+  const portrait = ref<{
+    entity: string
+    kind: string
+    mood: string | null
+    url: string | null
+  } | null>(null)
   const currentAssistant = ref<TavernRow | null>(null)
   /** 最近一条 DM 文本行的下标（系统卡可能在其后插入，音频块到达时不能靠 rows.length 反推） */
   const assistantRowIndex = ref<number | null>(null)
@@ -244,6 +254,14 @@ export function useTavernSession(audio: TavernAudio) {
       case 'status':
         statusHint.value = e.stage === 'rolling' ? '掷骰判定中…' : '切换场景…'
         break
+      case 'portrait':
+        portrait.value = {
+          entity: e.entity,
+          kind: e.kind,
+          mood: e.mood ?? null,
+          url: e.url ?? null,
+        }
+        break
       case 'system':
         rows.value.push({
           role: 'assistant',
@@ -299,6 +317,10 @@ export function useTavernSession(audio: TavernAudio) {
     audio.releaseAll()
   }
 
+  function dismissPortrait() {
+    portrait.value = null
+  }
+
   return {
     stage,
     campaigns,
@@ -310,6 +332,7 @@ export function useTavernSession(audio: TavernAudio) {
     sending,
     recording,
     statusHint,
+    portrait,
     status,
     hp,
     location,
@@ -317,6 +340,7 @@ export function useTavernSession(audio: TavernAudio) {
     activeTasks,
     danglingCount,
     npcNames,
+    dismissPortrait,
     boot,
     refreshCampaigns,
     selectCampaign,

@@ -9,7 +9,7 @@
 执行契约见 :mod:`app.trpg.tools.registry`；``turn.py`` 只依赖 build/execute 两个入口。
 """
 
-from app.trpg.tools import roll_dice, set_scene  # noqa: F401  # 注册副作用
+from app.trpg.tools import roll_dice, set_scene, show_portrait  # noqa: F401  # 注册副作用
 from app.trpg.tools.registry import (
     ToolSpec,
     build_trpg_tools,
@@ -26,4 +26,5 @@ __all__ = [
     "register",
     "roll_dice",
     "set_scene",
+    "show_portrait",
 ]

@@ -148,6 +148,33 @@ def ensure_entity(campaign_id: int, kind: str, name: str, pending: bool = False)
         db.close()
 
 
+def find_entity(campaign_id: int, name: str, kinds: tuple[str, ...] = ("npc", "pc")) -> dict | None:
+    """按名字查实体（限 kinds；重名取最近提及）→ ``{kind, status, pending}`` / None。
+
+    读实体场景用（如 show_portrait 的立绘展示校验）；写路径一律走 :func:`ensure_entity`。
+    """
+    db = get_session_factory()()
+    try:
+        row = (
+            db.execute(
+                select(TrpgEntity)
+                .where(
+                    TrpgEntity.campaign_id == campaign_id,
+                    TrpgEntity.name == name,
+                    TrpgEntity.kind.in_(kinds),
+                )
+                .order_by(TrpgEntity.last_mentioned_at.desc())
+            )
+            .scalars()
+            .first()
+        )
+        if row is None:
+            return None
+        return {"kind": row.kind, "status": row.status, "pending": row.pending}
+    finally:
+        db.close()
+
+
 def cleanup_idle_entities(campaign_id: int, idle_ms: float) -> int:
     """待确认实体懒清理（P2-42）：超窗未提及 → cleared（防积压）。"""
     db = get_session_factory()()
