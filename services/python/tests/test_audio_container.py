@@ -18,6 +18,8 @@ MP3_FRAME = b"\xff\xfb\x90\x00" + b"\x00" * 12
 WAV_RIFF = b"RIFF\x24\x08\x00\x00WAVEfmt " + b"\x00" * 4
 OGG = b"OggS\x00\x02\x00\x00" + b"\x00" * 8
 M4A = b"\x00\x00\x00\x20ftypM4A " + b"\x00" * 4
+# 本地演示曲库（2026-09-22）：5 首 flac，魔数 `fLaC` + STREAMINFO 块头
+FLAC = b"fLaC\x00\x00\x00\x22" + b"\x00" * 8
 
 
 def test_sniff_audio_ext_known_containers():
@@ -27,6 +29,7 @@ def test_sniff_audio_ext_known_containers():
     assert sniff_audio_ext(WAV_RIFF) == "wav"
     assert sniff_audio_ext(OGG) == "ogg"
     assert sniff_audio_ext(M4A) == "m4a"
+    assert sniff_audio_ext(FLAC) == "flac"
 
 
 def test_sniff_audio_ext_unknown():
@@ -44,6 +47,9 @@ def test_resolve_media_type_sniff_beats_extension():
     # 嗅探不出（如参考旋律 wav 被截断读取）→ 按扩展名
     assert resolve_media_type(b"", "wav") == "audio/wav"
     assert resolve_media_type(b"", "webm") == "audio/webm"
+    # flac（2026-09-22 本地演示曲库）：嗅探与按扩展名都要给 audio/flac（修复前回落 audio/mpeg）
+    assert resolve_media_type(FLAC, "flac") == "audio/flac"
+    assert resolve_media_type(b"", "flac") == "audio/flac"
     # 扩展名与内容都不可识别 → 默认 audio/mpeg（不抛错）
     assert resolve_media_type(b"", "weird") == "audio/mpeg"
 

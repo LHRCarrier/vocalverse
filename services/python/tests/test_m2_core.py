@@ -380,6 +380,43 @@ def test_published_song_asset_survives_ttl(client, auth_headers, settings):
     assert asset.exists(), "平台素材被惰性清理删除（修复前行为）"
 
 
+def test_published_song_flac_asset_playable(client, auth_headers, settings):
+    """已发布歌曲的 **flac** 参考旋律可回放（2026-09-22 本地演示曲库回归）。
+
+    修复前必失败：文件名白名单只认 `mp3|wav|m4a|ogg|webm`，本地演示曲库 8 首里有 7 首是
+    flac → 唱吧「听参考旋律」全部 **400 bad audio name**（浏览器网络面板实测），
+    mp3 那首正常——即用户在控制台看到的 `demo_*.flac 400`。
+    """
+    from pathlib import Path
+
+    from app.db import get_session_factory
+    from app.models import Song
+    from app.models.base import ContentStatus, PitchRefStatus
+
+    db = get_session_factory()()
+    try:
+        db.add(
+            Song(
+                title="FLAC Probe",
+                level=1,
+                audio_url="/data/audio/demo_flac_probe.flac",
+                status=ContentStatus.PUBLISHED,
+                pitch_ref_status=PitchRefStatus.READY,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    asset = Path(settings.audio_dir) / "demo_flac_probe.flac"
+    asset.parent.mkdir(parents=True, exist_ok=True)
+    asset.write_bytes(b"fLaC\x00\x00\x00\x22")  # 有效 flac 魔数（回放不解码内容）
+
+    resp = client.get("/api/v1/audio/demo_flac_probe.flac", headers=auth_headers)
+    assert resp.status_code == 200, resp.text  # 修复前：400 bad audio name
+    assert resp.headers["content-type"].startswith("audio/flac")  # 修复前：audio/mpeg
+
+
 def test_user_recording_still_expires_after_ttl(client, auth_headers, settings):
     """用户录音的 24h 保留期不因上面的分流而失效（隐私口径回归护栏）。
 
