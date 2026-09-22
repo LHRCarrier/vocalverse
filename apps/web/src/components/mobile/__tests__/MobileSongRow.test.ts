@@ -147,6 +147,21 @@ describe('MobileSongRow · 专辑封面（2026-09-22）', () => {
     expect(w.find('.m-sing-row__cover svg').exists()).toBe(true)
   })
 
+  it('窄屏契约（2026-09-23 真机反馈「歌名显示有问题」）：≤400px 收窄右侧控件、药丸只留图标', () => {
+    // 375px 真机下固定控件把歌名挤到 82px → 「Cyberangel」都被截断；窄屏媒体查询把
+    // 「去跟唱」收成 32px 图标键、封面 46、红心 36、内外边距收紧，歌名可用宽度回到 ≈150px。
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { readFileSync } = require('node:fs') as typeof import('node:fs')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { resolve } = require('node:path') as typeof import('node:path')
+    const css = readFileSync(resolve(process.cwd(), 'src/styles/mobile-sing.css'), 'utf-8')
+    const mq = css.slice(css.indexOf('@media (max-width: 400px)'))
+    expect(mq).toContain('.m-sing-row__sing-text')
+    expect(mq).toContain('display: none')
+    expect(mq).toContain('width: 32px')
+    expect(mq).toContain('width: 46px')
+  })
+
   it('样式契约：封面 52×52/圆角 10 在本页作用域内定义 + 图片铺满（读源文件，改回即红）', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { readFileSync } = require('node:fs') as typeof import('node:fs')
