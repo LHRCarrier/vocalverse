@@ -11577,6 +11577,17 @@
             ],
             "title": "Audio Url"
           },
+          "instrumental_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrumental Url"
+          },
           "pitch_ref_status": {
             "type": "string",
             "title": "Pitch Ref Status"
@@ -11745,6 +11756,17 @@
               }
             ],
             "title": "Audio Url"
+          },
+          "instrumental_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrumental Url"
           },
           "pitch_ref_status": {
             "type": "string",

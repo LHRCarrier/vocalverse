@@ -3202,6 +3202,8 @@ export interface components {
             cover_url?: string | null;
             /** Audio Url */
             audio_url?: string | null;
+            /** Instrumental Url */
+            instrumental_url?: string | null;
             /** Pitch Ref Status */
             pitch_ref_status: string;
             /** Expected Lines */
@@ -3251,6 +3253,8 @@ export interface components {
             cover_url?: string | null;
             /** Audio Url */
             audio_url?: string | null;
+            /** Instrumental Url */
+            instrumental_url?: string | null;
             /** Pitch Ref Status */
             pitch_ref_status: string;
             /** Expected Lines */

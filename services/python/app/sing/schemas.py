@@ -54,6 +54,8 @@ class SongSummary(BaseModel):
     cover_url: str | None = None
     # 参考旋律音频（共享卷路径）：前端取 basename 走 /api/v1/audio/{name} 回放
     audio_url: str | None = None
+    # 伴奏轨（2026-09-22）：跟唱录音期间播放的 no_vocals（可空 → 前端回退无伴奏）
+    instrumental_url: str | None = None
     pitch_ref_status: str
     expected_lines: int
     # 当前用户收藏态（2026-09-10）：前端每首歌一个收藏按钮的初始态

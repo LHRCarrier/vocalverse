@@ -175,6 +175,9 @@ class Song(TimestampMixin, Base):
     # 独立参考人声轨（2026-09-09 唱歌 P0 D1 拍板）：无语义/有则优先音频提取输入
     # （pyin 输入「vocal_ref 有→用它；无→audio_url」两级回退）；Java SongUpsert 可选字段
     vocal_ref_url: Mapped[str | None] = mapped_column(String(512))
+    # 伴奏轨（2026-09-22 用户口径「伴奏是唱的时候放的」）：Demucs 分离的 no_vocals，
+    # 跟唱录音期间由前端播放；原唱（audio_url）仍只用于试听。可空（老曲/示例曲无此轨）。
+    instrumental_url: Mapped[str | None] = mapped_column(String(512))
 
     __table_args__ = (
         CheckConstraint("level BETWEEN 1 AND 4", name="level"),

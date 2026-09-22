@@ -138,6 +138,8 @@ def _song_summary(s: Song, expected_lines: int, favorited: bool = False) -> dict
         # 参考旋律音频（共享卷路径）：前端取 basename 走 /api/v1/audio/{name} 回放——
         # 2026-09-09 真机反馈：无参考音时用户凭记忆清唱，音准普遍偏低
         "audio_url": s.audio_url,
+        # 伴奏轨（2026-09-22）：跟唱录音期间播放（原唱 audio_url 仍只用于试听）
+        "instrumental_url": s.instrumental_url,
         "pitch_ref_status": s.pitch_ref_status,
         "expected_lines": expected_lines,
         # 当前用户收藏态（2026-09-10）：前端每首歌一个收藏按钮的初始态
