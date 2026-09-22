@@ -3,6 +3,28 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 酒馆立绘展示骨架（show_portrait 工具 → SSE portrait → 前端状态）· 1 op
+
+> 归属：Python 后端 + Web 契约层（App 页面展示侧由「跑团页面重做」另一条线接，其改动未提交、本记录不含）。
+> docs/54 §4 的 P1 第一步（只落触发与通路，图源与页面展示后续接）。
+
+- **工具**（`app/trpg/tools/show_portrait.py`，注册表第 3 个工具）：DM 在关键节点调用；
+  handler 用 `state.find_entity` 校验实体（限 npc/pc、已离场拒绝）→ outcome 带 `portrait` 载荷；
+  **只发展示信号、不生成图**（`media_id`/`url` 暂空，docs/54 P1 落 `portrait_media_id` 后回填）；
+  实体不存在/离场 → 错误文本回填模型，不打断回合。
+- **通路**：`turn.py` 工具循环转发 `portrait`（**同回合同角色去重**）→ `events.PortraitShow` →
+  `service.stream_turn` 下发 SSE；`prompts.py` 增 DM 规则 7（关键节点可调用、同场景同角色至多一次）。
+- **前端数据层**：`audio/trpg-sse-types.ts`（新增 `TrpgPortraitEvent`）+ `useTavernSession`
+  （`portrait` 状态 + `dismissPortrait`）。展示侧未接：页面重做线落地后消费 `portrait` 即可自动开立绘展台。
+- **测试**：`test_trpg.py::test_turn_with_portrait_tool`（脚本化 LLM：已登记角色 → 1 条 portrait 事件；
+  同回合重复调用去重；未登记实体不发展示信号；图源字段为空）；`test_trpg_tools.py` 工具清单断言更新。
+- **顺带修复两例存量日期敏感失败**（与本功能无关，但挡全量门禁，一并修）：
+  `test_internal_checkin.py`（UTC 凌晨窗口 `now-3h` 跨日界 → 重锚当日 03:00）、
+  `src/stores/__tests__/checkin.test.ts`（写死 `2026-09-20` 当「昨天」→ 改按日历回拨）。
+- **门禁**：ruff check/format 绿；pytest **776 passed, 4 skipped**；web `lint`/`typecheck`/**365 passed**/`build` 绿。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-22 酒馆工具注册表重构：平铺 tools.py → tools/ 包（一工具一文件 + 注册表）· 1 op
 
 > 归属：Python 后端（`app/trpg`）。**零接口/SSE 契约变化**（trpg 回归用例证明）；`docs/52 §6` 已同步。
