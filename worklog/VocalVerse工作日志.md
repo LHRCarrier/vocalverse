@@ -3,6 +3,26 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 审核自动送审（Jev）接入 + 管理端审核闭环 4 处缺陷修复 · 1 op
+
+> 归属：Java 后端（自动送审链路 + 队列查询）+ 管理端控制台前端（`apps/admin`）。
+> 设计文档 `docs/58`（README 索引已登记）；BUG 归档 `worklog/BUG实测/审核队列升级件消失与看板口径错位.md`。
+
+- **Jev 接入**（TypeSafe System One 决策模型；**只建单、不自动处置**）：
+  - 触发链：`CommunityService` 发帖/评论 → 事务内发 `ContentPublishedEvent` → `@TransactionalEventListener(AFTER_COMMIT)`
+    → 单线程有界队列（满则丢弃 + WARN）→ `ModerationAutoScreen.screen()`（`REQUIRES_NEW`）→ `JevHttpClient`；
+  - 判定：一次调用并行问「是否违规（noul）/ 类型（choice，选项键与 `REASON_CODES` 逐字同值）/ 严重度（score 0~3）」；
+    阈值 `≥0.7` 建单，severity 映射优先级（≥2.5→1 / ≥1.5→2 / 其余 3），证据写 `snapshot.ai`，审计复用 `moderation.case.create` + `detail.source='auto'`；
+  - 失败语义 fail-open：无密钥短路、超时/429/529/解析失败/队列满一律降级放行，绝不阻断发布；
+  - 开关 `VOICEVERSE_MODERATION_AUTO_SCREEN`（默认 false，已登记 `docs/06 §17` / `docs/50 §13.2`）；密钥 `TYPESAFE_API_KEY` 走 `.env`（不入库）。
+- **审核闭环修复**：①队列 `status=open`（= pending+escalated，升级件不再从默认待办消失）；②趋势图「新建」改接 `created`（原接 `pending`，图例与数据不符）；③`decision_note` 弹窗文案对齐 `docs/51 B-4`（**不下发作者**）；④举报 handle 只发 `decision`（删双键 hack 与 `as unknown as` 断言）。
+- **测试**：Java 新增 6 例（5 例送审链路走**真实 HTTP 桩**：命中建单/低于阈值/上游 500 降级/评论送审/升级件留在 open 队列；1 例问题契约钉死选项=原因码），全量 `mvn -B -ntp verify -DskipITs` → **185 passed, 0 failed**，spotless 通过；管理端 `pnpm lint/typecheck/test/build` 全绿（**81 passed**）；`check_pg_typed_params.py`、`check_feature_flags.py` 绿；Java 契约快照已刷新（仅 status `@Pattern` 增 `open`）。
+- **真实冒烟**（非测试桩）：直连 `api.typesafe.ai` 一次 → HTTP 200、`model=jev-1.13.0`、端到端 6.16s（美西→本地，含 TLS 握手）。
+- **不做（登记 docs/58 §8）**：自动隐藏/删除、媒体与私信送审、送审重试队列、敏感词库（P1）。
+- **遗留**：C 端举报入口仍缺（本轮未动，docs/58 §5.5 登记）；作者侧处置原因下发属 P6（`docs/51 B-4`）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-22 酒馆闭环双视角评审 + 优化轮后端段（P0 机制真局触发）· 2 op
 
 > 归属：评审为全局（报告 `docs/57`）；本段为 **Python 后端**修复。前端修复段另记（安卓日志）。
