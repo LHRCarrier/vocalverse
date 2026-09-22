@@ -3,6 +3,32 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 社区流打卡可见性：他人打卡不进流（Java 谓词 + 回归测试）· 1 op
+
+> 归属：社区 feed 读路径（`PostRepository.feed` + `CommunityService.feed`）。用户口径：「社区里的打卡全部去掉，只能看到自己的打卡（影响体验）」。
+> 契约口径同步 docs/37 §5（feed 说明补「checkin 仅本人可见」）。
+
+- **改动**：`PostRepository.feed` 增加 `viewerId` 谓词 `kind <> 'checkin' OR author_id = viewerId`（`CommunityService.feed` 传 actorId）。
+  普通帖、领域过滤、keyset 分页、`mine=true`（我的发帖，含自己的打卡）语义均不变；关注流（`followingFeed`）未改（关注对象自选，保持原语义）。
+- **测试**：新增 `CommunityFeedCheckinFilterTest` 3 例——① 他人打卡被排除 + 自己打卡保留 + 普通帖不受影响；② 另一账号视角只见自己的卡；③ `mine=true` 仍回自己的打卡。
+  community 全包 **53 tests 全绿**（含新增 3 例）；`mvn spotless:apply` 通过。
+- **验证**：重启 Java 后实测 luna feed（`limit=40`）→ 20 条里 checkin 仅 luna 自己 3 张，Leo 的 7 张不再出现；打卡页（连续 3 天）与「我的发帖」正常；
+  截图 `local/演示数据/_验收截图/社区首页-无他人打卡.png`。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
+## 2026-09-22 演示数据切片七（社区视频帖再补 10 条 · 累计 23 条）· 1 op
+
+> 归属：演示数据准备（gitignored `local/演示数据/`；素材商用版权只本地，不入 git）。用户口径：「再找10个视频」。
+
+- **选片**：B 站搜索 API（英文歌翻唱/欧美；`duration=1` 按播放排序）→ 10 条（Numb / Diamonds / Shape of You / golden hour / Let It Go / Animals / Take Me Hand / Lovely /
+  Nothing's Gonna Change My Love for You / Wake Me Up When September Ends），与既有 13 条 bvid 零重复；1 条候选无可用格式（Counting Stars）按 SOP 换备选。
+- **落地**：追加 `videos.json`（英文标题 + 原创英文正文 + 作者分派）→ `fetch_bili_videos.py` 新增 10 / 跳过 13 → `seed_videos.py` 新建 10（幂等：第二次全「已存在」）。
+- **验证**：`vv-bili-*` 帖 **23** 条、video 媒体 23 条；接口分页 3 页 49 帖中新帖 10/10 带 `url`/`coverUrl`/`durationS`；Playwright 实测播放（Numb 0:12/3:23）；
+  截图 `local/演示数据/_验收截图/slice7-m-home.png`、`slice7-post57-numb-playing.png`；详情见 `local/演示数据/_log/slice7-videos2.md`。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-22 演示数据切片六（社区视频帖 · B 站素材 → 本地媒体 → 13 条视频帖）· 1 op
 
 > 归属：演示数据准备（gitignored `local/演示数据/`；素材是商用版权内容，**只落本地，不入 git / 不上生产**）。
