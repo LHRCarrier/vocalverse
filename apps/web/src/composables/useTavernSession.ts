@@ -22,7 +22,10 @@ import {
 import type { TrpgSseEvent } from '@/audio/trpg-sse-types'
 import { MIN_RECORD_MS, VoiceRecorder, micErrorMessage } from '@/audio/recorder'
 import type { TavernAudio } from '@/composables/useTavernAudio'
+import { useTavernCast } from '@/composables/useTavernCast'
 import { useTavernConsole } from '@/composables/useTavernConsole'
+import { useTavernEncounter } from '@/composables/useTavernEncounter'
+import { useTavernQuest } from '@/composables/useTavernQuest'
 
 export interface TavernRow {
   role: 'user' | 'assistant'
@@ -270,6 +273,19 @@ export function useTavernSession(audio: TavernAudio) {
           payload: { trpg_sys: e.trpg_sys, ...e.payload },
         })
         break
+      /* 闭环事件（docs/56 §5）：本层只做委派，派生在各自领域 composable */
+      case 'quest':
+        questDomain.apply(e)
+        break
+      case 'ending':
+        questDomain.applyEnding(e)
+        break
+      case 'character':
+        castDomain.apply(e)
+        break
+      case 'encounter':
+        encounterDomain.apply(e)
+        break
       case 'audio_chunk':
         // 逐词高亮：服务端带句子文本与偏移（docs/52 §12.3）
         audio.queueChunk(
@@ -311,6 +327,11 @@ export function useTavernSession(audio: TavernAudio) {
     },
   })
 
+  /** 闭环领域状态（docs/56 §6：一域一 composable；本层只转发事件 + 暴露） */
+  const questDomain = useTavernQuest(state)
+  const castDomain = useTavernCast(state)
+  const encounterDomain = useTavernEncounter(state)
+
   function dispose() {
     abort.abort()
     audio.flush()
@@ -351,6 +372,9 @@ export function useTavernSession(audio: TavernAudio) {
     sendText,
     toggleMic,
     dispose,
+    quest: questDomain,
+    cast: castDomain,
+    encounter: encounterDomain,
     ...consoleActions,
   }
 }

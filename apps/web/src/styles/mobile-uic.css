@@ -7110,6 +7110,469 @@ button.u-notes__card {
   resize: vertical;
 }
 
+/* ---- 进度钟条（docs/56 §6：任务名 + 分段刻度；正向=琥珀 / 威胁=红调 / 满格强调）---- */
+.t-clocks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+
+.t-clock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border: 1.5px solid var(--t-line-strong);
+  border-left: 4px solid var(--t-amber);
+  border-radius: 10px;
+  background: var(--t-card);
+  box-shadow: var(--t-shadow);
+}
+
+.t-clock--threat {
+  border-left-color: var(--t-hp);
+}
+
+.t-clock.is-full {
+  border-color: var(--t-amber);
+  background: var(--t-amber-soft);
+  box-shadow: 0 0 0 2px rgba(212, 136, 26, 0.22), var(--t-shadow);
+}
+
+.t-clock--threat.is-full {
+  border-color: var(--t-hp);
+  background: var(--t-hp-soft);
+  box-shadow: 0 0 0 2px rgba(210, 76, 62, 0.22), var(--t-shadow);
+}
+
+.t-clock.is-closed {
+  opacity: 0.55;
+}
+
+.t-clock__name {
+  flex: 1;
+  min-width: 0;
+  color: var(--t-teal-dark);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.t-clock__pips {
+  display: inline-flex;
+  flex: none;
+  gap: 3px;
+}
+
+.t-clock__pip {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--t-line-strong);
+  border-radius: 3px;
+  background: transparent;
+}
+
+.t-clock--positive .t-clock__pip.is-lit {
+  border-color: var(--t-amber);
+  background: var(--t-amber);
+}
+
+.t-clock--threat .t-clock__pip.is-lit {
+  border-color: var(--t-hp);
+  background: var(--t-hp);
+}
+
+.t-clock__num {
+  flex: none;
+  min-width: 52px;
+  color: var(--t-ink-light);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* ---- 在场角色条（docs/56 §6：头像 + 名字；arriving 脉冲 / departed 置灰）---- */
+.t-cast {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.t-cast::-webkit-scrollbar {
+  display: none;
+}
+
+.t-cast__item {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 62px;
+  padding: 6px 4px;
+  border: 1.5px solid var(--t-line);
+  border-radius: 12px;
+  background: var(--t-card);
+  box-shadow: 0 2px 6px rgba(23, 51, 56, 0.06);
+  font-family: var(--u-font);
+  cursor: pointer;
+}
+
+.t-cast__ava {
+  width: 38px;
+  height: 38px;
+  border: 2px solid var(--t-amber);
+  border-radius: 10px;
+  background: var(--t-teal-deep);
+  color: #fff7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 800;
+  overflow: hidden;
+}
+
+.t-cast__item--pc .t-cast__ava {
+  border-color: var(--t-teal-deep);
+}
+
+.t-cast__ava img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.t-cast__name {
+  max-width: 100%;
+  color: var(--t-ink);
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.t-cast__note {
+  color: var(--t-amber-dark);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.t-cast__item.is-arriving .t-cast__note {
+  animation: t-blink 1.1s steps(2, start) infinite;
+}
+
+.t-cast__item.is-arriving .t-cast__ava {
+  border-style: dashed;
+}
+
+.t-cast__item.is-departed {
+  opacity: 0.5;
+}
+
+/* ---- 遭遇卡（docs/56 §6：轮次 + 先攻序 + HP）---- */
+.t-enc {
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  border: 1.5px solid rgba(210, 76, 62, 0.35);
+  border-radius: 10px;
+  background: var(--t-hp-soft);
+}
+
+.t-enc__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.t-enc__title {
+  color: #b4281a;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.t-enc__round {
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(210, 76, 62, 0.16);
+  color: #b4281a;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.t-enc__turn {
+  margin-left: auto;
+  color: var(--t-ink-mid);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.t-enc__order {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.t-enc__pip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: 1px solid var(--t-line);
+  border-radius: 7px;
+  background: var(--t-card);
+  color: var(--t-ink-mid);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.t-enc__pip.is-current {
+  border-color: var(--t-amber);
+  background: var(--t-amber-soft);
+  color: var(--t-amber-dark);
+  font-weight: 800;
+}
+
+.t-enc__pip.is-npc .t-enc__pip-name {
+  color: #b4281a;
+}
+
+.t-enc__hp {
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.t-enc__hp--none {
+  color: var(--t-ink-light);
+  font-weight: 400;
+}
+
+.t-enc__sep {
+  margin-left: 2px;
+  color: var(--t-line-strong);
+  font-weight: 800;
+}
+
+/* ---- 动作面板（docs/56 §6：贴输入 dock 上方；攻击确认 + 道具 + 建议行动）---- */
+.t-act-panel {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1.5px solid var(--t-line-strong);
+  border-radius: 14px;
+  background: rgba(255, 253, 248, 0.96);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 -2px 12px rgba(23, 51, 56, 0.08);
+}
+
+.t-act-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.t-act-panel__row::-webkit-scrollbar {
+  display: none;
+}
+
+.t-act-panel__label {
+  flex: none;
+  color: var(--t-ink-light);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.t-act-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--t-line-strong);
+  border-radius: var(--u-r-pill);
+  background: var(--t-card);
+  color: var(--t-teal-dark);
+  font-family: var(--u-font);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.t-act-chip svg {
+  width: 14px;
+  height: 14px;
+}
+
+.t-act-chip:disabled {
+  opacity: 0.5;
+}
+
+.t-act-chip--attack {
+  border-color: rgba(210, 76, 62, 0.4);
+  background: var(--t-hp-soft);
+  color: #b4281a;
+}
+
+.t-act-chip--item {
+  border-color: rgba(212, 136, 26, 0.4);
+  background: var(--t-amber-soft);
+  color: var(--t-amber-dark);
+}
+
+.t-act-chip__hp {
+  font-size: 9.5px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.t-act-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.t-act-confirm__ask {
+  color: #b4281a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.t-act-confirm__select {
+  height: 30px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--u-r-pill);
+  background: var(--u-track);
+  color: var(--u-ink);
+  font-family: var(--u-font);
+  font-size: 12px;
+}
+
+.t-act-confirm__btn {
+  flex: none;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--t-line-strong);
+  border-radius: var(--u-r-pill);
+  background: var(--t-card);
+  color: var(--t-ink-mid);
+  font-family: var(--u-font);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.t-act-confirm__btn--go {
+  border-color: var(--t-hp);
+  background: var(--t-hp);
+  color: #fff;
+}
+
+/* 动作面板展开时给消息流让位（避免末条消息被固定 dock 压住） */
+.t-page--actions .u-content--dock {
+  padding-bottom: 300px;
+}
+
+/* ---- 尾声卡（docs/56 §6：结局标题/档位徽标/正文/后日谈；系统卡分支）---- */
+.t-ending {
+  padding: 14px 16px;
+  border: 2px solid var(--t-amber);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(212, 136, 26, 0.16) 0%, transparent 55%),
+    var(--t-card);
+  box-shadow: var(--t-shadow);
+}
+
+.t-ending--miss {
+  border-color: var(--t-hp);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(210, 76, 62, 0.14) 0%, transparent 55%),
+    var(--t-card);
+}
+
+.t-ending__kicker {
+  color: var(--t-ink-light);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.t-ending__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.t-ending__badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--t-amber);
+  color: #fffdf8;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.t-ending--miss .t-ending__badge {
+  background: var(--t-hp);
+}
+
+.t-ending__title {
+  color: var(--t-teal-dark);
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.t-ending__text {
+  margin: 10px 0 0;
+  color: var(--t-ink);
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.t-ending__epilogue {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed var(--t-line-strong);
+  color: var(--t-ink-light);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.7;
+}
+
+/* 展台占位（NPC 无挂图且未命中内置素材：名字首字） */
+.t-standee__ph {
+  width: 140px;
+  height: 140px;
+  border: 3px solid var(--t-amber);
+  border-radius: 24px;
+  background: var(--t-teal-deep);
+  color: #fff7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64px;
+  font-weight: 900;
+  box-shadow: 0 10px 24px rgba(23, 51, 56, 0.28);
+}
+
 /* ============================================================
  * 设置与隐私三页（docs/53 P5 ④ · /m/settings/:section）
  * ============================================================ */

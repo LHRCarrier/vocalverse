@@ -11,6 +11,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useTavernAudio } from '@/composables/useTavernAudio'
+import type { TavernCastMember } from '@/composables/useTavernCast'
 import { useTavernCards } from '@/composables/useTavernCards'
 import { useTavernMarks } from '@/composables/useTavernMarks'
 import { useTavernMessageActions } from '@/composables/useTavernMessageActions'
@@ -20,13 +21,16 @@ import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
+import TrpgActionPanel from '@/components/mobile/trpg/TrpgActionPanel.vue'
 import TrpgBottomBar from '@/components/mobile/trpg/TrpgBottomBar.vue'
 import TrpgCampaignPicker from '@/components/mobile/trpg/TrpgCampaignPicker.vue'
 import TrpgCardSheet from '@/components/mobile/trpg/TrpgCardSheet.vue'
+import TrpgCastBar from '@/components/mobile/trpg/TrpgCastBar.vue'
 import TrpgConsoleSheet from '@/components/mobile/trpg/TrpgConsoleSheet.vue'
 import TrpgMessageActions from '@/components/mobile/trpg/TrpgMessageActions.vue'
 import TrpgMessageItem from '@/components/mobile/trpg/TrpgMessageItem.vue'
 import TrpgOnboarding from '@/components/mobile/trpg/TrpgOnboarding.vue'
+import TrpgQuestBar from '@/components/mobile/trpg/TrpgQuestBar.vue'
 import TrpgSettingsSheet from '@/components/mobile/trpg/TrpgSettingsSheet.vue'
 import TrpgStageHeader from '@/components/mobile/trpg/TrpgStageHeader.vue'
 import TrpgStandeeSheet from '@/components/mobile/trpg/TrpgStandeeSheet.vue'
@@ -36,9 +40,7 @@ import '@/styles/mobile-uic.css'
 const router = useRouter()
 const auth = useAuthStore()
 const ui = useUiStore()
-const avatarLetter = computed(() =>
-  (auth.me?.nickname ?? auth.me?.username ?? '我').slice(0, 1).toUpperCase(),
-)
+const avatarLetter = computed(() => (auth.me?.nickname ?? auth.me?.username ?? '我').slice(0, 1).toUpperCase())
 const pcName = computed(() => auth.me?.nickname ?? auth.me?.username ?? '冒险者')
 
 const audio = useTavernAudio()
@@ -91,56 +93,45 @@ const pickerOpen = ref(false)
 const settingsOpen = ref(false)
 const cardsOpen = ref(false)
 const standeeOpen = ref(false)
-const standeeHero = ref<'dm' | 'pc'>('dm')
+const standeeHero = ref<'dm' | 'pc' | 'npc'>('dm')
+/** 立绘展台聚焦的任意角色（NPC 点击 / portrait 事件；null = 只看 DM/PC 档案） */
+const standeeNpc = ref<{ name: string; kind: string; portraitUrl: string | null; note?: string | null } | null>(null)
+
+/* ---- 闭环领域数据（docs/56 §6：useTavernSession 暴露的三个域 composable） ---- */
+const { quests: questClocks } = session.quest
+const { members: castMembers } = session.cast
+const { encounter: activeEncounter, participants: encounterParticipants } = session.encounter
+const { attackTargets, items: usableItems, suggestions: quickActions } = session.encounter
+const hasQuickActions = computed(
+  () => activeEncounter.value != null || attackTargets.value.length > 0 || usableItems.value.length > 0,
+)
 
 /** 副本任务卡「目标」行：全部 active 任务用 ` / ` 连接（对原型 mission-deck 的目标行） */
-const goalText = computed(() => {
-  const titles = state.value?.tasks.filter((t) => t.status === 'active').map((t) => t.title) ?? []
-  return titles.length ? titles.join(' / ') : null
-})
-const clueCount = computed(() => state.value?.clues.length ?? 0)
-const npcList = computed(
-  () => state.value?.entities.filter((e) => e.kind === 'npc').map((e) => e.name) ?? [],
+const goalText = computed(
+  () => state.value?.tasks.filter((t) => t.status === 'active').map((t) => t.title).join(' / ') || null,
 )
+const clueCount = computed(() => state.value?.clues.length ?? 0)
 
 watch(campaignId, (id) => { marks.load(id); translations.clear() }, { immediate: true })
 
-onMounted(() => {
-  void session.boot()
-  void loadPrefs()
-  void loadCards()
-})
+onMounted(() => { void session.boot(); void loadPrefs(); void loadCards() })
 
-onUnmounted(() => {
-  session.dispose()
-})
+onUnmounted(() => session.dispose())
 
 /** 会话滚到底：滚动容器是 window（.u-phone 为文档流，不是内部 scrollport）；
  *  此前对 .t-log 调 scrollTo 无效 → 新消息会被固定 dock 压住（2026-09-22 实测修复）。 */
 function scrollToLatest(smooth = true) {
-  window.scrollTo({
-    top: document.documentElement.scrollHeight,
-    behavior: smooth ? 'smooth' : 'auto',
-  })
+  window.scrollTo({ top: document.documentElement.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
 }
 
-watch(
-  () => rows.value.length,
-  async () => {
-    await nextTick()
-    scrollToLatest(false)
-  },
-)
+watch(() => rows.value.length, async () => {
+  await nextTick()
+  scrollToLatest(false)
+})
 
-async function onSwitch(id: number) {
-  pickerOpen.value = false
-  await session.switchCampaign(id)
-}
+async function onSwitch(id: number) { pickerOpen.value = false; await session.switchCampaign(id) }
 
-async function onRestart() {
-  pickerOpen.value = false
-  await session.restartCampaign()
-}
+async function onRestart() { pickerOpen.value = false; await session.restartCampaign() }
 
 /* ---- 设置 ---- */
 async function onPrefsUpdate(patch: Parameters<typeof savePrefs>[0]) {
@@ -149,10 +140,7 @@ async function onPrefsUpdate(patch: Parameters<typeof savePrefs>[0]) {
 }
 
 /* ---- 场景卡 ---- */
-function openCards() {
-  cardsOpen.value = true
-  void loadCards()
-}
+function openCards() { cardsOpen.value = true; void loadCards() }
 
 async function onStartCard(id: number) {
   const newCampaignId = await startFromCard(id)
@@ -173,10 +161,25 @@ async function onCreateCard(payload: { title: string; scene: string; opening_lin
 }
 
 /* ---- 角色立绘 / 属性检定 ---- */
-function openStandee(hero: 'dm' | 'pc') {
-  standeeHero.value = hero
-  standeeOpen.value = true
+function openStandee(hero: 'dm' | 'pc' | 'npc') { standeeHero.value = hero; standeeOpen.value = true }
+
+/** 聚焦任意角色开立绘展台（在场角色条点选 / portrait 事件；立绘回退在展台内完成） */
+function openStandeeFor(name: string, kind: string, url: string | null, note: string | null = null) {
+  standeeNpc.value = { name, kind, portraitUrl: url, note }
+  openStandee('npc')
 }
+
+const onCastSelect = (member: TavernCastMember) => openStandeeFor(member.name, member.kind, member.portraitUrl, member.note)
+
+/** 立绘事件（关键节点信号）：开立绘展台聚焦该角色，消费后清空 */
+watch(
+  () => session.portrait.value,
+  (portrait) => {
+    if (!portrait) return
+    openStandeeFor(portrait.entity, portrait.kind, portrait.url)
+    session.dismissPortrait()
+  },
+)
 
 /** 立绘抽屉「属性检定」→ 现有 D20 桌骰（真实请求；属性系统为占位，见组件注释） */
 function onStandeeRoll() {
@@ -187,7 +190,7 @@ function onStandeeRoll() {
 </script>
 
 <template>
-  <div class="u-phone t-page">
+  <div class="u-phone t-page" :class="{ 't-page--actions': hasQuickActions }">
     <div
       class="v-line"
       :class="`v-line--${status}`"
@@ -247,6 +250,9 @@ function onStandeeRoll() {
           :status="status"
         />
 
+        <TrpgQuestBar :quests="questClocks" />
+        <TrpgCastBar :members="castMembers" @select="onCastSelect" />
+
         <div class="t-log">
           <TrpgMessageItem
             v-for="(m, i) in rows"
@@ -286,7 +292,16 @@ function onStandeeRoll() {
       @send="session.sendText"
       @toggle-mic="session.toggleMic"
       @roll="session.onRoll({ dice: 'd20' })"
-    />
+    >
+      <template #panel>
+        <TrpgActionPanel
+          v-if="hasQuickActions"
+          :attack-targets="attackTargets" :items="usableItems" :quick-actions="quickActions"
+          :encounter="activeEncounter" :participants="encounterParticipants" :disabled="sending"
+          @send="session.sendText"
+        />
+      </template>
+    </TrpgBottomBar>
 
     <TrpgConsoleSheet
       v-if="state"
@@ -377,8 +392,9 @@ function onStandeeRoll() {
       :tasks="activeTasks"
       :clues="clueCount"
       :facts="state.facts"
-      :npcs="npcList"
+      :npcs="[...npcNames]"
       :initial-hero="standeeHero"
+      :npc="standeeNpc"
       @close="standeeOpen = false"
       @roll="onStandeeRoll"
     />

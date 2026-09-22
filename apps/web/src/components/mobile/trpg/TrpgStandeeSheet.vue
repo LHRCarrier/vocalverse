@@ -13,9 +13,9 @@ import { computed, ref, watch } from 'vue'
 import type { TrpgFactItem } from '@/api/trpg'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 
-import { TAVERN_ART } from './art'
+import { TAVERN_ART, npcAvatar } from './art'
 
-type Hero = 'dm' | 'pc'
+type Hero = 'dm' | 'pc' | 'npc'
 
 const props = withDefaults(
   defineProps<{
@@ -30,8 +30,10 @@ const props = withDefaults(
     npcs: string[]
     /** 打开时定位的档案页（消息头像/立绘链接传入） */
     initialHero?: Hero
+    /** 任意 NPC 主角（docs/56 §6：点击在场角色条/立绘事件打开；无图时回退内置素材→首字） */
+    npc?: { name: string; kind: string; portraitUrl?: string | null; note?: string | null } | null
   }>(),
-  { scene: null, initialHero: 'dm' },
+  { scene: null, initialHero: 'dm', npc: null },
 )
 
 const emit = defineEmits<{ close: []; roll: [] }>()
@@ -39,9 +41,10 @@ const emit = defineEmits<{ close: []; roll: [] }>()
 const hero = ref<Hero>('dm')
 
 watch(
-  () => props.open,
-  (open) => {
-    if (open) hero.value = props.initialHero
+  [() => props.open, () => props.npc],
+  ([open]) => {
+    if (!open) return
+    hero.value = props.initialHero === 'npc' ? (props.npc ? 'npc' : 'dm') : props.initialHero
   },
 )
 
@@ -56,23 +59,49 @@ const inventoryTags = computed(() =>
 )
 
 const isDm = computed(() => hero.value === 'dm')
-const heroName = computed(() => (isDm.value ? '守密人 (DM)' : props.pcName))
-const heroRole = computed(() =>
-  isDm.value ? '酒馆掌柜 · 规则仲裁者' : '冒险者 · 跑团主角',
+const isNpc = computed(() => hero.value === 'npc' && props.npc != null)
+const heroName = computed(() =>
+  isDm.value ? '守密人 (DM)' : isNpc.value ? (props.npc?.name ?? props.pcName) : props.pcName,
 )
-const heroTraits = computed<string[]>(() =>
-  isDm.value
-    ? [
-        `📖 ${props.campaignName}`,
-        props.scene ? `📍 ${props.scene}` : '📍 未定场景',
-        `🗝 ${props.clues} 线索`,
-        `⚔ ${props.tasks} 任务`,
-        `👥 ${props.npcs.length} 人物`,
-      ]
-    : inventoryTags.value.length
-      ? inventoryTags.value.map((t) => `🎒 ${t}`)
-      : ['🎒 行囊待生成'],
-)
+const heroRole = computed(() => {
+  if (isDm.value) return '酒馆掌柜 · 规则仲裁者'
+  if (isNpc.value) return props.npc?.kind === 'pc' ? '玩家角色 · 同行者' : '剧中人物 · NPC'
+  return '冒险者 · 跑团主角'
+})
+/** NPC 立绘：实体挂图 → 内置素材（art.ts 按名字命中）→ null（组件用首字占位） */
+const npcPortrait = computed(() => {
+  const npc = props.npc
+  if (!npc) return null
+  return npc.portraitUrl || npcAvatar(npc.name)
+})
+const heroImg = computed(() => {
+  if (isDm.value) return TAVERN_ART.dmStandee
+  if (hero.value === 'pc') return TAVERN_ART.pcStandee
+  return npcPortrait.value
+})
+const heroTraits = computed<string[]>(() => {
+  if (isDm.value) {
+    return [
+      `📖 ${props.campaignName}`,
+      props.scene ? `📍 ${props.scene}` : '📍 未定场景',
+      `🗝 ${props.clues} 线索`,
+      `⚔ ${props.tasks} 任务`,
+      `👥 ${props.npcs.length} 人物`,
+    ]
+  }
+  if (isNpc.value) {
+    const kind = props.npc?.kind === 'pc' ? '同行者' : 'NPC'
+    return [
+      `📖 ${props.campaignName}`,
+      props.scene ? `📍 ${props.scene}` : '📍 未定场景',
+      `🎭 ${kind}`,
+      ...(props.npc?.note ? [`📝 ${props.npc.note}`] : []),
+    ]
+  }
+  return inventoryTags.value.length
+    ? inventoryTags.value.map((t) => `🎒 ${t}`)
+    : ['🎒 行囊待生成']
+})
 </script>
 
 <template>
@@ -110,11 +139,21 @@ const heroTraits = computed<string[]>(() =>
           <button
             type="button"
             role="tab"
-            :aria-selected="!isDm"
-            :class="{ 'is-on': !isDm }"
+            :aria-selected="hero === 'pc'"
+            :class="{ 'is-on': hero === 'pc' }"
             @click="hero = 'pc'"
           >
             冒险者 ({{ pcName }})
+          </button>
+          <button
+            v-if="props.npc"
+            type="button"
+            role="tab"
+            :aria-selected="isNpc"
+            :class="{ 'is-on': isNpc }"
+            @click="hero = 'npc'"
+          >
+            {{ props.npc.name }}
           </button>
         </div>
       </div>
@@ -125,11 +164,8 @@ const heroTraits = computed<string[]>(() =>
       </div>
 
       <div class="t-standee__stage">
-        <img
-          class="t-standee__img"
-          :src="isDm ? TAVERN_ART.dmStandee : TAVERN_ART.pcStandee"
-          :alt="`${heroName} 全身立绘（设计稿占位）`"
-        >
+        <img v-if="heroImg" class="t-standee__img" :src="heroImg" :alt="`${heroName} 立绘`">
+        <div v-else class="t-standee__ph" aria-hidden="true">{{ heroName.slice(0, 1) }}</div>
       </div>
 
       <div class="t-standee__details">

@@ -18,6 +18,7 @@ import MobileAvatar from '@/components/mobile/MobileAvatar.vue'
 
 import { TAVERN_ART, npcAvatar } from './art'
 import { buildTrpgLines, groupTrpgParts, tokenizeTrpg } from './segments'
+import TrpgEndingCard from './TrpgEndingCard.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -173,6 +174,9 @@ const lastTextPart = computed(() => {
     <div class="t-card__dice-head">🎲 判定</div>
     <div v-for="(line, i) in diceLines" :key="i" class="t-card__dice-line">{{ line }}</div>
   </section>
+
+  <!-- 系统卡：任务结算尾声（docs/56 §5：ending 额外落系统卡，刷新仍在） -->
+  <TrpgEndingCard v-else-if="isSystem && sysType === 'ending'" :payload="scenePayload" />
 
   <!-- 未知系统卡：降级为文本（前向兼容） -->
   <div v-else-if="isSystem" class="t-scene-line">{{ content || `系统卡：${sysType}` }}</div>

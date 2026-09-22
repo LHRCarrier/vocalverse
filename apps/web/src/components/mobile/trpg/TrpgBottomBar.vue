@@ -32,6 +32,8 @@ function onNav(key: 'hall' | 'tavern' | 'card' | 'chronicle') {
 
 <template>
   <div class="u-chat-dock">
+    <!-- 动作面板槽（快速行动/遭遇战况）：贴输入 dock 上方，内容由页面注入 -->
+    <slot name="panel" />
     <TrpgActionDock
       :sending="sending"
       :recording="recording"

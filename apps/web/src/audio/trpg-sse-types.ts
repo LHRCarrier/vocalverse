@@ -61,6 +61,54 @@ export interface TrpgPortraitEvent {
   url?: string | null
 }
 
+/**
+ * 进度钟更新（docs/56 §5）：`progress` 为显示串 `"3/6"`，`segments` 为总格数，
+ * `full` = 已满格（DM 可结算）；威胁钟满格 = 倒计时走完（坏事发生）。
+ */
+export interface TrpgQuestEvent {
+  type: 'quest'
+  quest: string
+  progress: string
+  segments: number
+  kind: 'positive' | 'threat'
+  reason?: string | null
+  full: boolean
+}
+
+/** 任务结算尾声（同回合 SSE；另落系统卡 `trpg_sys="ending"` 保刷新，docs/56 §5）。 */
+export interface TrpgEndingEvent {
+  type: 'ending'
+  quest: string
+  outcome: 'strong' | 'weak' | 'miss'
+  title: string
+  text: string
+  epilogue: string
+}
+
+/** 人物在场状态变更（arriving=正在赶来 / active=在场 / departed=离场）。 */
+export interface TrpgCharacterEvent {
+  type: 'character'
+  name: string
+  kind: 'npc' | 'pc'
+  status: 'arriving' | 'active' | 'departed'
+  note?: string | null
+}
+
+/** 遭遇状态（start/attack/turn/end 四相；字段按 kind 按需填充，蛇形命名与后端同构）。 */
+export interface TrpgEncounterEvent {
+  type: 'encounter'
+  kind: 'start' | 'attack' | 'turn' | 'end'
+  order?: string[] | null
+  turn?: number | null
+  round?: number | null
+  attacker?: string | null
+  target?: string | null
+  hit?: boolean | null
+  damage?: number | null
+  target_hp?: number | null
+  outcome?: string | null
+}
+
 export interface TrpgTurnEndEvent {
   type: 'turn_end'
   message_id: number
@@ -81,5 +129,9 @@ export type TrpgSseEvent =
   | TrpgAudioChunkEvent
   | TrpgSystemCardEvent
   | TrpgPortraitEvent
+  | TrpgQuestEvent
+  | TrpgEndingEvent
+  | TrpgCharacterEvent
+  | TrpgEncounterEvent
   | TrpgTurnEndEvent
   | TrpgStreamErrorEvent

@@ -47,11 +47,19 @@ export interface TrpgClueItem {
   last_mentioned_at?: string | null
 }
 
+/** 实体立绘（docs/56 §4；未挂图 → null，前端按名字命中内置素材） */
+export interface TrpgEntityPortrait {
+  media_id: string
+  url: string
+}
+
 export interface TrpgEntityItem {
+  id: number
   kind: string
   name: string
   status: string
   pending: boolean
+  portrait: TrpgEntityPortrait | null
 }
 
 export interface TrpgEventItem {
