@@ -6,7 +6,15 @@
 import { describe, expect, it } from 'vitest'
 
 import type { SongDetail } from '@/api/sing'
-import { createFrameRing, eachSilenceSpan, flattenRefF0s, REF_HOP_MS, renderChart, scoreColorOf } from '@/lib/live-chart'
+import {
+  createFrameRing,
+  eachSilenceSpan,
+  flattenRefF0s,
+  octaveAlignedF0,
+  REF_HOP_MS,
+  renderChart,
+  scoreColorOf,
+} from '@/lib/live-chart'
 
 /** 与 renderChart 内部一致的纵轴映射（h = 120） */
 const y2f = (f: number) => 6 + (1 - (Math.log2(f) - Math.log2(65)) / (Math.log2(800) - Math.log2(65))) * (120 - 24)
@@ -252,6 +260,38 @@ describe('live-chart · renderChart（假 ctx 冒烟：不抛错、不依赖 DOM
     for (let i = 0; i < 20; i += 1) ring.push(i * 60, 440)
     renderChart(g, { w: 340, h: 120, x1: 1200, playheadT: 1140, headAlpha: 1, refF0s: new Float32Array(0), ring })
     expect(strokes.filter((s) => s.color === '#b9bdbc')).toHaveLength(0)
+  })
+
+  it('八度等价：用户低一个八度也画在目标音符块上（2026-09-22「怎么唱都不在块内」）', () => {
+    const { g, strokes } = makeRecorder()
+    const ring = createFrameRing(16)
+    for (let i = 0; i < 5; i += 1) ring.push(i * 60, 220) // 用户唱 A3（低一个八度）
+    const refF0s = flattenRefF0s(detail([line(1, 0, Array.from({ length: 20 }, () => 440))])) // 参考 A4
+    renderChart(g, { w: 340, h: 120, x1: 1000, playheadT: 300, headAlpha: 1, refF0s, ring })
+    const trace = strokes.filter((s) => s.color === '#e07a3f')
+    expect(trace.length).toBeGreaterThan(0)
+    expect(trace[trace.length - 1].y).toBeCloseTo(y2f(440), 3) // 对齐到参考的八度，而不是 y2f(220)
+  })
+
+  it('参考缺失段沿用最近一次八度偏移（句间空隙不来回跳）', () => {
+    const { g, strokes } = makeRecorder()
+    const ring = createFrameRing(16)
+    // 前 3 点有参考（440），后 3 点参考缺失（句间空隙）：仍应按 440 画
+    const refF0s = flattenRefF0s(detail([line(1, 0, [440, 440, 440])]))
+    for (let i = 0; i < 6; i += 1) ring.push(i * 60, 220)
+    renderChart(g, { w: 340, h: 120, x1: 1000, playheadT: 400, headAlpha: 1, refF0s, ring })
+    const trace = strokes.filter((s) => s.color === '#e07a3f')
+    expect(trace[trace.length - 1].y).toBeCloseTo(y2f(440), 3)
+  })
+
+  it('octaveAlignedF0：纯函数边界（同八度不动 / ±1 八度回正 / 无参考不动）', () => {
+    expect(octaveAlignedF0(440, 440)).toBe(440)
+    expect(octaveAlignedF0(220, 440)).toBe(440)
+    expect(octaveAlignedF0(880, 440)).toBe(440)
+    expect(octaveAlignedF0(220, 0)).toBe(220) // 参考无声：保持原值
+    expect(octaveAlignedF0(0, 440)).toBe(0)
+    // 非整八度差（差 3 半音）不误判：仍取最近八度，但不会改变半音关系
+    expect(octaveAlignedF0(440 * 2 ** (3 / 12), 440)).toBeCloseTo(440 * 2 ** (3 / 12), 6)
   })
 
   it('折线圆角化：多点轨迹用 quadraticCurveTo（不再逐段 lineTo）', () => {

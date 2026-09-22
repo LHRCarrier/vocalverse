@@ -7,7 +7,13 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { flattenRefMidi, midiSegments, NO_MIDI } from '@/lib/sing-note-lane'
+import {
+  barHeightOf,
+  flattenRefMidi,
+  midiSegments,
+  NO_MIDI,
+  renderNoteLane,
+} from '@/lib/sing-note-lane'
 import { REF_HOP_MS } from '@/lib/live-chart'
 import type { SongDetail } from '@/api/sing'
 
@@ -93,5 +99,68 @@ describe('midiSegments', () => {
 
   it('空轨 → 空段（安全）', () => {
     expect(midiSegments(new Float32Array(0), hop)).toEqual([])
+  })
+})
+
+describe('renderNoteLane · 用户轨迹与目标块同粗（2026-09-22 用户口径）', () => {
+  /** 记录每次「确有路径的」stroke 的颜色与线宽（假 ctx，无 DOM 依赖） */
+  function makeRecorder() {
+    const strokes: Array<{ color: string; width: number }> = []
+    const arcs: Array<{ r: number; color: string }> = []
+    const state = { strokeStyle: '', lineWidth: 0, fillStyle: '', pathOpen: false }
+    const g = new Proxy(
+      {},
+      {
+        get(_t, prop) {
+          if (prop === 'strokeStyle') return state.strokeStyle
+          if (prop === 'lineWidth') return state.lineWidth
+          if (prop === 'fillStyle') return state.fillStyle
+          return (...args: unknown[]) => {
+            if (prop === 'beginPath') state.pathOpen = false
+            if (prop === 'moveTo' || prop === 'lineTo') state.pathOpen = true
+            if (prop === 'stroke' && state.pathOpen) {
+              strokes.push({ color: state.strokeStyle, width: state.lineWidth })
+            }
+            if (prop === 'arc') arcs.push({ r: Number(args[2]), color: state.fillStyle })
+          }
+        },
+        set(_t, prop, value) {
+          if (prop === 'strokeStyle') state.strokeStyle = String(value)
+          if (prop === 'lineWidth') state.lineWidth = Number(value)
+          if (prop === 'fillStyle') state.fillStyle = String(value)
+          return true
+        },
+      },
+    ) as unknown as CanvasRenderingContext2D
+    return { g, strokes, arcs }
+  }
+
+  it('轨迹 lineWidth = 目标块高度（修复前 1.8px 细线，比块细一个数量级）', () => {
+    const { g, strokes, arcs } = makeRecorder()
+    const h = 120
+    const midi = flattenRefMidi(detail())
+    renderNoteLane(g, {
+      w: 340,
+      h,
+      x1: 2000,
+      playheadT: 1500,
+      windowMs: 8000,
+      refMidi: midi,
+      segments: midiSegments(midi),
+      userPoints: [
+        { t: 1400, midi: 60 },
+        { t: 1460, midi: 62 },
+      ],
+      headAlpha: 1,
+    })
+    const user = strokes.filter((s) => s.color === '#5ad2c0')
+    expect(user.length).toBeGreaterThan(0)
+    expect(user.every((s) => s.width === barHeightOf(h))).toBe(true)
+    // 与块同口径：h=120 → barH = (120-24)/30 = 3.2 → clamp 到下限 6
+    expect(barHeightOf(h)).toBe(6)
+    // 头点半径至少半个块高（不缩回 3.2px 小点）
+    const head = arcs.filter((a) => a.color === '#8ff0e2')
+    expect(head.length).toBeGreaterThan(0)
+    expect(head[0]!.r).toBeGreaterThanOrEqual(barHeightOf(h) / 2)
   })
 })
