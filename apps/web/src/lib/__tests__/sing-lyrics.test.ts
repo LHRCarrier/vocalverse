@@ -12,7 +12,9 @@ import {
   lineDistance,
   lineProgress,
   nearestLineIndex,
+  noteSpans,
   resolveLyricTimeMs,
+  spanProgress,
   toLyricLines,
 } from '@/lib/sing-lyrics'
 
@@ -101,8 +103,91 @@ describe('sing-lyrics · lineProgress', () => {
 
   it('不存在的下标 / 退化区间 → 0', () => {
     expect(lineProgress(lines, 9, 100)).toBe(0)
-    const degenerate = [{ seq: 1, startMs: 100, endMs: 100, text: 'x' }]
+    const degenerate = [{ seq: 1, startMs: 100, endMs: 100, text: 'x', midi: null }]
     expect(lineProgress(degenerate, 0, 100)).toBe(0)
+  })
+})
+
+/**
+ * 句内逐字节奏（2026-09-22 用户口径：整句对得上，但唱得有快有慢、唱到哪个字对不上）。
+ * 数据源 = `pitch_ref.midi` 逐帧音高（hop 32ms）→ 音符段 → 按段均分字推进。
+ */
+describe('sing-lyrics · 句内逐字节奏（noteSpans / spanProgress）', () => {
+  /** 用「帧游程」拼 MIDI 数组：[帧数, midi 值]；-1 = 无音高 */
+  const midiOf = (runs: [number, number][]) => {
+    const out: number[] = []
+    for (const [frames, v] of runs) for (let i = 0; i < frames; i += 1) out.push(v)
+    return out
+  }
+
+  it('noteSpans：同音成段、换音分段、无音高断开（长休止不跨）', () => {
+    // 10 帧 60（320ms）→ 10 帧 62 → 5 帧静音（160ms）→ 15 帧 64
+    const spans = noteSpans(midiOf([[10, 60], [10, 62], [5, -1], [15, 64]]))
+    expect(spans).toEqual([
+      { startMs: 0, endMs: 320 },
+      { startMs: 320, endMs: 640 },
+      { startMs: 800, endMs: 1280 },
+    ])
+  })
+
+  it('noteSpans：抖动碎音（<96ms）并入前段；相邻不同音仍保留各自边界（音符节拍点）', () => {
+    // 10 帧 60 → 1 帧 61（32ms 跳音）→ 10 帧 60 → 10 帧 64
+    const spans = noteSpans(midiOf([[10, 60], [1, 61], [10, 60], [10, 64]]))
+    expect(spans).toEqual([
+      { startMs: 0, endMs: 352 }, // 32ms 跳音并入前段
+      { startMs: 352, endMs: 672 }, // 相邻不同音：不合并（保住音符边界）
+      { startMs: 672, endMs: 992 },
+    ])
+  })
+
+  it('noteSpans：短间隙（<120ms，塞音/快速换气）不拆段；无/空 MIDI → 空数组', () => {
+    const spans = noteSpans(midiOf([[10, 60], [2, -1], [10, 62]])) // 64ms 间隙
+    expect(spans).toEqual([{ startMs: 0, endMs: 704 }])
+    expect(noteSpans(null)).toEqual([])
+    expect(noteSpans([])).toEqual([])
+    expect(noteSpans([-1, -1, null])).toEqual([])
+  })
+
+  it('spanProgress：段内推进该段负责的字、休止保持、首音前不抢跑、段尾到 1', () => {
+    const spans = noteSpans(midiOf([[10, 60], [10, 62], [5, -1], [15, 64]]))
+    const chars = 6 // 3 段 × 2 字
+    expect(spanProgress(spans, chars, -50)).toBe(0) // 行首休止
+    expect(spanProgress(spans, chars, 0)).toBe(0)
+    expect(spanProgress(spans, chars, 160)).toBeCloseTo(1 / 6) // 第 1 段过半 → 第 1 字填一半
+    expect(spanProgress(spans, chars, 320)).toBeCloseTo(2 / 6) // 第 1 段完
+    expect(spanProgress(spans, chars, 480)).toBeCloseTo(3 / 6)
+    expect(spanProgress(spans, chars, 700)).toBeCloseTo(4 / 6) // 休止中：保持
+    expect(spanProgress(spans, chars, 800)).toBeCloseTo(4 / 6) // 第 3 段起点
+    expect(spanProgress(spans, chars, 1040)).toBeCloseTo(5 / 6)
+    expect(spanProgress(spans, chars, 1280)).toBe(1)
+    expect(spanProgress(spans, chars, 99_999)).toBe(1)
+  })
+
+  it('spanProgress：快慢由音符结构决定——长音符填得慢、短音符填得快（不再按整句匀速）', () => {
+    const spans = noteSpans(midiOf([[47, 60], [15, 62]])) // 长音 1504ms + 短音 480ms
+    expect(spans).toEqual([
+      { startMs: 0, endMs: 1504 },
+      { startMs: 1504, endMs: 1984 },
+    ])
+    // 4 个字：前 2 个归长音（1.5s 才填完），后 2 个归短音（0.5s 填完）
+    expect(spanProgress(spans, 4, 752)).toBeCloseTo(0.25) // 长音过半 → 只填了 1 个字
+    expect(spanProgress(spans, 4, 1504)).toBeCloseTo(0.5)
+    expect(spanProgress(spans, 4, 1984)).toBe(1)
+    // 对照：线性口径在 752ms 已推进到 752/1984 ≈ 0.379（这就是「对不上字」的旧行为）
+    expect(752 / 1984).toBeCloseTo(0.379, 2)
+  })
+
+  it('spanProgress：无音符数据/空文本 → null（调用方回退线性口径）', () => {
+    expect(spanProgress([], 6, 100)).toBeNull()
+    expect(spanProgress(noteSpans(midiOf([[10, 60]])), 0, 100)).toBeNull()
+  })
+
+  it('toLyricLines 带上 pitch_ref.midi（逐字节奏的数据通路）', () => {
+    const [l] = toLyricLines([
+      { seq: 1, start_ms: 0, end_ms: 1000, text: 'ab', pitch_ref: { midi: [60, 60, -1] } },
+    ])
+    expect(l.midi).toEqual([60, 60, -1])
+    expect(toLyricLines([{ seq: 1, start_ms: 0, text: 'x' }])[0].midi).toBeNull()
   })
 })
 

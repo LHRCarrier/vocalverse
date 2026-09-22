@@ -78,6 +78,50 @@ describe('SingLyrics · 当前句颜色推进（进度指示）', () => {
     expect(pct(1000)).toBeGreaterThan(pct(1500))
     expect(pct(1500)).toBeGreaterThan(pct(2999))
   })
+
+  /**
+   * 句内逐字节奏（2026-09-22 用户口径：整句对得上，但唱得有快有慢、唱到哪个字对不上）。
+   * 有 `pitch_ref.midi` 时按音符段推进（长音慢填/短音快填/休止保持），不再按整句匀速。
+   */
+  it('有参考旋律时：clip-path 按音符段推进（长音过半只填 1/4 字，而非线性的 3/8）', () => {
+    // 单句 0~2000ms：长音 0~1500（47 帧）+ 短音 1500~1984（15 帧），文本 4 字
+    const rhythmLines = [
+      {
+        seq: 1,
+        start_ms: 0,
+        end_ms: 2000,
+        text: 'abcd',
+        pitch_ref: { midi: [...Array(47).fill(60), ...Array(15).fill(62)] },
+      },
+    ]
+    const pct = (t: number) => {
+      const s =
+        mount(SingLyrics, { props: { lines: rhythmLines, timeMs: t } })
+          .find('.m-sing-lyric__sung')
+          .attributes('style') ?? ''
+      return Number(/inset\(0 ([\d.]+)%/.exec(s)?.[1])
+    }
+    expect(pct(0)).toBe(100)
+    expect(pct(752)).toBeCloseTo(75, 1) // 长音过半 → 只填 1 个字（线性口径会是 ~62%）
+    expect(pct(1504)).toBeCloseTo(50, 1) // 长音结束 → 2/4 字
+    expect(pct(1984)).toBeCloseTo(0, 1) // 短音结束 → 全填
+  })
+
+  it('无参考旋律（pitch_ref 缺失/全静音）→ 回退按句长线性推进（旧口径不变）', () => {
+    const noPitch = [
+      { seq: 1, start_ms: 0, end_ms: 1000, text: 'abcd' },
+      { seq: 2, start_ms: 1000, end_ms: 2000, text: 'efgh', pitch_ref: { midi: [-1, -1, -1] } },
+    ]
+    const pct = (t: number) => {
+      const s =
+        mount(SingLyrics, { props: { lines: noPitch, timeMs: t } })
+          .find('.m-sing-lyric__sung')
+          .attributes('style') ?? ''
+      return Number(/inset\(0 ([\d.]+)%/.exec(s)?.[1])
+    }
+    expect(pct(500)).toBe(50) // 线性
+    expect(pct(1500)).toBe(50) // 第 2 句无有效音符 → 同样线性
+  })
 })
 
 describe('SingLyrics · 透明度渐隐（远近表达，按视频模板：不用模糊）', () => {
