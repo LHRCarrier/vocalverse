@@ -3,6 +3,25 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 演示数据切片二~五（学习 / 唱吧 / 酒馆 / 阅读 · 4 子代理并行）· 1 op
+
+> 归属：演示数据准备（gitignored `local/演示数据/`，四份 seed 脚本幂等可复现）；主演示号 `luna`（user_id=18）。
+> 详情留档：`local/演示数据/_log/slice{2,3,4,5}-*.md`；SOP：`local/演示数据/SOP-演示数据制作.md`。全程未改仓库源码。
+
+- **切片二 · 学习数据**（`seed_learning.py` + `learning.json`）：attempts 26 / scores 32（薄弱音素 /θ/ 9、/ð/ 7、/r/ 6）/ sessions 10 / events 520（84 天）/ 打卡卡 9 张（09-18 留空档）。
+  页面实测：画像「近 30 天练了 26 次（13 天有练习），综合分 +1.9」、热力图 84 天满格、三维 74.9/77.9/82.4、练习 114 分钟、**XP 425 → LV3**（250/500，距 LV4 余 75）。
+  设计取舍：26 次刻意压在 13 个练习日 ×2 重录，否则水平预测被裁到 100（现 90.55 ↑11.17）。
+- **切片三 · 唱吧**（`seed_sing.py` + `sing.json`）：收藏 2 首（Ode to Joy / Mary Had a Little Lamb）+ 完成态跟唱 1 条（overall 84.5，lines/alignment 按真实 schema，经 response_model 校验）+ sing 会话 1 条。
+  **UI 事实**：`/m/sing` 无跟唱历史列表（报告只在当次评分完成后渲染，后端无列表端点）→ 未伪造历史报告；「歌曲 / 收藏」是页面分段而非弹层 tab。App 侧记录见安卓日志同日置顶。
+- **切片四 · 酒馆**（`seed_tavern.py` + `tavern.json`）：清理测试局 4 局（测试局/评审采样局/R2结算验收/R2结算幂等卡）+ 重复「迷雾酒馆」3 局（保留 #5）+ 垃圾场景卡 1 张 + GBK 乱码消息 10 条（含森林之海 9 条，72→63）；
+  给 luna 造进行中战役「潮汐图书馆：被撕掉的一页」（15 消息 / 28 事实含双进度钟 / 3 任务 / 3 线索 / 3 实体 / 4 事件，narrative_summary 走 `render_narrative_summary` 无 LLM，verify dangling=0）。
+- **切片五 · 阅读**（`seed_reading.py` + `reading.json`）：批注 14（高亮 8 / 笔记 6，跨 3 书 4 章）+ 生词 28（全在词典，音标/首义 28/28）+ 阅读进度 1（Alice ch1 @2440，49%）。
+  offset 三重校验：写入前 `content.find()` 唯一命中 + SQL 复算 mismatch=0 + 接口/DOM 对照。
+- **幂等**：四份脚本各自连跑 2~3 次零新增（判重键见各脚本 docstring）；截图 15 张存 `local/演示数据/_验收截图/`。
+- **待组长知悉**：① XP 距 LV4 仅余 75，后续切片别再给 luna 加 attempts/sing_attempts；② 森林之海乱码 9 条已删（72→63），如需保原样要从 DB 备份恢复；③ `user_reading_progress` 会覆盖 luna 真实阅读进度。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-22 演示数据包（切片一 · 通知 + 关注互动 · `local/演示数据/`）· 1 op
 
 > 归属：演示数据准备（gitignored `local/演示数据/`，不入库；交接队友按 README 一条命令复现）+ 三个移动端页面真实头像接入（UI 部分见安卓日志同日置顶）。
