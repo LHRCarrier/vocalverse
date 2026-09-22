@@ -1,12 +1,15 @@
 """酒馆工具注册表：ToolSpec 定义 + 注册 / 下发 / 执行（2026-09-22 从平铺 tools.py 抽离）。
 
 契约（与旧 ``app/trpg/tools.py`` 逐字对齐，SSE / 前端无感）：
-- :func:`build_trpg_tools` 返回**注册顺序**的 OpenAI function schema 列表（DM 工具面）；
+- :func:`build_trpg_tools` 返回 OpenAI function schema 列表，内置工具按
+  :data:`BUILTIN_TOOL_ORDER` 排序（其余按注册序追加）——顺序稳定 = 测试可断言；
 - :func:`execute_tool` 按名字分发到 handler；参数坏 JSON 宽容解析为 ``{}``（handler 报可读错误）；
-- handler 返回 ``{text, status_stage?}``：text 回填模型；status_stage 由 ``turn.py`` 转 SSE status；
+- handler 返回 ``{text, status_stage?, ...}``：text 回填模型；status_stage 由 ``turn.py`` 转 SSE
+  status；闭环 outcome 键（quest/ending/character/encounter）由 ``turn.py`` 映射表转事件；
 - 未注册工具 / handler 抛异常 → 返回错误文本，**不向上抛**（单个工具失败不打断回合）。
 
-新增工具见 :mod:`app.trpg.tools` 包文档（一工具一文件 + register，注册顺序即下发顺序）。
+新增工具见 :mod:`app.trpg.tools` 包文档（一工具一文件 + register；内置顺序在
+:data:`BUILTIN_TOOL_ORDER` 登记）。
 """
 
 from __future__ import annotations
@@ -35,6 +38,23 @@ class ToolSpec:
 
 _REGISTRY: dict[str, ToolSpec] = {}
 
+#: 内置工具下发顺序（基础三件 + docs/56 §3 闭环九件）：与导入顺序解耦，保证模型工具面稳定
+#: （顺序稳定 = prompt 缓存友好 / 测试可断言）。
+BUILTIN_TOOL_ORDER: tuple[str, ...] = (
+    "roll_dice",
+    "set_scene",
+    "show_portrait",
+    "tick_clock",
+    "complete_quest",
+    "enter_character",
+    "exit_character",
+    "attack",
+    "use_item",
+    "start_encounter",
+    "next_turn",
+    "end_encounter",
+)
+
 
 def register(spec: ToolSpec) -> ToolSpec:
     """注册工具；重复名直接报错（同进程内每个工具只有一个真源）。"""
@@ -45,8 +65,10 @@ def register(spec: ToolSpec) -> ToolSpec:
 
 
 def build_trpg_tools() -> list[dict[str, Any]]:
-    """DM 工具面：注册顺序即下发顺序（顺序稳定 = 测试可断言 / 利于 prompt 缓存）。"""
-    return [spec.schema for spec in _REGISTRY.values()]
+    """DM 工具面：内置按 :data:`BUILTIN_TOOL_ORDER` 下发，其余（测试/扩展注册）按注册序追加。"""
+    ordered = [spec for name in BUILTIN_TOOL_ORDER if (spec := _REGISTRY.get(name)) is not None]
+    extras = [spec for name, spec in _REGISTRY.items() if name not in BUILTIN_TOOL_ORDER]
+    return [spec.schema for spec in ordered + extras]
 
 
 def parse_tool_args(raw: str) -> ToolArgs:

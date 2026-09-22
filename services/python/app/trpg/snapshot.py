@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from app.trpg.constants import SNAPSHOT_CLUE_MAX, SNAPSHOT_FACT_REL_MAX
+from app.trpg.constants import SNAPSHOT_CLUE_MAX, SNAPSHOT_FACT_REL_MAX, SNAPSHOT_NPC_MAX
 from app.trpg.facts import parse_key
 
 _PROPERTY_LABEL: dict[str, str] = {
@@ -78,8 +78,9 @@ def _time_of(value: Any) -> float:
 def build_state_snapshot(data: SnapshotInput) -> str:
     lines: list[str] = []
 
-    # 1. State 一行式（pc.* + scene.current）
+    # 1. State 一行式（pc.* + npc.* + scene.current；docs/56 §C：敌方 HP 进 DM 上下文）
     state_parts: list[str] = []
+    npc_state: dict[str, list[str]] = {}
     scene_value = data.scene
     for f in data.facts:
         if f.kind != "state":
@@ -90,9 +91,18 @@ def build_state_snapshot(data: SnapshotInput) -> str:
         if parsed.domain == "scene" and parsed.property == "current":
             scene_value = f.value
             continue
+        if parsed.domain == "npc" and parsed.entity:
+            if parsed.entity not in npc_state and len(npc_state) >= SNAPSHOT_NPC_MAX:
+                continue
+            npc_state.setdefault(parsed.entity, []).append(
+                f"{_PROPERTY_LABEL.get(parsed.property, parsed.property)} {f.value}"
+            )
+            continue
         state_parts.append(f"{_PROPERTY_LABEL.get(parsed.property, parsed.property)} {f.value}")
     if state_parts:
         lines.append(f"PC：{'｜'.join(state_parts)}")
+    for entity_name, parts in npc_state.items():
+        lines.append(f"{entity_name}：{'｜'.join(parts)}")
     if scene_value:
         lines.append(f"场景：{scene_value}")
 

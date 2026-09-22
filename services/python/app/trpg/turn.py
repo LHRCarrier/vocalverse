@@ -7,21 +7,37 @@
 - 无工具能力的 LLM（Fake/降级）→ 退化为纯文本流式（不调工具，回合仍可玩）。
 
 产出事件：``{"type": "delta", "text": ...}`` / ``{"type": "status", "stage": ...}`` /
-``{"type": "portrait", "portrait": {...}}``（同回合同角色去重）；
+``{"type": "portrait", "portrait": {...}}``（同回合同角色去重）/ ``{"type": "sse", "event": ...}``
+（工具 outcome → SSE 事件，映射表见 :data:`OUTCOME_EVENT_MODELS`；quest/character/encounter
+同回合按 payload 去重）；
 结果经 :attr:`DmTurnRunner.result` 领取（单次使用；与练习域 TurnRunner 同姿势）。
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+import pydantic
+
 from app.audio.base import LLMClient
+from app.trpg import events as ev
 from app.trpg.constants import DM_MAX_TOKENS, DM_TEMPERATURE, TOOL_MAX_ROUNDS, TOOL_ROUND_MAX_TOKENS
 from app.trpg.tools import build_trpg_tools, execute_tool
 
 logger = logging.getLogger("vocalverse")
+
+#: 工具 outcome 键 → SSE 事件模型（docs/56 §5）：只做转发，规则与文案在工具/纯模块里。
+OUTCOME_EVENT_MODELS: dict[str, type[pydantic.BaseModel]] = {
+    "quest": ev.QuestUpdate,
+    "ending": ev.Ending,
+    "character": ev.CharacterState,
+    "encounter": ev.EncounterState,
+}
+#: 同回合重复事件按 payload 去重（沿用 portrait 做法；ending 是显式结算动作，不去重）
+DEDUPE_OUTCOME_KEYS = frozenset({"quest", "character", "encounter"})
 
 
 @dataclass
@@ -68,6 +84,8 @@ class DmTurnRunner:
         tools = build_trpg_tools()
         # 立绘展示去重（同回合同角色只发展示信号一次；跨回合频控由 prompt 规则约束）
         seen_portraits: set[str] = set()
+        # 闭环事件去重（quest/character/encounter 同回合同一 payload 只发一次）
+        seen_outcomes: set[str] = set()
 
         for round_index in range(TOOL_MAX_ROUNDS + 1):
             force_answer = round_index == TOOL_MAX_ROUNDS
@@ -124,6 +142,25 @@ class DmTurnRunner:
                     if key and key not in seen_portraits:
                         seen_portraits.add(key)
                         yield {"type": "portrait", "portrait": portrait}
+                # 闭环 outcome → SSE 事件（映射表驱动，别堆 elif；docs/56 §5）
+                for outcome_key, model in OUTCOME_EVENT_MODELS.items():
+                    payload = outcome.get(outcome_key)
+                    if not isinstance(payload, dict):
+                        continue
+                    dedupe_key = ""
+                    if outcome_key in DEDUPE_OUTCOME_KEYS:
+                        payload_json = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+                        dedupe_key = f"{outcome_key}:{payload_json}"
+                        if dedupe_key in seen_outcomes:
+                            continue
+                    try:
+                        event = model(**payload)
+                    except pydantic.ValidationError as exc:
+                        logger.warning("酒馆工具 outcome 转事件失败（%s）：%s", outcome_key, exc)
+                        continue
+                    if dedupe_key:
+                        seen_outcomes.add(dedupe_key)
+                    yield {"type": "sse", "event": event}
                 messages.append(
                     {
                         "role": "tool",

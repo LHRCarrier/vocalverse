@@ -120,6 +120,35 @@ class RollBody(BaseModel):
     effects: list[dict] | None = None
 
 
+class EntityPortrait(BaseModel):
+    """实体立绘挂载（media_id = ``media_assets.public_id``；docs/56 §4）。"""
+
+    media_id: str
+
+
+def _media_owned_by(public_id: str, user_id: int) -> bool:
+    """媒体归属校验：public_id 命中且 owner 为调用者且 ready；否则 False（不泄露存在性）。"""
+    from sqlalchemy import select
+
+    from app.db import get_session_factory
+    from app.models.media import MediaAsset, MediaStatus
+
+    db = get_session_factory()()
+    try:
+        return (
+            db.execute(
+                select(MediaAsset.id).where(
+                    MediaAsset.public_id == public_id,
+                    MediaAsset.owner_id == user_id,
+                    MediaAsset.status == MediaStatus.READY,
+                )
+            ).first()
+            is not None
+        )
+    finally:
+        db.close()
+
+
 def _require_campaign(campaign_id: int, user_id: int):
     campaign = st.get_campaign_owned(campaign_id, user_id)
     if campaign is None:
@@ -359,6 +388,44 @@ async def set_campaign_scene(
     if not scene:
         raise BizError(http_status=422, code=47001, message="场景名不能为空")
     await asyncio.to_thread(st.set_scene, campaign_id, scene)
+    return ok({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# 实体立绘（docs/56 §4：owner 校验 + 媒体归属校验；实体列表回带 portrait）
+# ---------------------------------------------------------------------------
+@router.post("/campaigns/{campaign_id}/entities/{entity_id}/portrait")
+async def attach_entity_portrait(
+    campaign_id: int,
+    entity_id: int,
+    body: EntityPortrait,
+    user_id: int = Depends(get_current_user_id),
+):
+    """给实体挂立绘（媒体必须是调用者本人 ready 资产；缺失/非本人 → 40403）。"""
+    _require_campaign(campaign_id, user_id)
+    media_id = body.media_id.strip()
+    if not (8 <= len(media_id) <= 64):
+        raise BizError(http_status=422, code=47001, message="media_id 非法")
+    entity = await asyncio.to_thread(st.get_entity, campaign_id, entity_id)
+    if entity is None:
+        raise BizError(http_status=404, code=40401, message="entity not found")
+    owned = await asyncio.to_thread(_media_owned_by, media_id, user_id)
+    if not owned:
+        raise BizError(http_status=404, code=40403, message="media not found")
+    await asyncio.to_thread(st.set_entity_portrait, campaign_id, entity_id, media_id)
+    return ok({"ok": True, **(st.portrait_view(media_id) or {})})
+
+
+@router.delete("/campaigns/{campaign_id}/entities/{entity_id}/portrait")
+async def detach_entity_portrait(
+    campaign_id: int, entity_id: int, user_id: int = Depends(get_current_user_id)
+):
+    """卸下实体立绘（前端回退内置素材/占位）。"""
+    _require_campaign(campaign_id, user_id)
+    entity = await asyncio.to_thread(st.get_entity, campaign_id, entity_id)
+    if entity is None:
+        raise BizError(http_status=404, code=40401, message="entity not found")
+    await asyncio.to_thread(st.set_entity_portrait, campaign_id, entity_id, None)
     return ok({"ok": True})
 
 

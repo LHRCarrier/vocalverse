@@ -21,6 +21,7 @@ from app.trpg.constants import (
     FACT_VALUE_MAX_LEN,
     KEY_LEN_MAX,
     STATE_DOMAINS,
+    SYSTEM_ONLY_PROPERTIES,
 )
 
 Modality = Literal["fact", "claim", "rumor"]
@@ -68,7 +69,12 @@ def make_key(domain: str, entity: str | None, property: str) -> str | None:
 
 
 KeyCheckReason = Literal[
-    "malformed", "unknown-domain", "unknown-property", "unknown-entity", "entity-overlong"
+    "malformed",
+    "unknown-domain",
+    "unknown-property",
+    "unknown-entity",
+    "entity-overlong",
+    "system-only",
 ]
 
 
@@ -79,8 +85,15 @@ class KeyCheckResult:
     parsed: ParsedKey | None = None
 
 
-def check_key_whitelist(key: str, known_entities: set[str]) -> KeyCheckResult:
-    """两级白名单校验（域 → 属性 → 实体注册表）；pending 实体由调用方并入 known_entities。"""
+def check_key_whitelist(
+    key: str, known_entities: set[str], writer: str = "system"
+) -> KeyCheckResult:
+    """两级白名单校验（域 → 属性 → 实体注册表）；pending 实体由调用方并入 known_entities。
+
+    ``writer`` 维度（docs/56 §2）：``writer="llm"``（提取器）拒写系统专有属性
+    （progress/kind/stage/order/turn/round/qty/owner/consumable——只能由工具算术落表）；
+    默认 ``"system"`` 保持旧行为（系统直写全属性）。
+    """
     parsed = parse_key(key)
     if parsed is None:
         return KeyCheckResult(ok=False, reason="malformed")
@@ -89,6 +102,8 @@ def check_key_whitelist(key: str, known_entities: set[str]) -> KeyCheckResult:
         return KeyCheckResult(ok=False, reason="unknown-domain", parsed=parsed)
     if parsed.property not in props:
         return KeyCheckResult(ok=False, reason="unknown-property", parsed=parsed)
+    if writer == "llm" and parsed.property in SYSTEM_ONLY_PROPERTIES:
+        return KeyCheckResult(ok=False, reason="system-only", parsed=parsed)
     if parsed.entity is not None:
         if len(parsed.entity) > ENTITY_NAME_MAX:
             return KeyCheckResult(ok=False, reason="entity-overlong", parsed=parsed)
@@ -153,6 +168,8 @@ def parse_fact_ops(content: str) -> list[FactOp]:
                 modality=modality,
                 speaker=speaker,
                 importance=importance,
+                # 显式标 llm：提取器输出为模型来源，系统专有属性（docs/56 §2）在裁决层拒写
+                writer="llm",
             )
         )
     return ops
@@ -181,6 +198,7 @@ RejectReason = Literal[
     "unknown-entity",
     "entity-overlong",
     "llm-state",
+    "system-only",
     "user-touched",
     "tombstone",
 ]
@@ -210,6 +228,7 @@ def adjudicate_upsert(
     - key 结构非法 → reject malformed；
     - 域/属性白名单外 → reject unknown-domain / unknown-property；
     - LLM 写 State 域 → reject llm-state（红线 1）；
+    - LLM 写系统专有属性（进度钟/先攻/数量…）→ reject system-only（docs/56 §2）；
     - 墓碑 key（用户已删）→ reject tombstone（防提取复活）；
     - 用户碰过的行 → reject user-touched（user > rules > llm）；
     - key 命中既有无墓碑行 → update；
@@ -227,6 +246,8 @@ def adjudicate_upsert(
     writer = op.writer or "llm"
     if writer == "llm" and parsed.domain in STATE_DOMAINS:
         return Adjudication(action="reject", reason="llm-state", key=op.key)
+    if writer == "llm" and parsed.property in SYSTEM_ONLY_PROPERTIES:
+        return Adjudication(action="reject", reason="system-only", key=op.key)
 
     tombstones = tombstone_keys or set()
     found = next((e for e in existing if e.key == op.key), None)

@@ -149,7 +149,7 @@ def ensure_entity(campaign_id: int, kind: str, name: str, pending: bool = False)
 
 
 def find_entity(campaign_id: int, name: str, kinds: tuple[str, ...] = ("npc", "pc")) -> dict | None:
-    """按名字查实体（限 kinds；重名取最近提及）→ ``{kind, status, pending}`` / None。
+    """按名字查实体（限 kinds；重名取最近提及）→ :func:`_entity_dict` 形状 / None。
 
     读实体场景用（如 show_portrait 的立绘展示校验）；写路径一律走 :func:`ensure_entity`。
     """
@@ -168,9 +168,7 @@ def find_entity(campaign_id: int, name: str, kinds: tuple[str, ...] = ("npc", "p
             .scalars()
             .first()
         )
-        if row is None:
-            return None
-        return {"kind": row.kind, "status": row.status, "pending": row.pending}
+        return _entity_dict(row) if row is not None else None
     finally:
         db.close()
 
@@ -559,6 +557,340 @@ def set_scene(campaign_id: int, scene: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 闭环适配（docs/56 §B：quest 进度 / 实体在场 / 道具 / 遭遇 / 立绘 / 收尾）
+#
+# 纪律：本段只做「读事实 → 形状转换 → 起事务落库」，不做任何规则算术（算术/判定在
+# progress.py / encounter.py / items.py 纯模块）；写入一律经 upsert_facts(writer="system")。
+# ---------------------------------------------------------------------------
+_QUEST_PROPS: tuple[str, ...] = ("progress", "kind", "stage", "status")
+_ITEM_PROPS: tuple[str, ...] = ("qty", "owner", "effect", "consumable")
+
+
+def get_fact_value(campaign_id: int, key: str) -> str | None:
+    """按 key 读单条事实值（墓碑过滤与读路径一致）。"""
+    db = get_session_factory()()
+    try:
+        return db.execute(
+            select(TrpgFact.value).where(
+                TrpgFact.campaign_id == campaign_id,
+                TrpgFact.fact_key == key,
+                TrpgFact.user_deleted_at.is_(None),
+            )
+        ).scalar_one_or_none()
+    finally:
+        db.close()
+
+
+def _fact_values_by_prefix(campaign_id: int, prefix: str) -> dict[str, str]:
+    db = get_session_factory()()
+    try:
+        rows = db.execute(
+            select(TrpgFact.fact_key, TrpgFact.value).where(
+                TrpgFact.campaign_id == campaign_id,
+                TrpgFact.fact_key.like(f"{prefix}%"),
+                TrpgFact.user_deleted_at.is_(None),
+            )
+        ).all()
+        return {key: value for key, value in rows}
+    finally:
+        db.close()
+
+
+def _upsert_system_values(campaign_id: int, values: dict[str, str | None]) -> None:
+    ops = [
+        FactOp(op="create", key=key, value=str(value), writer="system")
+        for key, value in values.items()
+        if value is not None
+    ]
+    if ops:
+        upsert_facts(campaign_id, ops)
+
+
+def portrait_view(media_id: str | None) -> dict | None:
+    """立绘视图（``{media_id, url}``，未挂图 → None）；URL 口径 docs/56 §4。"""
+    if not media_id:
+        return None
+    from app.core.config import get_settings
+
+    return {"media_id": media_id, "url": f"{get_settings().media_url_prefix}{media_id}"}
+
+
+def get_quest_state(campaign_id: int, quest: str) -> dict:
+    """读任务闭环字段（progress/kind/stage/status；缺省 None，由工具补默认值）。"""
+    values = _fact_values_by_prefix(campaign_id, f"quest.{quest}.")
+    return {prop: values.get(f"quest.{quest}.{prop}") for prop in _QUEST_PROPS}
+
+
+def set_quest_facts(
+    campaign_id: int,
+    quest: str,
+    *,
+    progress: str | None = None,
+    kind: str | None = None,
+    stage: str | None = None,
+    status: str | None = None,
+) -> None:
+    """写任务闭环事实（系统写者；status 会经 ``_sync_task_clue_from_op`` 同步任务行）。"""
+    _upsert_system_values(
+        campaign_id,
+        {
+            f"quest.{quest}.progress": progress,
+            f"quest.{quest}.kind": kind,
+            f"quest.{quest}.stage": stage,
+            f"quest.{quest}.status": status,
+        },
+    )
+
+
+def get_item_state(campaign_id: int, name: str) -> dict:
+    """读道具条目（qty/owner/effect/consumable；无事实即 None 值）。"""
+    values = _fact_values_by_prefix(campaign_id, f"item.{name}.")
+    return {prop: values.get(f"item.{name}.{prop}") for prop in _ITEM_PROPS}
+
+
+def set_item_facts(
+    campaign_id: int,
+    name: str,
+    *,
+    qty: int | str | None = None,
+    owner: str | None = None,
+    effect: str | None = None,
+    consumable: bool | None = None,
+) -> None:
+    """写道具事实（数量/持有者/效果/是否消耗；None 字段不动）。"""
+    _upsert_system_values(
+        campaign_id,
+        {
+            f"item.{name}.qty": None if qty is None else str(int(qty)),
+            f"item.{name}.owner": owner,
+            f"item.{name}.effect": effect,
+            f"item.{name}.consumable": (
+                None if consumable is None else ("true" if consumable else "false")
+            ),
+        },
+    )
+
+
+def get_encounter(campaign_id: int, encounter_id: str = "main") -> dict:
+    """读遭遇事实（status/order/turn/round；order 在此解码为列表，工具不经手 JSON）。"""
+    from app.trpg.encounter import decode_order
+
+    prefix = f"encounter.{encounter_id}."
+    values = _fact_values_by_prefix(campaign_id, prefix)
+    return {
+        "id": encounter_id,
+        "status": values.get(f"{prefix}status"),
+        "order": decode_order(values.get(f"{prefix}order")),
+        "turn": _int_or_none(values.get(f"{prefix}turn")),
+        "round": _int_or_none(values.get(f"{prefix}round")),
+    }
+
+
+def set_encounter_facts(
+    campaign_id: int,
+    encounter_id: str,
+    *,
+    status: str | None = None,
+    order: list[str] | None = None,
+    turn: int | None = None,
+    round_no: int | None = None,
+) -> None:
+    """写遭遇事实（order 由系统编码为 JSON 数组字符串，LLM 禁写）。"""
+    from app.trpg.encounter import encode_order
+
+    prefix = f"encounter.{encounter_id}."
+    _upsert_system_values(
+        campaign_id,
+        {
+            f"{prefix}status": status,
+            f"{prefix}order": None if order is None else encode_order(order),
+            f"{prefix}turn": None if turn is None else str(int(turn)),
+            f"{prefix}round": None if round_no is None else str(int(round_no)),
+        },
+    )
+
+
+def get_active_encounter(campaign_id: int) -> dict | None:
+    """当前进行中的遭遇（``encounter.{id}.status == active`` 中最近写入的一条）。"""
+    db = get_session_factory()()
+    try:
+        row = (
+            db.execute(
+                select(TrpgFact)
+                .where(
+                    TrpgFact.campaign_id == campaign_id,
+                    TrpgFact.fact_key.like("encounter.%.status"),
+                    TrpgFact.value == "active",
+                    TrpgFact.user_deleted_at.is_(None),
+                )
+                .order_by(TrpgFact.id.desc())
+                .limit(1)
+            )
+            .scalars()
+            .first()
+        )
+    finally:
+        db.close()
+    if row is None:
+        return None
+    encounter_id = row.fact_key[len("encounter.") : -len(".status")]
+    if not encounter_id:
+        return None
+    return get_encounter(campaign_id, encounter_id)
+
+
+def _int_or_none(value: str | None) -> int | None:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _entity_dict(row: TrpgEntity) -> dict:
+    return {
+        "id": row.id,
+        "kind": row.kind,
+        "name": row.name,
+        "status": row.status,
+        "pending": row.pending,
+        "portrait_media_id": row.portrait_media_id,
+        "portrait": portrait_view(row.portrait_media_id),
+    }
+
+
+def get_entity(campaign_id: int, entity_id: int) -> dict | None:
+    """按 id 读实体（立绘挂载端点用）。"""
+    db = get_session_factory()()
+    try:
+        row = db.execute(
+            select(TrpgEntity).where(
+                TrpgEntity.id == entity_id, TrpgEntity.campaign_id == campaign_id
+            )
+        ).scalar_one_or_none()
+        return _entity_dict(row) if row is not None else None
+    finally:
+        db.close()
+
+
+def find_pc_entity(campaign_id: int) -> dict | None:
+    """最近提及的 PC 实体（attack 默认攻击者来源）；无 PC 实体 → None。"""
+    db = get_session_factory()()
+    try:
+        row = (
+            db.execute(
+                select(TrpgEntity)
+                .where(TrpgEntity.campaign_id == campaign_id, TrpgEntity.kind == "pc")
+                .order_by(TrpgEntity.last_mentioned_at.desc(), TrpgEntity.id.desc())
+            )
+            .scalars()
+            .first()
+        )
+        return _entity_dict(row) if row is not None else None
+    finally:
+        db.close()
+
+
+def set_entity_presence(
+    campaign_id: int,
+    kind: str,
+    name: str,
+    *,
+    pending: bool | None = None,
+    status: str | None = None,
+) -> bool:
+    """实体在场状态适配（docs/56 §B 映射：arriving↔pending=true / departed↔status=cleared）。"""
+    db = get_session_factory()()
+    try:
+        row = db.execute(
+            select(TrpgEntity).where(
+                TrpgEntity.campaign_id == campaign_id,
+                TrpgEntity.kind == kind,
+                TrpgEntity.name == name,
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return False
+        if pending is not None:
+            row.pending = pending
+        if status is not None:
+            row.status = status
+        row.last_mentioned_at = datetime.now(UTC)
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
+def mark_entity_arriving(campaign_id: int, kind: str, name: str) -> None:
+    """登场中：注册（pending 懒确认）并保持 active——前端按 pending 显示「正在赶来」。"""
+    ensure_entity(campaign_id, kind, name, pending=True)
+    set_entity_presence(campaign_id, kind, name, pending=True, status="active")
+
+
+def mark_entity_departed(campaign_id: int, name: str) -> dict | None:
+    """离场：``status=cleared`` + ``pending=False``；实体不存在 → None。"""
+    entity = find_entity(campaign_id, name)
+    if entity is None:
+        return None
+    set_entity_presence(campaign_id, str(entity["kind"]), name, pending=False, status="cleared")
+    return find_entity(campaign_id, name)
+
+
+def set_entity_portrait(campaign_id: int, entity_id: int, media_id: str | None) -> bool:
+    """挂/卸实体立绘（media_id=None 为卸下）；实体不存在返回 False。"""
+    db = get_session_factory()()
+    try:
+        row = db.execute(
+            select(TrpgEntity).where(
+                TrpgEntity.id == entity_id, TrpgEntity.campaign_id == campaign_id
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return False
+        row.portrait_media_id = media_id
+        row.last_mentioned_at = datetime.now(UTC)
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
+def get_entity_portrait(
+    campaign_id: int, name: str, kinds: tuple[str, ...] = ("npc", "pc")
+) -> str | None:
+    """按名字取实体立绘 media_id（重名取最近提及；无 → None）。"""
+    db = get_session_factory()()
+    try:
+        return (
+            db.execute(
+                select(TrpgEntity.portrait_media_id)
+                .where(
+                    TrpgEntity.campaign_id == campaign_id,
+                    TrpgEntity.name == name,
+                    TrpgEntity.kind.in_(kinds),
+                )
+                .order_by(TrpgEntity.last_mentioned_at.desc())
+            )
+            .scalars()
+            .first()
+        )
+    finally:
+        db.close()
+
+
+def mark_campaign_finished(campaign_id: int) -> None:
+    """一局收尾标记（complete_quest 结算后调用；finished_at 为归档/新篇章判据）。"""
+    db = get_session_factory()()
+    try:
+        row = db.get(TrpgCampaign, campaign_id)
+        if row is not None:
+            row.finished_at = datetime.now(UTC)
+            db.commit()
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
 # 用户编辑/删除（P2-26/35 用户路径）
 # ---------------------------------------------------------------------------
 def edit_fact(campaign_id: int, key: str, value: str) -> bool:
@@ -781,7 +1113,16 @@ def list_entities(campaign_id: int) -> list[dict]:
             .all()
         )
         return [
-            {"kind": r.kind, "name": r.name, "status": r.status, "pending": r.pending} for r in rows
+            {
+                "id": r.id,
+                "kind": r.kind,
+                "name": r.name,
+                "status": r.status,
+                "pending": r.pending,
+                "portrait_media_id": r.portrait_media_id,
+                "portrait": portrait_view(r.portrait_media_id),
+            }
+            for r in rows
         ]
     finally:
         db.close()

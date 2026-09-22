@@ -65,10 +65,10 @@ class SystemCard(pydantic.BaseModel):
 
 
 class PortraitShow(pydantic.BaseModel):
-    """角色立绘展示（关键节点信号；骨架 2026-09-22）。
+    """角色立绘展示（关键节点信号）。
 
-    图源未接：``media_id``/``url`` 暂为 null，前端按实体名命中内置素材（无命中降级占位）；
-    docs/54 §4 的 P1 落 ``portrait_media_id`` 后由后端回填。
+    ``media_id``/``url``：docs/56 §4 起由 ``trpg_entities.portrait_media_id`` 回填
+    （``/api/v1/media/{public_id}``）；未挂图 → null，前端按实体名命中内置素材。
     """
 
     type: Literal["portrait"] = "portrait"
@@ -77,6 +77,68 @@ class PortraitShow(pydantic.BaseModel):
     mood: str | None = None
     media_id: str | None = None
     url: str | None = None
+
+
+class QuestUpdate(pydantic.BaseModel):
+    """进度钟更新（docs/56 §5；``name`` 为工具 outcome 的键名别名）。
+
+    ``progress`` 是 ``"3/6"`` 显示串；``segments`` 是总格数；``full`` = 已满格（可结算）。
+    """
+
+    type: Literal["quest"] = "quest"
+    quest: str = pydantic.Field(validation_alias=pydantic.AliasChoices("quest", "name"))
+    progress: str
+    segments: int
+    kind: Literal["positive", "threat"] = "positive"
+    reason: str | None = None
+    full: bool
+
+
+class Ending(pydantic.BaseModel):
+    """任务结算尾声（模板渲染，零 LLM；同一局可再开新篇章）。"""
+
+    type: Literal["ending"] = "ending"
+    quest: str
+    outcome: Literal["strong", "weak", "miss"]
+    title: str
+    text: str
+    epilogue: str
+
+
+class CharacterState(pydantic.BaseModel):
+    """人物在场状态变更（arriving=首次登场/正在赶来；departed=离场）。
+
+    ``note`` 兼容工具 outcome 的 ``reason`` 键（入/出场理由，docs/56 §3）。
+    """
+
+    type: Literal["character"] = "character"
+    name: str
+    kind: str
+    status: Literal["arriving", "active", "departed"]
+    note: str | None = pydantic.Field(
+        default=None, validation_alias=pydantic.AliasChoices("note", "reason")
+    )
+
+
+class EncounterState(pydantic.BaseModel):
+    """遭遇状态（start/attack/turn/end 四相；字段按 kind 按需填充）。
+
+    ``target_hp`` 兼容工具 outcome 的 ``targetHp`` 驼峰键（docs/56 §3）。
+    """
+
+    type: Literal["encounter"] = "encounter"
+    kind: Literal["start", "attack", "turn", "end"]
+    order: list[str] | None = None
+    turn: int | None = None
+    round: int | None = None
+    attacker: str | None = None
+    target: str | None = None
+    hit: bool | None = None
+    damage: int | None = None
+    target_hp: int | None = pydantic.Field(
+        default=None, validation_alias=pydantic.AliasChoices("target_hp", "targetHp")
+    )
+    outcome: str | None = None
 
 
 class TurnEnd(pydantic.BaseModel):
@@ -99,6 +161,10 @@ TrpgEvent = (
     | AudioChunk
     | SystemCard
     | PortraitShow
+    | QuestUpdate
+    | Ending
+    | CharacterState
+    | EncounterState
     | TurnEnd
     | StreamError
 )

@@ -5,11 +5,27 @@
 2. 文件末尾 ``register(ToolSpec(name="<tool_name>", schema=..., handler=handle))``；
 3. 在本文件 import 该模块（触发注册副作用）并加进 ``__all__``。
 
-注册顺序 = :func:`build_trpg_tools` 下发顺序（保持稳定，便于测试断言）。
+注册顺序 = :func:`build_trpg_tools` 下发顺序（保持稳定，便于测试断言）：
+基础三件（roll_dice / set_scene / show_portrait）+ 闭环九件
+（tick_clock / complete_quest / enter_character / exit_character / attack / use_item /
+start_encounter / next_turn / end_encounter，docs/56 §3）。
 执行契约见 :mod:`app.trpg.tools.registry`；``turn.py`` 只依赖 build/execute 两个入口。
 """
 
-from app.trpg.tools import roll_dice, set_scene, show_portrait  # noqa: F401  # 注册副作用
+from app.trpg.tools import (  # noqa: F401  # 注册副作用
+    attack,
+    complete_quest,
+    end_encounter,
+    enter_character,
+    exit_character,
+    next_turn,
+    roll_dice,
+    set_scene,
+    show_portrait,
+    start_encounter,
+    tick_clock,
+    use_item,
+)
 from app.trpg.tools.registry import (
     ToolSpec,
     build_trpg_tools,
@@ -24,7 +40,16 @@ __all__ = [
     "execute_tool",
     "parse_tool_args",
     "register",
+    "attack",
+    "complete_quest",
+    "end_encounter",
+    "enter_character",
+    "exit_character",
+    "next_turn",
     "roll_dice",
     "set_scene",
     "show_portrait",
+    "start_encounter",
+    "tick_clock",
+    "use_item",
 ]

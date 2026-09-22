@@ -4,8 +4,8 @@
 1. ``trpg_ready`` → 首回合先落「开场卡」（剧本名/场景/任务）→ 玩家消息（ASR 可选）落库；
 2. 首回合恢复校验（P2-34）→【待记住】补丁；
 3. 组装 DM 上下文（P2-36：不注入画像/记忆；快照在动态段最末，P2-31）；
-4. 工具循环流式生成（roll_dice / set_scene）；
-5. DM 消息落库 → ``turn_end``；
+4. 工具循环流式生成（roll_dice / set_scene / 闭环工具：进度钟·结算·人物·战斗·道具）；
+5. DM 消息落库 → ``turn_end``（工具闭环事件随流转发；ending 另落系统卡，刷新不丢）；
 6. 系统卡协议（P2-44）：场景变化 → 过场卡；新事件 → 判定卡（落库 + 流内下发，刷新不丢）；
 7. DM 回复逐句 TTS（上限 :data:`TTS_MAX_SENTENCES`，缓存命中零成本）；
 8. 叙事摘要刷新（P2-45 状态渲染）+ 事实提取（每 2 回合，后台 fire-and-forget）。
@@ -198,6 +198,15 @@ async def stream_turn(
                     yield ev.TrpgStatus(stage=str(item["stage"]))
                 elif item["type"] == "portrait":
                     yield ev.PortraitShow(**(item.get("portrait") or {}))
+                elif item["type"] == "sse":
+                    # 闭环事件（quest/ending/character/encounter）：ending 额外落系统卡保刷新
+                    event = item.get("event")
+                    if isinstance(event, ev.Ending):
+                        await _post_system_row(
+                            campaign_id, "ending", event.model_dump(exclude={"type"})
+                        )
+                    if event is not None:
+                        yield event
     except Exception as exc:  # noqa: BLE001 - 流内错误交给前端（节奏优先）
         logger.exception("酒馆 DM 生成失败：%s", exc)
         fallback = "（DM 似乎走神了，请把你的行动再说一遍。）"
