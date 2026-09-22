@@ -20,14 +20,16 @@ const Harness = defineComponent({
     const playing = ref(false)
     const recording = ref(false)
     const voiceAtMs = ref<number | null>(null)
+    const firstLine = ref(0)
+    const audioMs = ref(0)
     const clock = useSingLyricClock({
       playing,
       recording,
-      audioMs: () => 0,
+      audioMs: () => audioMs.value,
       voiceAtMs,
-      firstLineMs: () => 0,
+      firstLineMs: () => firstLine.value,
     })
-    return { playing, recording, voiceAtMs, ...clock }
+    return { playing, recording, voiceAtMs, firstLine, audioMs, ...clock }
   },
   render: () => null,
 })
@@ -36,7 +38,10 @@ type Vm = {
   playing: boolean
   recording: boolean
   voiceAtMs: number | null
+  firstLine: number
+  audioMs: number
   timeMs: number | null
+  positionMs: number | null
   elapsedMs: number | null
   recMs: number | null
 }
@@ -113,5 +118,51 @@ describe('useSingLyricClock · 录音轴已用时长（elapsedMs）', () => {
     await tick()
     const b = vm.recMs!
     expect(b).toBeGreaterThanOrEqual(a) // 单调不减（暂停/继续不得回跳）
+  })
+})
+
+/**
+ * 歌曲轴位置（`positionMs`）——2026-09-22 用户口径「音频 / 歌词 / 时间轴对不上」的修复：
+ * 底部「时间 / 全长」与音准引导条改用这条轴（歌词轴 `timeMs` 在跟唱开口前为 null，不能直接用）。
+ */
+describe('useSingLyricClock · 歌曲轴位置（positionMs）', () => {
+  it('空闲 → null（视图回退 00:00）', () => {
+    const w = mount(Harness)
+    const vm = w.vm as unknown as Vm
+    expect(vm.positionMs).toBeNull()
+  })
+
+  it('跟唱尚未开口 → 冻结在首句起点（引导条先亮首句目标音符，不随录音时长跑）', async () => {
+    const w = mount(Harness)
+    const vm = w.vm as unknown as Vm
+    vm.firstLine = 22_480
+    vm.recording = true
+    await tick()
+    expect(vm.positionMs).toBe(22_480)
+    expect(vm.timeMs).toBeNull() // 歌词轴仍不预跑（高亮等开口）
+    await tick()
+    expect(vm.positionMs).toBe(22_480)
+  })
+
+  it('跟唱开口后 = 首句起点 + 已开口时长（与歌词轴同源）', async () => {
+    const w = mount(Harness)
+    const vm = w.vm as unknown as Vm
+    vm.firstLine = 8000
+    vm.recording = true
+    await tick()
+    vm.voiceAtMs = 3000
+    await tick()
+    const expected = 8000 + Math.max(0, (vm.recMs ?? 0) - 3000)
+    expect(vm.positionMs).not.toBeNull()
+    expect(Math.abs((vm.positionMs ?? 0) - expected)).toBeLessThan(3)
+  })
+
+  it('听原唱 = 音频位置（修复前底部恒 00:00 的根因）', async () => {
+    const w = mount(Harness)
+    const vm = w.vm as unknown as Vm
+    vm.playing = true
+    vm.audioMs = 49_000
+    await tick()
+    expect(vm.positionMs).toBe(49_000)
   })
 })

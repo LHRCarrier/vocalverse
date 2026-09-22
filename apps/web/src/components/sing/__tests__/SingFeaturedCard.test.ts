@@ -1,14 +1,15 @@
 /**
- * SingFeaturedCard（唱吧「本周精选」深青卡）组件测试 —— 2026-09-22 真机截图问题。
+ * SingFeaturedCard（唱吧「本周精选」深色卡）组件测试 —— 2026-09-22 真机截图问题。
  *
  * 修复前症状：meta 与标题**同处**卡片顶部那条横向带，而右上角是**绝对定位的插画**
  * （`.u-dark-card__art{right:20px;top:16px;width:104px}`）→ 长 artist 把 meta 挤成两行，
  * 第二行读作「句 · 可跟唱」，行数「6」正好被插画盖住。
  *
  * 本用例锁三件事：
- * 1. **结构**：meta 排在标题之后（不再与插画抢同一条横向带）+ 拆成「署名 / 句数·状态」两段；
- * 2. **文案**：署名只取 `·` 前第一段；就绪与否决定 chip 与状态文案；
- * 3. **样式契约**（读组件源文件）：署名可省略、「N 句 · 状态」永不省略。
+ * 1. **结构**：meta 排在标题之后（不再与插画抢同一条横向带）+ 拆成「歌手 · 专辑 / 时长」两段；
+ * 2. **文案**：2026-09-22 第四轮（用户口径「卡片上应该是歌曲信息」）——meta = 歌手 · 专辑，
+ *    facts = 时长；「N 句 · 可跟唱」下架（就绪态由 chip 与说明行表达）；
+ * 3. **样式契约**（读组件源文件）：meta 左段可省略、时长段永不省略。
  */
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -20,7 +21,9 @@ const song = (over: Partial<SongSummary> = {}): SongSummary => ({
   id: 1,
   title: 'Twinkle Twinkle Little Star',
   artist: 'Traditional · 合成旋律（公有领域童谣）',
+  album: '童谣精选集',
   level: 1,
+  duration_s: 30,
   pitch_ref_status: 'ready',
   expected_lines: 6,
   favorited: false,
@@ -31,17 +34,26 @@ const mountCard = (over: Partial<SongSummary> = {}) =>
   mount(SingFeaturedCard, { props: { song: song(over) } })
 
 describe('SingFeaturedCard · 信息分层', () => {
-  it('署名只取 `·` 前第一段；句数与状态各成一段（不再拼成一句长串）', () => {
+  it('meta = 「歌手 · 专辑」（署名只取 `·` 前第一段）；facts = 时长', () => {
     const w = mountCard()
-    expect(w.find('.m-feat__artist').text()).toBe('Traditional')
+    expect(w.find('.m-feat__artist').text()).toBe('Traditional · 童谣精选集')
     expect(w.find('.m-feat__artist').text()).not.toContain('合成旋律')
-    expect(w.find('.m-feat__facts').text()).toBe('6 句 · 可跟唱')
+    expect(w.find('.m-feat__facts').text()).toBe('00:30')
+    // 第四轮口径：练习元数据（句数/难度）与默认态「可跟唱」不再上卡
+    expect(w.text()).not.toContain('6 句')
+    expect(w.text()).not.toContain('可跟唱')
   })
 
-  it('未就绪：chip 变「参考旋律提取中」，状态变「稍后开放」，desc 同步换文案', () => {
+  it('album 缺失 → meta 只有歌手，不留空分隔符', () => {
+    const w = mountCard({ album: null })
+    expect(w.find('.m-feat__artist').text()).toBe('Traditional')
+    expect(w.find('.m-feat__artist').text()).not.toContain('·')
+  })
+
+  it('未就绪：chip 变「参考旋律提取中」，desc 同步换文案（时长仍照常显示）', () => {
     const w = mountCard({ pitch_ref_status: 'building' })
     expect(w.text()).toContain('参考旋律提取中')
-    expect(w.find('.m-feat__facts').text()).toBe('6 句 · 稍后开放')
+    expect(w.find('.m-feat__facts').text()).toBe('00:30')
     expect(w.text()).toContain('参考旋律生成中')
   })
 
@@ -63,8 +75,8 @@ describe('SingFeaturedCard · 信息分层', () => {
     expect(w.emitted('open')?.[0]).toEqual([1])
   })
 
-  it('artist 缺失 → 署名回落「歌单」', () => {
-    expect(mountCard({ artist: null }).find('.m-feat__artist').text()).toBe('歌单')
+  it('artist 缺失 → 署名回落「歌单」（专辑照常拼在后面）', () => {
+    expect(mountCard({ artist: null }).find('.m-feat__artist').text()).toBe('歌单 · 童谣精选集')
   })
 })
 
@@ -78,7 +90,7 @@ describe('SingFeaturedCard · 版式契约（插画压字回归护栏）', () =>
     'utf-8',
   )
 
-  it('meta 排在标题**之后**；署名可省略、「N 句 · 状态」永不省略', () => {
+  it('meta 排在标题**之后**；左段可省略、时长段永不省略', () => {
     const titleAt = src.indexOf('class="u-dark-card__title m-feat__title"')
     const metaAt = src.indexOf('class="u-dark-card__meta m-feat__meta"')
     expect(titleAt, '标题必须在模板里').toBeGreaterThan(-1)
@@ -126,7 +138,7 @@ describe('SingFeaturedCard · 版式契约（插画压字回归护栏）', () =>
     expect(desc).toContain('font-size: 13px')
     expect(desc).toContain('line-height: 1.5')
     expect(desc).toContain('rgba(255, 255, 255, 0.62)')
-    // 关键属性（句数/状态）比署名亮一档且半粗 —— 决策依据优先于出处
+    // 时长（次强属性）比歌曲信息亮一档且半粗
     const facts = style.slice(style.indexOf('.m-feat__facts {'), style.indexOf('.m-feat__desc {'))
     expect(facts).toContain('rgba(255, 255, 255, 0.78)')
     expect(facts).toContain('font-weight: 600')

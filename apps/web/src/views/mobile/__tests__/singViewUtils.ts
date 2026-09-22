@@ -18,9 +18,9 @@ import type { SongSummary } from '@/api/sing'
 
 /** 三首歌：L1 未收藏 / L3 已收藏 / L4 未收藏（旧「难度 ≤2」口径会把 L1 也算进收藏 tab） */
 export const songs: SongSummary[] = [
-  { id: 1, title: 'Twinkle', level: 1, pitch_ref_status: 'ready', expected_lines: 6, favorited: false },
-  { id: 2, title: 'Mary Had a Little Lamb', level: 3, pitch_ref_status: 'ready', expected_lines: 4, favorited: true },
-  { id: 3, title: 'Ode to Joy', level: 4, pitch_ref_status: 'ready', expected_lines: 4, favorited: false },
+  { id: 1, title: 'Twinkle', artist: 'Traditional', album: '童谣精选集', level: 1, duration_s: 30, pitch_ref_status: 'ready', expected_lines: 6, favorited: false },
+  { id: 2, title: 'Mary Had a Little Lamb', artist: 'Traditional', album: '童谣精选集', level: 3, duration_s: 20, pitch_ref_status: 'ready', expected_lines: 4, favorited: true },
+  { id: 3, title: 'Ode to Joy', artist: 'Beethoven', album: '古典小品集', level: 4, duration_s: 20, pitch_ref_status: 'ready', expected_lines: 4, favorited: false },
 ]
 
 export type SingView = Awaited<ReturnType<typeof mountView>>
@@ -67,6 +67,8 @@ export const revokedUrls: string[] = []
 export class FakeAudio {
   src: string
   onended: (() => void) | null = null
+  /** 播放位置（秒）：`useReferenceAudio.currentMs()` 的采样源——底部时间跟音频走的用例会改它 */
+  currentTime = 0
   pause = vi.fn()
   play = vi.fn(async () => {})
   constructor(src: string) {

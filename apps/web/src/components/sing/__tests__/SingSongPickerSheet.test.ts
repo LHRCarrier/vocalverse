@@ -3,7 +3,7 @@
  *
  * 覆盖：
  * - 关闭时不渲染；打开才拉列表（懒加载）；
- * - 行内三要素：歌名 / 歌手（只取 `·` 前第一段）/ 难度 `L{level}`；
+ * - 行内两要素：歌名 / 歌曲信息「歌手 · 专辑」（2026-09-22 第四轮：难度 `L{level}` 徽标下架）；
  * - **6 首 → 6 行全渲染**（靠容器滚动，不砍数据），列表容器 = `.m-sing-pick__list`；
  * - 选中项 `aria-current` + `.is-on`；点击 emit `select`（并请求关闭弹层）；
  * - 加载失败显错误文案 + 重试可用；
@@ -36,6 +36,7 @@ function song(id: number, over: Partial<SongSummary> = {}): SongSummary {
     id,
     title: `曲目 ${id}`,
     artist: 'Traditional · 合成旋律（公有领域童谣）',
+    album: '童谣精选集',
     level: id,
     pitch_ref_status: 'ready',
     expected_lines: 4,
@@ -73,16 +74,16 @@ describe('SingSongPickerSheet（移动端选曲弹层）', () => {
     expect(wrapper.findAll('.m-sing-pick__row')).toHaveLength(1)
   })
 
-  it('每行：歌名 / 歌手 / 难度 L{level}；6 首时 6 行全在（靠容器滚动不砍数据）', async () => {
+  it('每行：歌名 / 「歌手 · 专辑」（无难度徽标）；6 首时 6 行全在（靠容器滚动不砍数据）', async () => {
     mockedFetchSongs.mockResolvedValue([1, 2, 3, 4, 5, 6].map((i) => song(i)))
     const wrapper = await mountSheet()
 
     const rows = wrapper.findAll('.m-sing-pick__row')
     expect(rows).toHaveLength(6)
     expect(rows[0]!.text()).toContain('曲目 1')
-    expect(rows[0]!.text()).toContain('Traditional') // artist 只取 `·` 前第一段
+    expect(rows[0]!.text()).toContain('Traditional · 童谣精选集') // 歌手只取 `·` 前第一段 + 专辑
     expect(rows[0]!.text()).not.toContain('合成旋律')
-    expect(rows[2]!.text()).toContain('L3') // 难度标识
+    expect(rows[2]!.text()).not.toContain('L3') // 难度标识已下架（练习元数据不上卡片）
     expect(wrapper.find('.m-sing-pick__list').exists()).toBe(true)
     expect(wrapper.text()).toContain('当前跟唱：未选曲') // 未选时的兜底文案
   })

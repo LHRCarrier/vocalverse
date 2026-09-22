@@ -185,7 +185,7 @@ describe('MobileSingView · P1（参考旋律 / 加载错误态 / 报告图）',
  * 歌单屏状态与文案（2026-09-22 歌单排版优化）——与 P1-6/P1-8 同主题，故并到本文件。
  *
  * 修复前：加载态是「深青大卡写加载中…」再跳变成内容卡；错误态也用同一张内容卡（语义混淆）；
- * 加载中还会同时出现「共 0 首」与「这个分类还没有歌」两句自相矛盾的话（P1-6 只修了 hero 卡）。
+ * 加载中还会同时出现「共 0 首」与「歌曲库还没有歌」两句自相矛盾的话（P1-6 只修了 hero 卡）。
  */
 describe('MobileSingView · 歌单屏状态与文案', () => {
   it('加载中 → 骨架卡（aria-busy），不再出现「加载中…」深青卡，也不出现自相矛盾的空态', async () => {
@@ -202,7 +202,7 @@ describe('MobileSingView · 歌单屏状态与文案', () => {
     expect(skel.attributes('aria-busy')).toBe('true')
     expect(w.text()).not.toContain('加载中…')
     expect(w.text()).not.toContain('共 0 首')
-    expect(w.text()).not.toContain('这个分类还没有歌')
+    expect(w.text()).not.toContain('歌曲库还没有歌')
 
     resolveSongs(songs.map((s) => ({ ...s })))
     await flushPromises()
@@ -218,15 +218,102 @@ describe('MobileSingView · 歌单屏状态与文案', () => {
     expect(w.find('.u-comm-empty__title').text()).toBe('歌曲库加载失败')
     expect(w.find('.u-comm-empty__sub').text()).toContain('网络断了')
     expect(w.find('.u-comm-empty__btn').text()).toContain('重试')
-    expect(w.text()).not.toContain('这个分类还没有歌')
+    expect(w.text()).not.toContain('歌曲库还没有歌')
     expect(w.text()).not.toContain('共 0 首')
   })
 
-  it('精选卡已抽成组件；「热门」口径改名「短歌」', async () => {
+  it('全长取契约 duration_s；缺失时退回录音上限 180s（不显示 NaN/--:--）', async () => {
+    const detail = vi.mocked(singApi.fetchSongDetail).getMockImplementation()!
+    vi.mocked(singApi.fetchSongDetail).mockImplementationOnce(async (id) => ({
+      ...(await detail(id)),
+      duration_s: null,
+    }))
+    const w = await mountView()
+    await openSheet(w)
+    expect(w.find('.m-sing-foot').text()).toContain('03:00')
+  })
+
+  it('精选卡已抽成组件；meta = 歌手 · 专辑 + 时长（「N 句 · 可跟唱」已下架）', async () => {
     const w = await mountView()
     expect(w.find('.m-feat').exists()).toBe(true) // SingFeaturedCard 根节点
-    expect(w.find('.m-feat__facts').text()).toBe('6 句 · 可跟唱')
-    expect(w.text()).toContain('短歌')
+    expect(w.find('.m-feat__artist').text()).toBe('Traditional · 童谣精选集')
+    expect(w.find('.m-feat__facts').text()).toBe('00:30')
+    expect(w.text()).not.toContain('6 句')
+    expect(w.text()).not.toContain('可跟唱')
+    const segs = w.findAll('.u-segment button').map((b) => b.text())
+    expect(segs).toEqual(['歌曲', '收藏'])
+    expect(w.text()).not.toContain('短歌')
     expect(w.text()).not.toContain('热门')
+  })
+})
+
+/** rAF 时钟在 happy-dom 走 setImmediate：给一帧时间让 `positionMs` 落值 */
+const rafTick = () => new Promise((r) => setTimeout(r, 20))
+
+/**
+ * 时间轴一致性（2026-09-22 用户报「音频歌词和时间轴对不上 + 底部时间显示有问题」）：
+ * 底部「时间 / 全长」必须与歌词区时间、引导条走针共用**歌曲轴**——
+ * ① 听原唱 = 音频播放位置（修复前恒 00:00）；
+ * ② 跟唱 = 首句锚点位置（开口前即首句起点，不是录音已用时长）；
+ * ③ 引导条的用户轨迹偏移 `offsetMs` = 首句起点 − 首帧人声时刻（有前奏的歌不错位）。
+ */
+describe('MobileSingView · 时间轴一致性（歌曲轴）', () => {
+  it('听原唱：底部时间跟音频位置走（修复前恒 00:00 / 全长）', async () => {
+    const w = await mountView()
+    await openSheet(w)
+    expect(w.find('.m-sing-foot__times').text()).toBe('00:00 / 00:30')
+
+    await btn(w, '听参考旋律').trigger('click')
+    await flushPromises()
+    expect(audioInstances).toHaveLength(1)
+    expect(w.findComponent({ name: 'LivePitchChart' }).props('playing')).toBe(true)
+    audioInstances[0].currentTime = 12.3 // 模拟播放到 00:12
+    await rafTick()
+    expect(w.find('.m-sing-foot__times').text()).toBe('00:12 / 00:30')
+  })
+
+  it('跟唱：底部时间/引导条走针 = 首句起点（开口前冻结），轨迹偏移随首帧人声回锚', async () => {
+    const detail = vi.mocked(singApi.fetchSongDetail).getMockImplementation()!
+    vi.mocked(singApi.fetchSongDetail).mockImplementationOnce(async (id) => ({
+      ...(await detail(id)),
+      // 有前奏的真歌形态：首句 22.48s（demo 曲就是这种，旧实现引导条按录音轴画 → 整段空白）
+      lines: [
+        { seq: 1, start_ms: 22_480, end_ms: 31_820, text: 'line1', pitch_ref: { f0s: [440] } },
+      ],
+    }))
+    const w = await mountView()
+    await openSheet(w)
+    await btn(w, '开始跟唱').trigger('click')
+    await flushPromises()
+    await rafTick()
+
+    expect(w.find('.m-sing-foot__times').text()).toBe('00:22 / 00:30') // 不是录音已用时长 00:00
+    const lane = w.findComponent({ name: 'LivePitchChart' })
+    expect(lane.props('clockMs')).toBe(22_480) // 走针 = 首句起点
+    expect(lane.props('offsetMs')).toBe(22_480) // 尚未开口：轨迹偏移无实际影响
+
+    lane.vm.$emit('firstVoice', 500)
+    await flushPromises()
+    expect(lane.props('offsetMs')).toBe(21_980) // 500ms 才开口 → 轨迹整体前移回锚
+  })
+
+  it('跟唱开口后：走针按歌曲轴推进（= 首句起点 + 已开口时长）', async () => {
+    const detail = vi.mocked(singApi.fetchSongDetail).getMockImplementation()!
+    vi.mocked(singApi.fetchSongDetail).mockImplementationOnce(async (id) => ({
+      ...(await detail(id)),
+      lines: [
+        { seq: 1, start_ms: 22_480, end_ms: 31_820, text: 'line1', pitch_ref: { f0s: [440] } },
+      ],
+    }))
+    const w = await mountView()
+    await openSheet(w)
+    await btn(w, '开始跟唱').trigger('click')
+    await flushPromises()
+    await rafTick()
+    const lane = w.findComponent({ name: 'LivePitchChart' })
+    lane.vm.$emit('firstVoice', 0)
+    await flushPromises()
+    await rafTick()
+    expect(lane.props('clockMs') as number).toBeGreaterThan(22_480)
   })
 })

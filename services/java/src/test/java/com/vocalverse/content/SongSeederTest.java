@@ -34,7 +34,10 @@ class SongSeederTest {
     long before = songs.count();
     seeder(true).run();
     long after = songs.count();
-    assertTrue(after >= before + 3, "应播种 3 首演示曲目（实际 " + (after - before) + "）");
+    // 断言「库里有演示曲目」而非「本次新增 3 首」：H2 上下文在类内共享，另一条回填用例
+    // 可能已先播过种（JUnit 方法顺序不保证）——「本次新增」会在那种顺序下假红（踩过）。
+    assertTrue(after >= 3, "应播种演示曲目（库内 " + after + " 首）");
+    assertTrue(after >= before, "播种只增不减");
 
     SongEntity twinkle = songs.findByTitle("Twinkle Twinkle Little Star").orElseThrow();
     assertEquals("/data/audio/song_twinkle.wav", twinkle.getAudioUrl());
@@ -42,6 +45,9 @@ class SongSeederTest {
     assertEquals("original", twinkle.getSource(), "合成演奏=自研录音（旋律公有领域）");
     assertEquals("published", twinkle.getStatus());
     assertEquals(1, twinkle.getLevel());
+    assertEquals("童谣精选集", twinkle.getAlbum(), "专辑名随种子播种（歌单行「歌手 · 专辑」）");
+    assertEquals("/api/v1/songs/covers/twinkle.svg", twinkle.getCoverUrl());
+    assertEquals("C", twinkle.getMusicalKey(), "种子键名 musical_key（2026-09-22 修正：原误写 musicalKey）");
     assertTrue(twinkle.getDurationS() != null && twinkle.getDurationS() > 10);
 
     List<LrcEntity> lines = lrcs.findBySongIdOrderBySeqAsc(twinkle.getId());
@@ -55,6 +61,37 @@ class SongSeederTest {
     // 幂等：二次跑不新增
     seeder(true).run();
     assertEquals(after, songs.count(), "按 title 查重（只增不改）");
+  }
+
+  @Test
+  void backfills_album_and_cover_only_when_null() {
+    seeder(true).run();
+    // 1) 空值 → 回填（老库重启即补齐，无需重播种）
+    SongEntity twinkle = songs.findByTitle("Twinkle Twinkle Little Star").orElseThrow();
+    twinkle.setAlbum(null);
+    twinkle.setCoverUrl(null);
+    songs.save(twinkle);
+    seeder(true).run();
+    SongEntity filled = songs.findByTitle("Twinkle Twinkle Little Star").orElseThrow();
+    assertEquals("童谣精选集", filled.getAlbum(), "album 为 NULL 时应从种子回填");
+    assertEquals(
+        "/api/v1/songs/covers/twinkle.svg",
+        filled.getCoverUrl(),
+        "cover_url 为 NULL 时应从种子回填（最早三首 09-09 播种时还没有封面）");
+
+    // 2) 已有值 → 不覆盖（「只增不改」语义仍成立；管理员编辑过的值保持不动）
+    filled.setAlbum("管理员改过的专辑");
+    filled.setCoverUrl("/custom/cover.svg");
+    songs.save(filled);
+    seeder(true).run();
+    SongEntity kept = songs.findByTitle("Twinkle Twinkle Little Star").orElseThrow();
+    assertEquals("管理员改过的专辑", kept.getAlbum(), "非空 album 不得被种子覆盖");
+    assertEquals("/custom/cover.svg", kept.getCoverUrl(), "非空 cover_url 不得被种子覆盖");
+
+    // 还原种子值，避免与其他用例（共享 H2）的断言互相干扰
+    kept.setAlbum("童谣精选集");
+    kept.setCoverUrl("/api/v1/songs/covers/twinkle.svg");
+    songs.save(kept);
   }
 
   @Test

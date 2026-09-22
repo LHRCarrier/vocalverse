@@ -88,9 +88,9 @@ vi.mock('@/lib/sing-chart', () => ({ renderSingChart: vi.fn() }))
 
 /** 三首歌：L1 未收藏 / L3 已收藏 / L4 未收藏（旧的 level≤2 口径会把「L1 未收藏」也算进收藏 tab） */
 const songs: SongSummary[] = [
-  { id: 1, title: 'Twinkle', level: 1, pitch_ref_status: 'ready', expected_lines: 6, favorited: false },
-  { id: 2, title: 'Mary Had a Little Lamb', level: 3, pitch_ref_status: 'ready', expected_lines: 4, favorited: true },
-  { id: 3, title: 'Ode to Joy', level: 4, pitch_ref_status: 'ready', expected_lines: 4, favorited: false },
+  { id: 1, title: 'Twinkle', artist: 'Traditional', album: '童谣精选集', level: 1, duration_s: 30, pitch_ref_status: 'ready', expected_lines: 6, favorited: false },
+  { id: 2, title: 'Mary Had a Little Lamb', artist: 'Traditional', album: '童谣精选集', level: 3, duration_s: 20, pitch_ref_status: 'ready', expected_lines: 4, favorited: true },
+  { id: 3, title: 'Ode to Joy', artist: 'Beethoven', album: '古典小品集', level: 4, duration_s: 20, pitch_ref_status: 'ready', expected_lines: 4, favorited: false },
 ]
 
 const router = createRouter({
@@ -109,7 +109,7 @@ async function mountView() {
   return wrapper
 }
 
-/** 切到某个分段（全部/热门/收藏） */
+/** 切到某个分段（歌曲/收藏；2026-09-22 第三轮起只有这两档） */
 async function switchTab(w: Awaited<ReturnType<typeof mountView>>, label: string) {
   const btn = w.findAll('.u-segment button').find((b) => b.text().includes(label))
   expect(btn, `分段「${label}」应存在`).toBeTruthy()
@@ -373,8 +373,7 @@ describe('MobileSingView · 放弃重录（录音态复位）', () => {
     expect(foot.exists()).toBe(true)
     expect(foot.find('.m-sing-foot__name').text()).toBe('Twinkle')
     expect(foot.text()).toContain('00:00')
-    // fixtures 未给 duration_s → 退回录音上限 180s = 03:00（不显示 NaN/--:--）
-    expect(foot.text()).toContain('03:00')
+    expect(foot.text()).toContain('00:30') // 契约 duration_s=30 → 全长 00:30
   })
 
   it('顶栏评级条：无实时分为占位，录音中录音进度线就位', async () => {

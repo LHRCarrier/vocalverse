@@ -399,7 +399,7 @@ describe('MobileSongList · 样式契约守卫', () => {
     )
     expect(block).toContain('max-height')
     expect(block).toContain('overflow-y: auto')
-    expect(block).toContain('--m-sing-list-row: 92px')
+    expect(block).toContain('--m-sing-list-row: 96px')
     // 行高口径 × 可见行数：改行高必须同步改倍数，否则可见行数会悄悄变化
     expect(block).toContain('calc(var(--m-sing-list-row) * 3.5)')
   })

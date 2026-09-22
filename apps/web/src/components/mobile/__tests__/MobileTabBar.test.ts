@@ -135,11 +135,11 @@ describe('MobileTabBar（双场景分组）', () => {
     const messages = useMessagesStore()
     messages.unreadTotal = 7
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('a[aria-label="通知"] .u-badge').text()).toBe('7')
+    expect(wrapper.find('a[aria-label="通知"] .u-unread').text()).toBe('7')
 
     messages.unreadTotal = 120
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('a[aria-label="通知"] .u-badge').text()).toBe('99+')
+    expect(wrapper.find('a[aria-label="通知"] .u-unread').text()).toBe('99+')
   })
 
   it('打卡页属学习组（底栏保持可见）', async () => {
