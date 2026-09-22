@@ -140,6 +140,15 @@ export interface NoteLaneFrame {
   paused?: boolean
 }
 
+/**
+ * 目标音符块高度（逻辑 px）——**用户轨迹与块共用同一口径**（2026-09-22 用户口径
+ * 「我们的线不是太细了，起码得和块一样大小吧」）：此前轨迹 1.8px 细线，比块（6~14px）
+ * 细一个数量级，唱准了也看不出「压住块」。
+ */
+export function barHeightOf(h: number): number {
+  return Math.max(6, Math.min(14, (h - 24) / 30))
+}
+
 const midiToY = (midi: number, h: number) => {
   const lo = 48 // C3
   const hi = 84 // C6
@@ -180,7 +189,7 @@ function drawNotes(
 ): void {
   const { h, x1, playheadT } = f
   const x0 = x1 - f.windowMs
-  const barH = Math.max(6, Math.min(14, (h - 24) / 30))
+  const barH = barHeightOf(h)
   const rad = barH / 2
   for (const s of f.segments) {
     if (s.endMs < x0 || s.startMs > x1) continue
@@ -206,7 +215,7 @@ function drawNotes(
   g.globalAlpha = f.paused ? 0.55 : 1
 }
 
-/** 用户轨迹（青色细线 + 头点淡出）+ 走针 */
+/** 用户轨迹（青色**与块同粗**的带 + 头点淡出）+ 走针 */
 function drawUserAndPlayhead(
   g: CanvasRenderingContext2D,
   f: NoteLaneFrame,
@@ -215,9 +224,12 @@ function drawUserAndPlayhead(
   const { h, w, x1, playheadT } = f
   const x0 = x1 - f.windowMs
   const pts = f.userPoints
+  // 轨迹粗细 = 目标块高度（用户口径「起码和块一样大小」）；圆头圆角避免细尖
+  const barH = barHeightOf(h)
   if (pts.length > 1) {
     g.strokeStyle = LANE.user
-    g.lineWidth = 1.8
+    g.lineWidth = barH
+    g.lineCap = 'round'
     g.lineJoin = 'round'
     g.beginPath()
     let started = false
@@ -237,7 +249,7 @@ function drawUserAndPlayhead(
     g.globalAlpha = (f.paused ? 0.55 : 1) * (f.headAlpha ?? 1)
     g.fillStyle = LANE.userHead
     g.beginPath()
-    g.arc(t2x(last.t), midiToY(last.midi, h), 3.2, 0, Math.PI * 2)
+    g.arc(t2x(last.t), midiToY(last.midi, h), Math.max(3.2, barH / 2 + 1), 0, Math.PI * 2)
     g.fill()
     g.globalAlpha = f.paused ? 0.55 : 1
   }
@@ -253,7 +265,7 @@ function drawUserAndPlayhead(
 }
 
 /**
- * 画一条引导带：底 + 音名网格 + 目标音符块（橙色圆角条）+ 用户轨迹（青色细线）+ 走针竖线。
+ * 画一条引导带：底 + 音名网格 + 目标音符块（橙色圆角条）+ 用户轨迹（青色，粗细同块）+ 走针竖线。
  */
 export function renderNoteLane(g: CanvasRenderingContext2D, f: NoteLaneFrame): void {
   const { w, h, x1, windowMs } = f

@@ -58,6 +58,24 @@ export function refF0At(ref: Float32Array, tMs: number): number {
   return i >= 0 && i < ref.length ? ref[i] : 0
 }
 
+/**
+ * 用户音高按**八度等价**对齐到参考（**显示口径** · 2026-09-22 用户报「怎么唱都不在块内」）：
+ * 离线评分本就是八度等价（`_fold_cent` 折叠到 ±600 cent + v3 移调补偿，KTV/唱吧同口径），
+ * 而实时轨迹此前按**绝对频率**画 → 男声唱女声歌（或反之）整条轨迹落在目标音符块外一个八度，
+ * 用户看到的反馈就是「怎么唱都不在块内」。这里取最近的整数八度平移
+ * （k = round(log2(ref/f0))），让轨迹落回块内；无参考（refF ≤ 0）时不平移。
+ */
+export function octaveShift(f0: number, refF: number): number {
+  if (f0 <= 0 || refF <= 0) return 0
+  return Math.round(Math.log2(refF / f0))
+}
+
+/** 便捷式：把用户音高平移 {@link octaveShift} 个八度（无参考时原样返回）。 */
+export function octaveAlignedF0(f0: number, refF: number): number {
+  const oct = octaveShift(f0, refF)
+  return oct === 0 ? f0 : f0 * 2 ** oct
+}
+
 /** 用户帧环形缓冲（tMs 必须单调不减；满员覆盖最旧） */
 export interface FrameRing {
   readonly capacity: number
@@ -198,10 +216,14 @@ function drawRefLine(
  * 静音语义（2026-09-21 调整）：**静音段不画橙线**——橙色轨迹在「最后一次出声」处干净结束，
  * 之后交给底部灰线（{@link drawSilenceLine}）。原先"末尾 N 点渐隐"会在停唱位置留下一个
  * 淡不干净的橙点，现已去掉；只保留**头部圆点**随静音时长淡出到 0（无残留）。
+ *
+ * 音高语义（2026-09-22）：每个点先经 {@link octaveAlignedF0} 对齐到参考的八度
+ * （与离线评分同口径）——否则差一个八度时整条轨迹画在块外，用户看着像「唱不进去」。
  */
 function drawUserTrace(
   g: CanvasRenderingContext2D,
   ring: FrameRing,
+  refF0s: Float32Array,
   x0: number,
   x1: number,
   x2p: (t: number) => number,
@@ -231,12 +253,22 @@ function drawUserTrace(
     cx = x
     cy = y
   }
-  for (let i = i0; i < i1; i += 1) push(x2p(ring.tAt(i)), y2f(ring.fAt(i)))
+  /** 八度偏移**随最近一次有参考的点保持**：句间空隙/前奏处参考缺失时不来回跳 */
+  let oct = 0
+  const alignedY = (t: number, f0: number) => {
+    const refF = refF0At(refF0s, t)
+    if (f0 > 0 && refF > 0) oct = octaveShift(f0, refF)
+    return y2f(oct === 0 ? f0 : f0 * 2 ** oct)
+  }
+  for (let i = i0; i < i1; i += 1) {
+    const t = ring.tAt(i)
+    push(x2p(t), alignedY(t, ring.fAt(i)))
+  }
   const lastI = i1 - 1
   const headT = head ? head.t : ring.tAt(lastI)
   const headF = head ? head.f : ring.fAt(lastI)
   const headIn = headT >= x0 && headT <= x1
-  if (headIn) push(x2p(headT), y2f(headF))
+  if (headIn) push(x2p(headT), alignedY(headT, headF))
   if (started) {
     g.lineTo(cx, cy) // 收尾：二次贝塞尔只画到中点，需补到最后一个顶点
   }
@@ -246,7 +278,7 @@ function drawUserTrace(
     g.fillStyle = '#e07a3f'
     g.globalAlpha = headAlpha
     g.beginPath()
-    g.arc(x2p(headT), y2f(headF), 3, 0, Math.PI * 2)
+    g.arc(x2p(headT), alignedY(headT, headF), 3, 0, Math.PI * 2)
     g.fill()
     g.globalAlpha = 1
   }
@@ -263,7 +295,7 @@ export function renderChart(g: CanvasRenderingContext2D, f: ChartFrame): void {
   drawGrid(g, w, y2f)
   drawSilenceLine(g, ring, x0, x1, playheadT, x2p, h)
   drawRefLine(g, refF0s, w, x0, x1, x2p, y2f)
-  drawUserTrace(g, ring, x0, x1, x2p, y2f, headAlpha, head ?? null)
+  drawUserTrace(g, ring, refF0s, x0, x1, x2p, y2f, headAlpha, head ?? null)
 
   g.strokeStyle = 'rgba(0,0,0,.25)'
   g.lineWidth = 1
