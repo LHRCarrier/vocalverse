@@ -14,7 +14,14 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from app.audio.voices import DEFAULT_VOICE, EDGE_VOICES, VoiceSpec, list_voices
+from app.audio.voices import (
+    DEFAULT_VOICE,
+    EDGE_VOICES,
+    ZH_DEFAULT_VOICE,
+    VoiceSpec,
+    default_voice_for_lang,
+    list_voices,
+)
 
 
 def _settings(**over):
@@ -38,6 +45,7 @@ def test_edge_catalog_is_stable() -> None:
         "en-US-GuyNeural",
         "en-GB-SoniaNeural",
         "en-GB-RyanNeural",
+        "zh-CN-XiaoxiaoNeural",
     ]
     assert all(v.engine == "edge" and v.is_local is False for v in EDGE_VOICES)
 
@@ -45,6 +53,17 @@ def test_edge_catalog_is_stable() -> None:
 def test_default_voice_matches_edge_first() -> None:
     """默认音色单一真源：前端不再各写一份字符串。"""
     assert EDGE_VOICES[0].id == DEFAULT_VOICE
+
+
+def test_default_voice_follows_lang() -> None:
+    """DM 输出语言 → 默认音色（TTS 跟随语言，修复「切中文仍用英文嗓子」）。"""
+    assert default_voice_for_lang("zh") == ZH_DEFAULT_VOICE
+    assert default_voice_for_lang("zh-CN") == ZH_DEFAULT_VOICE
+    assert default_voice_for_lang("en") == DEFAULT_VOICE
+    assert default_voice_for_lang(None) == DEFAULT_VOICE
+    assert default_voice_for_lang("") == DEFAULT_VOICE
+    zh = next(v for v in EDGE_VOICES if v.id == ZH_DEFAULT_VOICE)
+    assert any(lang.startswith("zh") for lang in zh.langs)
 
 
 def test_list_voices_only_edge_when_no_local_engine() -> None:

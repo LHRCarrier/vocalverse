@@ -160,6 +160,22 @@ def test_parse_dice_and_format():
     assert text.startswith("掷出 ") and "对抗 5" in text
 
 
+def test_format_roll_faces():
+    """N4：判定卡文本带骰面明细（d20=14 +2 = 16），不泄露内部键。"""
+    from app.trpg.dice import DiceResult, format_roll_faces
+
+    buffed = DiceResult(
+        rolls=[14], sides=20, count=1, modifier=2, total=16, vs=12, outcome="success"
+    )
+    assert format_roll_faces(buffed) == "d20=14 +2 = 16"
+    plain = DiceResult(rolls=[14], sides=20, count=1, modifier=0, total=14, vs=None, outcome=None)
+    assert format_roll_faces(plain) == "d20=14"
+    multi = DiceResult(rolls=[3, 4], sides=6, count=2, modifier=0, total=7, vs=None, outcome=None)
+    assert format_roll_faces(multi) == "2d6=3+4"
+    empty = DiceResult(rolls=[], sides=1, count=0, modifier=0, total=0, vs=None, outcome=None)
+    assert format_roll_faces(empty) == ""
+
+
 def test_delta_value():
     assert delta_value("12", -5) == "7"
     assert delta_value("0", 3) == "3"
@@ -374,6 +390,47 @@ def test_panel_crud_snapshot_and_dice(client, auth_headers):
     # 非法骰子 → 47001（登记码）
     bad = client.post(f"{base}/roll", json={"dice": "d1"}, headers=auth_headers)
     assert bad.status_code == 422 and bad.json()["code"] == 47001
+
+
+def test_roll_summary_includes_dice_faces(client, auth_headers):
+    """N4：主持台 🎲 判定卡文本（result.summary）必须带骰面与对抗结果，且无内部键。"""
+    campaign_id = _create_campaign(client, auth_headers)
+    base = f"/api/v1/trpg/campaigns/{campaign_id}"
+    client.post(
+        f"{base}/facts/edit", json={"key": "pc.主角.hp", "value": "7"}, headers=auth_headers
+    )
+    roll = client.post(
+        f"{base}/roll",
+        json={
+            "dice": "d20",
+            "modifier": 2,
+            "vs": 5,
+            "effects": [{"key": "pc.主角.hp", "delta": -1}],
+        },
+        headers=auth_headers,
+    ).json()["data"]
+    summary = roll["summary"]
+    assert "d20=" in summary and "+2" in summary and "vs 5" in summary
+    assert "pc." not in summary and "npc." not in summary  # 展示名，不泄露内部键
+
+    plain = client.post(f"{base}/roll", json={"dice": "d20"}, headers=auth_headers).json()["data"]
+    assert "（骰 d20=" in plain["summary"]  # 无对抗也显示掷骰结果
+
+
+def test_dm_context_includes_items(client, auth_headers):
+    """P1-3：DM 上下文（快照）注入行囊行，DM 不再否认玩家持有的道具。"""
+    from app.trpg import state as st
+    from app.trpg.service import _build_dm_context
+
+    campaign_id = _create_campaign(client, auth_headers)
+    st.set_item_facts(campaign_id, "灯油", qty=2, owner="pc.主角", effect="hp+3")
+    messages = _build_dm_context(campaign_id, "迷雾酒馆", "我看看行囊", None)
+    snapshot = next(
+        m["content"]
+        for m in messages
+        if m["role"] == "system" and m["content"].startswith("【当前状态】")
+    )
+    assert "行囊：灯油×2（hp+3）" in snapshot
 
 
 def test_fact_tombstone_and_user_touched(client, auth_headers):
@@ -804,6 +861,156 @@ def test_turn_attack_hit_miss_and_hp_writeback(client, auth_headers, monkeypatch
     assert all("npc.地精" not in t and "pc.主角" not in t for t in card_texts)  # 不泄露内部键
 
 
+def test_turn_attack_target_guards(client, auth_headers, monkeypatch):
+    """P1-5：未知目标 / 攻击自己 / 已离场 / 幻影实体 main 全部拒绝且不改状态；
+    只有在场 NPC 能被打中。"""
+    from app.db import get_session_factory
+    from app.models.trpg import TrpgEntity
+    from app.trpg import state as st
+
+    headers = {"X-Test-User-Id": "8"}  # 独立用户：不吃 user 1 的 llm 限流桶
+    campaign_id = _create_campaign(client, headers)
+    st.ensure_entity(campaign_id, "pc", "主角")
+    st.ensure_entity(campaign_id, "npc", "地精")
+    st.ensure_entity(campaign_id, "npc", "幽灵")
+    st.mark_entity_departed(campaign_id, "幽灵")
+    # 历史幻影实体（legacy 数据）：直接写库模拟旧缺陷产物
+    db = get_session_factory()()
+    db.add(TrpgEntity(campaign_id=campaign_id, kind="npc", name="main"))
+    db.commit()
+    db.close()
+
+    rounds = [
+        [
+            (
+                "tool_calls",
+                [
+                    _tool_call("attack", "a1", target="野狼", damage=3),
+                    _tool_call("attack", "a2", target="主角", damage=3),
+                    _tool_call("attack", "a3", target="幽灵", damage=3),
+                    _tool_call("attack", "a4", target="main", damage=3),
+                    _tool_call(
+                        "attack",
+                        "a5",
+                        target="地精",
+                        target_hp=10,
+                        damage=3,
+                        modifier=50,
+                        vs=1,
+                    ),
+                ],
+            )
+        ],
+        [("delta", "剑光闪过。")],
+    ]
+    llm = ScriptedRounds(rounds)
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: llm)
+
+    events = _sse_events(client, campaign_id, headers, text="我挥剑攻击")
+    attacks = [e for e in events if e["type"] == "encounter" and e["kind"] == "attack"]
+    assert len(attacks) == 1 and attacks[0]["target"] == "npc.地精"
+    assert attacks[0]["hit"] is True and attacks[0]["target_hp"] == 7
+
+    facts = _facts(client, campaign_id, headers)
+    assert facts["npc.地精.hp"] == "7"
+    assert "pc.主角.hp" not in facts  # 自己/幻影目标未产生任何状态写
+    assert any("不在本局实体表里" in t and "野狼" in t for t in llm.tool_texts)
+    assert any("不能攻击玩家自己的角色" in t for t in llm.tool_texts)
+    assert any("不在场" in t and "幽灵" in t for t in llm.tool_texts)
+    assert any("不在本局实体表里" in t and "main" in t for t in llm.tool_texts)
+
+    # 幻影实体不暴露给面板/攻击目标列表
+    state = client.get(f"/api/v1/trpg/campaigns/{campaign_id}", headers=headers).json()["data"]
+    assert all(e["name"] != "main" for e in state["entities"])
+
+
+def test_turn_attack_npc_counterattack_writes_pc_hp(client, auth_headers, monkeypatch):
+    """P1-4：NPC 反击走 attack（attacker=NPC、target=PC）→ 伤害写回玩家 HP + 战报卡。"""
+    from app.trpg import state as st
+
+    headers = {"X-Test-User-Id": "9"}  # 独立用户：不吃 user 1 的 llm 限流桶
+    campaign_id = _create_campaign(client, headers)
+    base = f"/api/v1/trpg/campaigns/{campaign_id}"
+    st.ensure_entity(campaign_id, "pc", "主角")
+    st.ensure_entity(campaign_id, "npc", "刺客")
+    client.post(f"{base}/facts/edit", json={"key": "pc.主角.hp", "value": "10"}, headers=headers)
+    rounds = [
+        [
+            (
+                "tool_calls",
+                [
+                    _tool_call(
+                        "attack",
+                        "n1",
+                        target="主角",
+                        attacker="刺客",
+                        damage=4,
+                        modifier=50,
+                        vs=1,
+                        weapon="匕首",
+                    )
+                ],
+            )
+        ],
+        [("delta", "匕首划过你的肩头。")],
+    ]
+    llm = ScriptedRounds(rounds)
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: llm)
+
+    events = _sse_events(client, campaign_id, headers, text="我逼近刺客")
+    attacks = [e for e in events if e["type"] == "encounter" and e["kind"] == "attack"]
+    assert attacks and attacks[0]["attacker"] == "npc.刺客" and attacks[0]["target"] == "pc.主角"
+    assert attacks[0]["hit"] is True and attacks[0]["damage"] == 4
+    assert attacks[0]["target_hp"] == 6
+    assert _facts(client, campaign_id, headers)["pc.主角.hp"] == "6"
+
+    # 战报卡：展示名、有伤害、无内部键
+    state = client.get(base, headers=headers).json()["data"]
+    card_texts = [
+        m["payload"]["text"]
+        for m in state["messages"]
+        if m["kind"] == "system" and m["payload"].get("trpg_sys") == "dice"
+    ]
+    assert any("刺客" in t and "主角" in t and "造成 4 点伤害" in t for t in card_texts)
+    assert all("npc." not in t and "pc." not in t for t in card_texts)
+
+
+def test_turn_attack_unknown_attacker_rejected(client, auth_headers, monkeypatch):
+    """显式 attacker 未登记 → 可读错误文本，不落表（不再凭前缀凭空造 pc.名）。"""
+    from app.trpg import state as st
+
+    headers = {"X-Test-User-Id": "10"}  # 独立用户：不吃 user 1 的 llm 限流桶
+    campaign_id = _create_campaign(client, headers)
+    st.ensure_entity(campaign_id, "pc", "主角")
+    st.ensure_entity(campaign_id, "npc", "地精")
+    rounds = [
+        [
+            (
+                "tool_calls",
+                [
+                    _tool_call(
+                        "attack",
+                        "x1",
+                        target="地精",
+                        attacker="神秘人",
+                        damage=3,
+                        modifier=50,
+                        vs=1,
+                    )
+                ],
+            )
+        ],
+        [("delta", "…")],
+    ]
+    llm = ScriptedRounds(rounds)
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: llm)
+
+    events = _sse_events(client, campaign_id, headers, text="神秘人出手")
+    assert not [e for e in events if e["type"] == "encounter" and e["kind"] == "attack"]
+    assert any("攻击者" in t and "神秘人" in t and "不在本局实体表里" in t for t in llm.tool_texts)
+    assert "npc.地精.hp" not in _facts(client, campaign_id, headers)
+
+
 def test_turn_use_item_decrement_and_exhausted(client, auth_headers, monkeypatch):
     """use_item：consumable 扣减 + hp 效果写回；数量耗尽 → 错误文本、状态不动。"""
     from app.trpg import state as st
@@ -880,6 +1087,9 @@ def test_turn_encounter_start_turn_end(client, auth_headers, monkeypatch):
     assert facts["encounter.main.status"] == "active"
     assert encounter_rules.decode_order(facts["encounter.main.order"]) == starts[0]["order"]
     assert facts["encounter.main.turn"] == "0" and facts["encounter.main.round"] == "1"
+    # P1-5 源头修复：encounter.main.* 事实不再把内部 id "main" 注册成幻影实体
+    state = client.get(f"/api/v1/trpg/campaigns/{campaign_id}", headers=auth_headers).json()["data"]
+    assert all(e["name"] != "main" for e in state["entities"])
 
     events = _sse_events(client, campaign_id, auth_headers, text="轮到我了")
     turns = [e for e in events if e["type"] == "encounter" and e["kind"] == "turn"]
@@ -1202,6 +1412,81 @@ def test_complete_quest_idempotent_no_second_ending(client, auth_headers, monkey
     ]
     assert len(endings) == 1 and endings[0]["payload"]["outcome"] == "weak"
     assert _facts(client, campaign_id, headers)[f"quest.{quest}.status"] == "done"
+
+
+def test_settle_tolerates_duplicate_task_rows_and_stays_idempotent(client, auth_headers):
+    """P1-1：同名重复任务/线索行不再让 quest.status 写回被回滚；结算仍幂等（只一张结局卡）。"""
+    from app.db import get_session_factory
+    from app.models.trpg import TrpgClue, TrpgTask
+    from app.trpg import state as st
+    from app.trpg.facts import FactOp
+    from app.trpg.state import upsert_facts
+
+    campaign_id = _create_campaign(client, auth_headers)
+    base = f"/api/v1/trpg/campaigns/{campaign_id}"
+    quest = "点亮灯芯"
+    db = get_session_factory()()
+    db.add(TrpgTask(campaign_id=campaign_id, title=quest, status="active"))
+    db.add(TrpgTask(campaign_id=campaign_id, title=quest, status="active"))
+    db.add(TrpgClue(campaign_id=campaign_id, title="灯油", found=True, recovered=False))
+    db.add(
+        TrpgClue(
+            campaign_id=campaign_id,
+            title="灯油",
+            content="柜台下有灯油",
+            found=True,
+            recovered=False,
+        )
+    )
+    db.commit()
+    db.close()
+
+    # 重行存在也能落表（旧实现 scalar_one_or_none → MultipleResultsFound → 整 op 回滚）
+    st.set_quest_facts(campaign_id, quest, progress="6/6", kind="positive", status="done")
+    assert _facts(client, campaign_id, auth_headers)[f"quest.{quest}.status"] == "done"
+
+    results = upsert_facts(campaign_id, [FactOp(op="create", key="clue.灯油.found", value="lost")])
+    assert results[0]["action"] in ("create", "update")
+
+    state = client.get(base, headers=auth_headers).json()["data"]
+    assert len([t for t in state["tasks"] if t["title"] == quest]) == 1  # 重行清理
+    clues = [c for c in state["clues"] if c["title"] == "灯油"]
+    assert len(clues) == 1 and clues[0]["found"] is False
+    assert clues[0]["content"] == "柜台下有灯油"  # 重行里的有用字段被合并保留
+
+    first = client.post(
+        f"{base}/quests/settle", json={"quest": quest}, headers=auth_headers
+    ).json()["data"]
+    assert first["finished"] is True and first["title"]
+    second = client.post(
+        f"{base}/quests/settle", json={"quest": quest}, headers=auth_headers
+    ).json()["data"]
+    assert second["title"] == first["title"] and second["outcome"] == first["outcome"]
+    state = client.get(base, headers=auth_headers).json()["data"]
+    endings = [
+        m
+        for m in state["messages"]
+        if m["kind"] == "system" and m["payload"].get("trpg_sys") == "ending"
+    ]
+    assert len(endings) == 1  # 幂等：第二张结局卡不再出现
+
+
+def test_campaign_list_exposes_finished(client, auth_headers):
+    """N1/P1-2（前端契约）：GET /campaigns 每项带 finished / finished_at（additive）。"""
+    campaign_id = _create_campaign(client, auth_headers)
+    base = f"/api/v1/trpg/campaigns/{campaign_id}"
+    listed = client.get("/api/v1/trpg/campaigns", headers=auth_headers).json()["data"]
+    item = next(c for c in listed if c["id"] == campaign_id)
+    assert item["finished"] is False and item["finished_at"] is None
+
+    quest = "收束之约"
+    client.post(f"{base}/tasks", json={"title": quest}, headers=auth_headers)
+    client.post(
+        f"{base}/quests/settle", json={"quest": quest, "outcome": "strong"}, headers=auth_headers
+    )
+    listed = client.get("/api/v1/trpg/campaigns", headers=auth_headers).json()["data"]
+    item = next(c for c in listed if c["id"] == campaign_id)
+    assert item["finished"] is True and item["finished_at"]
 
 
 # ---------------------------------------------------------------------------

@@ -328,6 +328,59 @@ def test_snapshot_includes_npc_state_line():
     assert "路人" not in snapshot  # 非法域不进快照
 
 
+def test_snapshot_includes_item_bag_line():
+    """P1-3：item.* 事实进快照（DM 才能看见道具）；NPC 持有物不进玩家行囊。"""
+    snapshot = build_state_snapshot(
+        SnapshotInput(
+            facts=[
+                SnapshotFact(key="pc.主角.hp", kind="state", value="12"),
+                SnapshotFact(key="pc.主角.inventory", kind="state", value="行囊与短刀"),
+                SnapshotFact(key="item.短剑.qty", kind="fact", value="1"),
+                SnapshotFact(key="item.短剑.owner", kind="fact", value="pc.主角"),
+                SnapshotFact(key="item.治疗药剂.qty", kind="fact", value="2"),
+                SnapshotFact(key="item.治疗药剂.effect", kind="fact", value="hp+5"),
+                SnapshotFact(key="item.赃物.qty", kind="fact", value="1"),
+                SnapshotFact(key="item.赃物.owner", kind="fact", value="npc.商人"),
+            ],
+            tasks=[],
+            clues=[],
+            scene="酒馆",
+        )
+    )
+    assert "行囊：短剑×1、治疗药剂×2（hp+5）" in snapshot
+    assert "赃物" not in snapshot  # NPC 持有
+    assert "行囊与短刀" not in snapshot  # item.* 行优先，不再重复 inventory 字符串
+
+
+def test_snapshot_bag_falls_back_to_inventory_string():
+    """无 item.* 行 → pc.*.inventory 字符串兜底进「行囊」行（不再混在 PC 行）。"""
+    snapshot = build_state_snapshot(
+        SnapshotInput(
+            facts=[
+                SnapshotFact(key="pc.主角.hp", kind="state", value="12"),
+                SnapshotFact(key="pc.主角.inventory", kind="state", value="行囊与短刀"),
+            ],
+            tasks=[],
+            clues=[],
+            scene=None,
+        )
+    )
+    assert "行囊：行囊与短刀" in snapshot
+    assert "持有" not in snapshot
+    assert "PC：HP 12" in snapshot
+
+
+def test_snapshot_bag_line_limit():
+    """行囊条目按 SNAPSHOT_ITEM_MAX 截断（预算纪律）。"""
+    from app.trpg.constants import SNAPSHOT_ITEM_MAX
+
+    facts = [SnapshotFact(key=f"item.杂物{i}.qty", kind="fact", value="1") for i in range(12)]
+    snapshot = build_state_snapshot(SnapshotInput(facts=facts, tasks=[], clues=[], scene=None))
+    assert "行囊：" in snapshot
+    assert snapshot.count("×1") == SNAPSHOT_ITEM_MAX
+    assert "杂物11" not in snapshot
+
+
 # ---------------------------------------------------------------------------
 # 场景卡模板：道具种子（docs/57 §3.1）
 # ---------------------------------------------------------------------------
