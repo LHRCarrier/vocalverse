@@ -3,6 +3,20 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-23 演示数据：Luna 占位视频帖换成真视频（B 站「凑企鹅」梗）· 1 op
+
+> 归属：演示数据（gitignored `local/演示数据/`；素材商用版权只本地）。用户口径：「把这个视频换成真视频，内容来点别样的，B站上搜索凑企鹅的视频放进来」。
+
+- **新增附挂模式**（`videos.json` + `seed_videos.py`）：`attach_slug` = 把视频挂到**已有帖子**上（替换 media、可选同步标题/正文），
+  不新建帖子、不动计数与时间；媒体注册仍走 `app.media.service.create`（幂等）。
+- **内容**：`BV1sowFzwEs8`（徐Toso「凑企鹅」梗，131s / 1820 万播放）→ 替换 Luna 的 `luna-shadowing-routine`（原为占位深色封面 + 假 3:07）；
+  标题/正文同步改英文（"When Your Study Break Turns into a Penguin Marathon" + 原创简介），计数（1 评 / 2 赞）与「11 小时前」时间戳保持不动。
+- **验证**：DB media 指向新视频（dur 131）；Playwright 打开 `/m/post/25` 实测 `<video>` 播放（duration 131、currentTime 前进、poster 在）；
+  连跑两次 seed 幂等（第二次「媒体已是该视频，跳过」）；截图 `local/演示数据/_验收截图/视频帖-凑企鹅.png`。
+- 真机：本次纯数据改动（前端零改动），APK 无需重打（gradle 全 up-to-date 已确认）；App 内刷新即可见。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-23
+
 ## 2026-09-23 `songs.instrumental_url` 伴奏轨字段（迁移 0023 + 契约快照）· 1 op
 
 > 归属：`songs` 内容库（Java 独占写）+ Python 契约。评分/选歌/提取链路零语义变化（纯播放字段）。
