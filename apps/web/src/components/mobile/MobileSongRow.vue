@@ -1,37 +1,23 @@
 <script setup lang="ts">
 /**
- * 唱吧歌单行（MobileSingView 专用 · 2026-09-10；2026-09-22 歌单排版优化（含第三轮 QQ 音乐式改版））。
+ * 唱吧歌单行（MobileSingView 专用 · 2026-09-10；2026-09-23 QQ 音乐式改版）。
  *
- * - 两颗独立 button（原来的整行 button 无法内嵌按钮——嵌套 button 是无效 HTML，
- *   且触摸端无法区分「点行去跟唱」与「点收藏」）；
- * - 收藏态/就绪状态由父组件透传（`song.favorited` 来自服务端），点击经 emit 回父级，
- *   本组件不持状态（单一数据源在 useSingPlay.songs）。
+ * - 行内三颗独立 button（原整行 button 无法内嵌按钮——嵌套 button 是无效 HTML，
+ *   触摸端也无法区分「点行」与「点收藏」）：**行点击 = 试听参考旋律**（2026-09-23 用户原型口径，
+ *   与悬浮播放条联动）、**「去跟唱」= 打开跟唱面板**、**心形 = 收藏**；
+ * - 收藏态/在播态由父组件透传（`song.favorited` 来自服务端、`active` 来自播放条），
+ *   本组件不持状态（单一数据源在 useSingPlay.songs / 页面预览播放）。
  *
- * 2026-09-22 第三轮（用户截图：状态徽标叠了两遍 + 排版空、信息量低）：
- * 1. **就绪态不再占位**：`ready` 是曲库的默认态，每行都挂一颗「可跟唱」纯属噪音；
- *    徽标只在**异常态**（提取中 / 提取失败 / 暂不可唱）出现，且带 `title`+`aria-label`
- *    讲清「为什么不能唱」。异常态是少数派，徽标进副文行、`flex:none`，不挤文本。
- * 2. **QQ 音乐式信息密度**：封面 48 → **56px**（几何在本页作用域内定义，不再从
- *    `.u-icon-block` 借 48）；副文行 = 左「歌手 · 专辑」+ 右**时长**
- *    （`duration_s` → `mm:ss`，tabular-nums）。
- * 3. **行高 80 → 72px**（上下内边距 16 → 8）：列表更紧凑，同样一屏能多露一行。
+ * 2026-09-23 第六轮（用户提供 QQ 音乐式原型，视觉照搬、内容接真）：
+ * 1. 封面 56 → **52px**（原型口径），**在播行**叠加绿色音波（`m-sing-row__wave`，三根跳动条）；
+ * 2. 右侧新增**「去跟唱」药丸键**（浅绿底 + 深绿字，原型同款语义：行=试听、药丸=进录音）；
+ * 3. 不再上任何状态/元数据徽标（就绪/难度/句数此前已下架；原型里的 SQ无损/伴奏修音是假标签，不搬）。
  *
- * 2026-09-22 第五轮（用户口径「暂不可唱必须去掉，因为我们上架歌曲必须是可唱的，这是逻辑问题」）：
- * **状态徽标整体下架**（ready / 提取中 / 提取失败 / 暂不可唱 都不再上卡片）——曲库只上架
- * 可唱的曲子（导入即生成歌词时间轴 + 参考旋律，见 `local/_make_songs_singable.py`），
- * 卡片只讲歌曲信息；服务端 40905 门禁仍在（异常态点击会 toast，不在卡片上展示）。
- *
- * 2026-09-22 第四轮（用户口径「把这个 L2 L3 这类删掉，还有『几句』这种，
- * 卡片上应该是歌曲信息」）：副文只留**歌曲信息**——歌手 · 专辑（`songs.album`，可空，
- * 缺省时整段不出现）+ 时长；难度 Lx 与句数属练习元数据，不再上卡片（数据仍在详情/管理端）。
- * 署名只取 `artist` 里 `·` 前第一段（`Traditional · 合成旋律（公有领域童谣）` → `Traditional`；
- * 后半段是制作说明，完整值仍在歌曲详情与管理端）。
- *
- * 封面（2026-09-22 首轮）：`songs.cover_url` 有值就渲染封面图，无封面或图裂
- * （资产缺失/离线）退回音符图标——不给用户留破图占位。封面路径必须是**站点相对路径**
- * （如 `/api/v1/songs/covers/twinkle.svg`，后端公开路由服务），故一律过 `mediaUrl()`
- * 拼 `PYTHON_BASE`——打包壳里页面源是 `https://localhost`，相对路径会打到壳自身
- * 资源服务器（404，docs/48 B5）。
+ * 2026-09-22 第四轮（用户口径「卡片上应该是歌曲信息」）：副文只留**歌曲信息**——歌手 · 专辑
+ * （`songs.album`，可空，缺省时整段不出现）+ 时长；署名只取 `artist` 里 `·` 前第一段。
+ * 封面：`songs.cover_url` 有值就渲染，无封面或图裂退回音符图标——不留破图。
+ * 封面路径必须是**站点相对路径**（`/api/v1/songs/covers/*`），一律过 `mediaUrl()` 拼 `PYTHON_BASE`
+ * （打包壳里页面源是 `https://localhost`，相对路径会打到壳自身资源服务器，docs/48 B5）。
  */
 import { computed, ref } from 'vue'
 
@@ -40,8 +26,21 @@ import { formatClock } from '@/lib/sing-lyrics'
 import MobileIcon from './MobileIcon.vue'
 import type { SongSummary } from '@/api/sing'
 
-const props = defineProps<{ song: SongSummary }>()
-const emit = defineEmits<{ open: [number]; favorite: [SongSummary] }>()
+const props = withDefaults(
+  defineProps<{
+    song: SongSummary
+    /** 在播（悬浮播放条当前曲目）→ 封面叠加音波、标题高亮 */
+    active?: boolean
+  }>(),
+  { active: false },
+)
+const emit = defineEmits<{
+  /** 试听参考旋律（行点击；页面侧驱动悬浮播放条） */
+  preview: [song: SongSummary]
+  /** 去跟唱（打开跟唱面板） */
+  open: [id: number]
+  favorite: [song: SongSummary]
+}>()
 
 /** 专辑封面地址（`cover_url` → 绝对/代理地址；空值返回 ''） */
 const coverSrc = computed(() => mediaUrl(props.song.cover_url))
@@ -52,7 +51,7 @@ const coverFailed = ref(false)
 const artistShort = computed(() => (props.song.artist ?? '').split('·')[0].trim() || '歌单')
 /** 专辑（可空）：缺失时整段不出现，不留空分隔符 */
 const albumText = computed(() => (props.song.album ?? '').trim())
-/** 副文：**歌曲信息**「歌手 · 专辑」（难度 Lx / 句数属练习元数据，不再上卡片） */
+/** 副文：**歌曲信息**「歌手 · 专辑」 */
 const metaText = computed(() =>
   [artistShort.value, albumText.value].filter(Boolean).join(' · '),
 )
@@ -63,9 +62,9 @@ const durationText = computed(() =>
 </script>
 
 <template>
-  <div class="u-item m-sing-row">
-    <button class="m-sing-row__hit" type="button" @click="emit('open', song.id)">
-      <span class="u-icon-block m-sing-row__cover" :style="{ background: song.level <= 2 ? '#1E2B26' : '#16303A' }">
+  <div class="u-item m-sing-row" :class="{ 'is-active': active }">
+    <button class="m-sing-row__hit" type="button" @click="emit('preview', song)">
+      <span class="m-sing-row__cover">
         <!-- 封面为装饰图（歌名就在右侧），alt 留空避免读屏重复播报 -->
         <img
           v-if="coverSrc && !coverFailed"
@@ -75,15 +74,27 @@ const durationText = computed(() =>
           decoding="async"
           @error="coverFailed = true"
         >
-        <MobileIcon v-else :name="song.level <= 2 ? 'headphone' : 'note'" :size="22" />
+        <MobileIcon v-else :name="song.level <= 2 ? 'headphone' : 'note'" :size="20" />
+        <!-- 在播音波（原型同款：三根跳动条；动效分级 off 档只留静态竖条） -->
+        <span v-if="active" class="m-sing-row__wave" aria-hidden="true">
+          <i /><i /><i />
+        </span>
       </span>
       <span class="u-item__main">
-        <span class="u-item__title">{{ song.title }}</span>
+        <span class="u-item__title m-sing-row__name">{{ song.title }}</span>
         <span class="u-item__sub m-sing-row__sub">
           <span class="m-sing-row__meta">{{ metaText }}</span>
           <span v-if="durationText" class="m-sing-row__dur">{{ durationText }}</span>
         </span>
       </span>
+    </button>
+    <button
+      class="m-sing-row__sing"
+      type="button"
+      :aria-label="`去跟唱 ${song.title}`"
+      @click="emit('open', song.id)"
+    >
+      <MobileIcon name="mic" :size="13" /> 去跟唱
     </button>
     <button
       class="m-sing-fav"

@@ -8,14 +8,12 @@
  * 视觉：沿用重制版基线（深青精选卡/56px 分段/点线时间轴歌单）；交互逻辑接真。
  */
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-
-import IconShare from '~icons/tabler/share'
 
 import { shareDemoLink } from '@/composables/share'
 import { SING_MAX_RECORD_MS, useSingPlay } from '@/composables/sing'
 import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { useReferenceAudio } from '@/composables/useReferenceAudio'
+import { useSingAccompaniment } from '@/composables/useSingAccompaniment'
 import { useLivePitchPref } from '@/composables/useLivePitchPref'
 import { useSingLyricClock } from '@/composables/useSingLyricClock'
 import { useUiStore } from '@/stores/ui'
@@ -25,13 +23,12 @@ import { hapticTap } from '@/utils/haptic'
 import { toLyricLines } from '@/lib/sing-lyrics'
 import type { SongSummary } from '@/api/sing'
 
-import MobileArt from '@/components/mobile/MobileArt.vue'
-import MobileIcon from '@/components/mobile/MobileIcon.vue'
-import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
-import MobileSongList from '@/components/mobile/MobileSongList.vue'
-import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import SingActionBar from '@/components/sing/SingActionBar.vue'
-import SingFeaturedCard from '@/components/sing/SingFeaturedCard.vue'
+import SingLibrarySection from '@/components/sing/SingLibrarySection.vue'
+import SingTabBar from '@/components/sing/SingTabBar.vue'
+import SingTopBar from '@/components/sing/SingTopBar.vue'
+import type { SingCat } from '@/components/sing/SingTopBar.vue'
+import SingMiniPlayer from '@/components/sing/SingMiniPlayer.vue'
 import SingLyrics from '@/components/sing/SingLyrics.vue'
 import SingSheetHead from '@/components/sing/SingSheetHead.vue'
 import SingSongPickerSheet from '@/components/sing/SingSongPickerSheet.vue'
@@ -41,7 +38,6 @@ import { formatClock } from '@/lib/sing-lyrics'
 import '@/styles/mobile-uic.css'
 import '@/styles/mobile-sing.css'
 
-const router = useRouter()
 const ui = useUiStore()
 /** 选曲真源（与桌面顶栏同一份；跨模块读 `currentSong` 即可同步，2026-09-21） */
 const sing = useSingStore()
@@ -54,25 +50,35 @@ const sheetOpen = ref(false)
 /** 跟唱曲目选择弹层（顶栏入口 · 2026-09-21）：底部 sheet，列表/选中态来自 store */
 const pickerOpen = ref(false)
 
-/** 顶栏选曲入口的文案（icon-only 按钮的语义补充：把「当前在唱哪首」带出去） */
-const pickerLabel = computed(() =>
-  sing.currentSong ? `选择跟唱曲目（当前：${sing.currentSong.title}）` : '选择跟唱曲目',
-)
 
 type Tab = 'songs' | 'fav'
 
 const tab = ref<Tab>('songs')
 
 /**
- * 分段只有两档（2026-09-22 第三轮 · 用户口径「短歌改成歌曲」）：
- * 原「全部 / 短歌 / 收藏」里，短歌档的口径是 `expected_lines ≤ 8`（与「热度」无关），
- * 改名「歌曲」后名实不符；用户拍板**去掉「全部」档、歌曲档显示全部曲目**——
- * 标签与内容对齐，也不再有两档内容完全相同的冗余分区。
+ * 分类（2026-09-23 用户原型：QQ 式横滑 tab）。
+ *
+ * 原型 6 项「推荐/刷歌/乐馆/听书/伴奏库/热歌榜」中，我们只有两档真实内容：
+ * 推荐 = 全部曲目、收藏 = 用户自主收藏（2026-09-10 组长需求，带测试）——
+ * 原型第二项「刷歌」无对应能力，就地换成「收藏」；其余 4 项按原型保留视觉，
+ * 点击 toast「后续版本」（不假装有内容、不空跳）。
  */
-const tabs: { key: Tab; label: string; icon: 'note' | 'heart' }[] = [
-  { key: 'songs', label: '歌曲', icon: 'note' },
-  { key: 'fav', label: '收藏', icon: 'heart' },
+const tabs: SingCat[] = [
+  { key: 'songs', label: '推荐', real: true },
+  { key: 'fav', label: '收藏', real: true },
+  { key: 'hall', label: '乐馆', real: false },
+  { key: 'listen', label: '听书', real: false },
+  { key: 'accomp', label: '伴奏库', real: false },
+  { key: 'hot', label: '热歌榜', real: false },
 ]
+
+function onCat(t: SingCat) {
+  if (t.real) {
+    tab.value = t.key as Tab
+    return
+  }
+  ui.showToast(`${t.label} · 后续版本`)
+}
 
 /* 分类规则：songs=全部曲目；fav=**用户自主收藏**（服务端 favorited 为准，2026-09-10） */
 const visibleSongs = computed(() =>
@@ -80,6 +86,8 @@ const visibleSongs = computed(() =>
 )
 
 const featured = computed(() => play.songs.value[0] ?? null)
+/** 收藏第一首（英雄卡 2「My List」数据源；无收藏 → 卡 2 不渲染） */
+const firstFavorite = computed(() => play.favorites.value[0] ?? null)
 const sheetDetail = computed(() => play.detail.value)
 const recording = computed(() => play.phase.value === 'recording')
 /** 录音暂停中（2026-09-22 深色录唱页：中心钮变「继续」，计时/歌词游标冻结） */
@@ -120,6 +128,56 @@ const reference = useReferenceAudio(
 )
 const refPlaying = reference.playing
 
+/** 伴奏（录音期间播放 · 2026-09-22 用户口径「伴奏是唱的时候放的」；细节见组合式文件头） */
+const accompaniment = useSingAccompaniment(
+  () => ({ instrumental: sheetDetail.value?.instrumental_url, audio: sheetDetail.value?.audio_url }),
+  (msg) => ui.showToast(msg),
+)
+
+/**
+ * 悬浮播放条 · 参考旋律试听（2026-09-23 用户原型 QQ 音乐式播放条「接真」）。
+ * 与跟唱面板的「听原唱」是**两路独立实例**：试听只活在列表页，开跟唱面板即停（见 openSong），不叠放。
+ * 路径口径与面板一致：`audio_url` 取 basename 拼 `/api/v1/audio/`（后端公开音频路由）。
+ */
+const previewSong = ref<SongSummary | null>(null)
+const previewPath = computed(() => {
+  const url = previewSong.value?.audio_url
+  return url ? `/api/v1/audio/${url.split('/').pop()}` : null
+})
+const preview = useReferenceAudio(() => previewPath.value, (msg) => ui.showToast(msg))
+const previewPlaying = preview.playing
+
+/** 播放条展示的曲目：本次试听 > store 当前选中 > 列表第一首（列表页常驻可见） */
+const miniSong = computed(() => previewSong.value ?? sing.currentSong ?? featured.value)
+
+/** 试听/暂停同一首；换歌则从头播（`play()` 内部先停旧实例，P1-7 资源回收） */
+function playOrTogglePreview(song: SongSummary) {
+  if (previewSong.value?.id === song.id) {
+    if (previewPlaying.value) preview.pause()
+    else preview.resume()
+    return
+  }
+  previewSong.value = song
+  void preview.play()
+}
+
+/** 行点击：试听该曲（原型口径「点行=播放，药丸键=去跟唱」） */
+function onPreview(song: SongSummary) {
+  hapticTap('light')
+  playOrTogglePreview(song)
+}
+
+/** 播放条播放/暂停键：还没选过曲时，对当前展示的曲目开播 */
+function togglePreview() {
+  const s = previewSong.value ?? miniSong.value
+  if (s) playOrTogglePreview(s)
+}
+/** 任一路在播（歌词时钟的「跟随音频」判据：听原唱或跟唱放伴奏都算） */
+const anyPlaying = computed(() => refPlaying.value || accompaniment.playing.value)
+/** 当前音频位置（ms）：伴奏在播时取伴奏位置，否则取参考音位置 */
+const audioPosMs = () =>
+  accompaniment.playing.value ? accompaniment.currentMs() : reference.currentMs()
+
 /** 实时音准线显示开关（2026-09-22：按视频模板移到面板底部按钮行；只管显示，检测照常跑） */
 const { on: livePitchOn, toggle: toggleLivePitch } = useLivePitchPref()
 
@@ -142,36 +200,53 @@ const {
   positionMs,
   recMs,
 } = useSingLyricClock({
-  playing: refPlaying,
+  playing: anyPlaying,
   recording,
   paused,
-  audioMs: reference.currentMs,
+  audioMs: audioPosMs,
   voiceAtMs,
   firstLineMs: () => lyricFirstMs.value,
 })
 
+/** 本轮是否用伴奏起唱（决定轨迹的轴映射口径；由 `startSinging` 置位） */
+const takeWithAccompaniment = ref(false)
+
 /**
- * 引导条用户轨迹的轴映射（2026-09-22）：检测帧时间戳是**录音轴**（检测起点起算），
- * 而引导条的走针/目标音符块用**歌曲轴**（开口即首句锚点）。不加这个偏移，有前奏的歌
- * （如 demo 曲首句 22.48s）整段跟唱的目标音符块都会错位——真机表现为「歌词唱第 1 句、
- * 引导条却是前奏（空白）」。开口前无轨迹，偏移值无影响。
+ * 引导条用户轨迹的轴映射（2026-09-22；同日深夜按伴奏口径修正）：检测帧时间戳是**录音轴**
+ * （检测起点起算），引导条走针/目标音符块用**歌曲轴**：
+ * - **伴奏轮**：伴奏与录音同起点（`startSinging` 先等伴奏就位再开录）→ 两轴重合，偏移 = **0**。
+ *   此前一律按「首句锚点」算偏移——用户只要不是恰好在首句开口，整条轨迹就横移数秒，
+ *   看起来「怎么唱都不在块内」；
+ * - **清唱轮**：开口即首句锚点 → 偏移 = 首句起点 − 首帧人声时刻（有前奏的歌不错位）。
  */
-const laneOffsetMs = computed(() => lyricFirstMs.value - (voiceAtMs.value ?? 0))
+const laneOffsetMs = computed(() =>
+  takeWithAccompaniment.value ? 0 : lyricFirstMs.value - (voiceAtMs.value ?? 0),
+)
 
 /** 底部时间 = 歌曲轴位置（听原唱 = 播放位置；跟唱 = 首句锚点位置；空闲 = 00:00） */
 const songClock = computed(() => formatClock(positionMs.value ?? 0))
 
 /**
- * 开始跟唱（P1-5，2026-09-10）：**先停参考旋律再开录**。
- * 修复前录音按钮直接 `play.startRecording()`：外放先听后唱时原唱被麦克风一起录进去
- * （实时线显示的是参考音），而「停止参考旋律」按钮此刻又被 `:disabled` 锁死 → 用户停不掉。
- * 依据：docs/31（跟唱为练习辅助，输入须为用户本人）、拷问报告 A-F3/D-F3。
+ * 开始跟唱（P1-5，2026-09-10；2026-09-22 补伴奏）：
+ * - **先停原唱**（原口径：外放先听后唱时原唱会被麦克风录进评分）；
+ * - 若「伴奏」开着 → **从头播伴奏**（`songs.instrumental_url`，无则回退参考音）：
+ *   用户口径「没有伴奏怎么唱」——录音期间要有伴奏；伴奏同样经麦克风（建议戴耳机，
+ *   否则会与用户声音一起被录进去，评分受影响）。
+ * - 依据：docs/31（跟唱为练习辅助，输入须为用户本人）、拷问报告 A-F3/D-F3。
  */
-function startSinging() {
+async function startSinging() {
   voiceAtMs.value = null // 新一轮跟唱：锚点等首帧人声
   liveScore.value = null // 上一轮的实时分不带进新的一轮
   reference.stop()
+  // 伴奏先就位（加载+开播）再开录 → 歌曲轴与录音轴同一起点（轨迹偏移才为 0）
+  takeWithAccompaniment.value = await accompaniment.start()
   play.startRecording()
+}
+
+/** 听原唱 ⇄ 停止（听原唱时停掉伴奏，两路不叠放） */
+function toggleReference() {
+  accompaniment.stop()
+  void reference.toggle()
 }
 
 /**
@@ -191,6 +266,8 @@ function onFirstVoice(tMs: number) {
 
 async function openSong(songId: number) {
   reference.stop() // 换歌即停播（原实现会继续播上一首的参考旋律）
+  accompaniment.stop() // 伴奏同理
+  preview.stop() // 悬浮播放条的试听也停（进跟唱面板后由面板自己的「听原唱」接管）
   const ok = await play.openSong(songId)
   if (ok) sheetOpen.value = true
   else ui.showToast(play.error.value ?? '该歌暂时不能跟唱')
@@ -206,6 +283,7 @@ async function toggleFav(song: SongSummary) {
 
 async function startOver() {
   reference.stop()
+  accompaniment.stop()
   play.reset()
   sheetOpen.value = false
 }
@@ -222,6 +300,7 @@ watch(sheetOpen, (open) => {
 
 onUnmounted(() => {
   reference.stop()
+  accompaniment.stop()
   document.body.style.overflow = '' // 卸载兜底：面板开着直接离开页面时不得把整页锁死
 })
 
@@ -253,99 +332,35 @@ async function shareSong() {
 </script>
 
 <template>
-  <div class="u-phone">
-    <!-- 统一顶栏（← 回学习主页 + 全局头像 / 唱吧 / 分享歌曲） -->
-    <MobileTopBar title="唱吧" back @back="router.push('/m/learn')">
-      <template #actions>
-        <!-- 跟唱曲目入口（2026-09-21）：44px icon-only，与相邻分享钮同规格——
-             不在这里放「当前曲名」文本：顶栏是 `minmax(min-content,1fr)` 三轨居中布局，
-             右侧变宽会把居中标题顶偏（2026-09-10 长标题吞头像那次就是这类几何问题）；
-             当前曲目改在弹层副标题与跟唱面板标题里显示（同一 store，天然一致）。 -->
-        <button
-          class="u-topbar__act m-sing-pick-entry"
-          :class="{ 'is-on': !!sing.currentSong }"
-          type="button"
-          :title="pickerLabel"
-          :aria-label="pickerLabel"
-          @click="pickerOpen = true"
-        >
-          <MobileIcon name="music" :size="20" />
-        </button>
-        <button class="u-topbar__act" type="button" title="分享歌曲" aria-label="分享歌曲" @click="shareSong">
-          <IconShare />
-        </button>
-      </template>
-    </MobileTopBar>
+  <div class="u-phone m-sing-page">
+    <!-- 顶部区（搜索胶囊 + 图标工具 + 横滑分类）——2026-09-23 用户原型 1:1，见 components/sing/SingTopBar.vue -->
+    <SingTopBar
+      :song-title="miniSong?.title ?? null"
+      :cats="tabs"
+      :active-key="tab"
+      :picked="!!sing.currentSong"
+      @pick="pickerOpen = true"
+      @share="shareSong"
+      @cat="onCat"
+    />
 
-    <div class="u-content">
-      <!-- 2026-09-22 用户要求删掉页面副标题「英文歌逐句跟唱，音准与节奏即时评分。」：
-           与精选卡的说明行重复，页面直接从精选卡开场 -->
-      <!-- 本周精选（深色卡 · 每屏唯一深色卡）——版式见 components/sing/SingFeaturedCard.vue -->
-      <!-- 加载态：骨架卡（docs/31 硬规则 3：>300ms 才出现；防抖见 useDelayedLoading）
-           ——与其余 7 个移动端页同款，不再用「深青大卡写加载中…」再跳变成内容卡（P0-6 的跳变） -->
-      <MobileSkeleton
-        v-if="!featured && skelPending"
-        :class="{ 'is-pending': !skelVisible }"
-        variant="feed"
-        :count="3"
-        label="歌曲库加载中"
-      />
-      <SingFeaturedCard v-else-if="featured" :song="featured" @open="openSong" />
-      <!-- 错误态（P1-6）：与兄弟页同款 u-comm-empty（原来用深青内容卡承载错误，与内容态同形、语义混淆）；
-           「歌曲库加载失败」文案是既有测试锚点，必须保留。 -->
-      <div v-else-if="loadFailed" class="u-comm-empty" role="status">
-        <span class="u-comm-empty__icon"><MobileIcon name="info" :size="28" /></span>
-        <p class="u-comm-empty__title">歌曲库加载失败</p>
-        <p class="u-comm-empty__sub">{{ play.error.value ?? '网络异常，请重试' }}</p>
-        <button class="u-comm-empty__btn" type="button" @click="play.loadSongs()">
-          <MobileIcon name="refresh" :size="15" />
-          重试
-        </button>
-      </div>
-
-      <!-- 分段筛选（56px） -->
-      <div class="u-segment" role="tablist">
-        <button
-          v-for="t in tabs"
-          :key="t.key"
-          type="button"
-          role="tab"
-          :aria-selected="tab === t.key"
-          :class="{ active: tab === t.key }"
-          @click="tab = t.key"
-        >
-          <MobileIcon :name="t.icon" />{{ t.label }}
-        </button>
-      </div>
-
-      <!-- 歌单（滚动动画列表 · 真实数据 + 每首歌收藏按钮）。
-           2026-09-22：原来是 `.u-dotline` 连接的一长串卡片，**随曲库长高** —— 歌一多整页被拉到
-           几千像素，精选卡/筛选/页脚注释全被推走。现收进 `MobileSongList` 的定高滚动区
-           （React Bits AnimatedList 的 Vue 移植）：页面高度从此与曲库规模无关，列表内部自己滚。
-           区块标题与空态在**加载中/加载失败**时不渲染：否则会出现「共 0 首」+「歌曲库还没有歌」
-           与骨架/错误态自相矛盾的两句话（P1-6 对 hero 卡修过同一类问题，这里补齐列表侧）。 -->
-      <div v-if="!skelPending && !loadFailed" class="u-section-title">
-        歌曲库 · 共 {{ visibleSongs.length }} 首
-      </div>
-      <MobileSongList
-        v-if="visibleSongs.length"
+    <div class="u-content m-sing-content">
+      <!-- 曲库区（英雄卡/骨架/错误态/歌单/空态）——2026-09-23 抽出守 max-lines，见 components/sing/SingLibrarySection.vue -->
+      <SingLibrarySection
+        :featured="featured"
+        :favorite="firstFavorite"
         :songs="visibleSongs"
+        :tab="tab"
+        :active-id="previewSong?.id ?? null"
+        :skel-pending="skelPending"
+        :skel-visible="skelVisible"
+        :load-failed="loadFailed"
+        :error-text="play.error.value"
         @open="openSong"
+        @preview="onPreview"
         @favorite="toggleFav"
+        @retry="play.loadSongs()"
       />
-      <div v-if="!skelPending && !loadFailed && !visibleSongs.length" class="u-empty">
-        <div class="u-empty__art"><MobileArt name="note" :size="96" /></div>
-        <div class="u-empty__title">
-          {{ tab === 'fav' ? '还没有收藏的歌曲' : '歌曲库还没有歌' }}
-        </div>
-        <div class="u-empty__sub">
-          {{
-            tab === 'fav'
-              ? '点歌曲右侧的心形按钮收藏，再点一次取消。'
-              : '参考旋律离线提取完成后即可跟唱。'
-          }}
-        </div>
-      </div>
       <!-- 2026-09-22 用户要求删掉页脚评分公式（「跟唱评分 = 0.5·音准 + 0.2·节奏 + 0.3·发音…」）：
            属研发口径（口径真源在 docs/06 §9.4 与报告页），不该占歌单屏的版面 -->
     </div>
@@ -403,13 +418,15 @@ async function shareSong() {
             :processing="processing"
             :ref-playing="refPlaying"
             :live-on="livePitchOn"
-            @toggle-reference="reference.toggle()"
+            :accompaniment-on="accompaniment.on.value"
+            @toggle-reference="toggleReference"
             @start="startSinging"
-            @pause="play.pauseRecording()"
-            @resume="play.resumeRecording()"
-            @stop="play.stopRecording()"
-            @cancel="play.cancelRecording()"
+            @pause="play.pauseRecording(); accompaniment.pause()"
+            @resume="play.resumeRecording(); accompaniment.resume()"
+            @stop="accompaniment.stop(); play.stopRecording()"
+            @cancel="accompaniment.stop(); play.cancelRecording()"
             @toggle-live="toggleLivePitch()"
+            @toggle-accompaniment="accompaniment.toggle()"
             @pick="pickerOpen = true"
           />
           <!-- 歌曲位置 / 全长（参考图「若梦 · 00:42 / 04:04」的位置）；与歌词区时间、引导条同轴；
@@ -437,5 +454,19 @@ async function shareSong() {
     <!-- 跟唱曲目选择（顶栏入口的弹层；选曲直接复用页面既有 openSong：
          内部已停参考旋律 + 停录音 + 作废旧轮询 + 40905 门禁 → 即「先停止再切换」） -->
     <SingSongPickerSheet v-model:open="pickerOpen" @select="openSong" />
+
+    <!-- 悬浮试听播放条（2026-09-23 用户原型；转盘=封面、播放/暂停=参考旋律试听、红心=收藏、队列=选曲） -->
+    <SingMiniPlayer
+      v-if="miniSong"
+      :song="miniSong"
+      :playing="previewPlaying"
+      @toggle="togglePreview"
+      @open="openSong"
+      @queue="pickerOpen = true"
+      @favorite="toggleFav"
+    />
+
+    <!-- 页内底部 Tab 栏（2026-09-23 用户原型 1:1：唱吧独用一套；全局底栏在本页不再渲染） -->
+    <SingTabBar />
   </div>
 </template>

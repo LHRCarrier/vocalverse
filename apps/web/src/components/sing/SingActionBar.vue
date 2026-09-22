@@ -8,7 +8,8 @@
  *   左：**原唱**（听参考旋律 ⇄ 停止，录音中禁用）/ **曲线**（实时曲线开关，只管显示）/
  *       **选曲**（打开跟唱曲目列表；2026-09-21 加，见下）
  *   中：**开始跟唱 ⇄ 暂停 ⇄ 继续**（录音暂停为 2026-09-22 新增能力，见 `VoiceRecorder.pause`）
- *   右：**重录**（放弃本次，不上传）/ **完成**（停止并评分；未录音时禁用）
+ *   右：**伴奏**（跟唱时是否播放伴奏轨，默认开；2026-09-22 用户口径「伴奏是唱的时候放的」）/
+ *       **重录**（放弃本次，不上传）/ **完成**（停止并评分；未录音时禁用）
  * 各键**常驻**（不做显示/隐藏切换）：位置稳定 → 不会有「按到一半按钮换地方」的问题。
  *
  * **为什么左右各套一层 `__group`**（2026-09-21）：旧布局是「N 个 `flex:1` 键 + 中间一个定宽主钮」，
@@ -34,6 +35,8 @@ const props = defineProps<{
   refPlaying: boolean
   /** 实时曲线是否显示（只管显示，检测照常跑） */
   liveOn: boolean
+  /** 跟唱时是否播放伴奏（默认开；关掉即清唱） */
+  accompanimentOn: boolean
 }>()
 
 const emit = defineEmits<{
@@ -44,6 +47,8 @@ const emit = defineEmits<{
   (e: 'stop'): void
   (e: 'cancel'): void
   (e: 'toggleLive'): void
+  /** 伴奏开关（录音开始前决定；录音中禁用——避免中途从 0 起播造成与录音错位） */
+  (e: 'toggleAccompaniment'): void
   /** 打开跟唱曲目列表（切歌由视图经 openSong 完成，见文件头注释） */
   (e: 'pick'): void
 }>()
@@ -105,8 +110,21 @@ const mainIcon = () => (!props.recording ? 'mic' : props.paused ? 'play' : 'paus
       <MobileIcon :name="mainIcon()" :size="28" />
     </button>
 
-    <!-- 右组：结束本轮（重录 / 完成） -->
+    <!-- 右组：伴奏开关 + 结束本轮（重录 / 完成） -->
     <div class="m-sing-dock__group">
+      <button
+        class="m-sing-dock__key"
+        :class="{ 'is-on': accompanimentOn }"
+        type="button"
+        :disabled="recording || processing"
+        :aria-pressed="accompanimentOn"
+        aria-label="跟唱伴奏"
+        @click="emit('toggleAccompaniment')"
+      >
+        <MobileIcon name="volume" :size="20" />
+        <span>伴奏</span>
+      </button>
+
       <button
         class="m-sing-dock__key"
         type="button"

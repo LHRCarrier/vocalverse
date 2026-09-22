@@ -17,10 +17,9 @@
  * 故本行的一切调整都限定在 `.m-sing-row` 作用域内，绝不改全局定义。
  * ============================================================ */
 .m-sing-row {
-  /* 上下 16 → 8px（封面 56 + 8×2 = 行高 72）；右 12px 与心形按钮的视觉边距呼应
-     （原来心形贴卡片右边缘）；左 20px 沿用共享值，保证与区块标题对齐 */
+  /* 上下 8px；左 20px 沿用共享值（与区块标题对齐）；右 12px 与心形按钮的视觉边距呼应 */
   padding: 8px 12px 8px 20px;
-  gap: 12px;
+  gap: 8px;
 }
 /* 图标块与文本之间的 16 → 12px（同上，纯内部间距，不动跨页对齐） */
 .m-sing-row__hit {
@@ -46,12 +45,13 @@
   flex: none;
   font-variant-numeric: tabular-nums;
 }
-/* 专辑封面：几何在本页作用域内定义（56×56 / 圆角 12，QQ 音乐式行版），
+/* 专辑封面：几何在本页作用域内定义（52×52 / 圆角 10，QQ 音乐式行版），
    不再从共享 `.u-icon-block` 借 48px —— 共享类改尺寸会波及全站。 */
 .m-sing-row__cover {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
   overflow: hidden;
 }
 .m-sing-row__cover img {
@@ -394,7 +394,7 @@ html[data-motion='off'] .m-sing-lyric {
   transition: none;
 }
 
-/* —— 底部控制区（六键：原唱/曲线/选曲 + 主钮 + 重录/完成）+ 已录/全长 —— */
+/* —— 底部控制区（七键：原唱/曲线/选曲 + 主钮 + 伴奏/重录/完成）+ 已录/全长 —— */
 .m-sing-dock {
   flex: none;
   display: flex;
@@ -845,4 +845,215 @@ html[data-motion='off'] .m-sing-pick__row {
 html[data-motion='off'] .m-sing-list__item,
 html[data-motion='off'] .m-sing-list__grad {
   transition: none;
+}
+
+/* ============================================================================
+ * 2026-09-23 用户原型改版（QQ 音乐式 · 视觉照搬、内容接真）
+ * 新增：搜索胶囊 / 横滑分类 tab（绿色药丸激活态）/ 行内「去跟唱」药丸 + 在播音波
+ * 绿色取自原型（QQ 音乐品牌绿族）；仅限本页 `.m-sing-*` 作用域，不动全局 token。
+ * ============================================================================ */
+
+/* 页面底部留白：悬浮播放条（48px）+ 底部 Tab 栏（56px）+ 呼吸位 */
+.m-sing-content {
+  padding-bottom: 210px;
+}
+
+/* 顶部搜索栏（原型 1:1：白底 + 搜索胶囊 + 两颗图标工具；sticky 常驻，滚动时不离场） */
+.m-sing-head {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 10px;
+  background: #fff;
+}
+.m-sing-head__tool {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  color: #2f3742;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.m-sing-head__tool svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* 搜索胶囊（点 → 选曲弹层） */
+.m-sing-search {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 18px;
+  background: #f2f4f7;
+  color: #4e5969;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.m-sing-search__icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 50%;
+  background: #31c27c;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.m-sing-search__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 横滑分类（推荐 / 收藏）：激活 = 绿色药丸 + 深绿字（原型口径） */
+.m-sing-cats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.m-sing-cats::-webkit-scrollbar {
+  display: none;
+}
+.m-sing-cat {
+  flex: none;
+  position: relative;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  color: #646a73;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--u-dur-quick) var(--u-ease-out);
+}
+.m-sing-cat.active {
+  background: #22d57e;
+  color: #0e2e1d;
+  font-size: 17px;
+  font-weight: 800;
+}
+html[data-motion='off'] .m-sing-cat {
+  transition: none;
+}
+
+/* 行内「去跟唱」药丸键（原型：浅绿底 + 深绿字；行点击=试听，本键=进录音） */
+.m-sing-row__sing {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 14px;
+  background: #e8f8f0;
+  color: #199859;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.m-sing-row__sing:active {
+  background: #31c27c;
+  color: #fff;
+}
+
+/* 在播行的封面音波（原型同款三根跳动条） */
+.m-sing-row__wave {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.m-sing-row__wave i {
+  width: 2.5px;
+  height: 6px;
+  border-radius: 2px;
+  background: #22d57e;
+  animation: m-sing-wave 0.8s ease-in-out infinite alternate;
+}
+.m-sing-row__wave i:nth-child(1) {
+  animation-delay: 0.1s;
+}
+.m-sing-row__wave i:nth-child(2) {
+  height: 14px;
+  animation-delay: 0.3s;
+}
+.m-sing-row__wave i:nth-child(3) {
+  height: 9px;
+  animation-delay: 0.2s;
+}
+@keyframes m-sing-wave {
+  from {
+    height: 4px;
+  }
+  to {
+    height: 16px;
+  }
+}
+/* 在播行标题高亮（原型：绿色曲名） */
+.m-sing-row.is-active .u-item__title {
+  color: #199859;
+}
+/* 动效分级：off 档只留静态竖条（不再跳动） */
+html[data-motion='off'] .m-sing-row__wave i {
+  animation: none;
+}
+
+/* 页面底色（原型 1:1）：本页用原型的中性灰面，不上全局纸面点阵 */
+.m-sing-page {
+  background: #f6f7f9;
+}
+
+/* 歌单分组卡（原型 1:1：整组一张白卡 + 行间发丝线；原逐行独立白卡退场） */
+.m-sing-list {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.03);
+  border-radius: 18px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+.m-sing-list__item {
+  padding: 0 8px;
+  border-radius: 0;
+}
+.m-sing-list__item + .m-sing-list__item {
+  margin-top: 0;
+}
+/* 组内行：去掉独立卡片的白底/圆角/投影，只留行间发丝线（最后一行无线） */
+.m-sing-list .m-sing-row {
+  border-radius: 0;
+  box-shadow: none;
+  border-bottom: 1px solid #eaecef;
+}
+.m-sing-list__item:last-child .m-sing-row {
+  border-bottom: none;
+}
+/* 选中态（键盘/悬停）：组内改用浅底，左侧竖条保留 */
+.m-sing-list__item.is-selected {
+  background: #f2f4f7;
+  box-shadow: inset 2px 0 0 var(--u-accent);
+  border-radius: 10px;
 }

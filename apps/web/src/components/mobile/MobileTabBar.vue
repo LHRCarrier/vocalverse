@@ -2,7 +2,7 @@
 /**
  * 移动端底部 Tab 栏（2026-09-05 组长拍板 7：**双场景分组，全局挂载 App.vue**）
  * 社区场景一组 tab、学习场景一组 tab；各场景功能直接上底栏，彼此以出口图标互切：
- * - 社区组（/m/home 等）：🏠 社区 / 🔍 搜索 / ＋发帖(中央) / 📚 学习(出口) / ✉️ 私信
+ * - 社区组（/m/home 等）：🏠 社区 / 🔍 搜索 / ＋发帖(中央) / 🎓 学习(出口) / ✉️ 私信
  * - 学习组（/m/learn 等）：🏠 Home(出口) / 🍺 酒馆(中央) / 📖 笔记 / 🎵 唱吧 / 💬 自由对话
  * 场景归属：社区 = home/search/notifications(含会话)/report；学习 = learn(含 :module 详情)/notes/tavern/free-chat/sing；
  * 沉浸页 compose 无底部栏。2026-09-05 晚 8：练习 → 学习更名（路由 /m/learn）；09-09 /m/me 舍弃（收敛进抽屉）；
@@ -10,6 +10,8 @@
  * 2026-09-22：酒馆按设计稿改**沉浸页**（页内自带 4 项导航 TrpgGameNav：大堂/酒馆跑团/角色卡/纪事，
  * 出口在顶栏「离开」钮）→ /m/tavern 移出学习组，全局底栏不再覆盖（group 返回 null 即不渲染）。
  * 同日：酒馆入口图标与页内导航统一（组长反馈）——beer → stack-2（设计稿 tavern 图标，三层紧贴）。
+ * 2026-09-23：唱吧页（`/m/sing`）移出学习组——按用户原型改「独用一套上下 tab」（页内 SingTabBar，
+ * 首页/视频/刷歌/星光/我的），全局底栏不再覆盖（同酒馆的沉浸页口径）。
  */
 import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -18,9 +20,9 @@ import IconBell from '~icons/tabler/bell'
 import IconBook from '~icons/tabler/book'
 import IconHome from '~icons/tabler/home'
 import IconMessageCircle from '~icons/tabler/message-circle'
-import IconMicrophone from '~icons/tabler/microphone'
 import IconMusic from '~icons/tabler/music'
 import IconPlus from '~icons/tabler/plus'
+import IconSchool from '~icons/tabler/school'
 import IconSearch from '~icons/tabler/search'
 import IconStack2 from '~icons/tabler/stack-2'
 
@@ -55,7 +57,6 @@ const group = computed<null | 'community' | 'learn'>(() => {
     p === '/m/checkin' ||
     p === '/m/notes' ||
     p === '/m/free-chat' ||
-    p === '/m/sing' ||
     /* 读书域（docs/45 §6）：书架/书详情/生词本属学习组；阅读器保持沉浸（null） */
     p === '/m/bookshelf' ||
     p.startsWith('/m/books/') ||
@@ -63,7 +64,7 @@ const group = computed<null | 'community' | 'learn'>(() => {
   ) {
     return 'learn'
   }
-  return null // /m/compose（发帖）· /m/tavern（2026-09-22 起页内导航）
+  return null // /m/compose（发帖）· /m/tavern · /m/sing（2026-09-23 起页内自带底栏）
 })
 </script>
 
@@ -92,7 +93,9 @@ const group = computed<null | 'community' | 'learn'>(() => {
       title="学习"
       aria-label="学习"
     >
-      <IconMicrophone />
+      <!-- 2026-09-23：原为 `microphone`（旧「练习」时代遗留），用户口径「这怎么能表示学习」→
+           换 `school`（Tabler 同源：学士帽 + 肩线 = 教育/学习；`graduation-cap` 在该版本已并入 school） -->
+      <IconSchool />
     </RouterLink>
     <RouterLink
       to="/m/notifications"

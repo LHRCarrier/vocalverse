@@ -42,6 +42,8 @@ const props = withDefaults(
   defineProps<{
     /** 待展示曲目（顺序即渲染顺序；数据源与过滤都在页面/store，本组件不碰） */
     songs: SongSummary[]
+    /** 在播曲目 id（悬浮播放条当前曲目）→ 行叠加音波；null = 无 */
+    activeId?: number | null
     showGradients?: boolean
     enableArrowNavigation?: boolean
     className?: string
@@ -51,6 +53,7 @@ const props = withDefaults(
     initialSelectedIndex?: number
   }>(),
   {
+    activeId: null,
     showGradients: true,
     enableArrowNavigation: true,
     className: '',
@@ -61,7 +64,9 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  /** 打开某首歌（带下标，等价上游 `onItemSelect(item, index)` 的第二个参数） */
+  /** 试听（行点击 / 键盘 Enter；带下标，等价上游 `onItemSelect(item, index)`） */
+  preview: [id: number, index: number]
+  /** 去跟唱（行内药丸键；带下标） */
   open: [id: number, index: number]
   favorite: [song: SongSummary]
 }>()
@@ -100,7 +105,13 @@ function onItemEnter(index: number) {
   selectedIndex.value = index
 }
 
-/** 页面侧「打开跟唱」入口：下标由行自身带不出去，这里补上（上游 onItemSelect 的 (item, index) 语义） */
+/** 行激活（试听）：下标由行自身带不出去，这里补上（上游 onItemSelect 的 (item, index) 语义） */
+function onRowPreview(id: number, index: number) {
+  selectedIndex.value = index
+  emit('preview', id, index)
+}
+
+/** 「去跟唱」药丸键：带上标后原样上抛（页面侧打开跟唱面板） */
 function onRowOpen(id: number, index: number) {
   selectedIndex.value = index
   emit('open', id, index)
@@ -162,7 +173,7 @@ function onKeyDown(e: KeyboardEvent) {
   const s = props.songs[selectedIndex.value]
   if (!s) return
   e.preventDefault()
-  emit('open', s.id, selectedIndex.value)
+  emit('preview', s.id, selectedIndex.value)
 }
 
 let stopKeyboardWatch: (() => void) | null = null
@@ -265,7 +276,13 @@ function bindItem(el: Element | null, index: number) {
         @mouseenter="onItemEnter(i)"
         @focusin="onItemEnter(i)"
       >
-        <MobileSongRow :song="song" @open="onRowOpen($event, i)" @favorite="emit('favorite', $event)" />
+        <MobileSongRow
+          :song="song"
+          :active="activeId === song.id"
+          @preview="onRowPreview($event.id, i)"
+          @open="onRowOpen($event, i)"
+          @favorite="emit('favorite', $event)"
+        />
       </div>
     </div>
 

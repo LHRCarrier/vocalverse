@@ -22,6 +22,12 @@ export interface ReferenceAudio {
   playing: Ref<boolean>
   /** 播放/停止切换（同一按钮第二次点是停止） */
   toggle: () => Promise<void>
+  /** **从头播放**（跟唱伴奏用：录音开始即从 0 播；已在播则先停再重来） */
+  play: () => Promise<void>
+  /** 暂停（保留音频与进度；跟唱面板「暂停」时用） */
+  pause: () => void
+  /** 继续（从暂停处恢复） */
+  resume: () => void
   /** 停止并回收资源（幂等；换歌/关面板/卸载都要调） */
   stop: () => void
   /**
@@ -34,6 +40,8 @@ export interface ReferenceAudio {
 export function useReferenceAudio(
   path: () => string | null,
   onError: (message: string) => void,
+  /** 失败提示里的素材名（跟唱伴奏传「伴奏」；默认参考旋律） */
+  errorLabel = '参考旋律',
 ): ReferenceAudio {
   const playing = ref(false)
   let audio: HTMLAudioElement | null = null
@@ -50,14 +58,15 @@ export function useReferenceAudio(
     playing.value = false
   }
 
-  async function toggle() {
+  /** 载入并播放；`fromZero=true` 时先停掉当前实例再从 0 开始（伴奏跟唱用）。 */
+  async function start(fromZero: boolean) {
     if (playing.value) {
+      if (!fromZero) return
       stop()
-      return
     }
     const src = path()
     if (!src) {
-      onError('该曲目暂无参考旋律音频')
+      onError(`该曲目暂无${errorLabel}音频`)
       return
     }
     if (busy) return // P1-7：加载中重入直接忽略
@@ -71,10 +80,36 @@ export function useReferenceAudio(
       playing.value = true
     } catch {
       stop()
-      onError('参考旋律播放失败，请重试')
+      onError(`${errorLabel}播放失败，请重试`)
     } finally {
       busy = false
     }
+  }
+
+  async function toggle() {
+    if (playing.value) {
+      stop()
+      return
+    }
+    await start(false)
+  }
+
+  /** 从头播放（跟唱伴奏：录音开始即从 0 播） */
+  async function play() {
+    await start(true)
+  }
+
+  /** 暂停（保留音频与进度；面板「暂停」时用） */
+  function pause() {
+    audio?.pause()
+    playing.value = false
+  }
+
+  /** 继续（从暂停处恢复） */
+  function resume() {
+    if (!audio) return
+    void audio.play()
+    playing.value = true
   }
 
   onUnmounted(stop) // 卸载兜底（原实现只清引用，URL 泄漏）
@@ -82,5 +117,5 @@ export function useReferenceAudio(
   /** 当前播放位置（ms）；无音频/未播放 → 0（`stop()` 已把 audio 置空） */
   const currentMs = () => (audio && !audio.paused ? audio.currentTime * 1000 : 0)
 
-  return { playing, toggle, stop, currentMs }
+  return { playing, toggle, play, pause, resume, stop, currentMs }
 }
