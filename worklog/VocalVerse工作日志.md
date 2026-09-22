@@ -3,6 +3,31 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 跑团闭环后端 P2~P4：进度钟/结算尾声/人物进出场/道具/遭遇战斗 + 实体立绘挂载 · 1 op
+
+> 归属：Python 后端（契约 `docs/56`，设计 `docs/55`）；前端接线与页面重做另条线记录。
+
+- **架构**（组长要求高内聚低耦合）：新增纯规则模块 `app/trpg/{progress,encounter,items}.py`（无 DB/无 IO、全单测）；
+  `state.py` 只加 DB 适配（quest/item/encounter 事实、实体在场/立绘、收尾标记），业务规则不入口；
+  工具继续「一工具一文件」注册表，并新增 `BUILTIN_TOOL_ORDER`（下发顺序与导入顺序解耦，模型工具面稳定）。
+- **工具 +9**：`tick_clock` / `complete_quest`（模板渲染尾声，零 LLM）/ `enter_character` / `exit_character` /
+  `attack`（d20+mod vs 默认 12；命中才写 HP，未命中无副作用）/ `use_item`（校验+消耗扣减）/ `start_encounter` /
+  `next_turn` / `end_encounter`。
+- **事实键契约**：`quest.{名}.progress("3/6")|kind(positive|threat)|stage`、新域 `item.{名}.{qty,owner,effect,consumable}`、
+  `encounter.{id}.{status,order,turn,round}`、State 域新增 `npc.{名}.hp|status`（快照可见，上限 6）；
+  `check_key_whitelist` 增 writer 维度：`writer="llm"` 拒绝系统专写字段（进度/先攻/数量等，杜绝 LLM 编数值）。
+- **SSE**：`QuestUpdate` / `Ending` / `CharacterState` / `EncounterState` 四事件；`turn.py` 用 outcome→事件映射表转发
+  （quest/character/encounter 同回合去重）；`ending` 额外落系统卡（`trpg_sys="ending"`）→ 刷新仍在。
+- **立绘**：`trpg_entities.portrait_media_id` + `POST|DELETE /campaigns/{id}/entities/{entity_id}/portrait`
+  （owner 校验 + 媒体归属校验，复用 40401/40403/47001）；`show_portrait` 回带 `media_id`/`url`；
+  实体序列化补 `id` 与 `portrait`。迁移 `0021_trpg_closure`（+ `trpg_campaigns.finished_at`，含 downgrade）。
+- **门禁**：`ruff check`/`format --check` 绿；pytest **797 passed, 4 skipped**（trpg 定向 60 passed）。
+- **不做（本轮）**：异步文生图任务表（待服务商拍板）、跑团 XP 计入 `stats/progress`、NPC 情绪/记忆三轴。
+- **前端待办**：`trpg-sse-types` 四类事件镜像、`TrpgMessageItem` 的 `ending` 系统卡分支、
+  进度条/在场角色条/动作面板（一域一 composable，见 docs/56 §6）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-22 AI 跑团闭环调研（推进度 / 结束 / 人物 / 道具 / 战斗）· 设计提案（未落码）
 
 > 归属：全局设计调研（产出 `docs/55`，README 索引已登记）；UI 落地记录后续按约定走安卓日志。
