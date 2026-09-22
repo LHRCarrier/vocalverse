@@ -77,18 +77,17 @@ function goQueue(caseId: number | null): void {
 }
 
 /**
- * ⚠️ 契约缺口：`consoleApi.handleReport` 的入参类型写的是 `{decision, note}`，
- * 而 Java `ModerationController.ReportHandle` 收的是 `{action, caseId, note}`（`action` 还是 `@NotNull`）。
- * 只发 `decision` 会被校验拒绝。这里两个键一起发（服务端读 `action`），并把这层缺口记在此处；
- * 修正 `src/api/console.ts` 不在本次改动范围内。
+ * 线格式以 Java `ModerationController.ReportHandle` 为准：`{decision, note?}`。
+ *
+ * v1 曾同时发 `decision` + `action` 两个键并 `as unknown as` 断言（当时的注释误以为 `action` 是 `@NotNull`）——
+ * 实际 Java 侧 `effective()` 以 `decision` 优先、`action` 可空，只发 `decision` 即可。
  */
 async function callHandle(
   id: number,
   action: HandleAction,
   note: string,
 ): Promise<ModerationReportRow> {
-  const body = { decision: action, action, note: note.trim() || undefined }
-  return consoleApi.handleReport(id, body as unknown as { decision: HandleAction; note?: string })
+  return consoleApi.handleReport(id, { decision: action, note: note.trim() || undefined })
 }
 
 function handleFailure(err: unknown): void {

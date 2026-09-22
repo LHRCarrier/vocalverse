@@ -29,12 +29,13 @@ import { fmtCompact, fmtInt } from '@/utils/format'
 
 import DecisionDialog from './DecisionDialog.vue'
 import {
-  CASE_STATUS_OPTIONS,
+  CASE_STATUS_FILTER_OPTIONS,
   PRIORITY_OPTIONS,
   TARGET_TYPE_OPTIONS,
   describeFailure,
   failureLines,
   pickCase,
+  trendSeries,
 } from './moderationMeta'
 import { buildQueueColumns } from './queueColumns'
 
@@ -56,13 +57,14 @@ const cases = usePagedList<
       priority: q.priority ? Number(q.priority) : undefined,
       assigneeId: q.assigneeId ? Number(q.assigneeId) : undefined,
     }),
-  { status: 'pending', targetType: '', priority: '', assigneeId: '' },
+  // 默认 open = pending + escalated：升级件仍在队列里（docs/58 §5.1），换筛选前它不会消失
+  { status: 'open', targetType: '', priority: '', assigneeId: '' },
 )
 
 const meId = computed(() => auth.profile?.adminUserId ?? null)
 const canDecide = computed(() => auth.hasPermission('moderation:decide'))
 const s = computed(() => stats.state.value.data)
-const trendLabels = computed(() => (s.value?.trend ?? []).map((p) => p.date.slice(5)))
+const trend = computed(() => trendSeries(s.value?.trend))
 
 const assigneeOptions = computed(() => [
   { label: '全部认领人', value: '' },
@@ -232,11 +234,11 @@ function rowProps(row: ModerationCaseRow): { class: string } {
         >
           <template #default="{ revealed }">
             <HairlineLine
-              :labels="trendLabels"
+              :labels="trend.labels"
               :series="[
-                { name: '新建', values: (s?.trend ?? []).map((p) => p.pending), tone: 0 },
-                { name: '已处置', values: (s?.trend ?? []).map((p) => p.approved), tone: 2 },
-                { name: '驳回', values: (s?.trend ?? []).map((p) => p.rejected), tone: 4 },
+                { name: '新建', values: trend.created, tone: 0 },
+                { name: '已处置', values: trend.decided, tone: 2 },
+                { name: '驳回', values: trend.rejected, tone: 4 },
               ]"
               unit=" 单"
               :format="(v) => fmtCompact(v)"
@@ -252,7 +254,7 @@ function rowProps(row: ModerationCaseRow): { class: string } {
         <div>
           <h2 class="c-card-title">待审单</h2>
           <p class="c-card-sub">
-            默认只看待处理；升级件排在最高优先级（服务端把 priority 提到 1），不会被普通审核员误关
+            默认看全部待办（含已升级）；升级件排在最高优先级（服务端把 priority 提到 1），不会被普通审核员误关
           </p>
         </div>
         <div class="mq-filters">
@@ -260,7 +262,7 @@ function rowProps(row: ModerationCaseRow): { class: string } {
             v-model:value="cases.filters.value.status"
             class="mq-filter"
             size="small"
-            :options="[{ label: '全部状态', value: '' }, ...CASE_STATUS_OPTIONS]"
+            :options="[{ label: '全部状态', value: '' }, ...CASE_STATUS_FILTER_OPTIONS]"
             @update:value="cases.applyFilters({})"
           />
           <n-select
