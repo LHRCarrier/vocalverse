@@ -4,20 +4,25 @@
  * 会话列表来自 Java `/api/v1/community/messages/conversations`（对端 + 最后一条 + 未读）；
  * 点击进 /m/messages/:id。下拉刷新；长连（SSE）在通知中心私信 tab / 会话页建立，本页只读列表。
  */
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 
 import IconMail from '~icons/tabler/mail'
 import IconSettings from '~icons/tabler/settings'
 
 import { authorDisplay, timeAgo } from '@/api/community'
+import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import MobileUnreadBadge from '@/components/mobile/MobileUnreadBadge.vue'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { useMessagesStore } from '@/stores/messages'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
 const messages = useMessagesStore()
 const ui = useUiStore()
+
+/** 会话列表骨架防抖（docs/31 硬规则 3）：原实现加载期零指示，会白屏 */
+const { visible: skelVisible } = useDelayedLoading(computed(() => messages.loadingList))
 
 onMounted(() => {
   void messages.loadConversations()
@@ -52,7 +57,8 @@ function unreadText(n: number): string {
     </MobileTopBar>
 
     <div class="u-msg">
-      <p v-if="messages.listError" class="u-note u-notif__demo">{{ messages.listError }}</p>
+      <MobileSkeleton v-if="skelVisible" variant="lines" :count="3" label="会话加载中" />
+      <p v-else-if="messages.listError" class="u-note u-notif__demo">{{ messages.listError }}</p>
       <p v-else-if="!messages.loadingList && !messages.conversations.length" class="u-note u-notif__demo">
         还没有私信。在「关注」里找到同学，互动后即可开始聊天。
       </p>

@@ -130,11 +130,22 @@
 
 .scrollexpand .scroll-expand__title h1 {
   margin: 0;
+  /* 下内边距 + 等量负外边距：只把 overflow 的裁切边往下推，不改布局占位。
+     js/split-text.js 给标题写了内联的 overflow: hidden（样式表盖不掉内联），
+     而 Fraunces 的自然高度 ascent 82 + descent 21 = 103px 高于行盒：
+     行高 1.05 时行盒 88.2px，g 的下伸部实际到 95.6px，凭空被切掉 7.4px。
+     overflow 裁在 padding box，所以补 0.1em（84px 字号下 8.4px）即可让下伸部
+     完整显示；再用 -0.1em 的外边距把占位收回去，标题块高度与居中位置不变。 */
+  padding-bottom: 0.1em;
+  margin-bottom: -0.1em;
   font-family: var(--font-serif);
   font-size: var(--se-title-size);
   font-weight: 500;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
+  /* -0.03em 在大字号衬线体上偏挤：字怀互相贴太近。
+     放宽到 -0.015em，仍然紧凑但每个字母有呼吸。 */
+  letter-spacing: -0.015em;
+  /* 1.05 → 1.12：换行标题的上下行不再互相咬到，同时把下伸部被裁的深度减半 */
+  line-height: 1.12;
   color: var(--foreground);
 }
 

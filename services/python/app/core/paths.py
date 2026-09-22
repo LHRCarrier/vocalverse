@@ -43,6 +43,15 @@ def book_cover_dir() -> Path:
     return seed_dir() / "covers"
 
 
+def song_cover_dir() -> Path:
+    """`data/seed/song-covers`：唱吧歌曲封面图（程序生成的矢量图，随仓库分发；见 songs.cover_url）。
+
+    与书封分开目录：两类资产由不同路由服务（`/api/v1/reading/covers/*` vs
+    `/api/v1/songs/covers/*`），同名文件互不干扰。
+    """
+    return seed_dir() / "song-covers"
+
+
 def voices_dir() -> Path:
     """`data/seed/voices`：OmniVoice 音色参考件（`VOICES.json` + wav，随仓库分发）。
 

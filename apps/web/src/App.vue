@@ -6,16 +6,35 @@ import { useRouter } from 'vue-router'
 import MobileAccountDrawer from '@/components/mobile/MobileAccountDrawer.vue'
 import MobileCheckinPrompt from '@/components/mobile/MobileCheckinPrompt.vue'
 import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
+import { useMotionTier } from '@/composables/useMotionTier'
 import { useNativeBack } from '@/composables/useNativeBack'
+import { usePageTransition } from '@/composables/usePageTransition'
 import { useAuthStore } from '@/stores/auth'
 import { useProgressStore } from '@/stores/progress'
 import { useUiStore } from '@/stores/ui'
 import { themeOverrides } from '@/styles/theme'
 
+import type { RouteLocationNormalizedLoaded } from 'vue-router'
+
 const router = useRouter()
 const auth = useAuthStore()
 const progress = useProgressStore()
 const ui = useUiStore()
+
+/** 动效分级：写入 html[data-motion]（high/low/off），供样式侧统一降级（docs/31 规则 4） */
+useMotionTier()
+
+/** 页面转场方向（forward/back）：决定微位移符号 */
+const { dir } = usePageTransition(router)
+
+/**
+ * 哪些路由走页面转场：仅移动端真形态 `/m/*`。
+ * - `/login` 与桌面子树（UserLayout）直出，避免双重转场；
+ * - 阅读器（`/m/reader/*`）是沉浸页、自带滚动容器，排除以免转场期定位影响长文。
+ */
+function pageAnimated(route: RouteLocationNormalizedLoaded): boolean {
+  return route.path.startsWith('/m/') && !route.path.startsWith('/m/reader')
+}
 
 /* 全局 LV/XP 由服务端聚合（docs/53 P5 ③）：冷启动拉一次，练习完成各页再 refresh() */
 onMounted(() => {
@@ -48,7 +67,15 @@ function onDrawerLogout() {
   <n-config-provider :theme-overrides="themeOverrides">
     <n-dialog-provider>
       <n-message-provider>
-        <router-view />
+        <!-- 页面转场容器（定位上下文：leave 期旧页脱离文档流，避免撑高/滚动跳变） -->
+        <div class="m-page-wrap">
+          <router-view v-slot="{ Component, route }">
+            <Transition v-if="pageAnimated(route)" :name="`m-page-${dir}`">
+              <component :is="Component" :key="route.path" />
+            </Transition>
+            <component :is="Component" v-else />
+          </router-view>
+        </div>
 
         <!-- 全局底部 Tab 栏（路由显隐规则在组件内；二级页自动隐藏） -->
         <MobileTabBar />

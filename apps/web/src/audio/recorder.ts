@@ -9,7 +9,7 @@ export const MAX_RECORD_MS = 60_000
 export const MIN_RECORD_MS = 800
 export const MAX_BYTES = 20 * 1024 * 1024
 
-export type RecorderState = 'idle' | 'recording' | 'stopped' | 'error'
+export type RecorderState = 'idle' | 'recording' | 'paused' | 'stopped' | 'error'
 
 export class RecorderError extends Error {
   constructor(message: string) {
@@ -119,6 +119,9 @@ export class VoiceRecorder {
       }
 
       this.recordedMs = 0
+      this.pausedMs = 0
+      this.pausedAt = 0
+      this.maxMs = maxMs
       this.recordStart = Date.now()
       this.recorder.start()
       this._liveStream = activeStream
@@ -137,18 +140,44 @@ export class VoiceRecorder {
     }
   }
 
-  /** 正常停止：产出音频并经 onStop 交给调用方。重复调用安全（幂等）。 */
+  /** 正常停止：产出音频并经 onStop 交给调用方。重复调用安全（幂等）；**暂停中也能停**。 */
   stop(): void {
     // 守 MediaRecorder 自身的 state：this.state 要等 onstop 这个宏任务才翻成 'stopped'，
     // 期间连点两下会对已 inactive 的 recorder 再 stop() 一次 → InvalidStateError。
+    if (this.state !== 'recording' && this.state !== 'paused') return
+    if (!this.recorder || this.recorder.state === 'inactive') return
+    if (this.state === 'paused') this.freezePausedAt() // 结算暂停段，时长不含暂停
+    this.recordedMs = Math.max(0, Date.now() - this.recordStart - this.pausedMs)
+    this.clearTimer()
+    this.recorder.stop()
+  }
+
+  /**
+   * 暂停录音（2026-09-22 深色录唱页新增：参考图中心键为「暂停」）：
+   * `MediaRecorder.pause()` 之后**暂停段不入音频**，故评分口径天然不含暂停；
+   * 同时清掉自动停止定时器并在 resume 时按「剩余额度」重挂。
+   * 只在 recording 态有效（幂等）。
+   */
+  pause(): void {
     if (this.state !== 'recording') return
     if (!this.recorder || this.recorder.state !== 'recording') return
-    this.recordedMs = Date.now() - this.recordStart
-    if (this.timer) {
-      clearTimeout(this.timer)
-      this.timer = null
-    }
-    this.recorder.stop()
+    this.recorder.pause()
+    this.pausedAt = Date.now()
+    // 本段已录时长（不含历史暂停）→ resume 时用它算剩余额度
+    this.recordedMs = Math.max(0, this.pausedAt - this.recordStart - this.pausedMs)
+    this.clearTimer()
+    this.setState('paused')
+  }
+
+  /** 继续录音：结算本段暂停时长，重挂自动停止定时器（按剩余额度）。 */
+  resume(): void {
+    if (this.state !== 'paused') return
+    if (!this.recorder || this.recorder.state !== 'paused') return
+    this.freezePausedAt()
+    this.recorder.resume()
+    this.setState('recording')
+    const remain = Math.max(1000, this.maxMs - this.recordedMs)
+    this.timer = setTimeout(() => this.stop(), remain)
   }
 
   /**
@@ -157,12 +186,10 @@ export class VoiceRecorder {
    */
   cancel(): void {
     this.startGen += 1 // 作废尚未完成的 start()
-    if (this.recorder && this.state === 'recording' && this.recorder.state === 'recording') {
+    const live = this.state === 'recording' || this.state === 'paused'
+    if (this.recorder && live && this.recorder.state !== 'inactive') {
       this.cancelled = true
-      if (this.timer) {
-        clearTimeout(this.timer)
-        this.timer = null
-      }
+      this.clearTimer()
       this.recorder.stop()
       return
     }
@@ -172,6 +199,25 @@ export class VoiceRecorder {
 
   private recordStart = 0
   private recordedMs = 0
+  /** 本次录音累计**暂停**时长（ms）：时长统计与 auto-stop 额度都要扣掉它 */
+  private pausedMs = 0
+  /** 当前暂停段的起点（0 = 未在暂停） */
+  private pausedAt = 0
+  private maxMs = MAX_RECORD_MS
+
+  /** 结算当前暂停段（idempotent：pausedAt 为 0 时什么都不做） */
+  private freezePausedAt(): void {
+    if (!this.pausedAt) return
+    this.pausedMs += Date.now() - this.pausedAt
+    this.pausedAt = 0
+  }
+
+  private clearTimer(): void {
+    if (this.timer) {
+      clearTimeout(this.timer)
+      this.timer = null
+    }
+  }
 
   private setState(state: RecorderState): void {
     this.state = state

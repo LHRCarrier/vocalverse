@@ -40,6 +40,9 @@ vocalverse:
     secret: ${JWT_SECRET:}
     access-ttl-seconds: 3600
   service-token: ${SERVICE_TOKEN:}
+  # CORS 追加源（逗号分隔，根 .env 注入 VOICEVERSE_CORS_EXTRA_ORIGINS）：
+  # 本机网卡 IP 随网络变化，局域网/手机联调的 Origin 在此追加，避免改代码（SecurityConfig）。
+  cors-extra-origins: ${VOICEVERSE_CORS_EXTRA_ORIGINS:}
   console:
     # 控制台 access token 的独立签名密钥（≥32 字节）。空 = 回退 JWT_SECRET 并打 WARN
     # （两服务共享该密钥才能互相验签；跨端隔离由 aud/typ 双向校验承担，不靠密钥差异）。

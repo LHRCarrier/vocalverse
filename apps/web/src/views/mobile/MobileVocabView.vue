@@ -9,8 +9,10 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
+import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import { deleteVocab, fetchVocab, patchVocab } from '@/api/reading'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 import '@/styles/reader-uic.css'
@@ -26,6 +28,9 @@ const error = ref('')
 const nextCursor = ref<string | null>(null)
 const hasMore = computed(() => nextCursor.value !== null)
 const savingIds = ref<Set<number>>(new Set())
+
+/** 骨架防抖（docs/31 硬规则 3）：<300ms 完成不闪骨架；pending 先占位防 CLS */
+const { visible: skelVisible, pending: skelPending } = useDelayedLoading(loading)
 
 async function load() {
   loading.value = true
@@ -110,16 +115,20 @@ function dateLabel(iso?: string | null): string {
         <p class="u-vb__count">共 {{ items.length }} 词 · 状态可点击循环（新词→学习中→已掌握）</p>
       </header>
 
-      <section v-if="loading" class="u-comm-skel" aria-label="加载中" aria-busy="true">
-        <div v-for="i in 3" :key="i" class="u-comm-skel__card"><span class="u-comm-skel__lines" /></div>
-      </section>
+      <MobileSkeleton
+        v-if="skelPending"
+        :class="{ 'is-pending': !skelVisible }"
+        variant="lines"
+        :count="3"
+        label="加载中"
+      />
 
-      <div v-else-if="error" class="u-comm-empty" role="status">
+      <div v-else-if="!loading && error" class="u-comm-empty" role="status">
         <span class="u-comm-empty__title">加载失败</span>
         <p class="u-comm-empty__sub">{{ error }}</p>
       </div>
 
-      <div v-else-if="items.length === 0" class="u-comm-empty" role="status">
+      <div v-else-if="!loading && items.length === 0" class="u-comm-empty" role="status">
         <span class="u-comm-empty__title">单词本空着</span>
         <p class="u-comm-empty__sub">阅读时点击单词 → 「加入生词本」，就会出现在这里。</p>
         <button class="u-comm-empty__btn" type="button" @click="router.push('/m/bookshelf')">

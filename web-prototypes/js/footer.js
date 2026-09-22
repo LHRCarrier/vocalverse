@@ -19,7 +19,7 @@
     '  </div>',
     '  <div class="site-footer__block site-footer__contact">',
     '    <span class="site-footer__heading">Contact</span>',
-    '    <a class="site-footer__link" href="mailto:hello@example.com">hello@example.com</a>',
+    '    <a class="site-footer__link" href="mailto:1844622298@qq.com">1844622298@qq.com</a>',
     '    <div class="site-footer__social">',
     '      <a href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"><img src="assets/linkedin.svg" alt="" width="14" height="14" aria-hidden="true" /></a>',
     '      <a href="https://x.com" target="_blank" rel="noopener noreferrer" aria-label="X"><img src="assets/x.svg" alt="" width="14" height="14" aria-hidden="true" /></a>',

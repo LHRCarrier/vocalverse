@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="css/gooey-nav.css" />
   <link rel="stylesheet" href="css/footer.css" />
   <link rel="stylesheet" href="css/aero-shards.css" />
+<link rel="stylesheet" href="css/gradual-blur.css" />
   <script>document.documentElement.classList.add((localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")));</script>
   <style>
     /* ============================================================
@@ -245,6 +246,121 @@
     }
     .uc-phones.is-inview .uc-phone { opacity: 1; transform: none; filter: blur(0); }
 
+    /* ============================================================
+       操作演示：右下角常驻按钮 + 从按钮长成居中手机框的浮层
+       ============================================================ */
+
+    /* —— 右下角常驻按钮 —— */
+    .uc-demo-fab {
+      position: fixed;
+      right: 1.75rem;
+      bottom: 1.75rem;
+      z-index: 60;
+      display: inline-flex;
+      align-items: center;
+      gap: .55rem;
+      height: 3.25rem;
+      padding: 0 1.3rem;
+      border: 0;
+      border-radius: 9999px;
+      background: var(--foreground);
+      color: var(--background);
+      font-size: .875rem;
+      font-weight: 600;
+      letter-spacing: -.01em;
+      cursor: pointer;
+      box-shadow: 0 12px 30px -10px rgb(0 0 0 / .45);
+      transition: transform .4s cubic-bezier(.22, 1, .36, 1), box-shadow .4s ease, opacity .28s ease;
+    }
+    .uc-demo-fab svg {
+      width: 19px; height: 19px;
+      fill: none; stroke: currentColor; stroke-width: 1.7;
+      stroke-linecap: round; stroke-linejoin: round;
+    }
+    .uc-demo-fab:hover { transform: translateY(-2px); box-shadow: 0 18px 38px -12px rgb(0 0 0 / .5); }
+    .uc-demo-fab:active { transform: translateY(0) scale(.97); }
+    /* 展开期间让位：手机框就是从它这儿长出来的，留着会重影 */
+    .uc-demo-fab.is-hidden { opacity: 0; transform: scale(.7); pointer-events: none; }
+
+    /* —— 浮层 —— */
+    .uc-demo { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 1.25rem; }
+    .uc-demo[hidden] { display: none; }
+
+    /* 模糊层：手机框画在它之上（同一浮层里的兄弟节点），所以只有框外被糊掉 */
+    .uc-demo__scrim {
+      position: absolute;
+      inset: 0;
+      /* 底色只压掉一点：压太狠会变成"白屏"而不是"糊掉的页面"，
+         框外那层模糊是效果本身，得看得出来 */
+      background: color-mix(in srgb, var(--background) 34%, transparent);
+      -webkit-backdrop-filter: blur(22px) saturate(.8);
+      backdrop-filter: blur(22px) saturate(.8);
+      opacity: 0;
+      transition: opacity .45s ease;
+    }
+    .uc-demo.is-open .uc-demo__scrim { opacity: 1; }
+
+    .uc-demo__stage {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.1rem;
+      max-height: 100%;
+    }
+    /* 焦点落在浮层容器上只是为了键盘可达与 Esc 有落点，
+       它本身不是控件，不该画出一圈默认焦点框（里面的按钮仍有自己的焦点环） */
+    .uc-demo__stage:focus,
+    .uc-demo__stage:focus-visible { outline: none; }
+
+    /* FLIP 的载体：transform / opacity 全由 js 写，这里只定原点 */
+    .uc-demo__phone { transform-origin: center center; will-change: transform, opacity; }
+
+    /* 浮层里的机身：按视口高度定尺，宽度交给 aspect-ratio 反推。
+       68vh/620px → 80vh/780px：原先 900px 视口下只有 300px 宽，
+       演示里的界面文字偏小，放大一档才看得清（底栏与留白同步收紧腾出空间）。 */
+    .uc-phones--demo { display: block; }
+    .uc-phones--demo .uc-phone__body {
+      width: auto;
+      height: min(80vh, 780px);
+      max-width: 90vw;
+      aspect-ratio: 433 / 882;
+    }
+    /* 入场交给 FLIP，机身自带的入场动画必须关掉，否则两套 transform 打架 */
+    .uc-phones--demo .uc-phone {
+      opacity: 1;
+      transform: none;
+      filter: none;
+      transition: none;
+    }
+    .uc-phones--demo .uc-phone__cap { display: none; }  /* 说明改由浮层底栏承担 */
+
+    .uc-demo__bar {
+      text-align: center;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity .4s ease, transform .5s cubic-bezier(.22, 1, .36, 1);
+    }
+    .uc-demo.is-open .uc-demo__bar { opacity: 1; transform: none; transition-delay: .16s; }
+    .uc-demo__hint {
+      margin: 0 0 .85rem;
+      font-family: var(--font-mono);
+      font-size: .74rem;
+      letter-spacing: .02em;
+      color: color-mix(in srgb, var(--foreground) 62%, transparent);
+    }
+    .uc-demo__acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .6rem; }
+    .uc-demo__kbd {
+      font-family: var(--font-mono);
+      font-size: .72rem;
+      letter-spacing: .02em;
+      color: color-mix(in srgb, var(--foreground) 45%, transparent);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .uc-demo__scrim, .uc-demo__bar, .uc-demo-fab, .uc-demo__phone { transition: none !important; }
+    }
+
     .uc-phone__body {
       position: relative;
       width: 100%;
@@ -280,6 +396,7 @@
       background: var(--background);
     }
     .uc-phone__screen iframe,
+    .uc-phone__screen video,
     .uc-phone__screen img {
       display: block;
       width: 390px;
@@ -582,8 +699,10 @@
     <ul>
       <span class="uc-rail__line" aria-hidden="true"><span class="uc-rail__fill" data-uc-fill></span></span>
       <li><a class="uc-rail__dot" href="#uc-1" data-uc-dot="uc-1"><span class="uc-rail__label">Learn</span></a></li>
-      <li><a class="uc-rail__dot" href="#uc-2" data-uc-dot="uc-2"><span class="uc-rail__label">Community</span></a></li>
-      <li><a class="uc-rail__dot" href="#uc-3" data-uc-dot="uc-3"><span class="uc-rail__label">Messages</span></a></li>
+      <li><a class="uc-rail__dot" href="#uc-2" data-uc-dot="uc-2"><span class="uc-rail__label">Sing</span></a></li>
+      <li><a class="uc-rail__dot" href="#uc-3" data-uc-dot="uc-3"><span class="uc-rail__label">Reading</span></a></li>
+      <li><a class="uc-rail__dot" href="#uc-4" data-uc-dot="uc-4"><span class="uc-rail__label">Community</span></a></li>
+      <li><a class="uc-rail__dot" href="#uc-5" data-uc-dot="uc-5"><span class="uc-rail__label">Messages</span></a></li>
     </ul>
   </nav>
 
@@ -608,7 +727,8 @@
       </p>
       <div class="fade-in mt-8 flex flex-wrap items-center gap-2.5" style="transition-delay: .18s">
         <span class="uc-chip">Captured <b>390×844</b> (2x)</span>
-        <span class="uc-chip"><b>3</b> sets · <b>9</b> screens</span>
+        <span class="uc-chip"><b>5</b> sets · <b>15</b> screens</span>
+        <span class="uc-chip"><b>+1</b> recorded walkthrough</span>
         <span class="uc-chip">Source <b>live app</b> · Vite dev</span>
       </div>
     </section>
@@ -629,9 +749,9 @@
               shortcuts — wordbook, reading room, community footprint and my pronunciation.
               <b>Scoring report</b> replays a single take as a 92.4 total split into pronunciation 93 ·
               grammar 91 · fluency 88 · coverage 100%, followed by a score and a one-line note for every
-              sentence. <b>Sing</b> leads with last take's diagnosis (88.1 overall · pitch 93 · rhythm 91)
-              plus a coaching hint, then the library grouped into all / popular / saved, each track badged
-              with its best score and level.
+              sentence. <b>My pronunciation</b> rolls that up over time: 82 / 76 / 86 across pronunciation,
+              fluency and grammar, a seven-session bar chart, and the weak phonemes (/θ/ /ð/ /r/) that the
+              word-level assessment keeps surfacing.
             </p>
           </div>
         </header>
@@ -643,13 +763,72 @@
           </button>
           <span class="uc-path">assets/app-shots/learn-center.png</span>
           <span class="uc-path">assets/app-shots/report.png</span>
-          <span class="uc-path">assets/app-shots/sing.png</span>
+          <span class="uc-path">assets/app-shots/pronunciation.png</span>
         </div>
       </article>
 
       <article class="uc-block" id="uc-2" data-uc-section>
         <header class="fade-in flex items-start gap-3.5">
           <span class="uc-idx">2</span>
+          <div>
+            <h2 class="font-serif text-[1.75rem] font-medium leading-[1.15] tracking-tight text-foreground sm:text-[2rem]">
+              Mobile · sing along, scored line by line
+            </h2>
+            <p class="mt-3 max-w-[70ch] text-[15px] leading-[1.75] tracking-tight text-foreground/65">
+              <b>Song library</b> opens with the diagnosis from your last take (88.1 overall · pitch 93 ·
+              rhythm 91) and a coaching hint, then the catalogue grouped into all / popular / saved, each
+              track badged with its best score. <b>Ready to sing</b> shows the whole lyric sheet, a
+              reference melody to listen to first, and a three-minute recording budget with a live pitch
+              guide. <b>The result</b> is where the feature actually pays off: one overall score split into
+              pitch, rhythm and pronunciation, a D3 pitch-alignment chart over the whole take, and a row
+              per line with its entry offset and score — and when too few lines were sung it refuses to
+              give a total and tells you to transpose instead.
+            </p>
+          </div>
+        </header>
+        <div class="uc-phones mt-12" data-uc-phones data-group="uc-2" aria-label="Mobile sing-along screens: library, ready to sing, and the line-by-line score"></div>
+        <div class="fade-in mt-8 flex flex-wrap items-center gap-2.5">
+          <button type="button" class="uc-sheet focus-ring" data-uc-zoom data-uc-src="assets/app-shots/sing-score.png" data-uc-caption="02 · Sing along — the line-by-line score (390×844 @2x)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M15 21h6v-6M9 21H3v-6"/></svg>
+            Open full-size screenshot
+          </button>
+          <span class="uc-path">assets/app-shots/sing.png</span>
+          <span class="uc-path">assets/app-shots/sing-ready.png</span>
+          <span class="uc-path">assets/app-shots/sing-score.png</span>
+        </div>
+      </article>
+
+      <article class="uc-block" id="uc-3" data-uc-section>
+        <header class="fade-in flex items-start gap-3.5">
+          <span class="uc-idx">3</span>
+          <div>
+            <h2 class="font-serif text-[1.75rem] font-medium leading-[1.15] tracking-tight text-foreground sm:text-[2rem]">
+              Mobile · reading, off the shelf
+            </h2>
+            <p class="mt-3 max-w-[70ch] text-[15px] leading-[1.75] tracking-tight text-foreground/65">
+              The reading line was missing from this page entirely. <b>Bookshelf</b> holds public-domain
+              novels — Alice, Pride and Prejudice, The Wizard of Oz, Don Quixote — each with its cover and
+              author. <b>Book detail</b> carries the facts that matter for a learner: level, chapter
+              count, word count. <b>The reader</b> is the actual surface: chapter title, paragraph-set
+              prose, and tap-a-word lookup that drops the word into your wordbook.
+            </p>
+          </div>
+        </header>
+        <div class="uc-phones mt-12" data-uc-phones data-group="uc-3" aria-label="Mobile reading screens: bookshelf, book detail, and the reader"></div>
+        <div class="fade-in mt-8 flex flex-wrap items-center gap-2.5">
+          <button type="button" class="uc-sheet focus-ring" data-uc-zoom data-uc-src="assets/app-shots/reader.png" data-uc-caption="03 · Reading — the reader (390×844 @2x)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M15 21h6v-6M9 21H3v-6"/></svg>
+            Open full-size screenshot
+          </button>
+          <span class="uc-path">assets/app-shots/bookshelf.png</span>
+          <span class="uc-path">assets/app-shots/book-detail.png</span>
+          <span class="uc-path">assets/app-shots/reader.png</span>
+        </div>
+      </article>
+
+      <article class="uc-block" id="uc-4" data-uc-section>
+        <header class="fade-in flex items-start gap-3.5">
+          <span class="uc-idx">4</span>
           <div>
             <h2 class="font-serif text-[1.75rem] font-medium leading-[1.15] tracking-tight text-foreground sm:text-[2rem]">
               Mobile · community &amp; posting
@@ -664,9 +843,9 @@
             </p>
           </div>
         </header>
-        <div class="uc-phones mt-12" data-uc-phones data-group="uc-2" aria-label="Mobile community screens shown in device frames"></div>
+        <div class="uc-phones mt-12" data-uc-phones data-group="uc-4" aria-label="Mobile community screens shown in device frames"></div>
         <div class="fade-in mt-8 flex flex-wrap items-center gap-2.5">
-          <button type="button" class="uc-sheet focus-ring" data-uc-zoom data-uc-src="assets/app-shots/community.png" data-uc-caption="02 · Mobile community — feed (390×844 @2x)">
+          <button type="button" class="uc-sheet focus-ring" data-uc-zoom data-uc-src="assets/app-shots/community.png" data-uc-caption="04 · Mobile community — feed (390×844 @2x)">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M15 21h6v-6M9 21H3v-6"/></svg>
             Open full-size screenshot
           </button>
@@ -676,9 +855,9 @@
         </div>
       </article>
 
-      <article class="uc-block" id="uc-3" data-uc-section>
+      <article class="uc-block" id="uc-5" data-uc-section>
         <header class="fade-in flex items-start gap-3.5">
-          <span class="uc-idx">3</span>
+          <span class="uc-idx">5</span>
           <div>
             <h2 class="font-serif text-[1.75rem] font-medium leading-[1.15] tracking-tight text-foreground sm:text-[2rem]">
               Mobile · messages &amp; notes
@@ -694,9 +873,9 @@
             </p>
           </div>
         </header>
-        <div class="uc-phones mt-12" data-uc-phones data-group="uc-3" aria-label="Mobile messages and notes screens shown in device frames"></div>
+        <div class="uc-phones mt-12" data-uc-phones data-group="uc-5" aria-label="Mobile messages and notes screens shown in device frames"></div>
         <div class="fade-in mt-8 flex flex-wrap items-center gap-2.5">
-          <button type="button" class="uc-sheet focus-ring" data-uc-zoom data-uc-src="assets/app-shots/notifications.png" data-uc-caption="03 · Mobile messages &amp; notes — notification centre (390×844 @2x)">
+          <button type="button" class="uc-sheet focus-ring" data-uc-zoom data-uc-src="assets/app-shots/notifications.png" data-uc-caption="05 · Mobile messages &amp; notes — notification centre (390×844 @2x)">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M15 21h6v-6M9 21H3v-6"/></svg>
             Open full-size screenshot
           </button>
@@ -739,6 +918,35 @@
     <div class="h-12 sm:h-16"></div>
   </main>
 
+  <!-- ============================================================
+       操作演示：右下角常驻按钮 → 点开从按钮位置长成居中的手机框
+       手机框以外整片模糊；点框外（或 Esc）收回按钮原地。
+       手机框复用 .uc-phone 机身，屏幕内容由 js 按 PHONE_GROUPS["uc-0"] 注入。
+       ============================================================ -->
+  <button type="button" class="uc-demo-fab focus-ring" data-uc-demo-open aria-haspopup="dialog" aria-expanded="false" aria-controls="uc-demo">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4z"/></svg>
+    <span>Watch demo</span>
+  </button>
+
+  <div class="uc-demo" id="uc-demo" data-uc-demo role="dialog" aria-modal="true" aria-label="Recorded walkthrough of the mobile app" hidden>
+    <div class="uc-demo__scrim" data-uc-demo-close></div>
+    <div class="uc-demo__stage" tabindex="-1">
+      <div class="uc-demo__phone" data-uc-demo-phone>
+        <div class="uc-phones uc-phones--demo" data-uc-phones data-group="uc-0" aria-label="Recorded walkthrough, shown in a device frame"></div>
+      </div>
+      <div class="uc-demo__bar">
+        <p class="uc-demo__hint">社区首页 → 帖子详情 → 发帖 → 通知 → 学习中心 → 唱吧 → 跟唱 → 评分 · 47s</p>
+        <div class="uc-demo__acts">
+          <button type="button" class="uc-sheet focus-ring" data-uc-video-toggle aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+            <span data-uc-video-label>Pause</span>
+          </button>
+          <span class="uc-demo__kbd">点击框外关闭 · Esc</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="js/vendor/lenis.min.js"></script>
   <script src="js/theme.js" defer></script>
   <script src="js/gooey-nav.js" defer></script>
@@ -747,6 +955,7 @@
   <script src="js/nav-reveal.js" defer></script>
   <script src="js/main.js" defer></script>
   <script src="js/footer.js" defer></script>
+<script src="js/gradual-blur.js" defer></script>
   <script src="js/showcase-interactions.js" defer></script>
   <script type="module" src="js/aero-shards-init.js"></script>
 </body>

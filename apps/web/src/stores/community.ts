@@ -9,6 +9,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { coinPost, fetchFeed, likePost, sharePost } from '@/api/community'
+import { hapticTap } from '@/utils/haptic'
 import { useUiStore } from '@/stores/ui'
 
 import type { AuthorView, CommunityPostView } from '@/types/community'
@@ -157,6 +158,7 @@ export const useCommunityStore = defineStore('community', () => {
 
   /** 点赞 toggle（乐观 + 回滚；以后端返回计数为准） */
   async function toggleLike(post: CommunityPostView) {
+    hapticTap('light') // 语义动作触觉（安卓支持；其余平台静默）
     const target = items.value.find((p) => p.id === post.id) ?? post
     const next = !target.liked
     const prev = { liked: target.liked, likeCount: target.likeCount }
@@ -178,6 +180,7 @@ export const useCommunityStore = defineStore('community', () => {
       ui.showToast('你已支持过这条内容（支持不可取消）')
       return
     }
+    hapticTap('medium') // 支持比点赞更"重"，给更强的触觉确认
     const prev = { coined: target.coined, coinCount: target.coinCount }
     target.coined = true
     target.coinCount = target.coinCount + 1

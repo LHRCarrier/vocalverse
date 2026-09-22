@@ -3,6 +3,68 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 PR #39 解冲突：两轮合并 main（合计 132 提交）+ 原型归档就地取代 · 3 op
+
+> 归属：仓库全局（合并/归档/门禁）。PR：https://github.com/LHRCarrier/vocalverse/pull/39
+> （base main ← head `chore/sync-2026-09-18`，此前 GitHub 判 `CONFLICTING / DIRTY`）。
+
+- **第一轮**（`origin/main` = `cc198c3`，落后 92 提交）：13 处冲突，逐条定档——
+  - **并集**（两侧各自新增，互不覆盖）：`app/core/paths.py`（`song_cover_dir()` + `voices_dir()`）、
+    `App.vue`（动效分级/页面转场 + 全局 XP 冷启动）、`composables/sing.ts`（store 委派 + 埋点 `track`）、
+    `mobile-uic.css`（`--u-paper-dots` + 动效时长变量）、三个移动视图（未读角标 + 骨架防抖 import）。
+  - **取 main**（本分支是占位/mock 版，main 已接真）：`api/stats.ts`、`views/StatsView.vue`（docs/53 P2）、
+    `views/mobile/MobileSearchView.vue`（搜索三 tab 接真 + 250ms 防抖 + 请求序号防串）。
+  - **各取一半**：`views/mobile/MobileHomeView.vue` —— 结构取 main（`.u-head` 吸顶 + 未读角标），
+    加载态取本分支（`useDelayedLoading` 防抖骨架，替代 main 的裸骨架块）。
+  - **worklog**：两份都并集 + 日期倒序；顺带修 2 处「签名行与 `## 标题` 粘连」。
+- **第二轮**（main 期间又前进 40 提交到 `4dc67f4`：TRPG 工具/审核判据/酒馆页内三入口/社区规范页…）：
+  仅两份 worklog 冲突，仍按并集 + 日期倒序解；其余自动合并。**教训：分支落后期间 main 在动，
+  解完一轮要 `git fetch` 复看，别按旧 `origin/main` 收尾。**
+- **原型归档（PR owner 裁定）**：本分支的 `原型备份/` 是 main `web-prototypes/` 的**路径超集**
+  （0 个 main 独有路径）且 21 个同名文件更新（showcase.html +31% / showcase-interactions.js +51% /
+  feature-blocks.css +42% / theme.js +29%，另含 main 没有的 app-shots 截图与演示视频）→
+  **整体取代** `web-prototypes/**`（目录名不变），并删除 `原型备份/`、`worklog/原型备份/` 两套重复副本。
+  例外两条：① 8 个回滚脚手架（`starter-rollback/` `showcase-rollback/`）**不恢复**（依 2026-09-20 组长
+  「归档只收原型内容」口径）；② `web-prototypes/README.md` 保留 main 版——本分支那份实为另一份
+  设计 skill 文档（其引用的 `SKILL.md`/`references/`/`tokens/` 并不在库内），放回会指向不存在的文件。
+- **队友在制品保护（关键操作纪律）**：工作区原有 8 个未提交的 `web-prototypes/*` 改动（页脚换内联
+  GitHub 图标 + 真邮箱等），合并前用 `git stash push -- <paths>` 暂存、合并后 `stash pop` 就地还原；
+  其中 7 个文件的编辑**留在工作区不入库**（`git update-index --cacheinfo` 把索引回落到归档内容），
+  README 的备注同理；原 stash 条目保留兜底。**"解冲突"不能顺手把队友未提交内容带进提交。**
+- **门禁（复跑，含 main 全部新提交）**：Python `ruff check` / `format --check` 全过、
+  `pytest -q` **769 passed, 4 skipped**、契约快照与 `app.openapi()` 一致（**100 op**）；
+  Web `pnpm gen:api` 后 `src/api/generated/` **零漂移**、`vitest run` **670 passed（101 文件）**、
+  `vite build` + `check-bundle`（fe-09）通过。`web-prototypes/` 按该目录 README 声明不参与门禁。
+- **踩坑（本次新增）**：① **`git merge-tree` 预览的冲突清单 ≠ 实际冲突**——main 在你解冲突期间继续前进，
+  必须 `fetch` 后再合一轮（本轮实测：预览 2 处、实际 2 处，但上一轮预览的 13 处在 main 前进后已变）；②
+  **`git stash pop` 会连带把内容放回索引**——若该内容属队友在制品，须显式把索引回落到入库版本，
+  否则会被 merge commit 一并带走；③ 判定「哪边更新」不要只看提交时间（main 的 `web-prototypes` 最后
+  触碰时间更晚，但内容是旧版），要看**路径集合 + 逐文件字节/行数**。
+- **遗留（转告）**：① 未入仓的队友 WIP `apps/web/src/api/community.test.ts` 引用了尚不存在的
+  `applyLikeMutation` → `vitest` 3 例红（该文件不在本次提交内，属库外状态）；② 分支合并历史为两个
+  merge commit（`fdcb1b5` / `3d49b19`），若组长要求单条，可在合入时用 squash 口径记录。
+
+—— 执行人：xiaoqing-one（AI 代工），2026-09-22
+
+## 2026-09-22 歌曲封面公开路由 + 种子封面资产 + Python 契约快照刷新 · 1 op
+
+> 归属：后端/契约/种子资产（**前端 UI 部分见同日`安卓开发日志.md`**——按 2026-09-08 拆分规矩）。需求由「歌单行图标换成本曲封面」触发的数据侧缺口。
+
+- **为什么动后端**：`songs.cover_url` 全为 NULL（seed 与库都无封面），且本仓约定「内容域静态资产由后端只读路由服务」（书封 = `reading.py /covers/{name}` → `data/seed/covers/`）。前端 `<img>` 不能带 Authorization，且打包壳页面源是 `https://localhost`（相对路径必 404）→ 必须有公开路由。
+- **改动**：
+  - `app/api/routes/singing.py` 新增 `GET /api/v1/songs/covers/{name}`：**公开**（无鉴权，与书封完全同款处置）、`FileResponse` + `image/*` 响应声明、`Cache-Control: public, max-age=86400`；白名单 `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` + `..` 拦截（错误码复用 40001/40401，未新增）。
+  - `app/core/paths.py` 新增 `song_cover_dir()` → `data/seed/song-covers/`（与书封目录分开，两类资产各自路由）。
+  - 资产入 `data/seed/song-covers/*.svg`（10 张，`.gitignore` 已豁免 `data/seed/**`；生产方 = 本机 `local/make-song-covers.ps1`）。
+  - `scripts/setup-assets.py`：`cover_url` 由 `None` 改为按 slug 生成 `/api/v1/songs/covers/{slug}.svg`（**重跑 setup 不再丢封面**）；`data/seed/songs.json` 同步补齐 10/10（匹配行尾、仅 10 行变化）。
+  - 存量库：`UPDATE songs … WHERE cover_url IS NULL`（10 行；带 `IS NULL` 守卫，不会覆盖日后上传的真封面）。
+- **契约**：`apps/web/src/api/specs/python-openapi.json` + `generated/python-api.d.ts` 同步刷新，diff **+41 / +60 行且全部来自新路由**；本地跑 CI 同款判定（`app.openapi()` vs 快照）→ **True（0 差异）**。
+- **门禁**：`uv run ruff check .` 全过；`ruff format --check` 230 文件已格式化；`pytest -q` **665 passed**。
+- **实测**：`curl /api/v1/songs/covers/twinkle.svg` → 200 / `image/svg+xml` / 1101 B；目录穿越 `../..` → 404 被拦。
+- **踩坑（会静默毁掉整个快照）**：PS 5.1 的 `Invoke-WebRequest` 把 `$resp.Content` 按 **Latin-1** 解码 → 快照里中文全变乱码、并传染进 `pnpm gen:api` 的生成类型（diff 一度 8495 行）。正确做法：`curl.exe -o` 落字节 + Python `json.dumps(…, ensure_ascii=False, indent=2)` 写文件（另：`scripts/refresh-openapi.ps1` 同样用 `$resp.Content`，在本机带中文的契约上有同样风险）。
+- **联调测试页判定（AGENTS 强制项自查）**：本次是**内容资产 + 只读公开端点**，无前后端交互流程（无表单/无状态机/无新用户路径），故未建 `docs/13 §8` 预览页；可复现验证 = 上条 curl + 歌单实拍（见同日安卓日志）。若组长判仍需预览页，补一个 registry 行即可。
+
+—— 执行人：xiaoqing-one（AI 代工），2026-09-22
+
 ## 2026-09-22 闭环复评（R2）+ 二次修复后端段：语言语音/结算幂等/道具可见/攻击目标 · 2 op
 
 > 归属：复评为全局（结论追加 `docs/57 §6`）；本段为 **Python 后端**修复。UI 段（大堂/角色卡/纪事）见安卓日志。
@@ -571,6 +633,29 @@
 - **遗留（转告作者与后人）**：① 分支 `chore/sync-2026-09-18`（9/18 推送、尚无 PR）当前 `web-prototypes/` 相对 main **零 diff**，即本次合入的 app-shots / card-art / feature-blocks / 第2周.md 在该分支上会**显示为删除**——作者开 PR 前需确认是有意回滚还是本地快照漏同步；② 9/10 使用过的 DeepSeek API Key 曾出现在对话记录中，**如仍生效建议重置**（密钥卫生，已在 `第2周.md` §四 记录）；③ 该分支的 `docs(worklog)` 归档条目与本条都会改本文件顶部，合入时按日期倒序手工解冲突。
 
 —— 执行人：LHRCarrier（评审处置与合入）；内容作者：xiaoqing-one（原型备份二期），2026-09-20
+
+## 2026-09-16 唱吧「参考旋律未就绪」排查：`data/audio` 素材文件被删 + 失败任务不自动重建 · 1 op
+
+- **现象**：`/m/sing` 三首歌全「未就绪」，顶栏「参考旋律生成中或缺失（暂时不能跟唱）」；Python 日志每 60s 一条 `pitch extract job failed beyond attempts song=1/2/3 (attempts=3)`。
+- **根因链（本机实测）**：① `data/audio/` 下三首 `song_*.wav` **已不存在**（只剩 `cache/tts` 预热缓存），目录 mtime **2026-09-15 15:38:53**；② 三个 `pitch_extract_jobs` 全部 `failed / attempts=3`，payload 错误快照一致为 `音频文件不可达（audio=/data/audio/song_*.wav）`，`failed_at` = **2026-09-15T07:49:52Z（北京时间 15:49）**，即昨日「合并远端 + 对齐工作树 + 重启」那段；③ 失败任务按 P1-12 规则判定 `RETRY_SKIP`（世代未变 `lrc-m6/10/14` + `extractor_version=pyin-v2` 已达上限）→ **扫描器不再重建**，于是 `songs.pitch_ref_status` 永久停在 `missing`，页面一直「生成中或缺失」。**素材是 gitignored 重建产物（不入库），被移除后无任何自愈路径**——这正是"文件没了"表现为"参考旋律丢失"的原因。
+- **删除来源（如实说明，未能唯一归因）**：应用侧自删路径已排除——`GET /audio/{name}` 的 24h 惰性清理在 2026-09-10 修复后**先做平台素材豁免**（`_is_published_song_asset`，`practice.py`）再判 TTL，且豁免命中的是已发布歌曲；代码内亦无遍历 `audio_dir` 的后台清扫。最可能是昨日「对齐工作树 / 清理未跟踪文件」那一步连带删了忽略目录（`data/audio` 在 `.gitignore` 第 44 行，`git clean -x` 一类操作会一并清除），但本机 shell 历史无留痕，无法坐实。
+- **恢复（两条命令，已验证）**：① `cd services/python && uv run python ../../scripts/setup-assets.py` → 三首 wav 确定性重建（1,307,168 / 873,224 / 869,696 B，与 09-14 记录逐字节一致；`data/seed/songs.json` 仅 CRLF 行尾差异，已 `git checkout` 还原）；② `update pitch_extract_jobs set status='queued', attempts=0, finished_at=null;` —— **必须手工重置**：素材回来≠任务会自动重试（同上）→ 60s 内扫描器抢到 queued 任务，pyin 提取 3/3 `done`。
+- **验证（经前端实际链路）**：`GET /api/v1/songs` → 三首 `pitch_ref_status=ready`；`GET /api/v1/audio/song_twinkle.wav` → **200 / audio/wav / 1,307,168 B**；提取任务全 `done`。
+- **踩坑/备忘**：① 重建素材后若不同步冲掉失败任务的 `attempts`，扫描器按设计**不会**自愈（`RETRY_SKIP` 是防无限重建的护栏）——排障时别只看文件是否恢复；② `setup-assets.py` 在 Windows 上写文件会把 `\n` 落成 CRLF，会让入库的 `data/seed/songs.json` 显示为已修改（内容一致）——直接 `git checkout` 还原行尾即可，勿误 commit；③ 本机 `.env` 注入（`APP_AUDIO_DIR` 等）只在进程环境里生效，**不会**被 pydantic 的 `env_file` 写回 `os.environ`，所以 conftest 的 `setdefault` 隔离照常生效——但"shell 里 export 过 APP_AUDIO_DIR 再跑 pytest"仍会删真素材（09-14 已登记的同一条陷阱）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-16
+
+## 2026-09-16 局域网/手机登录 403 修复：CORS 白名单硬编码旧 IP → 追加源改走 env · 1 op
+
+- **现象**：方式 B 裸跑下用局域网 IP 打开页面登录，红字「Java（登录/管理端）服务不可达（HTTP 403，/manage/auth/login）」——**措辞误导**：Java 实际在跑，403 是 Spring Security 的 CORS 层拒的（「Invalid CORS request」，空体响应），前端 `apps/web/src/api/client.ts` 对空体响应统一展示成「服务不可达」。
+- **根因**：`SecurityConfig.corsConfigurationSource` 的白名单硬编码了 `192.168.0.104`（2026-09-10 的旧网卡 IP）+ localhost 系；本机 IP 随网络环境变化（DHCP，当前 `26.134.181.175` 等），页面源不在白名单 → 403。
+- **实证（修复前）**：同一 `POST /auth/login`，`Origin: http://localhost:5173` → **400**（进控制器）；`Origin: http://26.134.181.175:5173` → **403**。修复后同 Origin → 400，经 Vite 代理 `demoadult` 登录 → `code:0` 拿 token；`/readyz` database/redis 全 ok。
+- **修复（沿用控制台侧既有模式，不硬编码）**：控制台本来就有 `VOICEVERSE_CONSOLE_CORS_ORIGINS` 追加源机制（`.env` 注释里记过同款 403 坑）；App 端照搬：`SecurityConfig` 新增构造参数 `vocalverse.cors-extra-origins`（逗号分隔追加进白名单）、`application.yml` 登记 `${VOICEVERSE_CORS_EXTRA_ORIGINS:}`、根 `.env` 追加当前局域网 IP 系列。**换网络只改 .env 一行，不改代码**。
+- **同日二连：开 HTTPS 后**又**一次 403（协议也参与匹配）**：为手机录音开 HTTPS（安全上下文）后，页面源由 `http://…:5173` 变为 `https://…:5173`，浏览器 Origin 随之换协议 → 白名单只登记了 `http://` → **再次 403**。实证：`Origin: https://localhost:5173` → **403**、`Origin: http://localhost:5173` → **400**（对照）。修复：`.env` 追加源补齐 **http/https 两套**（localhost / 127.0.0.1 / 各网卡 IP × 5173/8088）。**结论：CORS 白名单按「协议 + 主机 + 端口」精确匹配——换协议与换 IP 等价**，手机换到 HTTPS 访问时别忘了这一步。验证：两个 https 源 → 400（进业务层）；带 `Origin: https://localhost:5173` 经 HTTPS 代理登录 → `code:0`（token 已发）；`/readyz` 经 HTTPS 代理 → db/redis 全 ok。配套：mkcert 生成 `local/certs/dev-*.pem`（SAN 含 `10.133.34.29` 等，gitignored），前端以 `VITE_HTTPS_CERT/VITE_HTTPS_KEY` 起 HTTPS，手机装 `rootCA.crt` 即信任。
+- **本机启动备忘（方式 B 裸跑四端）**：Docker Desktop 装在 `C:\Users\ROG\AppData\Local\Programs\DockerDesktop\`（不在默认 Program Files 路径）；mvn 用 IntelliJ 内置 `C:\Program Files\JetBrains\IntelliJ IDEA 2025.1\plugins\maven\lib\maven3\bin\mvn.cmd`（系统 PATH 无 mvn）；pnpm 走 `corepack pnpm`；Python 8000 被系统保留 → 照旧 `--port 8001` + `PY_API_TARGET`。
+- **产出**：`services/java/.../SecurityConfig.java`、`services/java/src/main/resources/application.yml`、根 `.env`（不入库）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-16
 
 ## 2026-09-14 记录纪律 · 署名更正：AI 代工一律署 LHRCarrier（不是分支 owner）· 1 op
 

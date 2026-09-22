@@ -9,9 +9,18 @@
 
   const applyIcons = () => {
     const isDark = root.classList.contains("dark");
+    /* 必须写独立的 rotate / scale，不能写 transform 简写。
+       Tailwind v4 把 .scale-0 / .-rotate-90 编译成**独立属性**：
+         .scale-0    { scale: var(--tw-scale-x) var(--tw-scale-y) }
+         .-rotate-90 { rotate: -90deg }
+       而 transform 简写与 rotate / scale 是两套互不覆盖的属性 ——
+       之前写 el.style.transform = "rotate(0deg) scale(1)" 时，样式表里的
+       scale:0% 依旧生效，两个图标都被永久缩成 0，按钮里就什么都看不见。
+       改用同名的独立属性并内联覆盖（内联优先级高于类），图标才能正常切换。 */
     const set = (el, rotate, scale, opacity) => {
-      el.style.transform = `rotate(${rotate}deg) scale(${scale})`;
-      el.style.opacity = opacity;
+      el.style.setProperty("rotate", rotate + "deg");
+      el.style.setProperty("scale", String(scale));
+      el.style.setProperty("opacity", String(opacity));
     };
     if (isDark) {
       set(sunIcon, 0, 1, 1);

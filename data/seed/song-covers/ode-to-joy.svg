@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Ode to Joy">
+<defs>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F5A623"/><stop offset="1" stop-color="#E8556D"/></linearGradient>
+<radialGradient id="gl" cx="0.5" cy="0.34" r="0.72"><stop offset="0" stop-color="#fff" stop-opacity="0.20"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="512" height="512" fill="url(#g)"/>
+<rect width="512" height="512" fill="url(#gl)"/><circle cx="256" cy="232" r="74" fill="#FFF6D8" opacity=".95"/>
+<g stroke="#FFF6D8" stroke-width="10" stroke-linecap="round" opacity=".9">
+<path d="M256 108v-34M256 390v34M132 232H98M414 232h34M168 144l-24-24M344 320l24 24M344 144l24-24M168 320l-24 24"/>
+</g>
+<path d="M0 430q128-46 256 0t256 0v82H0z" fill="#8C2F45" opacity=".45"/>
+</svg>

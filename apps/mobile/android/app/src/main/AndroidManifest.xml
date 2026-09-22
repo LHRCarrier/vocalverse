@@ -46,4 +46,7 @@
          同时申请 MODIFY_AUDIO_SETTINGS + RECORD_AUDIO，任一缺失/未授予 → request.deny()
          → getUserMedia NotAllowedError「麦克风被拒绝」。此前只有 RECORD_AUDIO → 真机必被拒。 -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- 2026-09-18：语义动作触觉反馈（点赞/支持/收藏/发送）用 WebView 的 Vibration API
+         （apps/web/src/utils/haptic.ts 的 navigator.vibrate）；缺此权限时 WebView 内调用静默失败 -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 </manifest>

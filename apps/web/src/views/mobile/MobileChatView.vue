@@ -17,6 +17,7 @@ import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMessagesStore } from '@/stores/messages'
 import { useUiStore } from '@/stores/ui'
+import { hapticTap } from '@/utils/haptic'
 import '@/styles/mobile-uic.css'
 
 const route = useRoute()
@@ -43,6 +44,7 @@ function scrollBottom(behavior: ScrollBehavior = 'auto') {
 async function send() {
   const text = draft.value.trim()
   if (!text) return
+  hapticTap('light') // 发送动作触觉（安卓支持；其余平台静默）
   draft.value = ''
   const ok = await messages.send(peerId, text)
   if (ok) scrollBottom('smooth')

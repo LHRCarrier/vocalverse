@@ -11,7 +11,22 @@
 
 export const YIN_MIN_HZ = 65
 export const YIN_MAX_HZ = 800
-export const YIN_THRESHOLD = 0.1
+/**
+ * 检出阈值（CMNDF 谷值上限）。**越高越灵敏**（更易接受周期性较弱的轻声/气声），
+ * 越低越保守。2026-09-21 由 0.1 放宽到 0.22，依据实测（`local/yin-sensitivity.mjs`）：
+ * 「轻唱 + 底噪大」场景检出率 0.10→0.00、**0.15→0.00（无效区）**、0.20→0.07、0.22→0.20；
+ * 而"没人唱只有房间底噪/工频"的误检率在各阈值下**均为 0.000**（阈值放宽并未引入误检）。
+ * 另注：CMNDF 已做归一化，**幅度会被约掉**——放大增益对检出率无影响（实测 f0 逐位相同），
+ * 故"麦克风更敏感"只能靠阈值与窗长，不能靠增益。
+ */
+export const YIN_THRESHOLD = 0.22
+/**
+ * 默认分析窗（采样点）。窗越长积分越多 → 弱信号检出率越高，代价是单帧 CPU 与读数时延上升。
+ * 2026-09-21 由 2048（43ms@48k）加长到 4096（85ms）：同一「轻唱+底噪大」场景下 0.20 档检出率
+ * 0.07→0.14；单帧 CPU 实测 1.8ms→4.0ms（跑在 Worker 内，60ms 帧预算内可忽略）。
+ * AnalyserNode.fftSize 必须与此值一致（见 composables/useLivePitch.ts）。
+ */
+export const YIN_WINDOW_SIZE = 4096
 
 export interface YinResult {
   f0: number
@@ -32,12 +47,61 @@ export function detectPitch(
   const tauMax = Math.min(Math.floor(n / 2), Math.floor(sampleRate / YIN_MIN_HZ))
   const tauMin = Math.max(2, Math.floor(sampleRate / YIN_MAX_HZ))
   if (tauMax <= tauMin) return null
+  return yinCore(samples, sampleRate, tauMax, tauMin, new Float64Array(tauMax + 1), new Float64Array(tauMax + 1), threshold)
+}
+
+/**
+ * 复用缓冲的 YIN 检测器（实时链路每 tick 调用，**零分配**）。
+ *
+ * 2026-09-18 性能改造：旧实现每帧调用 detectPitch → 每次新建 2 个 (tauMax+1)≈679 长
+ * Float64Array（16.7 次/秒×2），在真机上表现为周期性 GC 抖动（基线见 local/sing-bench-before-*.json）。
+ * 本检测器一次性分配 d/cmndf，检测结果与 detectPitch **逐位一致**（同一 yinCore）。
+ */
+export interface YinDetector {
+  /** 检测窗长（采样点） */
+  readonly n: number
+  /** 差分 tau 上界（= 最低音约束，同时决定缓冲长度） */
+  readonly tauMax: number
+  /** 内部缓冲（测试/调试用：证明跨次复用而非重建） */
+  readonly buffers: { d: Float64Array; cmndf: Float64Array }
+  detect: (samples: Float32Array) => YinResult | null
+}
+
+export function createYinDetector(
+  sampleRate: number,
+  n = YIN_WINDOW_SIZE,
+  threshold: number = YIN_THRESHOLD,
+): YinDetector {
+  const tauMax = Math.min(Math.floor(n / 2), Math.floor(sampleRate / YIN_MIN_HZ))
+  const tauMin = Math.max(2, Math.floor(sampleRate / YIN_MAX_HZ))
+  const d = new Float64Array(Math.max(0, tauMax + 1))
+  const cmndf = new Float64Array(Math.max(0, tauMax + 1))
+  return {
+    n,
+    tauMax,
+    buffers: { d, cmndf },
+    detect: (samples) => yinCore(samples, sampleRate, tauMax, tauMin, d, cmndf, threshold),
+  }
+}
+
+/** 差分累积 → CMNDF → 阈值首谷 → 抛物线插值（detectPitch 与 createYinDetector 共用） */
+function yinCore(
+  samples: Float32Array,
+  sampleRate: number,
+  tauMax: number,
+  tauMin: number,
+  d: Float64Array,
+  cmndf: Float64Array,
+  threshold: number,
+): YinResult | null {
+  const n = samples.length
+  if (tauMax <= tauMin) return null
 
   // ① 差分累积 d'(tau)（论文式(1)）
-  const d = new Float64Array(tauMax + 1)
   for (let tau = 1; tau <= tauMax; tau += 1) {
     let sum = 0
-    for (let i = 0; i < n - tau; i += 1) {
+    const lim = n - tau
+    for (let i = 0; i < lim; i += 1) {
       const diff = samples[i] - samples[i + tau]
       sum += diff * diff
     }
@@ -45,7 +109,6 @@ export function detectPitch(
   }
 
   // ② CMNDF 归一化（论文式(4)）
-  const cmndf = new Float64Array(tauMax + 1)
   cmndf[0] = 1
   let running = 0
   for (let tau = 1; tau <= tauMax; tau += 1) {

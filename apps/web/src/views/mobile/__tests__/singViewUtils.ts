@@ -46,9 +46,15 @@ export function rowOf(w: Awaited<ReturnType<typeof mountView>>, title: string) {
   return w.findAll('.m-sing-row').find((r) => r.text().includes(title))
 }
 
-/** 按文案找按钮（找不到即断言失败，避免断言里到处 `!`） */
+/**
+ * 按文案找按钮（找不到即断言失败，避免断言里到处 `!`）。
+ * 2026-09-22：面板底部按钮改为「图标 + aria-label」（视频模板排版），
+ * 故匹配 **可见文案或 aria-label** —— 既有用例（传完整动作名如「听参考旋律」）无需改动。
+ */
 export function btn(w: Awaited<ReturnType<typeof mountView>>, text: string) {
-  const found = w.findAll('button').find((b) => b.text().includes(text))
+  const found = w
+    .findAll('button')
+    .find((b) => b.text().includes(text) || (b.attributes('aria-label') ?? '').includes(text))
   if (!found) throw new Error(`按钮不存在：${text}`)
   return found
 }

@@ -7,17 +7,17 @@
  * 本轮询为组件无关组合式：MobileSingView（真形态）与 SingingPreview（联调页）共用同一逻辑，
  * UI 侧只订阅 phase/result 状态。中止纪律：组件卸载必须调 stop()（防泄漏定时器）。
  */
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, ref, toRef } from 'vue'
 import type { Ref } from 'vue'
 
 import { VoiceRecorder, micErrorMessage } from '@/audio/recorder'
+import { useSingStore } from '@/stores/sing'
 import { track } from '@/api/events'
 import {
   createSingSession,
   fetchSingResult,
   fetchSingStatus,
   fetchSongDetail,
-  fetchSongs,
   setSongFavorite,
   singErrorMessage,
   singFailureMessage,
@@ -40,6 +40,15 @@ export type SingPhase =
   | 'processing'
   | 'done'
   | 'failed'
+
+/**
+ * 跟唱单次录音上限（ms）：180s（docs/06 §9.4「整首 ≤180s」口径）。
+ *
+ * 单一来源：既作为 `recorder.start()` 的自动停止上限，也作为面板头部录音进度线的分母
+ * （2026-09-22 排版优化把「录音 3 分钟自动停止」从底部一行小字变成可见进度，
+ * 两处若各写一个字面量，改一处就会出现「进度条走完了录音还没停」）。
+ */
+export const SING_MAX_RECORD_MS = 180_000
 
 export interface SingPlay {
   songs: Ref<SongSummary[]>
@@ -64,6 +73,12 @@ export interface SingPlay {
   submitAudio: (blob: Blob) => Promise<void>
   startRecording: () => void
   stopRecording: () => void
+  /** 暂停 = 录音仍在进行但暂停采集（暂停段不入音频） */
+  pauseRecording: () => void
+  /** 继续：结算暂停时长并按剩余额度重挂自动停止 */
+  resumeRecording: () => void
+  /** 是否处于「录音暂停中」（2026-09-22 深色录唱页：中心钮变「继续」、计时与歌词游标冻结） */
+  paused: Ref<boolean>
   cancelRecording: () => void
   /** 同一录音流（实时音准线用，docs/06 §9.4 注记；录音态非空、停止后 null） */
   getLiveStream: () => MediaStream | null
@@ -73,9 +88,18 @@ export interface SingPlay {
 }
 
 export function useSingPlay(): SingPlay {
-  const songs = ref<SongSummary[]>([])
+  /**
+   * 歌曲列表真源在 store（2026-09-21）：「当前跟唱歌曲」要能被导航栏等其他模块同步读取，
+   * 列表不能只活在本组合式实例里；页面 / 桌面顶栏 / 移动选曲 sheet 共读同一份，
+   * 收藏态的乐观更新也改的是同一批对象（不再是「页面一份、导航一份」）。
+   * 本组合式的**公开 API 不变**（`songs` 仍是 `Ref<SongSummary[]>`）。
+   */
+  const sing = useSingStore()
+  const songs = toRef(sing, 'songs')
   const detail = ref<SongDetail | null>(null)
   const phase = ref<SingPhase>('pick')
+  /** 录音暂停中（phase 仍为 'recording'：会话未结束） */
+  const paused = ref(false)
   const error = ref<string | null>(null)
   const status = ref<SingAttemptStatus | null>(null)
   const result = ref<SingAttemptResult | null>(null)
@@ -96,8 +120,17 @@ export function useSingPlay(): SingPlay {
    */
   recorder.onStateChange = (s) => {
     if (s === 'error') phase.value = 'failed'
-    else if (s === 'recording') phase.value = 'recording'
-    else if (phase.value === 'recording') phase.value = 'idle'
+    else if (s === 'recording') {
+      phase.value = 'recording'
+      paused.value = false
+    } else if (s === 'paused') {
+      // 暂停（2026-09-22 深色录唱页）：**会话仍在进行** → phase 保持 recording，
+      // 只翻 paused 标志（视图据此把中心钮变「继续」、冻结计时/歌词游标与进度线）。
+      paused.value = true
+    } else if (phase.value === 'recording') {
+      phase.value = 'idle'
+      paused.value = false
+    }
   }
   recorder.onStop = (blob) => {
     void submitAudio(blob)
@@ -144,13 +177,15 @@ export function useSingPlay(): SingPlay {
   async function loadSongs() {
     phase.value = 'loading'
     error.value = null
-    try {
-      songs.value = await fetchSongs()
-      phase.value = 'idle'
-    } catch (e) {
+    await sing.loadSongs()
+    // 列表真源在 store：把它的三态映射回本组合式的 phase/error ——
+    // 视图侧判据（`phase==='loading'` 骨架、`phase==='failed'` 错误态）与既有测试断言一律不变。
+    if (sing.songsStatus === 'failed') {
       phase.value = 'failed'
-      error.value = singErrorMessage(e)
+      error.value = sing.songsError
+      return
     }
+    phase.value = 'idle'
   }
 
   /** 选歌：详情 + 就绪门禁（40905 语义前置提示，不进入跟唱） */
@@ -178,6 +213,8 @@ export function useSingPlay(): SingPlay {
       error.value = '参考旋律生成中或缺失（暂时不能跟唱）：等提取完成后刷新即可'
       return false
     }
+    // 门禁通过才落选（2026-09-21）：顶栏/导航的选中高亮不会指向一首点不开的歌
+    sing.selectSong(songId)
     phase.value = 'idle'
     return true
   }
@@ -210,10 +247,21 @@ export function useSingPlay(): SingPlay {
 
   function startRecording() {
     error.value = null
-    void recorder.start(180_000).catch((e) => {
+    paused.value = false
+    void recorder.start(SING_MAX_RECORD_MS).catch((e) => {
       phase.value = 'failed'
       error.value = micErrorMessage(e)
     })
+  }
+
+  /** 暂停录音（录音态有效；暂停段不入音频、不计入时长——见 VoiceRecorder.pause） */
+  function pauseRecording() {
+    recorder.pause()
+  }
+
+  /** 继续录音（暂停态有效；按剩余额度重挂自动停止定时器） */
+  function resumeRecording() {
+    recorder.resume()
   }
 
   function stopRecording() {
@@ -352,6 +400,9 @@ export function useSingPlay(): SingPlay {
     submitAudio,
     startRecording,
     stopRecording,
+    pauseRecording,
+    resumeRecording,
+    paused,
     cancelRecording,
     getLiveStream,
     retry,

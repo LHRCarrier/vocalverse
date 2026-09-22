@@ -33,15 +33,41 @@
        uc-1 学习与评分   uc-2 社区与投稿   uc-3 消息与笔记
      （Web 端截图 assets/app-shots/web-*.png 仍在目录里，但页面不再展示。） */
   var PHONE_GROUPS = {
+    /* 0 号：操作演示 —— 真实跑一遍的录屏，放在手机框里静音循环播放，
+       作为「先看它怎么跑起来」的开场。录屏由 CDP screencast 抓帧、
+       ffmpeg 按帧时间戳合成（可变帧率），素材与截图同为 390×844 @2x。 */
+    "uc-0": [
+      { video: "assets/app-shots/app-demo.mp4", title: "操作演示 · 浏览与导航",
+        desc: "从社区首页出发：切频道 → 打开一条帖子 → 发帖 → 通知 → 学习中心 → 唱吧，最后完整走一遍跟唱（听参考旋律 → 开始跟唱 → 停止并评分）。录制自运行中的 app（Vite dev，演示账号 demoadult），47 秒，静音循环播放。" }
+    ],
     "uc-1": [
       { img: "assets/app-shots/learn-center.png", title: "学习中心",
         desc: "以问候语和本周小结开场；等级徽章带 70 / 500 XP 进度条，右侧是连续打卡 12 天；近 30 天学习热力图标出当天 +75 XP；下方依次是我的单词、书房、社区足迹、我的发音四个入口，底部五个 Tab 主导航。" },
       { img: "assets/app-shots/report.png", title: "评分报告",
         desc: "一次跟唱的完整复盘：曲目与时间、总分 92.4，拆成发音 93 · 语法 91 · 流利 88 · 覆盖 100%；再往下是逐句评分（95 / 88 / 81），每句配一句点评，底部提供「再唱一遍」。" },
-      { img: "assets/app-shots/sing.png", title: "唱吧 · 曲库",
-        desc: "顶部是上一遍的诊断：88.1 分、音准 93、节奏 91，并给出「稳住节奏就能破 90」的建议；下方按全部 / 热门 / 收藏分组的歌曲库，每首带最佳成绩与等级标签（Perfect Night 88.1 新纪录、Yesterday Once More 91.5 优秀）。" }
+      { img: "assets/app-shots/pronunciation.png", title: "我的发音",
+        desc: "发音这条线的纵向汇总：三张卡分别是发音 82 · 流利度 76 · 语法 86，下面用近 7 次练习的柱状图对比三项的走势；再往下是薄弱音素 /θ/ /ð/ /r/——词级错误沉淀自每次练习的发音评测，用来指下一轮该练什么。" }
     ],
+    /* 唱吧单独成组：曲库 → 跟唱 → 评分，三张连起来才是这个功能的完整闭环。
+       此前只展示了曲库，最关键的"逐句音准/节奏评分"反而没露过面。 */
     "uc-2": [
+      { img: "assets/app-shots/sing.png", title: "唱吧 · 曲库",
+        desc: "顶部是上一遍的诊断：88.1 分、音准 93、节奏 91，并给出「稳住节奏就能破 90」的建议；下方按全部 / 热门 / 收藏分组的歌曲库，每首带最佳成绩与等级标签（Perfect Night 88.1 新纪录、Yesterday Once More 91.5 优秀）。" },
+      { img: "assets/app-shots/sing-ready.png", title: "跟唱 · 准备",
+        desc: "从「去跟唱」进入的跟唱页：顶部是曲目与规模（Twinkle Twinkle Little Star · 6 句 · 整首 ≤180s），中间是整首歌词，先「听参考旋律」再「开始跟唱（≤3 分钟）」；下方预留实时音准线区域，可勾选是否显示。移动端提示授权后保持前台、录音 3 分钟自动停止。" },
+      { img: "assets/app-shots/sing-score.png", title: "跟唱 · 评分结果",
+        desc: "一遍唱完的评分：综合分拆成音准 41.0 · 节奏 57.4 · 发音 90.0；中间是 D3 绘制的音高对齐图（纵轴 G#5–C-1、横轴 0–25s，青线是实际音高走向）；下方逐句列出「起唱偏差 1237ms / 208ms」与得分，未唱到的句子标 no_pitch。有效句不足 40% 时不给总分，并直接建议「降 5 个半音」。" }
+    ],
+    /* 阅读线此前完全没展示：书房 → 书籍详情 → 阅读器。 */
+    "uc-3": [
+      { img: "assets/app-shots/bookshelf.png", title: "书房",
+        desc: "英文小说书架：Alice's Adventures in Wonderland、Pride and Prejudice、The Wonderful Wizard of Oz、Don Quixote 四本公版书，各带封面与作者，点进去是书籍详情。" },
+      { img: "assets/app-shots/book-detail.png", title: "书籍详情",
+        desc: "单本书的档案页：封面、书名与作者，难度等级 L1、12 章、27k 词、公版标识，底部「开始阅读」直接进入第一章。" },
+      { img: "assets/app-shots/reader.png", title: "阅读器",
+        desc: "正文阅读页：章节名 Down the Rabbit-Hole、第 1 章 · 2.2k 词，正文按段落排版；阅读时点击单词即可查义并「加入生词本」，生词之后会出现在我的单词里。" }
+    ],
+    "uc-4": [
       { img: "assets/app-shots/community.png", title: "社区动态",
         desc: "为你推荐流，按新闻稿 / 教学分享 / 海外生活三频道组织；每张卡片带作者与等级、发布时间、正文摘要，以及点赞 / 评论 / 收藏数——例如 VocalVerse News 的 AI 英语学习长文、Teacher Amy 的职场闲聊三句式。" },
       { img: "assets/app-shots/post-detail.png", title: "帖子详情",
@@ -49,7 +75,7 @@
       { img: "assets/app-shots/compose.png", title: "发帖",
         desc: "发布页：0/280 字数、与动态流一致的三个频道，图片最多 9 张（≤20MB）或视频 1 个（MP4/WebM，≤64MB）且不能同时发，可加话题标签与表情。" }
     ],
-    "uc-3": [
+    "uc-5": [
       { img: "assets/app-shots/notifications.png", title: "通知中心",
         desc: "私信 / 通知 / 关注三条独立流；每条带对方等级与时间，例如老年高级 LV4 分享阅读笔记、青少年初级 LV1 询问跟读方法；弱网时自动降级，不依赖长连。" },
       { img: "assets/app-shots/messages.png", title: "私信会话",
@@ -101,12 +127,14 @@
       '<div class="uc-phone__body" data-uc-tilt>' +
       '<div class="uc-phone__tilt">' +
       '<div class="uc-phone__screen">' +
-      /* 两种屏幕内容：img = 真实 app 截图（当前），src = 本地活页面 iframe。
-         截图刻意不加 loading="lazy"：9 台机一次性加载更可预期，
-         lazy 若未按预期触发，机身里就是一片空白，不划算。 */
-      (item.img
-        ? '<img src="' + item.img + '" alt="' + item.title + '" draggable="false">'
-        : '<iframe src="' + item.src + '" scrolling="no" title="' + item.title + '"></iframe>') +
+      /* 三种屏幕内容：video = 演示录屏（0 号机）｜img = 真实 app 截图（当前）
+         ｜src = 本地活页面 iframe。
+         静音 + autoplay + loop，播放无需用户手势；preload=auto 让首帧尽快出来。 */
+      (item.video
+        ? '<video src="' + item.video + '" autoplay muted loop playsinline preload="auto" aria-label="' + item.title + '"></video>'
+        : item.img
+          ? '<img src="' + item.img + '" alt="' + item.title + '" draggable="false">'
+          : '<iframe src="' + item.src + '" scrolling="no" title="' + item.title + '"></iframe>') +
       '<span class="uc-phone__glare" aria-hidden="true"></span>' +
       "</div>" +
       frameSvg() +
@@ -147,7 +175,7 @@
 
     function fit() {
       screens.forEach(function (s) {
-        var el = s.querySelector("iframe, img");
+        var el = s.querySelector("iframe, img, video");
         if (!el) return;
         var w = s.clientWidth;
         if (!w) return;
@@ -201,6 +229,174 @@
         body.style.setProperty("--uc-rx", "0deg");
       });
     });
+  })();
+
+  /* ============================================================
+     操作演示浮层：右下角按钮 → 手机框从按钮位置长到页面正中
+     ------------------------------------------------------------
+     展开用 FLIP：先量出按钮矩形与手机框矩形，把手机框用 transform 摆到
+     按钮上（缩到按钮大小），强制回流后再过渡回 transform:none —— 于是
+     观感是"从按钮里长出来"，而不是淡入。关闭就是同一段反过来跑。
+     关闭入口：点手机框外任意处、Esc。点手机框本身不关（便于细看）。
+     ============================================================ */
+  (function initDemoModal() {
+    var fab = document.querySelector("[data-uc-demo-open]");
+    var modal = document.querySelector("[data-uc-demo]");
+    if (!fab || !modal) return;
+
+    var phoneWrap = modal.querySelector("[data-uc-demo-phone]");
+    var toggle = modal.querySelector("[data-uc-video-toggle]");
+    var video = modal.querySelector(".uc-phone__screen video");
+    var host = modal.querySelector("[data-uc-phones]");
+    if (!phoneWrap || !host) return;
+
+    var isOpen = false;
+    var busy = false;
+
+    /* 机身自带的入场动画在浮层里已被 CSS 关掉，但 IntersectionObserver 在
+       hidden 状态下不会给 is-inview —— 这里直接补上，避免开框时内容还是空的 */
+    host.classList.add("is-inview");
+
+    /* —— 滚动锁 ——
+       overflow:hidden 之后 Lenis 也写不动 window.scrollY，等于一并锁住；
+       顺带补滚动条宽度，免得开框瞬间整页横向抖一下。 */
+    function lockScroll(on) {
+      if (on) {
+        var sbw = window.innerWidth - root.clientWidth;
+        root.style.overflow = "hidden";
+        document.body.style.paddingRight = sbw > 0 ? sbw + "px" : "";
+      } else {
+        root.style.overflow = "";
+        document.body.style.paddingRight = "";
+      }
+    }
+
+    /* 让手机框"正好盖在按钮上"所需的 transform */
+    function flipVector() {
+      var f = fab.getBoundingClientRect();
+      var p = phoneWrap.getBoundingClientRect();
+      if (!p.width || !p.height || !f.width) return null;
+      return {
+        dx: (f.left + f.width / 2) - (p.left + p.width / 2),
+        dy: (f.top + f.height / 2) - (p.top + p.height / 2),
+        scale: f.width / p.width
+      };
+    }
+
+    function place(v, opacity) {
+      phoneWrap.style.transform =
+        "translate(" + v.dx.toFixed(2) + "px," + v.dy.toFixed(2) + "px) scale(" + v.scale.toFixed(4) + ")";
+      if (opacity !== undefined) phoneWrap.style.opacity = String(opacity);
+    }
+
+    function syncToggle() {
+      if (!toggle || !video) return;
+      var playing = !video.paused && !video.ended;
+      toggle.setAttribute("aria-pressed", String(!playing)); // 按下态 = 已暂停
+      var label = toggle.querySelector("[data-uc-video-label]");
+      if (label) label.textContent = playing ? "Pause" : "Play";
+    }
+
+    function openModal() {
+      if (isOpen || busy) return;
+      isOpen = true;
+      busy = true;
+
+      modal.hidden = false;
+      // 先让基础态（scrim/底栏 opacity:0）落地，再加 is-open ——
+      // 两件事挤在同一帧里的话没有"起始值"可插值，遮罩会直接跳出来而不是淡入
+      void modal.offsetWidth;
+      modal.classList.add("is-open");
+      lockScroll(true);
+      fab.classList.add("is-hidden");
+      fab.setAttribute("aria-expanded", "true");
+
+      var v = reduceMotion ? null : flipVector();
+      if (v) {
+        phoneWrap.style.transition = "none";
+        place(v, 0.25);
+        void phoneWrap.offsetWidth; // 强制回流，让起始态先落地
+        phoneWrap.style.transition = "transform .62s cubic-bezier(.22, 1, .36, 1), opacity .45s ease";
+        phoneWrap.style.transform = "none";
+        phoneWrap.style.opacity = "1";
+      } else {
+        phoneWrap.style.transition = "none";
+        phoneWrap.style.transform = "none";
+        phoneWrap.style.opacity = "1";
+      }
+
+      if (video) {
+        try { video.currentTime = 0; } catch (_) {} // 每次打开都从头发
+        var pr = video.play();
+        if (pr && pr.catch) pr.catch(function () {}); // 自动播放被拒时静默降级
+        syncToggle();
+      }
+
+      window.setTimeout(function () {
+        busy = false;
+        // 焦点交给浮层容器而不是按钮：键盘能接管、Esc 有落点，
+        // 又不会在鼠标点开时给某个按钮套上一圈 focus-visible 蓝框
+        var stage = modal.querySelector(".uc-demo__stage");
+        if (stage) stage.focus();
+      }, v ? 660 : 0);
+    }
+
+    function closeModal() {
+      if (!isOpen || busy) return;
+      busy = true;
+      fab.setAttribute("aria-expanded", "false");
+      // 先摘掉 is-open：scrim 与底栏立刻开始淡出，不必等手机框收完
+      modal.classList.remove("is-open");
+
+      var v = reduceMotion ? null : flipVector();
+
+      function finish() {
+        modal.hidden = true;
+        phoneWrap.style.transition = "none";
+        phoneWrap.style.transform = "none";
+        phoneWrap.style.opacity = "";
+        lockScroll(false);
+        if (video) video.pause();
+        fab.classList.remove("is-hidden"); // 收到位了才把按钮露出来，接得上
+        busy = false;
+        isOpen = false;
+        fab.focus();
+      }
+
+      if (v) {
+        phoneWrap.style.transition = "transform .5s cubic-bezier(.4, 0, .2, 1), opacity .45s ease";
+        place(v, 0.2);
+        window.setTimeout(finish, 540); // 略长于收缩时长，淡出与收缩一起收尾
+      } else {
+        window.setTimeout(finish, 460);
+      }
+    }
+
+    fab.addEventListener("click", openModal);
+
+    /* 点框外关闭：手机框与底部操作条之外都算"框外"（含模糊层与浮层留白） */
+    modal.addEventListener("click", function (e) {
+      if (e.target.closest("[data-uc-demo-phone], .uc-demo__bar")) return;
+      closeModal();
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && isOpen) closeModal();
+    });
+
+    if (toggle && video) {
+      toggle.addEventListener("click", function () {
+        if (video.paused) {
+          var p = video.play();
+          if (p && p.catch) p.catch(function () {});
+        } else {
+          video.pause();
+        }
+      });
+      video.addEventListener("play", syncToggle);
+      video.addEventListener("pause", syncToggle);
+      syncToggle();
+    }
   })();
 
   /* ============================================================

@@ -333,6 +333,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/songs/covers/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Song Cover
+         * @description 歌曲封面图（**公开**端点，无鉴权）。
+         *
+         *     为什么公开：封面是**非隐私的内容资产**，且 `<img src>` 不会带 Authorization 头 ——
+         *     与书封 `reading.py /covers/{name}` 完全同款处置，风险面同样被三重收窄：
+         *     只读、只服务 `data/seed/song-covers/` 下的白名单文件名、目录穿越由 `_SAFE_COVER_NAME` 挡掉。
+         *
+         *     资产位置：`data/seed/song-covers/`（随仓库分发的程序生成矢量图，`.gitignore` 已豁免
+         *     `data/seed/**`）。`songs.cover_url` 存**站点相对路径**（如 `/api/v1/songs/covers/twinkle.svg`，
+         *     文件名 = `scripts/setup-assets.py` 的 slug），前端必须过 `mediaUrl()`
+         *     拼 `PYTHON_BASE`——打包壳里页面源是 `https://localhost`，相对路径会打到壳自身资源服务器（404）。
+         */
+        get: operations["song_cover_api_v1_songs_covers__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}/audio": {
         parameters: {
             query?: never;
@@ -3995,6 +4024,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_FavoriteState_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    song_cover_api_v1_songs_covers__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 歌曲封面图文件（image/*） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": unknown;
                 };
             };
             /** @description Validation Error */

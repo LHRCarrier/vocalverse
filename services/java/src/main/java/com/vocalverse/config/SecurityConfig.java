@@ -7,6 +7,7 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -37,6 +38,7 @@ public class SecurityConfig {
 
   private final JwtService jwt;
   private final String serviceToken;
+  private final String corsExtraOrigins;
   private final com.vocalverse.user.UserRepository users;
   private final com.fasterxml.jackson.databind.ObjectMapper mapper;
 
@@ -44,7 +46,8 @@ public class SecurityConfig {
       JwtService jwt,
       com.vocalverse.user.UserRepository users,
       com.fasterxml.jackson.databind.ObjectMapper mapper,
-      @Value("${vocalverse.service-token}") String serviceToken) {
+      @Value("${vocalverse.service-token}") String serviceToken,
+      @Value("${vocalverse.cors-extra-origins:}") String corsExtraOrigins) {
     // docs/19 P0-9：service-token 缺失 → 启动即失败（fail-fast）：内部委托端点双端契约依赖同值，
     // 空串会导致 /internal/** 全部 403 且难以定位（改由启动时显式报错）。
     if (serviceToken == null || serviceToken.isBlank()) {
@@ -53,6 +56,7 @@ public class SecurityConfig {
     }
     this.jwt = jwt;
     this.serviceToken = serviceToken;
+    this.corsExtraOrigins = corsExtraOrigins;
     this.users = users;
     this.mapper = mapper;
   }
@@ -100,20 +104,29 @@ public class SecurityConfig {
     return http.build();
   }
 
-  /** 跨域配置（2026-09-10 打包壳方案 B：页面源 https://localhost，API 打到本机 http://<IP>:8080）。 */
+  /**
+   * 跨域配置（2026-09-10 打包壳方案 B：页面源 https://localhost，API 打到本机 http://<IP>:8080）。 追加源走配置项 {@code
+   * vocalverse.cors-extra-origins}（逗号分隔，根 .env 注入）：本机网卡 IP 会随网络环境变化（DHCP），硬编码白名单会让手机/局域网联调莫名
+   * 403（2026-09-16 实测复现）。
+   */
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration cfg = new CorsConfiguration();
-    cfg.setAllowedOrigins(
-        List.of(
-            "https://localhost",
-            "http://localhost",
-            "http://127.0.0.1",
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://192.168.0.104:5173",
-            "http://192.168.0.104:8088",
-            "http://localhost:8088"));
+    List<String> origins =
+        new ArrayList<>(
+            List.of(
+                "https://localhost",
+                "http://localhost",
+                "http://127.0.0.1",
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://192.168.0.104:5173",
+                "http://192.168.0.104:8088",
+                "http://localhost:8088"));
+    for (String o : corsExtraOrigins.split(",")) {
+      if (!o.isBlank()) origins.add(o.trim());
+    }
+    cfg.setAllowedOrigins(origins);
     cfg.setAllowedMethods(List.of("*"));
     cfg.setAllowedHeaders(List.of("*"));
     cfg.setAllowCredentials(true);

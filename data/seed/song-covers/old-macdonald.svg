@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Old MacDonald Had a Farm">
+<defs>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E4B44C"/><stop offset="1" stop-color="#7C9A3C"/></linearGradient>
+<radialGradient id="gl" cx="0.5" cy="0.34" r="0.72"><stop offset="0" stop-color="#fff" stop-opacity="0.20"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="512" height="512" fill="url(#g)"/>
+<rect width="512" height="512" fill="url(#gl)"/><path d="M256 118l128 96v164H128V214z" fill="#FFF6E0" opacity=".95"/>
+<path d="M256 92l156 112-26 32-130-94-130 94-26-32z" fill="#B33A2E"/>
+<path d="M212 268h88v110h-88z" fill="#B33A2E" opacity=".8"/>
+<path d="M256 268v110M212 322h88" stroke="#FFF6E0" stroke-width="8"/>
+<path d="M0 424q128-44 256 0t256 0v88H0z" fill="#4C6B22" opacity=".5"/>
+</svg>

@@ -11,7 +11,12 @@
  *   `cancel` 只发 idle 不触发 onStop）——2026-09-10 两次 BUG 都出在这些语义上；
  * - `installMock` 内部 `vi.resetModules()` 后重装两个 mock，故映射函数用 `importActual`
  *   拿真实实现（纯函数），网络函数被替换。
+ * - **`installMock` 内建 Pinia**（2026-09-21）：`useSingPlay()` 自选曲 store 上提后
+ *   会 `useSingStore()`，无 active Pinia 会直接抛
+ *   `getActivePinia() was called but there was no active Pinia`（改 store 前本脚手架
+ *   未建 Pinia，sing.test.ts 18 例 / sing-epoch.test.ts 3 例全挂）。
  */
+import { createPinia, setActivePinia } from 'pinia'
 import { vi } from 'vitest'
 
 import type { SingAttemptResult, SongDetail } from '@/api/sing'
@@ -103,6 +108,9 @@ export function installRecorderMock() {
 
 export async function installMock(overrides: ApiMock = {}) {
   vi.resetModules()
+  // 每个用例一套全新 Pinia：`vi.resetModules()` 会连同 store 模块图一起重置，
+  // 复用旧实例会让「上一个用例选中的歌」漏进下一个用例。
+  setActivePinia(createPinia())
   installRecorderMock() // 录音器伪实现（每次 resetModules 后需重装）
   const { ApiError: ClientApiError } = await import('@/api/client')
   // 「真实实现」图（importActual）与上面 import 的图不是同一个模块实例表：

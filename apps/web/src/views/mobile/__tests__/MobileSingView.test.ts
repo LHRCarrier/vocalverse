@@ -36,6 +36,17 @@ vi.mock('@/audio/recorder', () => ({
       this.liveStream = {} as MediaStream
       this.onStateChange?.('recording')
     }
+    /** 暂停/继续（2026-09-22 深色录唱页新增能力；状态机与真实实现同序） */
+    pause() {
+      if (this.state !== 'recording') return
+      this.state = 'paused'
+      this.onStateChange?.('paused')
+    }
+    resume() {
+      if (this.state !== 'paused') return
+      this.state = 'recording'
+      this.onStateChange?.('recording')
+    }
     /** 正常停止：stopped → onStop（真实实现同序） */
     stop() {
       if (this.state !== 'recording') return
@@ -276,46 +287,47 @@ describe('MobileSingView · 放弃重录（录音态复位）', () => {
   async function startRecording(w: Awaited<ReturnType<typeof mountView>>) {
     await rowOf(w, 'Twinkle')!.get('button.m-sing-row__hit').trigger('click')
     await flushPromises()
-    const start = w.findAll('button').find((b) => b.text().includes('开始跟唱'))
+    // 2026-09-22 深色录唱页：中心主钮只有图标 → 按 aria-label 定位（旧版按可见文案会取不到）
+    const start = w.findAll('button').find((b) => (b.attributes('aria-label') ?? '') === '开始跟唱')
     expect(start, '跟唱面板应有「开始跟唱」').toBeTruthy()
     await start!.trigger('click')
     await flushPromises()
     return start!
   }
 
-  it('放弃重录 → 停止条消失、主按钮重新可用（可再点开始跟唱）', async () => {
+  it('放弃重录 → 回到未录音态、主钮重新可用（可再点开始跟唱）', async () => {
     const w = await mountView()
     await startRecording(w)
-    // 录音态：主按钮文案变化 + 出现「放弃重录 / 停止并评分」
-    expect(w.find('.m-sing-sheet__stopbar').exists()).toBe(true)
-    expect(w.text()).toContain('放弃重录')
+    // 录音态：底部五键容器带 is-recording；「重录」可点（2026-09-22 深色录唱页：文案缩短为「重录」，
+    // 动作全名在 aria-label，测试按 aria-label 定位）
+    expect(w.find('.m-sing-dock.is-recording').exists()).toBe(true)
+    expect(w.find('button[aria-label="放弃重录"]').exists()).toBe(true)
 
-    const giveUp = w.findAll('button').find((b) => b.text().includes('放弃重录'))
-    await giveUp!.trigger('click')
+    await w.get('button[aria-label="放弃重录"]').trigger('click')
     await flushPromises()
 
-    // 复位：停止条消失、主按钮回到可点状态（修复前这里仍然渲染停止条且按钮 disabled）
-    expect(w.find('.m-sing-sheet__stopbar').exists()).toBe(false)
-    const start = w.findAll('button').find((b) => b.text().includes('开始跟唱'))
-    expect(start, '放弃后主按钮应回到「开始跟唱」').toBeTruthy()
+    // 复位：回到未录音态，主钮回到「开始跟唱」且可点（修复前这里仍停在录音态且按钮 disabled）
+    expect(w.find('.m-sing-dock.is-recording').exists()).toBe(false)
+    const start = w.findAll('button').find((b) => (b.attributes('aria-label') ?? '') === '开始跟唱')
+    expect(start, '放弃后主钮应回到「开始跟唱」').toBeTruthy()
     expect(start!.attributes('disabled')).toBeUndefined()
   })
 
   it('放弃后再次开始录音仍然正常进入录音态', async () => {
     const w = await mountView()
     await startRecording(w)
-    await w.findAll('button').find((b) => b.text().includes('放弃重录'))!.trigger('click')
+    await w.get('button[aria-label="放弃重录"]').trigger('click')
     await flushPromises()
 
-    await w.findAll('button').find((b) => b.text().includes('开始跟唱'))!.trigger('click')
+    await w.get('button[aria-label="开始跟唱"]').trigger('click')
     await flushPromises()
-    expect(w.find('.m-sing-sheet__stopbar').exists()).toBe(true)
+    expect(w.find('.m-sing-dock.is-recording').exists()).toBe(true)
   })
 
   it('录音中关闭面板 → 录音被取消；重新打开仍能开始录音（修复前必失败）', async () => {
     const w = await mountView()
     await startRecording(w)
-    expect(w.find('.m-sing-sheet__stopbar').exists()).toBe(true)
+    expect(w.find('.m-sing-dock.is-recording').exists()).toBe(true)
 
     // chevron 关闭（startOver → play.reset()）：修复前只清状态，录音被遗弃在后台
     await w.get('button[aria-label="关闭"]').trigger('click')
@@ -324,7 +336,75 @@ describe('MobileSingView · 放弃重录（录音态复位）', () => {
 
     // 重新打开同一首歌 → 点开始跟唱：修复前被 start() 同态守卫静默吞掉（界面毫无反应）
     await startRecording(w)
-    expect(w.find('.m-sing-sheet__stopbar').exists()).toBe(true)
+    expect(w.find('.m-sing-dock.is-recording').exists()).toBe(true)
+  })
+
+  /**
+   * 深色录唱页（2026-09-22 参考图口径）：中心键「开始 ⇄ 暂停 ⇄ 继续」+ 底部「已录 / 全长」。
+   * 暂停是新能力（`VoiceRecorder.pause`），本用例锁「点得动 + 状态对 + 文案对」。
+   */
+  it('中心键：开始 → 暂停 → 继续（aria-label 三态）', async () => {
+    const w = await mountView()
+    await rowOf(w, 'Twinkle')!.get('button.m-sing-row__hit').trigger('click')
+    await flushPromises()
+    expect(w.find('button[aria-label="开始跟唱"]').exists()).toBe(true)
+
+    await w.get('button[aria-label="开始跟唱"]').trigger('click')
+    await flushPromises()
+    expect(w.find('button[aria-label="暂停跟唱"]').exists()).toBe(true)
+
+    await w.get('button[aria-label="暂停跟唱"]').trigger('click')
+    await flushPromises()
+    expect(w.find('button[aria-label="继续跟唱"]').exists()).toBe(true)
+    expect(w.find('.m-sing-dock.is-paused').exists()).toBe(true)
+    expect(w.find('.m-sing-top__mode').text()).toBe('暂停中')
+
+    await w.get('button[aria-label="继续跟唱"]').trigger('click')
+    await flushPromises()
+    expect(w.find('button[aria-label="暂停跟唱"]').exists()).toBe(true)
+    expect(w.find('.m-sing-dock.is-paused').exists()).toBe(false)
+  })
+
+  it('底部一行显示「歌名 · 已录 / 全长」；未录音时为 00:00 / 全长（契约 duration_s）', async () => {
+    const w = await mountView()
+    await rowOf(w, 'Twinkle')!.get('button.m-sing-row__hit').trigger('click')
+    await flushPromises()
+    const foot = w.find('.m-sing-foot')
+    expect(foot.exists()).toBe(true)
+    expect(foot.find('.m-sing-foot__name').text()).toBe('Twinkle')
+    expect(foot.text()).toContain('00:00')
+    // fixtures 未给 duration_s → 退回录音上限 180s = 03:00（不显示 NaN/--:--）
+    expect(foot.text()).toContain('03:00')
+  })
+
+  it('顶栏评级条：无实时分为占位，录音中录音进度线就位', async () => {
+    const w = await mountView()
+    await startRecording(w)
+    expect(w.find('.m-sing-grade').exists()).toBe(true)
+    expect(w.find('.m-sing-grade__letter').text()).toBe('—') // 未出声 → 不猜等级
+    expect(w.find('.m-sing-top__recbar').exists()).toBe(true) // 3 分钟进度线（只动 transform）
+  })
+
+  /**
+   * 首帧人声锚点加固（2026-09-22 用户实测「暂停后进度有时候归零」）。
+   *
+   * 修复前直接把事件值写进 `voiceAtMs`：检测重启（暂停等）会再次触发 `firstVoice`，而 Worker 的
+   * 帧时间戳是**跨会话累加**的 → 第二个锚点是个很大的值 → 游标算成负数 → clamp 到 0 →
+   * 歌词进度与高亮整个归零。现在**同一轮只认第一个**，且拒绝明显来自上一轮的时间戳。
+   */
+  it('首帧人声锚点：同一轮只认第一个；跨会话的离谱值被丢弃（修复前必失败）', async () => {
+    const w = await mountView()
+    await startRecording(w)
+    const lane = w.findComponent({ name: 'LivePitchChart' })
+    expect(lane.exists(), '引导条组件应已挂载').toBe(true)
+    // 第一次锚点：正常值 500ms
+    lane.vm.$emit('firstVoice', 500)
+    await flushPromises()
+    expect((w.vm as unknown as { voiceAtMs: number | null }).voiceAtMs).toBe(500)
+    // 第二次锚点（模拟检测重启后 Worker 用累计时间戳重放首帧）：必须被忽略
+    lane.vm.$emit('firstVoice', 999_999)
+    await flushPromises()
+    expect((w.vm as unknown as { voiceAtMs: number | null }).voiceAtMs).toBe(500)
   })
 })
 
@@ -343,7 +423,7 @@ describe('MobileSingView · 跟唱面板视口锚定（P0-4）', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { resolve } = require('node:path') as typeof import('node:path')
     const css = readFileSync(resolve(process.cwd(), 'src/styles/mobile-sing.css'), 'utf-8')
-    const block = css.slice(css.indexOf('.m-sing-sheet {'), css.indexOf('.m-sing-sheet__head'))
+    const block = css.slice(css.indexOf('.m-sing-sheet {'), css.indexOf('.m-sing-top {'))
     expect(block).toContain('position: fixed')
     expect(block).not.toContain('position: absolute')
     expect(block).toContain('translateX(-50%)') // 与 .u-phone（max-width:480px 居中）对齐
