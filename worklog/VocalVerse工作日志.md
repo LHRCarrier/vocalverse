@@ -3,6 +3,25 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 歌曲封面公开路由 + 种子封面资产 + Python 契约快照刷新 · 1 op
+
+> 归属：后端/契约/种子资产（**前端 UI 部分见同日`安卓开发日志.md`**——按 2026-09-08 拆分规矩）。需求由「歌单行图标换成本曲封面」触发的数据侧缺口。
+
+- **为什么动后端**：`songs.cover_url` 全为 NULL（seed 与库都无封面），且本仓约定「内容域静态资产由后端只读路由服务」（书封 = `reading.py /covers/{name}` → `data/seed/covers/`）。前端 `<img>` 不能带 Authorization，且打包壳页面源是 `https://localhost`（相对路径必 404）→ 必须有公开路由。
+- **改动**：
+  - `app/api/routes/singing.py` 新增 `GET /api/v1/songs/covers/{name}`：**公开**（无鉴权，与书封完全同款处置）、`FileResponse` + `image/*` 响应声明、`Cache-Control: public, max-age=86400`；白名单 `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` + `..` 拦截（错误码复用 40001/40401，未新增）。
+  - `app/core/paths.py` 新增 `song_cover_dir()` → `data/seed/song-covers/`（与书封目录分开，两类资产各自路由）。
+  - 资产入 `data/seed/song-covers/*.svg`（10 张，`.gitignore` 已豁免 `data/seed/**`；生产方 = 本机 `local/make-song-covers.ps1`）。
+  - `scripts/setup-assets.py`：`cover_url` 由 `None` 改为按 slug 生成 `/api/v1/songs/covers/{slug}.svg`（**重跑 setup 不再丢封面**）；`data/seed/songs.json` 同步补齐 10/10（匹配行尾、仅 10 行变化）。
+  - 存量库：`UPDATE songs … WHERE cover_url IS NULL`（10 行；带 `IS NULL` 守卫，不会覆盖日后上传的真封面）。
+- **契约**：`apps/web/src/api/specs/python-openapi.json` + `generated/python-api.d.ts` 同步刷新，diff **+41 / +60 行且全部来自新路由**；本地跑 CI 同款判定（`app.openapi()` vs 快照）→ **True（0 差异）**。
+- **门禁**：`uv run ruff check .` 全过；`ruff format --check` 230 文件已格式化；`pytest -q` **665 passed**。
+- **实测**：`curl /api/v1/songs/covers/twinkle.svg` → 200 / `image/svg+xml` / 1101 B；目录穿越 `../..` → 404 被拦。
+- **踩坑（会静默毁掉整个快照）**：PS 5.1 的 `Invoke-WebRequest` 把 `$resp.Content` 按 **Latin-1** 解码 → 快照里中文全变乱码、并传染进 `pnpm gen:api` 的生成类型（diff 一度 8495 行）。正确做法：`curl.exe -o` 落字节 + Python `json.dumps(…, ensure_ascii=False, indent=2)` 写文件（另：`scripts/refresh-openapi.ps1` 同样用 `$resp.Content`，在本机带中文的契约上有同样风险）。
+- **联调测试页判定（AGENTS 强制项自查）**：本次是**内容资产 + 只读公开端点**，无前后端交互流程（无表单/无状态机/无新用户路径），故未建 `docs/13 §8` 预览页；可复现验证 = 上条 curl + 歌单实拍（见同日安卓日志）。若组长判仍需预览页，补一个 registry 行即可。
+
+—— 执行人：xiaoqing-one（AI 代工），2026-09-22
+
 ## 2026-09-16 唱吧「参考旋律未就绪」排查：`data/audio` 素材文件被删 + 失败任务不自动重建 · 1 op
 
 - **现象**：`/m/sing` 三首歌全「未就绪」，顶栏「参考旋律生成中或缺失（暂时不能跟唱）」；Python 日志每 60s 一条 `pitch extract job failed beyond attempts song=1/2/3 (attempts=3)`。
