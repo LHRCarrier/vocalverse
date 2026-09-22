@@ -4712,7 +4712,15 @@ button.u-notes__card {
   object-fit: cover;
 }
 
+/* 播放钮：**绝对定位居中**（2026-09-23 修复）。
+   旧实现是普通 flex 子项：封面图 `width:100%`（且替换元素 `min-width:auto` 不可收缩）占满整行，
+   52px 圆钮被挤出容器右侧、`overflow:hidden` 裁掉一半——真机/桌面表现为「播放按钮跑到右缘只剩半个」。
+   绝对定位后不再参与 flex 排布，封面图独占整行。 */
 .u-media__play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
