@@ -45,6 +45,8 @@ class SongSummary(BaseModel):
     id: int
     title: str
     artist: str | None = None
+    # 专辑名（2026-09-22）：纯展示字段（歌单行「歌手 · 专辑」），可空
+    album: str | None = None
     level: int
     duration_s: int | None = None
     bpm: float | None = None

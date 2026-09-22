@@ -11507,6 +11507,17 @@
             ],
             "title": "Artist"
           },
+          "album": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Album"
+          },
           "level": {
             "type": "integer",
             "title": "Level"
@@ -11664,6 +11675,17 @@
               }
             ],
             "title": "Artist"
+          },
+          "album": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Album"
           },
           "level": {
             "type": "integer",

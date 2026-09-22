@@ -3188,6 +3188,8 @@ export interface components {
             title: string;
             /** Artist */
             artist?: string | null;
+            /** Album */
+            album?: string | null;
             /** Level */
             level: number;
             /** Duration S */
@@ -3235,6 +3237,8 @@ export interface components {
             title: string;
             /** Artist */
             artist?: string | null;
+            /** Album */
+            album?: string | null;
             /** Level */
             level: number;
             /** Duration S */

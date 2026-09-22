@@ -146,6 +146,9 @@ class Song(TimestampMixin, Base):
     id: Mapped[int] = bigint_pk()
     title: Mapped[str] = mapped_column(String(128), nullable=False)
     artist: Mapped[str | None] = mapped_column(String(128))
+    # 专辑名（2026-09-22 用户要求「卡片上应该是歌曲信息」）：纯展示字段，可空；
+    # 参与选歌/评分的字段（level/duration/bpm/key）语义不变
+    album: Mapped[str | None] = mapped_column(String(128))
     level: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     duration_s: Mapped[int | None] = mapped_column(BigInteger)
     bpm: Mapped[Decimal | None] = mapped_column(Numeric(6, 2))

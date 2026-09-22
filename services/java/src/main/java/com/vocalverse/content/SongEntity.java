@@ -32,6 +32,10 @@ public class SongEntity {
   @Column(length = 128)
   private String artist;
 
+  /** 专辑名（2026-09-22 唱吧歌单「歌曲信息」补全）：纯展示字段，可空，不参与评分/选歌过滤。 */
+  @Column(length = 128)
+  private String album;
+
   @Column(nullable = false)
   private Integer level;
 
@@ -95,6 +99,14 @@ public class SongEntity {
 
   public void setArtist(String artist) {
     this.artist = artist;
+  }
+
+  public String getAlbum() {
+    return album;
+  }
+
+  public void setAlbum(String album) {
+    this.album = album;
   }
 
   public Integer getLevel() {

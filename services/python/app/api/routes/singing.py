@@ -128,6 +128,8 @@ def _song_summary(s: Song, expected_lines: int, favorited: bool = False) -> dict
         "id": int(s.id),
         "title": s.title,
         "artist": s.artist,
+        # 专辑名（2026-09-22）：纯展示字段，歌单行显示「歌手 · 专辑 + 时长」
+        "album": s.album,
         "level": s.level,
         "duration_s": s.duration_s,
         "bpm": float(s.bpm) if s.bpm is not None else None,

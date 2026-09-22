@@ -88,22 +88,43 @@ public class SongSeeder implements CommandLineRunner {
     return null;
   }
 
-  /** 单首播种：按 title 查重（只增不改）；返回是否新增。 */
+  /** 单首播种：按 title 查重（只增不改；唯一例外 = album 空值回填，见下）；返回是否新增。 */
   private boolean seedOne(JsonNode item) {
     String title = item.path("title").asText();
     Optional<SongEntity> exists = songs.findByTitle(title);
     if (exists.isPresent()) {
+      // 空值回填（2026-09-22）：老库行只补 NULL、绝不覆盖已有值（管理员编辑过的字段保持不动）——
+      // 这样老库重启即补齐新增的展示字段，无需重播种：
+      //  · album：当日新增字段（迁移 0022），旧行天然为 NULL；
+      //  · cover_url：封面 2026-09-22 才进种子，而最早三首（Twinkle/Ode/Mary）是 09-09 播种的，
+      //    「只增不改」导致它们一直没有封面（真机表现为前三首是音符图标、后面才有图）。
+      SongEntity existing = exists.get();
+      boolean dirty = false;
+      if (existing.getAlbum() == null && item.hasNonNull("album")) {
+        existing.setAlbum(item.get("album").asText());
+        dirty = true;
+      }
+      if (existing.getCoverUrl() == null && item.hasNonNull("cover_url")) {
+        existing.setCoverUrl(item.get("cover_url").asText());
+        dirty = true;
+      }
+      if (dirty) {
+        songs.save(existing);
+      }
       return false;
     }
     Instant now = Instant.now();
     SongEntity song = new SongEntity();
     song.setTitle(title);
     song.setArtist(item.path("artist").asText(null));
+    song.setAlbum(item.path("album").asText(null));
     song.setLevel(item.path("level").asInt(1));
     song.setDurationS(item.hasNonNull("duration_s") ? item.get("duration_s").asLong() : null);
     song.setBpm(
         item.hasNonNull("bpm") ? java.math.BigDecimal.valueOf(item.get("bpm").asDouble()) : null);
-    song.setMusicalKey(item.path("musicalKey").asText(null));
+    // 键名与种子 JSON 对齐（`musical_key`）；2026-09-22 修正：原写 `musicalKey`，
+    // `path()` 恒取 MissingNode → 该字段从未被播种（库内一直为 NULL）。
+    song.setMusicalKey(item.path("musical_key").asText(null));
     song.setAudioUrl(item.path("audio_url").asText());
     song.setVocalRefUrl(item.path("vocal_ref_url").asText(null));
     song.setLrcUrl(item.path("lrc_url").asText(null));

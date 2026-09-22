@@ -4,6 +4,7 @@
     {
       "title": "Twinkle Twinkle Little Star",
       "artist": "Traditional · 合成旋律（公有领域童谣）",
+      "album": "童谣精选集",
       "level": 1,
       "duration_s": 30,
       "bpm": 100.0,
@@ -51,6 +52,7 @@
     {
       "title": "Ode to Joy",
       "artist": "Beethoven · 合成旋律（公有领域主题）",
+      "album": "古典小品集",
       "level": 2,
       "duration_s": 20,
       "bpm": 100.0,
@@ -88,6 +90,7 @@
     {
       "title": "Mary Had a Little Lamb",
       "artist": "Traditional · 合成旋律（公有领域童谣）",
+      "album": "童谣精选集",
       "level": 1,
       "duration_s": 20,
       "bpm": 100.0,
@@ -125,6 +128,7 @@
     {
       "title": "Row, Row, Row Your Boat",
       "artist": "Traditional · 合成旋律（公有领域童谣）",
+      "album": "童谣精选集",
       "level": 1,
       "duration_s": 14,
       "bpm": 100.0,
@@ -162,6 +166,7 @@
     {
       "title": "London Bridge Is Falling Down",
       "artist": "Traditional · 合成旋律（公有领域童谣）",
+      "album": "童谣精选集",
       "level": 1,
       "duration_s": 19,
       "bpm": 100.0,
@@ -199,6 +204,7 @@
     {
       "title": "Old MacDonald Had a Farm",
       "artist": "Traditional · 合成旋律（公有领域童谣）",
+      "album": "童谣精选集",
       "level": 1,
       "duration_s": 17,
       "bpm": 100.0,
@@ -236,6 +242,7 @@
     {
       "title": "Baa, Baa, Black Sheep",
       "artist": "Traditional · 合成旋律（公有领域童谣）",
+      "album": "童谣精选集",
       "level": 1,
       "duration_s": 20,
       "bpm": 100.0,
@@ -273,6 +280,7 @@
     {
       "title": "Jingle Bells",
       "artist": "Traditional · 合成旋律（公有领域民谣）",
+      "album": "节日欢歌",
       "level": 2,
       "duration_s": 20,
       "bpm": 100.0,
@@ -310,6 +318,7 @@
     {
       "title": "Hot Cross Buns",
       "artist": "Traditional · 合成旋律（公有领域童谣）",
+      "album": "童谣精选集",
       "level": 1,
       "duration_s": 10,
       "bpm": 100.0,
@@ -347,6 +356,7 @@
     {
       "title": "Frère Jacques",
       "artist": "Traditional · 合成旋律（公有领域民谣）",
+      "album": "民谣与轮唱",
       "level": 2,
       "duration_s": 20,
       "bpm": 100.0,
