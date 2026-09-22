@@ -43,6 +43,26 @@ describe('useTavernCast · 在场名单（entities + character 事件）', () =>
     expect(cast.arriving.value[0]!.status).toBe('arriving')
   })
 
+  it('PC 永不 arriving（pending=true 也按在场）；NPC pending 仍为赶来中', () => {
+    const state = ref(
+      makeState([
+        entity({ id: 1, kind: 'pc', name: '主角', status: 'active', pending: true }),
+        entity({ id: 2, name: '信使', status: 'active', pending: true }),
+      ]),
+    )
+    const cast = useTavernCast(state)
+    expect(cast.members.value.find((m) => m.name === '主角')?.status).toBe('active')
+    expect(cast.present.value.map((m) => m.name)).toContain('主角')
+    expect(cast.arriving.value.map((m) => m.name)).toEqual(['信使'])
+  })
+
+  it('character 事件：PC arriving 归一为 active', () => {
+    const cast = useTavernCast(ref(makeState([])))
+    cast.apply({ type: 'character', name: '主角', kind: 'pc', status: 'arriving' })
+    expect(cast.members.value.find((m) => m.name === '主角')?.status).toBe('active')
+    expect(cast.arriving.value).toEqual([])
+  })
+
   it('portraitFor 解析顺序：实体挂图 url → 内置素材（PC 占位/NPC 名字命中）→ null', () => {
     const state = ref(
       makeState([

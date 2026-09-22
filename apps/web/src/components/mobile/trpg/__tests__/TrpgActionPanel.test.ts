@@ -27,8 +27,15 @@ const ENCOUNTER: TavernEncounter = {
   currentName: '地精',
 }
 
-describe('TrpgActionPanel · 快速行动条', () => {
-  it('攻击：点目标出确认（目标名 + 武器下拉），确认发「我攻击{目标}」', async () => {
+describe('TrpgActionPanel · 常驻快速行动条（docs/57 §3.2）', () => {
+  it('无实体/无道具：面板仍渲染（行动行常驻）', () => {
+    const wrapper = mount(TrpgActionPanel)
+    expect(wrapper.find('.t-act-panel').exists()).toBe(true)
+    expect(wrapper.find('.t-act-panel__row').exists()).toBe(true)
+    expect(wrapper.find('.t-act-confirm').exists()).toBe(false)
+  })
+
+  it('攻击：点目标出确认（目标名 + 武器下拉仅非消耗品），确认发「我用{武器}攻击{目标}」+ 回执', async () => {
     const wrapper = mount(TrpgActionPanel, {
       props: { attackTargets: [target({ name: '地精', hp: '7' })], items: ITEMS },
     })
@@ -38,36 +45,67 @@ describe('TrpgActionPanel · 快速行动条', () => {
 
     await chip.trigger('click')
     expect(wrapper.find('.t-act-confirm').text()).toContain('攻击 地精')
+    const options = wrapper.findAll('select[aria-label="选择武器"] option').map((o) => o.text())
+    expect(options).toEqual(['徒手', '短剑']) // 治疗药水（消耗品）不是武器
+    await wrapper.find('select[aria-label="选择武器"]').setValue('短剑')
     await wrapper.find('.t-act-confirm__btn--go').trigger('click')
-    expect(wrapper.emitted('send')).toEqual([['我攻击地精']])
+    expect(wrapper.emitted('send')).toEqual([['我用短剑攻击地精']])
+    expect(wrapper.emitted('feedback')).toEqual([['已出手 · 我用短剑攻击地精']])
     expect(wrapper.find('.t-act-confirm').exists()).toBe(false)
   })
 
-  it('攻击确认：可选持有道具当武器 → 「我用{武器}攻击{目标}」；取消不发', async () => {
+  it('攻击确认：取消不发；disabled 时点目标不出确认', async () => {
     const wrapper = mount(TrpgActionPanel, {
       props: { attackTargets: [target({ name: '地精' })], items: ITEMS },
     })
     await wrapper.find('.t-act-chip--attack').trigger('click')
-    await wrapper.find('select[aria-label="选择武器"]').setValue('短剑')
-    await wrapper.find('.t-act-confirm__btn--go').trigger('click')
-    expect(wrapper.emitted('send')).toEqual([['我用短剑攻击地精']])
-
-    await wrapper.find('.t-act-chip--attack').trigger('click')
     await wrapper.findAll('.t-act-confirm__btn')[0]!.trigger('click') // 取消
-    expect(wrapper.emitted('send')).toHaveLength(1)
+    expect(wrapper.emitted('send')).toBeUndefined()
     expect(wrapper.find('.t-act-confirm').exists()).toBe(false)
+
+    const disabled = mount(TrpgActionPanel, {
+      props: { attackTargets: [target({ name: '地精' })], items: ITEMS, disabled: true },
+    })
+    await disabled.find('.t-act-chip--attack').trigger('click')
+    expect(disabled.find('.t-act-confirm').exists()).toBe(false)
   })
 
-  it('道具点击直接发「我使用{道具}」；建议行动发对应台词', async () => {
+  it('道具点击直接发「我使用{道具}」+ 即时回执；建议行动只填入（prefill）不发送', async () => {
     const wrapper = mount(TrpgActionPanel, {
       props: {
         items: [ITEMS[1]!],
-        quickActions: [{ label: '观察', text: '我仔细观察四周' }],
+        quickActions: [
+          { kind: 'observe', label: '观察酒馆', text: '我仔细观察酒馆' },
+          { kind: 'talk', label: '与莉亚交谈', text: '我试着与莉亚交谈' },
+          { kind: 'advance', label: '推进寻找戒指', text: '我继续推进：寻找戒指' },
+        ],
       },
     })
     await wrapper.find('.t-act-chip--item').trigger('click')
-    await wrapper.find('.t-act-chip:not(.t-act-chip--item)').trigger('click')
-    expect(wrapper.emitted('send')).toEqual([['我使用治疗药水'], ['我仔细观察四周']])
+    expect(wrapper.emitted('send')).toEqual([['我使用治疗药水']])
+    expect(wrapper.emitted('feedback')).toEqual([['已使用 · 治疗药水']])
+
+    const suggests = wrapper.findAll('.t-act-chip--suggest')
+    expect(suggests.map((s) => s.text())).toEqual(['观察酒馆', '与莉亚交谈', '推进寻找戒指'])
+    await suggests[1]!.trigger('click')
+    expect(wrapper.emitted('prefill')).toEqual([['我试着与莉亚交谈']])
+    expect(wrapper.emitted('send')).toHaveLength(1) // 建议不直接发送
+  })
+
+  it('收尾本幕：满格任务出现按钮 → 上抛 settle；settling 中禁点', async () => {
+    const wrapper = mount(TrpgActionPanel, {
+      props: { settleable: [{ name: '寻找戒指' }] },
+    })
+    const button = wrapper.find('.t-act-chip--settle')
+    expect(button.text()).toContain('收尾本幕 · 寻找戒指')
+    await button.trigger('click')
+    expect(wrapper.emitted('settle')).toEqual([['寻找戒指']])
+
+    const settling = mount(TrpgActionPanel, {
+      props: { settleable: [{ name: '寻找戒指' }], settling: true },
+    })
+    await settling.find('.t-act-chip--settle').trigger('click')
+    expect(settling.emitted('settle')).toBeUndefined()
   })
 
   it('遭遇进行中：内嵌战况卡（轮次 + 当前行动者高亮）', () => {
@@ -87,11 +125,20 @@ describe('TrpgActionPanel · 快速行动条', () => {
     expect(card.text()).toContain('HP 7')
   })
 
-  it('disabled 时点击不发动作', async () => {
+  it('disabled 时道具/建议/收尾都不可点', async () => {
     const wrapper = mount(TrpgActionPanel, {
-      props: { attackTargets: [target({ name: '地精' })], items: ITEMS, disabled: true },
+      props: {
+        items: ITEMS,
+        quickActions: [{ kind: 'observe', label: '观察', text: '我仔细观察四周' }],
+        settleable: [{ name: '寻找戒指' }],
+        disabled: true,
+      },
     })
-    await wrapper.find('.t-act-chip--attack').trigger('click')
-    expect(wrapper.find('.t-act-confirm').exists()).toBe(false)
+    await wrapper.find('.t-act-chip--item').trigger('click')
+    await wrapper.find('.t-act-chip--suggest').trigger('click')
+    await wrapper.find('.t-act-chip--settle').trigger('click')
+    expect(wrapper.emitted('send')).toBeUndefined()
+    expect(wrapper.emitted('prefill')).toBeUndefined()
+    expect(wrapper.emitted('settle')).toBeUndefined()
   })
 })

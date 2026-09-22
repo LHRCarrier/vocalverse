@@ -2,6 +2,18 @@ import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 
 import TrpgMessageItem from '@/components/mobile/trpg/TrpgMessageItem.vue'
+import { diceOutcomeOf, prettifyDiceText } from '@/components/mobile/trpg/segments'
+
+function diceCard(text: string) {
+  return mount(TrpgMessageItem, {
+    props: {
+      role: 'assistant',
+      kind: 'system',
+      content: '',
+      payload: { trpg_sys: 'dice', text },
+    },
+  })
+}
 
 describe('TrpgMessageItem（逐词高亮 + 长按操作 + NPC 分段）', () => {
   it('卡拉OK高亮：句子偏移内的 token 点亮（含中文逐字 + 英文按词）', async () => {
@@ -168,5 +180,35 @@ describe('TrpgMessageItem（逐词高亮 + 长按操作 + NPC 分段）', () => 
     expect(card.text()).toContain('尘埃落定')
     expect(card.find('.t-ending__epilogue').text()).toContain('下一次相遇')
     expect(wrapper.find('.t-scene-line').exists()).toBe(false)
+  })
+
+  it('战报/判定卡：命中→成功样式、失手/未命中→失败样式（docs/57 §3.2）', () => {
+    const hit = diceCard('第 1 回合：地精 HP 4（-5）（骰 15 对抗 12 命中）')
+    expect(hit.find('.t-card--dice').classes()).toContain('is-success')
+    expect(hit.find('.t-card--dice').classes()).not.toContain('is-fail')
+
+    const miss = diceCard('第 1 回合：主角 HP 8（-4）（骰 9 对抗 12 未命中）')
+    expect(miss.find('.t-card--dice').classes()).toContain('is-fail')
+    expect(miss.find('.t-card--dice').classes()).not.toContain('is-success')
+
+    const slip = diceCard('第 1 回合：你失手了')
+    expect(slip.find('.t-card--dice').classes()).toContain('is-fail')
+
+    // 旧关键词（成功/失败）仍生效
+    expect(diceCard('（骰 18 对抗 12 成功）').find('.t-card--dice').classes()).toContain('is-success')
+    expect(diceCard('（骰 3 对抗 12 失败）').find('.t-card--dice').classes()).toContain('is-fail')
+    expect(diceOutcomeOf('什么都没有发生')).toBeNull()
+  })
+
+  it('战报内部键名不落到玩家卡面：pc.主角.hp=7 → 主角 HP 7（后端已 prettify 则原样）', () => {
+    const raw = diceCard('第 1 回合：pc.主角.hp=7（-5）（骰 15 对抗 12 命中）')
+    expect(raw.text()).toContain('主角 HP 7')
+    expect(raw.text()).not.toContain('pc.主角.hp')
+
+    const npc = diceCard('npc.地精.hp=2（-5）')
+    expect(npc.text()).toContain('地精 HP 2')
+    expect(npc.text()).not.toContain('npc.地精.hp')
+
+    expect(prettifyDiceText('主角 HP 7（-5）')).toBe('主角 HP 7（-5）')
   })
 })

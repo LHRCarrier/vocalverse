@@ -4,7 +4,9 @@ import { nextTick, ref } from 'vue'
 import type { TrpgEntityItem, TrpgFactItem, TrpgState } from '@/api/trpg'
 import {
   decodeOrder,
+  isWeapon,
   parseParticipantKey,
+  splitInventory,
   useTavernEncounter,
 } from '@/composables/useTavernEncounter'
 
@@ -92,7 +94,32 @@ describe('useTavernEncounter · 遭遇（facts + encounter 事件）', () => {
     expect(encounter.attackTargets.value[0]!.hp).toBe('7')
     expect(encounter.items.value.map((i) => i.name)).toEqual(['治疗药水'])
     expect(encounter.items.value[0]!.qty).toBe(2)
-    expect(encounter.suggestions.map((s) => s.label)).toEqual(['观察', '交谈', '前进'])
+  })
+
+  it('行囊字符串兜底：只有 `pc.*.inventory`（没有 item.* 事实）也能出道具 chip', () => {
+    const state = ref(
+      makeState([fact('pc.主角.inventory', '短剑, 黄铜钥匙、治疗药水')], [ENTITIES[0]!]),
+    )
+    const encounter = useTavernEncounter(state)
+    expect(encounter.items.value.map((i) => i.name)).toEqual(['短剑', '黄铜钥匙', '治疗药水'])
+    expect(encounter.items.value.every((i) => i.qty === 1)).toBe(true)
+    // 与 item.* 事实同名时不重复出 chip（事实优先）
+    state.value = makeState(
+      [fact('pc.主角.inventory', '短剑, 黄铜钥匙'), fact('item.短剑.qty', '1'), fact('item.短剑.owner', 'pc.主角')],
+      [ENTITIES[0]!],
+    )
+    expect(encounter.items.value.map((i) => i.name)).toEqual(['短剑', '黄铜钥匙'])
+  })
+
+  it('武器候选：排除消耗品与治疗类效果（药水不能当武器）', () => {
+    expect(splitInventory('短剑, 黄铜钥匙、治疗药水')).toEqual(['短剑', '黄铜钥匙', '治疗药水'])
+    expect(splitInventory(null)).toEqual([])
+    expect(isWeapon({ name: '短剑', qty: 1, owner: null, effect: null, consumable: false })).toBe(true)
+    expect(isWeapon({ name: '治疗药水', qty: 2, owner: null, effect: '回复5', consumable: true })).toBe(false)
+    // 未标 consumable=false 的默认消耗品不做武器
+    expect(isWeapon({ name: '火把', qty: 1, owner: null, effect: null, consumable: true })).toBe(false)
+    // 即便标记非消耗品，治疗类效果也排除
+    expect(isWeapon({ name: '圣水', qty: 1, owner: null, effect: '恢复生命', consumable: false })).toBe(false)
   })
 
   it('encounter 事件：start 建序 → attack 覆盖目标 HP → turn 轮转 → end 关闭', async () => {

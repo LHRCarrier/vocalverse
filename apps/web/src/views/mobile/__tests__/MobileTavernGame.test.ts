@@ -196,16 +196,24 @@ describe('酒馆设计稿改版（页内底栏 / 立绘抽屉 / dock）', () => 
     expect(wrapper.find('[role="dialog"][aria-label="角色立绘"]').exists()).toBe(false)
   })
 
-  it('dock：推荐行动只填入不发送；骰钮触发 D20', async () => {
+  it('动作面板建议 chips：点击只填入输入框不发流；骰钮触发 D20', async () => {
     const wrapper = await mountView()
-    await wrapper.findAll('.t-quick__chip')[0]!.trigger('click')
+    const chips = wrapper.findAll('.t-act-chip--suggest')
+    expect(chips.map((c) => c.text())).toEqual(['观察酒馆', '与莉亚交谈', '推进打听怪谈'])
+    await chips[0]!.trigger('click')
     const input = wrapper.find('input[aria-label="酒馆输入"]')
-    expect((input.element as HTMLInputElement).value).toBe('我仔细观察四周')
+    expect((input.element as HTMLInputElement).value).toBe('我仔细观察酒馆')
     expect(mocks.streamTrpgTurn).not.toHaveBeenCalled()
 
     await wrapper.find('button[aria-label="快速投骰 D20"]').trigger('click')
     await flushPromises()
     expect(mocks.rollDice).toHaveBeenCalledWith(1, { dice: 'd20' })
+  })
+
+  it('dock 不再有第二排推荐行动（单排建议在动作面板内）', async () => {
+    const wrapper = await mountView()
+    expect(wrapper.find('.t-quick__row').exists()).toBe(false)
+    expect(wrapper.findAll('.t-act-panel__row')).toHaveLength(1)
   })
 
   it('NPC 段渲染成插片卡（设计稿 npc-whisper-card）', async () => {
@@ -232,7 +240,7 @@ describe('酒馆设计稿改版（页内底栏 / 立绘抽屉 / dock）', () => 
     expect(npc.text()).toContain('这边坐')
   })
 
-  it('闭环面板：进度钟条 + 在场角色条 + 动作面板（道具点击即发行动）', async () => {
+  it('迷你状态条：任务/在场常驻；展开出完整钟条与在场条；动作面板常驻单行（无遭遇无攻击）', async () => {
     const facts = baseState().facts
     mocks.fetchCampaignState.mockResolvedValue(
       baseState({
@@ -275,17 +283,59 @@ describe('酒馆设计稿改版（页内底栏 / 立绘抽屉 / dock）', () => 
       }),
     )
     const wrapper = await mountView()
+
+    // 折叠态：正文里不再常驻大钟条/在场条，迷你条一行可见
+    const mini = wrapper.find('.t-mini')
+    expect(mini.exists()).toBe(true)
+    expect(mini.text()).toContain('寻找戒指')
+    expect(mini.text()).toContain('3/6')
+    expect(mini.text()).toContain('在场 1')
+    expect(wrapper.find('.t-clock').exists()).toBe(false)
+    expect(wrapper.find('.t-cast__item').exists()).toBe(false)
+
+    // 展开：完整钟条 + 在场条
+    await wrapper.find('.t-mini__caret').trigger('click')
     expect(wrapper.find('.t-clock').text()).toContain('寻找戒指')
     expect(wrapper.find('.t-clock__num').text()).toBe('3/6')
     expect(wrapper.find('.t-cast__item').text()).toContain('莉亚')
 
+    // 动作面板常驻单行：道具可点、无遭遇不出攻击
     const panel = wrapper.find('.t-act-panel')
     expect(panel.exists()).toBe(true)
-    expect(panel.text()).toContain('攻击 莉亚')
-    expect(panel.text()).toContain('治疗药水 ×2')
+    expect(panel.findAll('.t-act-panel__row')).toHaveLength(1)
+    expect(panel.find('.t-act-chip--attack').exists()).toBe(false)
+    expect(panel.text()).toContain('治疗药水')
+    expect(panel.findAll('.t-act-chip--suggest')).toHaveLength(3)
 
     await panel.find('.t-act-chip--item').trigger('click')
     await flushPromises()
     expect(mocks.streamTrpgTurn).toHaveBeenCalled()
+  })
+
+  it('迷你状态条线索入口：直达主持台「任务线索」页', async () => {
+    mocks.fetchCampaignState.mockResolvedValue(
+      baseState({
+        clues: [
+          {
+            id: 1,
+            title: '地下室里的暗门',
+            content: '酒保提到过',
+            scene: '酒馆',
+            found: true,
+            recovered: false,
+            last_mentioned_at: null,
+          },
+        ],
+      }),
+    )
+    const wrapper = await mountView()
+    expect(wrapper.find('.t-mini__clue').text()).toContain('1')
+    await wrapper.find('.t-mini__clue').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.t-sheet__panel').exists()).toBe(true)
+    const activeTab = wrapper
+      .findAll('.t-sheet__tabs button')
+      .find((b) => b.classes().includes('is-on'))
+    expect(activeTab?.text()).toBe('任务线索')
   })
 })

@@ -253,7 +253,8 @@ describe('MobileTavernView（酒馆 · 剧本/回合/系统卡）', () => {
     const text = wrapper.text()
     expect(text).toContain('欢迎来到迷雾酒馆')
     expect(text).toContain('判定')
-    expect(text).toContain('pc.主角.hp=7')
+    expect(text).toContain('主角 HP 7') // 内部键名 pc.主角.hp=7 已玩家化
+    expect(text).not.toContain('pc.主角.hp=')
     // 回合结束（流关闭）→ 状态刷新（事实/任务对齐）
     expect(mocks.fetchCampaignState.mock.calls.length).toBeGreaterThanOrEqual(2)
   })
@@ -360,7 +361,7 @@ describe('MobileTavernView（酒馆 · 剧本/回合/系统卡）', () => {
     await wrapper.findAll('button').find((b) => b.text() === '掷骰')!.trigger('click')
     await flushPromises()
     expect(mocks.rollDice).toHaveBeenCalledWith(1, expect.objectContaining({ dice: 'd20' }))
-    expect(wrapper.text()).toContain('pc.主角.hp=7')
+    expect(wrapper.text()).toContain('主角 HP 7')
   })
 
   it('流内错误提示（error 事件 + onError）', async () => {
