@@ -1,5 +1,6 @@
 package com.vocalverse.config;
 
+import com.vocalverse.common.dto.Envelope;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletRequest;
@@ -71,6 +72,21 @@ public class SecurityConfig {
     http.csrf(csrf -> csrf.disable())
         .cors(Customizer.withDefaults()) // CORS（2026-09-10 打包壳跨域直连本机后端）
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        // 2026-09-22：匿名访问受保护端点 → **401 + Envelope{40101}**（此前未配 entry point，
+        // ExceptionTranslationFilter 退回 Http403ForbiddenEntryPoint → 403）。403 会让前端
+        // 「401 静默续期」钩子失效（apps/web/src/api/client.ts 只认 401）——access token 过期后
+        // 页面表现为「加载失败 HTTP 403」，必须刷新才恢复。语义上「未认证」也应为 401，
+        // 「已认证但无权」仍由 AccessDeniedHandler 返回 403（如 40302 业务拒绝）。
+        .exceptionHandling(
+            ex ->
+                ex.authenticationEntryPoint(
+                    (request, response, authException) -> {
+                      response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                      response.setContentType("application/json;charset=UTF-8");
+                      response
+                          .getWriter()
+                          .write(mapper.writeValueAsString(Envelope.error(40101, "未登录或登录已过期")));
+                    }))
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers(
