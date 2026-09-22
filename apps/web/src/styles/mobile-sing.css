@@ -838,9 +838,13 @@ html[data-motion='off'] .m-sing-pick__row {
 /* 选中态（键盘 ↑↓ / 悬停）：底色 + 左侧强调竖条 —— 与跟唱弹层 `.m-sing-pick__row.is-on`
    同一套多重区分思路，不只靠颜色深浅。竖条用**内阴影**而不是伪元素：不新增定位上下文、
    不参与行宽计算，也不会把白卡顶偏。 */
+/* 选中态（键盘 ↑↓ / 悬停 / 聚焦）：**浅底圆角高亮**。
+   2026-09-23 用户口径（真机截图）：「卡片左边有个蓝色的边边，去掉，改成圆角（选中态）」——
+   原实现用 `inset 2px 0 0 var(--u-accent)` 画左侧蓝色竖条，在 QQ 式分组卡里像一条突兀的边。 */
 .m-sing-list__item.is-selected {
-  background: var(--u-track);
-  box-shadow: inset 2px 0 0 var(--u-accent);
+  background: #f2f4f7;
+  border-radius: 12px;
+  box-shadow: none;
 }
 html[data-motion='off'] .m-sing-list__item,
 html[data-motion='off'] .m-sing-list__grad {
@@ -1052,11 +1056,6 @@ html[data-motion='off'] .m-sing-row__wave i {
   border-bottom: none;
 }
 /* 选中态（键盘/悬停）：组内改用浅底，左侧竖条保留 */
-.m-sing-list__item.is-selected {
-  background: #f2f4f7;
-  box-shadow: inset 2px 0 0 var(--u-accent);
-  border-radius: 10px;
-}
 
 /* ----------------------------------------------------------------------------
  * 窄屏（≤400px，含真机 375/390）：行内右侧控件收窄，把宽度让给歌名。
