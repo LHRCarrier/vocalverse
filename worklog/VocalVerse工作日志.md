@@ -3,6 +3,25 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 AI 跑团闭环调研（推进度 / 结束 / 人物 / 道具 / 战斗）· 设计提案（未落码）
+
+> 归属：全局设计调研（产出 `docs/55`，README 索引已登记）；UI 落地记录后续按约定走安卓日志。
+
+- **背景**：组长定总目标 = 按重做后的跑团页面完成各功能点闭环；「怎样才算结束／galgame 式推进度／新增人物（生成中显示
+  「XX 正在赶来…」）／道具与攻击要像游戏一样可用」均未定 → 要求先做网络调研（帖子/开源/商业软件）再开工。
+- **方法**：开源 7 个 AI 跑团项目（trpg-agent、TRPG_Agent、ZRIC-AI-TRPG-Engine、AITRPG、DiceFrame、TRPG-master、
+  OpenDndMaster）+ SillyTavern（群聊/世界书/扩展事件钩子/CharacterVisuals 流式切立绘）+ 商业（Friends & Fables/Franz、
+  AI Dungeon、星野、猫箱）+ 规则书（Ironsworn 进度轨、Blades in the Dark 进度钟）+ Galgame 选择肢/Flag 设计文。
+- **结论（写入 docs/55）**：①推进度 = 威胁钟 + 正向钟 / 进度轨（不发明数值，挂到现有 quest 事实，DM 工具 tick）；
+  ②结束 = Ironsworn 式「进度结算 + 尾声卡」，不做硬 Game Over、不做开放结局；③人物 = 实体状态机（arriving/active/departed）
+  + 异步立绘任务 + 「XX 正在赶来…」占位（与已落地的 `show_portrait` 骨架对齐）；④道具/攻击 = 工具化 + 状态写回 +
+  动作面板（与 `roll_dice.effects` 同一写路径）；⑤行业共识 = 三层分离：引擎管硬状态 / 工具收提案 / LLM 只叙事。
+- **产出**：`docs/55-AI跑团闭环设计调研（推进度·结束·人物·道具·战斗）.md`（含现状差距映射、P2~P4 分期提案、风险对策、
+  不做项、5 项待拍板、全部来源 URL）。
+- **未落码**：待组长拍板 docs/55 §6 五项后另开（P2 章节/进度/结束最优先，UI 增量小）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-22 酒馆立绘展示骨架（show_portrait 工具 → SSE portrait → 前端状态）· 1 op
 
 > 归属：Python 后端 + Web 契约层（App 页面展示侧由「跑团页面重做」另一条线接，其改动未提交、本记录不含）。
