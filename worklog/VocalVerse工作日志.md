@@ -3,6 +3,22 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-23 `songs.instrumental_url` 伴奏轨字段（迁移 0023 + 契约快照）· 1 op
+
+> 归属：`songs` 内容库（Java 独占写）+ Python 契约。评分/选歌/提取链路零语义变化（纯播放字段）。
+> UI 侧（跟唱面板「伴奏」键、录音期播放与轨迹体验修复）见 `worklog/安卓开发日志.md` 同日置顶。
+
+- **用户口径**：「原唱是给用户学习、是用来听的；伴奏指的是用户在唱的时候的伴奏音乐，没有伴奏怎么唱」→ 补 `songs.instrumental_url`（Demucs 分离出的 no_vocals），跟唱录音期间由前端播放。
+- **改动**：
+  - 迁移 **0023**（`services/python/alembic/versions/0023_song_instrumental.py`）：`songs.instrumental_url VARCHAR(512) NULL`；可空、无默认值，历史行 NULL → 前端回退参考音；
+  - Python：`models/content.py` Song.instrumental_url；`sing/schemas.py` SongSummary.instrumental_url；`api/routes/singing.py::_song_summary` 带出；
+  - 音频路由 `practice.py::_is_published_song_asset` 放行 `instrumental_url` 素材（原口径只认 `audio_url` → 伴奏请求会落进「用户录音」分支 403）；与并行线的 flac 白名单修复同批（commit `1b20232`）；
+  - 契约：`app.openapi()` 重导出快照 + `pnpm gen:api`（`instrumental_url?: string | null` 进生成类型）；
+  - 伴奏资产：Demucs no_vocals → **转 mp3**（4~7MB/首；wav 30MB 手机拉不动）落 `data/audio/demo_*_instrumental.mp3`（本地演示，`data/audio/` gitignored）。
+- **验证**：`alembic current = 0023`；`GET /api/v1/songs` 带 `instrumental_url`；`GET /api/v1/audio/demo_imase-night-dancer_instrumental.mp3` → 200 `audio/mpeg`；前端录音期真请求该轨（证据见安卓日志）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-23
+
 ## 2026-09-22 演示曲 flac「听参考旋律」400 修复（回放白名单/MIME/嗅探补 flac）· 1 op
 
 > 归属：`GET /api/v1/audio/{name}` 回放链路（Python）。契约零改动（白名单不是对外契约）；归档见 `worklog/BUG实测/演示曲flac回放400.md`。
