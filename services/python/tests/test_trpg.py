@@ -522,6 +522,62 @@ def test_turn_with_tool_calls(client, auth_headers, monkeypatch):
     assert hp["value"] == "7"
 
 
+def test_turn_with_portrait_tool(client, auth_headers, monkeypatch):
+    """show_portrait（docs/54 P1 骨架）：已登记实体 → SSE portrait 事件（同回合去重）；
+    未登记/已离场实体 → 不发展示信号、不打断回合（工具错误文本回填模型）。"""
+    from app.trpg import state as st
+
+    campaign_id = _create_campaign(client, auth_headers)
+    st.ensure_entity(campaign_id, "npc", "老陈")
+
+    rounds: list[str] = []
+
+    class ScriptedLLM:
+        async def stream_with_tools(self, messages, *, tools=None, tool_choice="auto", **kwargs):
+            rounds.append(tool_choice)
+            names = [t["function"]["name"] for t in (tools or [])]
+            assert "show_portrait" in names
+            if len(rounds) == 1:
+                yield (
+                    "tool_calls",
+                    [
+                        {
+                            "id": "p1",
+                            "name": "show_portrait",
+                            "arguments": json.dumps({"entity": "老陈", "mood": "戒备"}),
+                        },
+                        {
+                            "id": "p2",
+                            "name": "show_portrait",
+                            "arguments": json.dumps({"entity": "查无此人"}),
+                        },
+                        {
+                            "id": "p3",
+                            "name": "show_portrait",
+                            "arguments": json.dumps({"entity": "老陈"}),
+                        },
+                    ],
+                )
+            else:
+                yield ("delta", "老陈从柜台后抬起头，目光落在你身上。")
+            yield ("usage", {"model": "scripted", "prompt_tokens": 1, "completion_tokens": 1})
+
+        async def chat(self, messages, temperature=0.7, max_tokens=512):
+            return "[]"
+
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: ScriptedLLM())
+
+    events = _sse_events(client, campaign_id, auth_headers, text="我环顾四周")
+    portraits = [e for e in events if e["type"] == "portrait"]
+    assert len(portraits) == 1  # 同回合重复调用去重；未登记实体不发展示信号
+    assert portraits[0]["entity"] == "老陈"
+    assert portraits[0]["kind"] == "npc" and portraits[0]["mood"] == "戒备"
+    assert portraits[0].get("media_id") is None and portraits[0].get("url") is None  # 图源未接（P1）
+    assert any(e["type"] == "turn_end" for e in events)
+    text = "".join(e["text"] for e in events if e["type"] == "text_delta")
+    assert "老陈从柜台后抬起头" in text
+
+
 def test_turn_audio_asr(client, auth_headers):
     """语音轮：Fake ASR 回显 + 用户录音落盘 + words 元数据链路。"""
     campaign_id = _create_campaign(client, auth_headers)

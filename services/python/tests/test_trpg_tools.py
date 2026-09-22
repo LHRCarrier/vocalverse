@@ -24,7 +24,7 @@ def _isolated_registry(monkeypatch) -> None:
 
 def test_builtin_tools_order_and_schema_shape():
     schemas = tools.build_trpg_tools()
-    assert [s["function"]["name"] for s in schemas] == ["roll_dice", "set_scene"]
+    assert [s["function"]["name"] for s in schemas] == ["roll_dice", "set_scene", "show_portrait"]
     for schema in schemas:
         assert schema["type"] == "function"
         assert schema["function"]["description"]
