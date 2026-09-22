@@ -3,6 +3,20 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 审核判据条款化：社区规范落 docs/59 → Jev 按 R1~R9 判定 + 管理端证据展示条款号 · 1 op
+
+> 归属：Java 后端（判定契约）+ 管理端控制台（证据展示）；**App 侧规范页与侧栏入口见安卓日志同日条**。
+> 判据真源：`docs/59-社区规范与使用条例.md`（README 索引已登记）。
+
+- **背景**：此前「社区规范」只是 prompt 里一句话，判定无条款依据——审核员看到 AI 判 `abuse`，无法回答「违反哪一条」。
+- **规范落地**（docs/59）：内容准则 **R1~R9**（与 9 个 reason code 一一对应）+ 使用条例 3.1~3.6 + 处理阶梯与申诉 + 「AI 辅助筛选、人工复核」透明性承诺；条款号只增不改（改编号 = 改历史判据）。
+- **判定契约**（`JevHttpClient`）：`state.communityRules` 随请求下发 R1~R9 条款摘要；原 `category`（reason code 选择）改为 `clause`（R1~R9 + `none`），命中条款经 `CLAUSE_TO_REASON` 派生原因码；证据 `snapshot.ai` 增 `clause`、`clauseConfidence`（管理端显示「类型 辱骂骚扰（R2）」）。
+- **契约测试**：`JevQuestionContractTest` 两条等式钉死（选项 = R1~R9+none；映射恰好覆盖全部 reason codes）；`ModerationAutoScreenTest` 桩响应改 clause 并断言 `ai.clause=R2`。
+- **门禁**：Java `mvn verify -DskipITs` **186 passed** + spotless；管理端 lint/typecheck/test（**82 passed**）/build 全绿。App 端门禁与已知项见安卓日志。
+- **不做**：不自动处置（只建单）、不做全文条款判定（state 只带审核摘要，用户页是全文）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-22 审核自动送审（Jev）接入 + 管理端审核闭环 4 处缺陷修复 · 1 op
 
 > 归属：Java 后端（自动送审链路 + 队列查询）+ 管理端控制台前端（`apps/admin`）。

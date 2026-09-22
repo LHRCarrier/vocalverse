@@ -57,25 +57,28 @@ CommunityService.create / addComment   （@Transactional）
 
 ### 3.2 判定契约
 
+**判据真源是 `docs/59-社区规范与使用条例.md`**：内容准则 R1~R9 的条款摘要随请求放进 `state.communityRules`，
+问题只引用它判「命中哪一条」——用户侧看到的规范文本与机器判据是同一套条款号。
+
 一次调用并行问三个问题（官方口径：并行评估，加问题几乎不加延迟）：
 
 | 问题 id | 类型 | 说明 |
 |---|---|---|
 | `is_violation` | `noul` | 是否违反社区规范（返回 0–1 概率） |
-| `category` | `choice` | 违规类型。**选项键与 `ModerationService.REASON_CODES` 逐字同值**（spam/abuse/porn/violence/politics/ad/copyright/misinfo/other），因此不需要映射表；测试 `JevQuestionContractTest` 把两者相等钉死 |
+| `clause` | `choice` | 命中的规范条款号（R1~R9 + `none`）。**条款→原因码**由 `JevHttpClient.CLAUSE_TO_REASON` 映射（R1→spam、R2→abuse、R3→porn、R4→violence、R5→politics、R6→ad、R7→copyright、R8→misinfo、R9→other）；`JevQuestionContractTest` 把「选项集合 = R1~R9+none」「映射恰好覆盖全部原因码」钉死 |
 | `severity` | `score` | 严重度（0 无问题 / 1 轻微 / 2 中等 / 3 严重，可落级别之间） |
 
 `state` 只带判定必需字段：`contentType`（帖子/评论）、`kind`、`domain`、`title`、`body`（截断
-≤ `max-chars`，默认 4000）；**不带作者 id、用户 id、媒体 URL**。
+≤ `max-chars`，默认 4000）、`communityRules`（R1~R9 摘要）；**不带作者 id、用户 id、媒体 URL**。
 
 ### 3.3 建单口径
 
 - **阈值**：`violation ≥ threshold`（默认 0.7）才建单 —— 只建单不处置，阈值宁松勿紧；
-- **原因码**：`category` 若不在 `REASON_CODES` 内 → 回落 `other`（防上游加选项导致的脏值入库）；
+- **原因码**：`clause` 经 `CLAUSE_TO_REASON` 映射为原因码，映射表外的脏值 → `other`；
 - **优先级**：`severity ≥ 2.5 → 1（高）`、`≥ 1.5 → 2（中）`、其余 `3（低）`；
-- **证据**：`moderation_cases.snapshot.ai = {model, violation, category, categoryConfidence,
+- **证据**：`moderation_cases.snapshot.ai = {model, violation, clause, category, clauseConfidence,
   severity, severityConfidence, latencyMs, inputTokens}`（保留三位小数）。审核员在决定弹窗里直接看到
-  「这单为什么自动进来」；事后调阈值也有可对账凭据；
+  「这单为什么自动进来、违反了哪一条」；事后调阈值也有可对账凭据；
 - **审计**：系统身份落行（`adminUserId=null`、`username="-"`），动作名复用 `moderation.case.create`
   （不新增动作，前端审计过滤器零改动），`detail.source='auto'` 区分来源（白名单新增 `source` 键）；
 - **幂等**：目标已有 pending/escalated 单 → 复用不新建（同一目标先被举报、再被自动送审命中也只有一张单）。
@@ -168,7 +171,7 @@ pnpm lint / pnpm typecheck / pnpm test -- --run / pnpm build
 - `ModerationAutoScreenTest.escalatedCaseStaysVisibleInOpenQueue`：修复前 `status=open` 会被
   `@Pattern` 拒绝（400），测试必红；
 - `moderationMeta.test.ts` 的「新建 = created」：修复前 `trendSeries` 不存在、图接 `pending`，断言必红；
-- `JevQuestionContractTest`：把「Jev 选项 = reason codes」的等式钉死，任一侧加值未同步必红。
+- `JevQuestionContractTest`：把「条款选项 = R1~R9 + none」「条款→原因码映射恰好覆盖全部 reason codes」钉死，任一侧加值未同步必红。
 
 另有一次**真实 API 冒烟**（本机直连 api.typesafe.ai，非测试桩）：HTTP 200，
 `model=jev-1.13.0`，`noul=0.96`，`severity=1.96`，端到端 6.16s（含 TLS 握手；美西→本地）。
