@@ -84,6 +84,22 @@ vocalverse:
     # 演示曲目种子（M3 唱歌 P0 D-G2：读 data/seed/songs.json 播种 songs+lrc；
     # 音频由 scripts/setup-assets.py 物化到 data/audio/，不入库）
     seed: ${VOICEVERSE_SONG_SEED:true}
+  moderation:
+    # 审核自动送审（Jev / TypeSafe System One，docs/58）。默认**关**：公开仓库不默认把 UGC
+    # 送第三方判定；开启且配了 TYPESAFE_API_KEY 才真正送审（只建单、不自动隐藏）。
+    auto-screen:
+      enabled: ${VOICEVERSE_MODERATION_AUTO_SCREEN:false}
+      base-url: ${TYPESAFE_BASE_URL:https://api.typesafe.ai}
+      api-key: ${TYPESAFE_API_KEY:}
+      model: ${VOICEVERSE_MODERATION_JEV_MODEL:jev-latest}
+      # 建单阈值：违规概率 ≥ threshold 才建待审单。**只建单不自动处置**，阈值可以宽松
+      # （误报成本 = 一次人工复核；漏报成本 = 违规内容继续可见，所以宁松勿紧）。
+      threshold: ${VOICEVERSE_MODERATION_THRESHOLD:0.7}
+      timeout-ms: ${VOICEVERSE_MODERATION_JEV_TIMEOUT_MS:10000}
+      # 送审正文截断（隐私最小化 + 成本控制；快照留存口径另见 docs/50 §5.3.8）
+      max-chars: ${VOICEVERSE_MODERATION_MAX_CHARS:4000}
+      # false = 同步执行（仅测试用；生产同步会把这第三方延迟加到发帖请求上）
+      async: ${VOICEVERSE_MODERATION_ASYNC:true}
 
 management:
   endpoints:

@@ -68,6 +68,8 @@ class TrpgCampaign(TimestampMixin, Base):
     last_active_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+    # 一局收尾标记（docs/56 §G：complete_quest 结算后置位；NULL=尚在冒险中）
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
         CheckConstraint("length(name) > 0", name="name_not_empty"),
@@ -177,7 +179,8 @@ class TrpgClue(TimestampMixin, Base):
 class TrpgEntity(TimestampMixin, Base):
     """实体注册表（``(campaign_id, kind, name)`` 幂等键）。
 
-    pending=True 为 LLM 发现的懒确认实体（默认可用；超窗未提及 → status=cleared）。
+    pending 为未来确认流/立绘任务的预留标志（2026-09-22 起发现即 active，不再据此显示
+    「正在赶来」，docs/57 §3.1）；**在场映射**：active / cleared(=departed) 由 status 表达。
     """
 
     __tablename__ = "trpg_entities"
@@ -190,6 +193,8 @@ class TrpgEntity(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(60), nullable=False)
     status: Mapped[str] = mapped_column(String(8), nullable=False, server_default=text("'active'"))
     pending: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    # 立绘媒体（docs/56 §4：media_assets.public_id；NULL=前端按实体名命中内置素材）
+    portrait_media_id: Mapped[str | None] = mapped_column(String(64))
     last_mentioned_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

@@ -110,7 +110,8 @@ App（/m/tavern）  ── POST /api/v1/trpg/campaigns/{id}/turns（multipart te
 
 ## 6. DM 回合与工具循环
 
-- **工具**（`tools.py`）：`roll_dice`（骰面 2-1000/骰数 1-10/|调整值|≤50/effects 仅 pc|scene 域；系统判定并先落表再回文本）、`set_scene`（显式切场景）；
+- **工具**（`tools/` 注册表，一工具一文件）：`roll_dice`（骰面 2-1000/骰数 1-10/|调整值|≤50/effects 仅 pc|scene 域；系统判定并先落表再回文本）、`set_scene`（显式切场景）；
+  新增工具 = 新文件（schema + handler）+ `register(ToolSpec(...))` + 包内 import；执行契约（未注册/异常 → 错误文本不打断回合）见 `tools/registry.py`；
 - **循环**（`turn.py`）：最多 2 轮可调工具 + 最后 1 轮 `tool_choice=none` 强制正文；工具轮 max_tokens 4096 / 正文轮 1200；工具文本回填后继续生成；
 - **LLM 能力**：`DeepSeekLLMClient.stream_with_tools`（流式工具调用，事件 `delta|tool_calls|usage`）+ Fake 同形桩；
 - **上下文**（`service.py::_build_dm_context`）：DM system 人设（NPC 台词「名：……」一行一句协议）→ 叙事摘要 → 快照 →【待记住】补丁 → 最近 8 条 **kind=text** 历史（修复 ai4u 系统卡空 assistant 混入 prompt 的缺陷）→ 本回合输入；
@@ -120,19 +121,28 @@ App（/m/tavern）  ── POST /api/v1/trpg/campaigns/{id}/turns（multipart te
 
 | 文件 | 职责 |
 |---|---|
-| `views/mobile/MobileTavernView.vue` | 页面编排（开局引导/状态带/消息流/输入 dock/剧本切换/主持台入口） |
-| `components/mobile/trpg/TrpgStageHeader.vue` | 状态带（氛围四色条/HP/位置/持有/任务数/悬空徽章/AI 状态点） |
-| `components/mobile/trpg/TrpgMessageItem.vue` | 系统卡（open/scene/dice）+ 气泡；NPC 台词分人名段；**文本插值禁 v-html**（docs/13 §5） |
-| `components/mobile/trpg/TrpgActionDock.vue` | 快捷行动芯片 + 文本 + 语音（≤30s） |
+| `views/mobile/MobileTavernView.vue` | 页面编排（开局引导/副本任务卡/消息流/底部控制区/剧本切换/主持台入口/立绘抽屉） |
+| `components/mobile/trpg/TrpgTopBar.vue` | 顶栏编排（酒馆印章=立绘入口/设置/切换剧本/主持台/离开；标题居中配平） |
+| `components/mobile/trpg/TrpgStageHeader.vue` | 副本任务卡（暗色副本横幅：当前副本/氛围/剧本名/场景/目标 + 状态条：HP 条/待办/坐标/悬空/行囊/AI 状态点） |
+| `components/mobile/trpg/TrpgMessageItem.vue` | 系统卡（open/scene/dice）+ **三种说话人三种呈现**（DM 米白气泡 / 玩家暗茶气泡 / NPC 独立 whisper 卡）；整行引号 dm-quote 高亮；**文本插值禁 v-html**（docs/13 §5） |
+| `components/mobile/trpg/segments.ts` | 场景氛围 + 消息 token 化/分行/NPC 识别/说话块分组（纯函数，供组件与单测） |
+| `components/mobile/trpg/art.ts` | 美术资源路径（`public/tavern/*.webp`）+ NPC 名字→头像映射 |
+| `public/tavern/*.webp` | 设计稿 AI 生成占位素材（DM/PC/NPC 头像 + DM/PC 全身立绘；提示词见 `local/跑团设计/avatars/PROMPTS.md`，真实生成能力未实现） |
+| `components/mobile/trpg/TrpgActionDock.vue` | 推荐行动芯片（点击填入）+ 骰钮（D20）+ 文本 + 语音（≤30s） |
+| `components/mobile/trpg/TrpgBottomBar.vue` | 底部控制区（dock + 页内 4 项导航；导航占位项 toast 提示） |
+| `components/mobile/trpg/TrpgGameNav.vue` | 页内底栏四 tab：大堂/酒馆跑团/角色卡/纪事（沉浸页导航） |
+| `components/mobile/trpg/TrpgStandeeSheet.vue` | 角色立绘抽屉（DM/冒险者档案切换 + 设计稿全身立绘占位 + 属性占位，真实 D20 检定） |
 | `components/mobile/trpg/TrpgConsoleSheet.vue` | 主持台抽屉四 tab：状态/事实表/任务线索/桌骰 |
 | `components/mobile/trpg/TrpgOnboarding.vue` | 开局引导（示例剧本「迷雾酒馆」/自建） |
 | `composables/useTavernSession.ts` | 剧本装载/开局/SSE 回合/状态刷新（音频委托 useTavernAudio） |
 | `composables/useTavernConsole.ts` | 主持台动作（手改/墓碑/任务线索/切场景/桌骰/摘要） |
 | `composables/useTavernAudio.ts` | 单元素串行播音器 + 逐句音频队列 + 重听 |
 | `api/trpg.ts` + `audio/trpg-sse-types.ts` | 14 端点封装 + SSE 类型镜像 |
-| `styles/mobile-uic.css`（酒馆段） | `t-*` 样式（状态带/系统卡/主持台/开局引导） |
+| `styles/mobile-uic.css`（酒馆段） | `t-*` 样式（副本任务卡/消息流/立绘抽屉/底栏/dock；页面主题变量 `--t-*`） |
 
-入口：底栏学习组「🍺 酒馆」（`/m/tavern`）与桌面导航「酒馆」；`/m/chat`、`/practice` 路由已删除。
+入口：桌面导航「酒馆」；移动端 `/m/tavern` **2026-09-22 起为沉浸页**（全局底栏移出，
+`MobileTabBar` 的 group 返回 null），页内自带「大堂/酒馆跑团/角色卡/纪事」四项导航（后两项占位），
+出口 = 顶栏「离开」钮 → `/m/learn`。`/m/chat`、`/practice` 路由已删除。
 
 ## 8. 删除清单（老场景对话链路）
 

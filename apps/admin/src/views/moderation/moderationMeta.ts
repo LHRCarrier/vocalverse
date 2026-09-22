@@ -16,6 +16,8 @@ import type {
   AuditLogRow,
   ModerationCaseRow,
   ModerationDecision,
+  ModerationSnapshot,
+  ModerationStats,
   ModerationTargetType,
 } from '@/api'
 
@@ -48,9 +50,16 @@ export const PRIORITY_OPTIONS = [1, 2, 3].map((value) => ({
   value: String(value),
 }))
 
-export const CASE_STATUS_OPTIONS = [
-  { label: '待处理', value: 'pending' },
-  { label: '已升级', value: 'escalated' },
+/**
+ * 队列状态筛选（`GET /moderation/cases?status=`，Java `ModerationController.listCases` 的 `@Pattern`）。
+ *
+ * `open` 是服务端的**聚合筛选**（`pending + escalated`），不是真实状态值：升级件优先级提到 1 之后仍是待办，
+ * 默认视图若只看 `pending`，升级过的单会从队列里消失（docs/58 §5.1 修的正是这条）。
+ */
+export const CASE_STATUS_FILTER_OPTIONS = [
+  { label: '待处理（含已升级）', value: 'open' },
+  { label: '仅待处理', value: 'pending' },
+  { label: '仅已升级', value: 'escalated' },
   { label: '已处置', value: 'approved' },
   { label: '已驳回', value: 'rejected' },
   { label: '已撤回', value: 'withdrawn' },
@@ -171,6 +180,57 @@ export function targetText(row: Pick<ModerationCaseRow, 'targetType' | 'targetId
   return `${TARGET_TYPE_LABEL[row.targetType] ?? row.targetType} #${row.targetId}`
 }
 
+// ── 自动送审证据（docs/58） ────────────────────────────────────────────────
+
+/**
+ * `snapshot.ai` → 一行可读证据（无证据返回 null）。
+ *
+ * 审核员决定前必须看到「这单为什么自动进来 + 违反了哪一条」：违规概率、条款号（docs/59）、
+ * 类型、严重度、模型版本。这里只做展示，不做门禁——判定阈值已经在服务端生效过，
+ * 前端再判一次会形成第二个真源。
+ */
+export function aiEvidenceText(snapshot: ModerationSnapshot | null | undefined): string | null {
+  const ai = snapshot?.ai
+  if (!ai) return null
+  const parts: string[] = []
+  if (typeof ai.violation === 'number') parts.push(`违规概率 ${Math.round(ai.violation * 100)}%`)
+  if (typeof ai.category === 'string') {
+    const clause = typeof ai.clause === 'string' && ai.clause !== 'none' ? `（${ai.clause}）` : ''
+    parts.push(`类型 ${reasonCodeText(ai.category)}${clause}`)
+  }
+  if (typeof ai.severity === 'number') parts.push(`严重度 ${ai.severity.toFixed(2)}/3`)
+  if (typeof ai.clauseConfidence === 'number') {
+    parts.push(`条款置信 ${ai.clauseConfidence.toFixed(2)}`)
+  }
+  if (typeof ai.model === 'string' && ai.model) parts.push(ai.model)
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
+// ── 队列趋势（`GET /moderation/stats` 的 trend） ───────────────────────────
+
+type TrendPoint = NonNullable<ModerationStats['trend']>[number]
+
+/**
+ * trend → 图表序列。**口径必须各就各位**：
+ * - `created` = 当日新建（v1 图例写「新建」却接了 `pending`，图与图例不符）；
+ * - `pending` = 当日结束时仍未决定（积压，下界）；
+ * - `approved` / `rejected` = 当日决定数。
+ */
+export function trendSeries(trend: TrendPoint[] | undefined): {
+  labels: string[]
+  created: number[]
+  decided: number[]
+  rejected: number[]
+} {
+  const points = trend ?? []
+  return {
+    labels: points.map((p) => p.date.slice(5)),
+    created: points.map((p) => p.created ?? 0),
+    decided: points.map((p) => p.approved),
+    rejected: points.map((p) => p.rejected),
+  }
+}
+
 /** 终态单：`approved / rejected / withdrawn` 都不能再处置（docs/50 §6.2 幂等保护 → 46010） */
 export function isTerminalCase(row: Pick<ModerationCaseRow, 'status'>): boolean {
   return row.status === 'approved' || row.status === 'rejected' || row.status === 'withdrawn'
@@ -263,7 +323,12 @@ export function auditDecisionText(row: AuditLogRow): string {
   return decisionMeta(decision)?.label ?? decision
 }
 
-/** 备注列：`detail.note`（就是作者会看到的 `decision_note`） */
+/**
+ * 备注列：`detail.note`（审核侧的内部备注）。
+ *
+ * ⚠️ 它**不是**作者会看到的文字：docs/51 B-4 已拍板 `decision_note` 不下发作者（避免审核员身份 /
+ * 内部理由外泄）；作者侧的原因下发是固定枚举 `reason_code` 的标签，属 P6 后续 PR。
+ */
 export function auditNoteText(row: AuditLogRow): string {
   const note = auditDetail(row).note
   return typeof note === 'string' && note ? note : '—'

@@ -54,6 +54,7 @@ const props = withDefaults(
       | 'bookmark'
       | 'x'
       | 'copy'
+      | 'shield'
     size?: number
   }>(),
   { size: 20 },
@@ -296,6 +297,12 @@ const props = withDefaults(
     <!-- 关闭（tabler: x） -->
     <template v-else-if="props.name === 'x'">
       <path d="M6 6l12 12M18 6L6 18" />
+    </template>
+
+    <!-- 盾牌对勾（社区规范/守则 · tabler: shield-check） -->
+    <template v-else-if="props.name === 'shield'">
+      <path d="M11.46 20.846A12 12 0 0 1 3.5 6A12 12 0 0 0 12 3a12 12 0 0 0 8.5 3a12 12 0 0 1-.09 7.06" />
+      <path d="M15 19l2 2l4-4" />
     </template>
   </svg>
 </template>

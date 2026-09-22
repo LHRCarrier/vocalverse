@@ -22,6 +22,183 @@
 
 —— 执行人：xiaoqing-one（AI 代工），2026-09-22
 
+## 2026-09-22 闭环复评（R2）+ 二次修复后端段：语言语音/结算幂等/道具可见/攻击目标 · 2 op
+
+> 归属：复评为全局（结论追加 `docs/57 §6`）；本段为 **Python 后端**修复。UI 段（大堂/角色卡/纪事）见安卓日志。
+
+- **复评（同口径双视角子代理）**：DoD ①真局触发 **部分 PASS**（T3 quest 事实+SSE+判定卡、T5 attack 战报卡且刷新仍在；
+  但 2 回合窗口未达标、`item.*`/敌 HP 仍 0）；②结算 **FAIL**（刷新丢已完结 + 幂等失效）；③状态可见 **PASS**（阅读区 13%→48%）；
+  ④在场语义 **PASS（新局）**；⑤道具来源 **FAIL**（DM 当面否认持有）。报告 `local/ux-review/*-r2.md`。
+- **语言/语音 bug（用户报）**：根因 `config.tts_voice` 写死 `en-US-JennyNeural` 且 `_tts_chunks` 不看 `lang` →
+  切中文后语音仍是英文音色。修复：`voices.default_voice_for_lang`（zh→`zh-CN-XiaoxiaoNeural`），
+  `stream_turn` 把 lang 传入 `_tts_chunks`（显式 `voice_name` 优先）。
+  另经真机复现：**文本语言切换本就正常**（en/zh 双向 DM 跟随，PUT /preferences 200）——用户感知应为语音语言。
+- **结算幂等（P1-1，最硬）**：`_sync_task_clue_from_op` 用 `scalar_one_or_none` 查任务，重复任务行（场景卡 tasks +
+  同名 `quest.*` 事实双写）→ `MultipleResultsFound` → 整批回滚 → 二次结算再发结局卡。
+  修复：容忍重复（保最早/清多余）+ `create_task` 按标题 upsert + 结果只在提交后追加。
+- **道具可见（P1-3）**：DM 快照补「行囊」行（`item.*` 优先、`pc.*.inventory` 兜底，上限 6）→ DM 不再否认持有、`use_item` 可被自然触发。
+- **攻击目标（P1-5/N5）**：根因 `DOMAIN_ENTITY_KIND.get(domain, "npc")` 把 `encounter.main.*` 注册成 `npc.main`；
+  已修（encounter 不注册 + `RESERVED_ENTITY_NAMES` 过滤）；`attack` 只接受在场 npc/pc，拒自身/其他 PC/离场/内部名，错误文本列可用目标。
+- **NPC 反击（P1-4）**：prompt 规则 13——敌方伤害必须走 `attack(attacker=NPC, target=PC)` 或 `roll_dice effects`。
+- **判定卡骰面（N4）**：`/roll` 摘要补骰面（`d20=14 +2 = 16 vs 12 成功`）。
+- **契约**：`GET /campaigns` 列表项补 `finished/finished_at`（供大堂「已完结」分组）。
+- **测试**：新增 14 例回归（语音按语言/重复行幂等/快照行囊/攻击目标矩阵/骰面格式/列表 finished）；
+  **825 passed, 4 skipped**；ruff check/format 绿。
+- **遗留（写入 docs/57 §6.3）**：正钟推进经济学偏慢、阅读区 48%→55% 未达、旧局 legacy pending 仍显「赶来」、
+  折叠态不显示 tick reason、并发双击无 DB 唯一约束。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
+## 2026-09-22 审核判据条款化：社区规范落 docs/59 → Jev 按 R1~R9 判定 + 管理端证据展示条款号 · 1 op
+
+> 归属：Java 后端（判定契约）+ 管理端控制台（证据展示）；**App 侧规范页与侧栏入口见安卓日志同日条**。
+> 判据真源：`docs/59-社区规范与使用条例.md`（README 索引已登记）。
+
+- **背景**：此前「社区规范」只是 prompt 里一句话，判定无条款依据——审核员看到 AI 判 `abuse`，无法回答「违反哪一条」。
+- **规范落地**（docs/59）：内容准则 **R1~R9**（与 9 个 reason code 一一对应）+ 使用条例 3.1~3.6 + 处理阶梯与申诉 + 「AI 辅助筛选、人工复核」透明性承诺；条款号只增不改（改编号 = 改历史判据）。
+- **判定契约**（`JevHttpClient`）：`state.communityRules` 随请求下发 R1~R9 条款摘要；原 `category`（reason code 选择）改为 `clause`（R1~R9 + `none`），命中条款经 `CLAUSE_TO_REASON` 派生原因码；证据 `snapshot.ai` 增 `clause`、`clauseConfidence`（管理端显示「类型 辱骂骚扰（R2）」）。
+- **契约测试**：`JevQuestionContractTest` 两条等式钉死（选项 = R1~R9+none；映射恰好覆盖全部 reason codes）；`ModerationAutoScreenTest` 桩响应改 clause 并断言 `ai.clause=R2`。
+- **门禁**：Java `mvn verify -DskipITs` **186 passed** + spotless；管理端 lint/typecheck/test（**82 passed**）/build 全绿。App 端门禁与已知项见安卓日志。
+- **不做**：不自动处置（只建单）、不做全文条款判定（state 只带审核摘要，用户页是全文）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
+## 2026-09-22 审核自动送审（Jev）接入 + 管理端审核闭环 4 处缺陷修复 · 1 op
+
+> 归属：Java 后端（自动送审链路 + 队列查询）+ 管理端控制台前端（`apps/admin`）。
+> 设计文档 `docs/58`（README 索引已登记）；BUG 归档 `worklog/BUG实测/审核队列升级件消失与看板口径错位.md`。
+
+- **Jev 接入**（TypeSafe System One 决策模型；**只建单、不自动处置**）：
+  - 触发链：`CommunityService` 发帖/评论 → 事务内发 `ContentPublishedEvent` → `@TransactionalEventListener(AFTER_COMMIT)`
+    → 单线程有界队列（满则丢弃 + WARN）→ `ModerationAutoScreen.screen()`（`REQUIRES_NEW`）→ `JevHttpClient`；
+  - 判定：一次调用并行问「是否违规（noul）/ 类型（choice，选项键与 `REASON_CODES` 逐字同值）/ 严重度（score 0~3）」；
+    阈值 `≥0.7` 建单，severity 映射优先级（≥2.5→1 / ≥1.5→2 / 其余 3），证据写 `snapshot.ai`，审计复用 `moderation.case.create` + `detail.source='auto'`；
+  - 失败语义 fail-open：无密钥短路、超时/429/529/解析失败/队列满一律降级放行，绝不阻断发布；
+  - 开关 `VOICEVERSE_MODERATION_AUTO_SCREEN`（默认 false，已登记 `docs/06 §17` / `docs/50 §13.2`）；密钥 `TYPESAFE_API_KEY` 走 `.env`（不入库）。
+- **审核闭环修复**：①队列 `status=open`（= pending+escalated，升级件不再从默认待办消失）；②趋势图「新建」改接 `created`（原接 `pending`，图例与数据不符）；③`decision_note` 弹窗文案对齐 `docs/51 B-4`（**不下发作者**）；④举报 handle 只发 `decision`（删双键 hack 与 `as unknown as` 断言）。
+- **测试**：Java 新增 6 例（5 例送审链路走**真实 HTTP 桩**：命中建单/低于阈值/上游 500 降级/评论送审/升级件留在 open 队列；1 例问题契约钉死选项=原因码），全量 `mvn -B -ntp verify -DskipITs` → **185 passed, 0 failed**，spotless 通过；管理端 `pnpm lint/typecheck/test/build` 全绿（**81 passed**）；`check_pg_typed_params.py`、`check_feature_flags.py` 绿；Java 契约快照已刷新（仅 status `@Pattern` 增 `open`）。
+- **真实冒烟**（非测试桩）：直连 `api.typesafe.ai` 一次 → HTTP 200、`model=jev-1.13.0`、端到端 6.16s（美西→本地，含 TLS 握手）。
+- **不做（登记 docs/58 §8）**：自动隐藏/删除、媒体与私信送审、送审重试队列、敏感词库（P1）。
+- **遗留**：C 端举报入口仍缺（本轮未动，docs/58 §5.5 登记）；作者侧处置原因下发属 P6（`docs/51 B-4`）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
+## 2026-09-22 酒馆闭环双视角评审 + 优化轮后端段（P0 机制真局触发）· 2 op
+
+> 归属：评审为全局（报告 `docs/57`）；本段为 **Python 后端**修复。前端修复段另记（安卓日志）。
+
+- **评审**（两个独立子代理，真机 390×844 + 真 DeepSeek 8 回合 + 路由拦截确定性态）：
+  - **P0 闭环真局零触发**：8 回合 0 次 `tick_clock`/`attack`/`use_item`（两代理独立复现）；
+  - **P0 人物状态机死路**：`enter_character` 只写 pending，「正在赶来」永无出口；闲置清理把赶来中变已离场；
+  - **P0 道具无来源**：无 `grant_item`，提取器/场景卡白名单都写不了 `item.*`；
+  - **P0 结算不可发现**：前端无入口、`finished_at` 不接口、结算后可继续玩且重复结算；
+  - P1：流式不跟随/状态条在视线外（钟在 −4500px）/阅读区被压到 13%/动作面板与推荐行动同质/尾声只认系统卡/遭遇刷新即失/玩家 HP 误取敌人 `.hp`/DM 复读实测。
+  - 完整清单与验收见 `docs/57`（原始报告 `local/ux-review/`，含截图，gitignored）。
+- **后端修复**（契约 docs/57 §3.1）：
+  - **结算确定性接口** `POST /campaigns/{id}/quests/settle`（幂等；复用 `state.settle_quest` 与工具同一逻辑）；`GET /campaigns/{id}` 增 `finished/finished_at`；
+  - **道具来源**：新工具 `grant_item`（qty 1~99、累加/更新 owner 默认最早 PC）；场景卡 prompt/模板白名单允许 `item.*`（拒 owner）；DM 规则 12；
+  - **人物语义**：`enter_character` 直接 active；提取器懒注册不再 pending（arriving 留给未来立绘任务）；
+  - **推进绑规则**：`roll_dice` 可选 `quest` → 成功 +1（余量≥5 +2）/ 失败威胁钟 +1，系统判定落表并发 `quest` 事件；已结算任务不推进；
+  - **战报与可读性**：`attack` 命中/失手均落 `dice` 系统卡（刷新仍在）；`apply_dice_delta` 摘要改显示名（`主角 HP 7（-5）`）；
+  - **防重复结算**：`complete_quest` 已结算 → 幂等文本，不再发卡。
+- **测试**：新增 18 例 + 3 处旧断言按新契约更新；**811 passed, 4 skipped**；ruff check/format 绿。
+- **遗留**：结算幂等为顺序幂等（前端需 pending 禁用）；并发双击双落卡无 DB 唯一约束（记为已知项）。
+- **调研依据**（本轮新增，写入 docs/57 §3.3）：工具可靠性靠结构（强制 tool_choice / extract-then-act / 路由分类器）；移动端叙事 HUD 小常驻 + 大面板可折叠。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
+## 2026-09-22 跑团闭环后端 P2~P4：进度钟/结算尾声/人物进出场/道具/遭遇战斗 + 实体立绘挂载 · 1 op
+
+> 归属：Python 后端（契约 `docs/56`，设计 `docs/55`）；前端接线与页面重做另条线记录。
+
+- **架构**（组长要求高内聚低耦合）：新增纯规则模块 `app/trpg/{progress,encounter,items}.py`（无 DB/无 IO、全单测）；
+  `state.py` 只加 DB 适配（quest/item/encounter 事实、实体在场/立绘、收尾标记），业务规则不入口；
+  工具继续「一工具一文件」注册表，并新增 `BUILTIN_TOOL_ORDER`（下发顺序与导入顺序解耦，模型工具面稳定）。
+- **工具 +9**：`tick_clock` / `complete_quest`（模板渲染尾声，零 LLM）/ `enter_character` / `exit_character` /
+  `attack`（d20+mod vs 默认 12；命中才写 HP，未命中无副作用）/ `use_item`（校验+消耗扣减）/ `start_encounter` /
+  `next_turn` / `end_encounter`。
+- **事实键契约**：`quest.{名}.progress("3/6")|kind(positive|threat)|stage`、新域 `item.{名}.{qty,owner,effect,consumable}`、
+  `encounter.{id}.{status,order,turn,round}`、State 域新增 `npc.{名}.hp|status`（快照可见，上限 6）；
+  `check_key_whitelist` 增 writer 维度：`writer="llm"` 拒绝系统专写字段（进度/先攻/数量等，杜绝 LLM 编数值）。
+- **SSE**：`QuestUpdate` / `Ending` / `CharacterState` / `EncounterState` 四事件；`turn.py` 用 outcome→事件映射表转发
+  （quest/character/encounter 同回合去重）；`ending` 额外落系统卡（`trpg_sys="ending"`）→ 刷新仍在。
+- **立绘**：`trpg_entities.portrait_media_id` + `POST|DELETE /campaigns/{id}/entities/{entity_id}/portrait`
+  （owner 校验 + 媒体归属校验，复用 40401/40403/47001）；`show_portrait` 回带 `media_id`/`url`；
+  实体序列化补 `id` 与 `portrait`。迁移 `0021_trpg_closure`（+ `trpg_campaigns.finished_at`，含 downgrade）。
+- **门禁**：`ruff check`/`format --check` 绿；pytest **797 passed, 4 skipped**（trpg 定向 60 passed）。
+- **不做（本轮）**：异步文生图任务表（待服务商拍板）、跑团 XP 计入 `stats/progress`、NPC 情绪/记忆三轴。
+- **前端待办**：`trpg-sse-types` 四类事件镜像、`TrpgMessageItem` 的 `ending` 系统卡分支、
+  进度条/在场角色条/动作面板（一域一 composable，见 docs/56 §6）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
+## 2026-09-22 AI 跑团闭环调研（推进度 / 结束 / 人物 / 道具 / 战斗）· 设计提案（未落码）
+
+> 归属：全局设计调研（产出 `docs/55`，README 索引已登记）；UI 落地记录后续按约定走安卓日志。
+
+- **背景**：组长定总目标 = 按重做后的跑团页面完成各功能点闭环；「怎样才算结束／galgame 式推进度／新增人物（生成中显示
+  「XX 正在赶来…」）／道具与攻击要像游戏一样可用」均未定 → 要求先做网络调研（帖子/开源/商业软件）再开工。
+- **方法**：开源 7 个 AI 跑团项目（trpg-agent、TRPG_Agent、ZRIC-AI-TRPG-Engine、AITRPG、DiceFrame、TRPG-master、
+  OpenDndMaster）+ SillyTavern（群聊/世界书/扩展事件钩子/CharacterVisuals 流式切立绘）+ 商业（Friends & Fables/Franz、
+  AI Dungeon、星野、猫箱）+ 规则书（Ironsworn 进度轨、Blades in the Dark 进度钟）+ Galgame 选择肢/Flag 设计文。
+- **结论（写入 docs/55）**：①推进度 = 威胁钟 + 正向钟 / 进度轨（不发明数值，挂到现有 quest 事实，DM 工具 tick）；
+  ②结束 = Ironsworn 式「进度结算 + 尾声卡」，不做硬 Game Over、不做开放结局；③人物 = 实体状态机（arriving/active/departed）
+  + 异步立绘任务 + 「XX 正在赶来…」占位（与已落地的 `show_portrait` 骨架对齐）；④道具/攻击 = 工具化 + 状态写回 +
+  动作面板（与 `roll_dice.effects` 同一写路径）；⑤行业共识 = 三层分离：引擎管硬状态 / 工具收提案 / LLM 只叙事。
+- **产出**：`docs/55-AI跑团闭环设计调研（推进度·结束·人物·道具·战斗）.md`（含现状差距映射、P2~P4 分期提案、风险对策、
+  不做项、5 项待拍板、全部来源 URL）。
+- **未落码**：待组长拍板 docs/55 §6 五项后另开（P2 章节/进度/结束最优先，UI 增量小）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
+## 2026-09-22 酒馆立绘展示骨架（show_portrait 工具 → SSE portrait → 前端状态）· 1 op
+
+> 归属：Python 后端 + Web 契约层（App 页面展示侧由「跑团页面重做」另一条线接，其改动未提交、本记录不含）。
+> docs/54 §4 的 P1 第一步（只落触发与通路，图源与页面展示后续接）。
+
+- **工具**（`app/trpg/tools/show_portrait.py`，注册表第 3 个工具）：DM 在关键节点调用；
+  handler 用 `state.find_entity` 校验实体（限 npc/pc、已离场拒绝）→ outcome 带 `portrait` 载荷；
+  **只发展示信号、不生成图**（`media_id`/`url` 暂空，docs/54 P1 落 `portrait_media_id` 后回填）；
+  实体不存在/离场 → 错误文本回填模型，不打断回合。
+- **通路**：`turn.py` 工具循环转发 `portrait`（**同回合同角色去重**）→ `events.PortraitShow` →
+  `service.stream_turn` 下发 SSE；`prompts.py` 增 DM 规则 7（关键节点可调用、同场景同角色至多一次）。
+- **前端数据层**：`audio/trpg-sse-types.ts`（新增 `TrpgPortraitEvent`）+ `useTavernSession`
+  （`portrait` 状态 + `dismissPortrait`）。展示侧未接：页面重做线落地后消费 `portrait` 即可自动开立绘展台。
+- **测试**：`test_trpg.py::test_turn_with_portrait_tool`（脚本化 LLM：已登记角色 → 1 条 portrait 事件；
+  同回合重复调用去重；未登记实体不发展示信号；图源字段为空）；`test_trpg_tools.py` 工具清单断言更新。
+- **顺带修复两例存量日期敏感失败**（与本功能无关，但挡全量门禁，一并修）：
+  `test_internal_checkin.py`（UTC 凌晨窗口 `now-3h` 跨日界 → 重锚当日 03:00）、
+  `src/stores/__tests__/checkin.test.ts`（写死 `2026-09-20` 当「昨天」→ 改按日历回拨）。
+- **门禁**：ruff check/format 绿；pytest **776 passed, 4 skipped**；web `lint`/`typecheck`/**365 passed**/`build` 绿。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
+## 2026-09-22 酒馆工具注册表重构：平铺 tools.py → tools/ 包（一工具一文件 + 注册表）· 1 op
+
+> 归属：Python 后端（`app/trpg`）。**零接口/SSE 契约变化**（trpg 回归用例证明）；`docs/52 §6` 已同步。
+
+- **背景**：`app/trpg/tools.py` 平铺（两个工具 schema + `build_trpg_tools` + `execute_tool` 的 if/elif 分发），
+  新增工具要在同一文件改三处、无注册机制（多人/AI 协作易漂移）。本次按组长要求抽注册表。
+- **重构**（新增 `app/trpg/tools/` 包，删除 `tools.py`）：
+  - `registry.py`：`ToolSpec(name/schema/handler)` + `register / build_trpg_tools / parse_tool_args / execute_tool`；
+    **新增错误隔离**——未注册工具 / handler 抛异常 → 返回错误文本（不打断回合；旧版只有各分支内 try 兜底）；
+  - `roll_dice.py` / `set_scene.py`：schema 与 handler 同文件（文件名 = 工具名），文件末尾 `register(...)`；
+  - `__init__.py`：import 即注册（**注册顺序 = 下发顺序**），扩展三步写进包 docstring；
+  - 新增工具 = 一个文件 + 一行 import，`turn.py` 不动。
+- **引用修正**：`api/routes/trpg.py` 原先借道 `from app.trpg.tools import set_scene` 拿 state 层函数（隐式 re-export，
+  重构后会拿到同名模块）→ 已改回 `st.set_scene`；`app/trpg/__init__.py` 模块地图同步。
+- **测试**：新增 `tests/test_trpg_tools.py` 6 例（注册顺序与 schema 形状 / 参数宽容解析 / 未知工具不抛 /
+  handler 异常不打断回合 / 重复注册报错 / args+campaign_id 透传）；用例用注册表副本隔离（monkeypatch，不污染全局）。
+- **门禁**：ruff check + format 绿；`pytest tests/test_trpg*.py` **38 passed**；全量 **774 passed, 4 skipped**，
+  另 1 例**存量失败**（与本次无关，已 `git stash` 在干净 HEAD 复现）：`test_internal_checkin.py::test_manual_checkin_aggregates_day_and_delegates`
+  ——根因：用例以 `now=datetime.now(UTC)` 播种 `now-2h/now-3h`，而聚合按 **UTC 日界**切片，
+  本地 08:00~11:00（UTC 00:00~03:00）运行时种子落到前一 UTC 日（断言差 9 回合 / 3 次练习）。
+  修法建议（未做）：播种锚点固定到 UTC 当日 12:00。
+- **遗留**：立绘展示工具（`show_portrait`）可注册表新增，但需先扩 `turn.py` 的 outcome→SSE 通路
+  （现仅透传 text/status_stage）与 docs/54 的实体挂图字段，待方案拍板另开。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-21 M3 收口 P4 尾项 + P5/P6（后端与契约）：搜索/XP/笔记三端点 + 契约刷新 + 死代码清理 · 1 op
 
 > 归属：Python 后端 + 契约 + Web 全局（App UI 部分见 `worklog/安卓开发日志.md` 同日条）。计划与 DoD 见 `docs/53`。

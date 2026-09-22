@@ -4,7 +4,9 @@
 1. State 一行式：pc.* 当前值拼一行；scene.current 拼场景行；
 2. 活动任务全量 + 完成/失败折叠为一行计数；
 3. 线索：当前场景 + 未回收，按最后提及倒序，上限 SNAPSHOT_CLUE_MAX；
-4. Fact 关系子集：rel.* 按 importance 降序，上限 SNAPSHOT_FACT_REL_MAX。
+4. Fact 关系子集：rel.* 按 importance 降序，上限 SNAPSHOT_FACT_REL_MAX；
+5. 行囊：item.* 聚合（P1-3 道具对 DM 可见），无道具行 → pc.*.inventory 字符串兜底，
+   上限 SNAPSHOT_ITEM_MAX。
 返回空串 = 无状态可注入（调用方跳过该 section）。
 """
 
@@ -14,7 +16,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from app.trpg.constants import SNAPSHOT_CLUE_MAX, SNAPSHOT_FACT_REL_MAX
+from app.trpg.constants import (
+    SNAPSHOT_CLUE_MAX,
+    SNAPSHOT_FACT_REL_MAX,
+    SNAPSHOT_ITEM_MAX,
+    SNAPSHOT_NPC_MAX,
+)
 from app.trpg.facts import parse_key
 
 _PROPERTY_LABEL: dict[str, str] = {
@@ -78,23 +85,65 @@ def _time_of(value: Any) -> float:
 def build_state_snapshot(data: SnapshotInput) -> str:
     lines: list[str] = []
 
-    # 1. State 一行式（pc.* + scene.current）
+    # 1. State 一行式（pc.* + npc.* + scene.current；docs/56 §C：敌方 HP 进 DM 上下文）
     state_parts: list[str] = []
+    npc_state: dict[str, list[str]] = {}
     scene_value = data.scene
+    inventory_text: str | None = None
+    item_props: dict[str, dict[str, str]] = {}
+    item_order: list[str] = []
     for f in data.facts:
-        if f.kind != "state":
-            continue
         parsed = parse_key(f.key)
         if parsed is None:
+            continue
+        # 道具（item.* 为 fact 域）：聚合为行囊行（P1-3），不散进 PC 状态行
+        if parsed.domain == "item" and parsed.entity:
+            if parsed.entity not in item_props:
+                item_props[parsed.entity] = {}
+                item_order.append(parsed.entity)
+            item_props[parsed.entity][parsed.property] = f.value
+            continue
+        if f.kind != "state":
             continue
         if parsed.domain == "scene" and parsed.property == "current":
             scene_value = f.value
             continue
+        if parsed.domain == "pc" and parsed.property == "inventory":
+            inventory_text = f.value
+            continue
+        if parsed.domain == "npc" and parsed.entity:
+            if parsed.entity not in npc_state and len(npc_state) >= SNAPSHOT_NPC_MAX:
+                continue
+            npc_state.setdefault(parsed.entity, []).append(
+                f"{_PROPERTY_LABEL.get(parsed.property, parsed.property)} {f.value}"
+            )
+            continue
         state_parts.append(f"{_PROPERTY_LABEL.get(parsed.property, parsed.property)} {f.value}")
     if state_parts:
         lines.append(f"PC：{'｜'.join(state_parts)}")
+    for entity_name, parts in npc_state.items():
+        lines.append(f"{entity_name}：{'｜'.join(parts)}")
     if scene_value:
         lines.append(f"场景：{scene_value}")
+
+    # 1b. 行囊（P1-3：DM 必须看得见道具，否则会当面否认玩家持有）
+    bag_parts: list[str] = []
+    for name in item_order:
+        props = item_props[name]
+        owner = (props.get("owner") or "").strip()
+        if owner and not owner.startswith("pc."):
+            continue  # NPC/商人持有 → 不进玩家行囊
+        qty = (props.get("qty") or "").strip()
+        label = f"{name}×{qty}" if qty else name
+        effect = (props.get("effect") or "").strip()
+        if effect:
+            label = f"{label}（{effect}）"
+        bag_parts.append(label)
+        if len(bag_parts) >= SNAPSHOT_ITEM_MAX:
+            break
+    bag_text = "、".join(bag_parts) or (inventory_text or "")
+    if bag_text:
+        lines.append(f"行囊：{bag_text}")
 
     # 2. 任务：活动全量 + 完成/失败计数
     active = [t for t in data.tasks if t.status == "active"]

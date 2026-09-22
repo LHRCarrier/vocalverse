@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/gradual-blur.css" />
 <link rel="stylesheet" href="css/footer.css">
 <style>
 /* ============================================================
@@ -317,10 +318,13 @@ body.menu-open { overflow: hidden; } /* 移动菜单打开时锁定滚动 */
 .icon-btn svg { width: 19px; height: 19px; }
 .icon-btn--send svg { width: 21px; height: 21px; }
 
-/* —— 今日练习启动器（原 AI 输入框的位置）——
-   纯静态链接：场景 chips、Speaking/Singing 分段、主 CTA 全是 <a>，
-   不依赖任何脚本，file:// 双击即可用。改造前的输入框版本见 git 历史
-   （合入前已移除随附的 starter-rollback/ 回滚脚手架）。 */
+/* —— 功能全览 v3（原"今日练习启动器"的位置）——
+   结构：head（streak + Continue 两条真实入口）→ kicker → 5 个模块 tile。
+   每个 tile = 实色图标块 + 名称 + 一句说明，整块是一个 <a>，点哪儿都能进。
+   为什么是 5 列一行：卡片固定 790px（.prompt），5 列每列 ~142px，刚好放得下
+   图标块 + 两行说明；hero 是 100svh + overflow:hidden，卡片一旦折成两行就会
+   被裁掉，所以模块列表必须一行铺开。
+   想改回"分段 + 推荐 + chips"见 starter-rollback/（restore-v2.ps1）。 */
 .starter {
   display: flex;
   flex-direction: column;
@@ -364,95 +368,67 @@ body.menu-open { overflow: hidden; } /* 移动菜单打开时锁定滚动 */
 }
 .starter__resume:hover { color: var(--ink); border-bottom-color: currentColor; }
 
-/* 场景 chips */
-.starter__scenes {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+/* 小节标签：由 v2 的"Also try"复用而来，现在是全览的抬头 */
+.starter__also {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* —— 5 个模块一行铺开 ——
+   刻意不给 tile 底色：卡片本身已经是玻璃面，再套 5 个小方块就成了
+   "盒子里套盒子"；只靠留白分组，悬停时才浮出底色（设计系统：用留白分组）。 */
+.starter__grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.starter__chip,
-.starter__more {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 15px;
-  border-radius: 999px;
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.09);
-  color: var(--ink);
-  font-size: 13.5px;
-  text-decoration: none;
-  white-space: nowrap;
-  transition: background 0.18s ease, transform 0.18s var(--ease), border-color 0.18s ease;
-}
-.starter__chip:hover { background: #f1f1ef; transform: translateY(-1px); }
-.starter__more {
-  padding-inline: 6px;
-  background: transparent;
-  border-color: transparent;
-  color: var(--muted);
-}
-.starter__more:hover { color: var(--ink); }
-
-/* 底部：模式分段（照搬设计系统 .segment 的造型）+ 主 CTA */
-.starter__foot {
+.starter__tile {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.starter__modes {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.055);
-}
-.starter__mode {
-  padding: 7px 18px;
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 13px;
-  text-decoration: none;
-  transition: background 0.18s ease, color 0.18s ease;
-}
-.starter__mode:hover { color: var(--ink); }
-/* 视觉上默认停在 Speaking（与 App Home 的分段一致）；两个都是普通链接，
-   首页没有"当前项"，所以不加 aria-current。 */
-.starter__mode.is-active {
-  background: #fff;
-  color: var(--ink);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-}
-.starter__cta {
-  display: inline-flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
-  height: 46px;
-  padding: 0 20px;
-  border-radius: 12px;
-  background: #141414;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
+  height: 100%;
+  padding: 12px 11px 13px;
+  border-radius: 14px;
   text-decoration: none;
   transition: background 0.18s ease, transform 0.18s var(--ease);
 }
-.starter__cta:hover { background: #000; transform: translateY(-1px); }
-
-/* 键盘可达性：首页原本没有焦点样式，给新控件补上 */
-.starter a:focus-visible {
-  outline: 2px solid #141414;
-  outline-offset: 3px;
-  border-radius: 999px;
+.starter__tile:hover { background: rgba(255, 255, 255, 0.72); transform: translateY(-2px); }
+/* 图标块：实色底 + 白色线性图标。5 个模块是平级的，所以统一用一个颜色
+   （卡片的黑），不做五色 —— 这套系统彩色只留 accent 蓝与 star 黄。 */
+.starter__tile-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  background: #141414;
+  color: #fff;
 }
-.starter__cta:focus-visible { border-radius: 12px; }
+.starter__tile-icon svg { width: 19px; height: 19px; }
+.starter__tile-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.starter__tile-desc {
+  font-size: 11.5px;
+  line-height: 1.42;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
 /* —— 页面加载入场动画 —— */
 @keyframes rise {
@@ -563,15 +539,33 @@ body.menu-open { overflow: hidden; } /* 移动菜单打开时锁定滚动 */
   .icon-btn { width: 38px; height: 38px; }
   .icon-btn--bare { width: 32px; }
   .icon-btn--send { width: 42px; height: 42px; border-radius: 11px; }
-  /* 启动器：窄屏下 chips 自然换行，底部模式分段与 CTA 各占整行 */
-  .starter { gap: 12px; }
+  /* 功能全览：5 列折成 3 列（2 行），并收掉说明与抬头 ——
+     窄屏卡片只有 ~560px 宽，带说明会折成 3 行把 hero 顶破。 */
+  .starter { gap: 10px; }
   .starter__head { gap: 8px; }
   .starter__streak { font-size: 11.5px; padding: 0 12px; }
-  .starter__chip { padding: 8px 13px; font-size: 13px; }
-  .starter__foot { flex-direction: column; align-items: stretch; gap: 10px; }
-  .starter__modes { display: flex; }
-  .starter__mode { flex: 1; text-align: center; }
-  .starter__cta { width: 100%; justify-content: center; }
+  .starter__also { display: none; }
+  .starter__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .starter__tile { padding: 10px 9px 11px; gap: 7px; }
+  .starter__tile-icon { width: 36px; height: 36px; border-radius: 12px; }
+  .starter__tile-icon svg { width: 17px; height: 17px; }
+  .starter__tile-desc { display: none; }
+}
+
+/* —— 短视口（≤800px 高）：收掉抬头与说明文字 ——
+   hero 是 100svh + overflow:hidden，卡片一长高就被裁；矮屏优先保"图标 + 名称"。
+   （≥801px 高时 5 列只有一行，高度够用，说明文字照常显示。） */
+@media (max-height: 800px) {
+  .starter { gap: 10px; }
+  .starter__also { display: none; }
+  .starter__tile { padding: 10px 9px 11px; gap: 7px; }
+  .starter__tile-desc { display: none; }
+}
+
+/* —— 窄视口（≤720px 宽）：5 列每列不足 120px，两行说明会被挤成三行 ——
+   同样只留"图标 + 名称"，卡片高度不随宽度变高。 */
+@media (max-width: 720px) {
+  .starter__tile-desc { display: none; }
 }
 
 /* —— 横屏手机 —— */
@@ -646,10 +640,13 @@ body.menu-open { overflow: hidden; } /* 移动菜单打开时锁定滚动 */
           Practice real conversations with AI roleplay, sing your way to better pronunciation,<br class="brk" />
           and watch every session turn into visible progress.
         </p>
-        <!-- 今日练习启动器：原来这里是"跟 AI 对话"的输入框，对话功能移除后
-             改成"选场景 + 选模式 + 开始"。全部是普通链接，无脚本、可键盘操作，
-             入口都指向已有页面；场景名与 App 原型 speaking 屏一致。
-             （streak / Continue 里的数字是静态演示值，与原型其它屏同类。） -->
+        <!-- 功能全览（v3）：把这张卡从"今天练哪个场景"改成"整个 App 能做什么"。
+             头部保留 streak 与 Continue 两条真实入口；下面 5 个模块一行铺开，
+             每块 = 实色图标块 + 名称 + 一句说明，整块可点（全部是普通 <a>，
+             file:// 双击即可用，不需要脚本）。
+             高 DPI 下 5 列每列约 142px，正好放两行说明；窄屏与短视口的降级
+             见上方 @media 块。想改回"分段 + 推荐 + chips"见
+             starter-rollback/（restore-v2.ps1）。 -->
         <div class="prompt starter rise" style="--i:16">
           <div class="starter__head">
             <a class="starter__streak" href="stats.html">
@@ -659,21 +656,55 @@ body.menu-open { overflow: hidden; } /* 移动菜单打开时锁定滚动 */
             <a class="starter__resume" href="practice.html">Continue: Coffee Shop · 3m12s <span aria-hidden="true">→</span></a>
           </div>
 
-          <ul class="starter__scenes">
-            <li><a class="starter__chip" href="practice.html" data-scene="coffee-shop">Coffee shop</a></li>
-            <li><a class="starter__chip" href="practice.html" data-scene="airport-check-in">Airport check-in</a></li>
-            <li><a class="starter__chip" href="practice.html" data-scene="job-interview">Job interview</a></li>
-            <li><a class="starter__chip" href="practice.html" data-scene="see-a-doctor">See a doctor</a></li>
-            <li><a class="starter__more" href="recommend.html">More scenes <span aria-hidden="true">→</span></a></li>
-          </ul>
+          <p class="starter__also">Everything in VocalVerse</p>
 
-          <div class="starter__foot">
-            <div class="starter__modes" role="group" aria-label="Practice mode">
-              <a class="starter__mode is-active" href="practice.html" aria-label="Practice speaking">Speaking</a>
-              <a class="starter__mode" href="sing.html" aria-label="Practice singing">Singing</a>
-            </div>
-            <a class="starter__cta" href="practice.html">Start a scene <span aria-hidden="true">→</span></a>
-          </div>
+          <ul class="starter__grid">
+            <li>
+              <a class="starter__tile" href="practice.html">
+                <span class="starter__tile-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2a2.9 2.9 0 0 0-2.9 2.9v6a2.9 2.9 0 0 0 5.8 0v-6A2.9 2.9 0 0 0 12 3.2z"/><path d="M18.4 11.4v.7a6.4 6.4 0 0 1-12.8 0v-.7"/><path d="M12 18.5v2.3"/></svg>
+                </span>
+                <span class="starter__tile-title">Practice</span>
+                <span class="starter__tile-desc">Roleplay 8 scenes, scored every turn</span>
+              </a>
+            </li>
+            <li>
+              <a class="starter__tile" href="sing.html">
+                <span class="starter__tile-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>
+                </span>
+                <span class="starter__tile-title">Sing</span>
+                <span class="starter__tile-desc">Sing along, scored line by line</span>
+              </a>
+            </li>
+            <li>
+              <a class="starter__tile" href="recommend.html">
+                <span class="starter__tile-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.4 13.7 8.3 18.6 10 13.7 11.7 12 16.6 10.3 11.7 5.4 10 10.3 8.3z"/><path d="M18.6 15.2v3.4M20.3 16.9h-3.4"/></svg>
+                </span>
+                <span class="starter__tile-title">Recommend</span>
+                <span class="starter__tile-desc">Picks built from your weak spots</span>
+              </a>
+            </li>
+            <li>
+              <a class="starter__tile" href="stats.html">
+                <span class="starter__tile-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5v15.2a1.8 1.8 0 0 0 1.8 1.8h15.2"/><path d="m7.2 15.4 3.6-4.2 3 3 4.9-5.6"/></svg>
+                </span>
+                <span class="starter__tile-title">Stats</span>
+                <span class="starter__tile-desc">Five-axis radar and your trends</span>
+              </a>
+            </li>
+            <li>
+              <a class="starter__tile" href="community.html">
+                <span class="starter__tile-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15.6 20.6v-1.8a3.7 3.7 0 0 0-3.7-3.7H6.3a3.7 3.7 0 0 0-3.7 3.7v1.8"/><circle cx="9.1" cy="7.6" r="3.7"/><path d="M21.4 20.6v-1.8a3.7 3.7 0 0 0-2.8-3.6"/><path d="M15.6 3.9a3.7 3.7 0 0 1 0 7.2"/></svg>
+                </span>
+                <span class="starter__tile-title">Community</span>
+                <span class="starter__tile-desc">Posts and video, three domains</span>
+              </a>
+            </li>
+          </ul>
         </div>
       </div>
     </div>
@@ -724,5 +755,6 @@ body.menu-open { overflow: hidden; } /* 移动菜单打开时锁定滚动 */
 })();
 </script>
 <script src="js/footer.js" defer></script>
+<script src="js/gradual-blur.js" defer></script>
 </body>
 </html>

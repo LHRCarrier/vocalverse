@@ -192,6 +192,10 @@ def test_manual_checkin_aggregates_day_and_delegates(monkeypatch):
     captured = _install_fake_post(monkeypatch)
     uid = _new_user()
     now = datetime.now(UTC)
+    if now.hour < 3:
+        # 凌晨窗口（UTC 00:00~03:00）：下面 now-3h/now-2h 会跨 UTC 日界 → 重锚到当日 03:00，
+        # 否则种子落到「昨天」、按 UTC 日界聚合的取值范围与断言不符（2026-09-22 实测）。
+        now = now.replace(hour=3, minute=0, second=0, microsecond=0)
     # 当日两个会话（一个 81.5 分、一个 90 分）+ 一条评分失败 attempt（overall NULL 不参与最佳分）
     _seed_completed_session(
         uid,

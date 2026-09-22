@@ -9,6 +9,10 @@ from __future__ import annotations
 SNAPSHOT_CLUE_MAX = 8
 #: 快照 Fact 关系子集注入上限（P2-30 修订：防 20 个 NPC 塞爆快照）
 SNAPSHOT_FACT_REL_MAX = 6
+#: 快照 NPC 状态行上限（docs/56 §C：敌方 HP 进 DM 上下文/面板，按最近提及截断）
+SNAPSHOT_NPC_MAX = 6
+#: 快照「行囊」道具条目上限（P1-3：道具对 DM 可见；防 20 件杂物塞爆快照）
+SNAPSHOT_ITEM_MAX = 6
 #: 叙事事实提取频率：每 2 个玩家回合一次（P2-27 战斗一轮内状态变化频繁）
 EXTRACT_EVERY_ROUNDS = 2
 #: 单次提取最多应用操作数（P2-39 写频率系统级强制）
@@ -39,28 +43,45 @@ TOOL_MAX_ROUNDS = 2
 #: 一次性 DM 回复 TTS 合成的句子上限（防长旁白烧 TTS 配额；超出只回文本）
 TTS_MAX_SENTENCES = 10
 
-#: State 类域（系统直写，LLM 提取一律拒绝；P2-22/27 红线 1）
-STATE_DOMAINS = frozenset({"pc", "scene"})
-#: Fact 类域（LLM 提取：rel=人物关系 / quest=任务 / clue=线索）
+#: State 类域（系统直写，LLM 提取一律拒绝；P2-22/27 红线 1；docs/56 §2 增 npc）
+STATE_DOMAINS = frozenset({"pc", "scene", "npc"})
+#: Fact 类域（LLM 提取：rel=人物关系 / quest=任务 / clue=线索；item/encounter 为工具域）
 FACT_DOMAINS = frozenset({"rel", "quest", "clue"})
 
-#: 域 → 属性白名单（P2-24 两级白名单之属性层；新增属性必须先登记）
+#: 域 → 属性白名单（P2-24 两级白名单之属性层；新增属性必须先登记；docs/56 §2 扩展）
 DOMAIN_PROPERTIES: dict[str, tuple[str, ...]] = {
     "pc": ("hp", "location", "inventory"),
     "scene": ("current",),
     "rel": ("attitude", "trust", "status"),
-    "quest": ("status",),
+    "quest": ("progress", "kind", "stage", "status"),
     "clue": ("found",),
+    "npc": ("hp", "status"),
+    "item": ("qty", "owner", "effect", "consumable"),
+    "encounter": ("status", "order", "turn", "round"),
 }
 
-#: 域 → 实体 kind（P2-42 实体注册：rel→npc / quest→task / clue→clue / pc→pc）
+#: 系统专有属性（docs/56 §2）：LLM 提取（writer="llm"）一律拒写——进度钟/先攻/数量只能是
+#: 工具（writer="system"）的算术结果，模型只叙事（DiceFrame 口径：模型讲故事，引擎管状态）。
+SYSTEM_ONLY_PROPERTIES = frozenset(
+    {"progress", "kind", "stage", "order", "turn", "round", "qty", "owner", "consumable"}
+)
+
+#: 域 → 实体 kind（P2-42 实体注册：rel→npc / quest→task / clue→clue / pc→pc；
+#: docs/56 §2：item→task（实体登记用）、encounter 不登记实体——缺省无映射即不注册）
 DOMAIN_ENTITY_KIND: dict[str, str] = {
     "rel": "npc",
     "quest": "task",
     "clue": "clue",
     "pc": "pc",
     "scene": "scene",
+    "npc": "npc",
+    "item": "task",
 }
+
+#: 保留实体名（内部键式命名不得成为实体）：``main`` 是 encounter 事实的固定 id
+#: （``encounter.main.*``），曾因 ``DOMAIN_ENTITY_KIND`` 缺省回退 ``"npc"`` 被误注册成
+#: 幻影实体 ``npc.main``（P1-5）。注册/查找/展示三处统一过滤。
+RESERVED_ENTITY_NAMES: frozenset[str] = frozenset({"main"})
 
 #: 属性 → 值词对照表（P2-35 矛盾检测：摘要出现反向词且提到该实体 → 判定矛盾）
 OPPOSITE_PAIRS: tuple[tuple[str, str], ...] = (

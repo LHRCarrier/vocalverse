@@ -162,6 +162,64 @@ def test_turn_language_and_voice_switch(client, auth_headers):
     assert bad.status_code == 422 and bad.json()["code"] == 47001
 
 
+def test_turn_tts_voice_follows_lang(client, auth_headers, monkeypatch):
+    """TTS 音色跟随 DM 输出语言（zh→中文音色 / en→英文默认）；用户显式音色优先。"""
+    from app.audio.voices import DEFAULT_VOICE, ZH_DEFAULT_VOICE
+
+    calls: list[str] = []
+    headers = {"X-Test-User-Id": "11"}  # 独立用户：不吃 user 1 的 llm 限流桶
+
+    class RecTTS:
+        provider_id = "edge"
+
+        async def synthesize(self, text, voice="en-US-JennyNeural", rate="+0%"):
+            calls.append(voice)
+            return b"RIFF__fake_tts__"
+
+    monkeypatch.setattr("app.trpg.service.get_tts_client", lambda: RecTTS())
+    campaign_id = client.post(
+        "/api/v1/trpg/campaigns", json={"name": "音色跟随"}, headers=headers
+    ).json()["data"]["id"]
+
+    _turn(client, campaign_id, headers, "我看看四周")  # 默认 lang=zh
+    assert calls and all(v == ZH_DEFAULT_VOICE for v in calls)
+
+    calls.clear()
+    client.put("/api/v1/trpg/preferences", json={"lang": "en"}, headers=headers)
+    _turn(client, campaign_id, headers, "I look around")
+    assert calls and all(v == DEFAULT_VOICE for v in calls)
+
+    calls.clear()
+    client.put("/api/v1/trpg/preferences", json={"voice_name": "en-GB-RyanNeural"}, headers=headers)
+    _turn(client, campaign_id, headers, "我继续观察")
+    assert calls and all(v == "en-GB-RyanNeural" for v in calls)
+
+
+def test_card_template_apply_twice_no_duplicate_tasks(client, auth_headers):
+    """P1-1：模板 facts(quest.*.status) 与 tasks 同名时任务行按 title 幂等，不产生重行。"""
+    template = {
+        **GOOD_CARD["template"],
+        "facts": [{"key": "quest.查明幽灵船的真相.status", "value": "active", "modality": "fact"}],
+        "tasks": ["查明幽灵船的真相"],
+        "clues": [],
+    }
+    card_id = client.post(
+        "/api/v1/trpg/cards", json={**GOOD_CARD, "template": template}, headers=auth_headers
+    ).json()["data"]["id"]
+    campaign_id = client.post(f"/api/v1/trpg/cards/{card_id}/start", headers=auth_headers).json()[
+        "data"
+    ]["campaign_id"]
+
+    from app.trpg.cards import _apply_template
+
+    _apply_template(campaign_id, template)
+    _apply_template(campaign_id, template)
+    state = client.get(f"/api/v1/trpg/campaigns/{campaign_id}", headers=auth_headers).json()["data"]
+    assert [t["title"] for t in state["tasks"]].count("查明幽灵船的真相") == 1
+    facts = {f["key"]: f["value"] for f in state["facts"]}
+    assert facts["quest.查明幽灵船的真相.status"] == "active"
+
+
 # ---------------------------------------------------------------------------
 # 用户卡 CRUD + 开局
 # ---------------------------------------------------------------------------

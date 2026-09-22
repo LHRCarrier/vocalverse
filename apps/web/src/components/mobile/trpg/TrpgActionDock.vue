@@ -1,10 +1,15 @@
 <script setup lang="ts">
 /**
- * 酒馆 · 输入 dock（迁移自 ai4u ActionDock + 移动端自由对话输入栏）：
- * 快捷行动芯片（观察/交涉/攻击，发送固定中文行动）+ 文本输入 + 语音（ASR）+ 发送。
- * Enter 发送；处理中/录音中禁用；录音态显示提示。
+ * 酒馆 · 输入 dock（2026-09-22 按设计稿 dock-control 改版；2026-09-22 晚 docs/57 §3.2）：
+ * - 只保留输入职责：骰钮（快速投骰 D20）+ 文本 + 语音（ASR）+ 发送；
+ *   「推荐行动」相关 chip 已合并到 TrpgActionPanel（全站只有一排建议行动）；
+ * - `prefill`：动作面板点建议 chips 时由页面注入台词（填入 + 聚焦，不直接发送）；
+ * - Enter 发送；处理中/录音中禁用；录音态显示提示。语音链路（录音→ASR→逐句 TTS）原样保留。
  */
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+
+import IconCube from '~icons/tabler/cube'
+import IconSend from '~icons/tabler/send'
 
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 
@@ -14,29 +19,36 @@ const props = withDefaults(
     recording?: boolean
     /** 语音输入上限（秒），提示文案用 */
     maxSeconds?: number
+    /** 外部注入的填入请求（seq 递增以重复触发同一文案） */
+    prefill?: { text: string; seq: number } | null
   }>(),
-  { sending: false, recording: false, maxSeconds: 30 },
+  { sending: false, recording: false, maxSeconds: 30, prefill: null },
 )
 
 const emit = defineEmits<{
   send: [text: string]
   'toggle-mic': []
+  roll: []
 }>()
 
 const text = ref('')
+const inputEl = ref<HTMLInputElement | null>(null)
 
-const QUICK_ACTIONS = ['我仔细观察四周', '我试着和店里的人搭话', '我握紧武器，准备应对']
+watch(
+  () => props.prefill?.seq,
+  () => {
+    const incoming = props.prefill?.text
+    if (!incoming || props.sending || props.recording) return
+    text.value = incoming
+    inputEl.value?.focus()
+  },
+)
 
 function send() {
   const value = text.value.trim()
   if (!value || props.sending || props.recording) return
   text.value = ''
   emit('send', value)
-}
-
-function quick(action: string) {
-  if (props.sending || props.recording) return
-  emit('send', action)
 }
 </script>
 
@@ -45,42 +57,32 @@ function quick(action: string) {
     <div v-if="recording" class="t-dock-state" role="status">
       聆听中… 点击 ■ 停止并发送（最长 {{ maxSeconds }} 秒）
     </div>
-    <div class="t-quick">
+
+    <div class="t-input-bar">
       <button
-        v-for="action in QUICK_ACTIONS"
-        :key="action"
-        class="t-quick__chip"
+        class="t-input-bar__btn t-input-bar__btn--dice"
         type="button"
+        title="快速投骰 D20"
+        aria-label="快速投骰 D20"
         :disabled="sending || recording"
-        @click="quick(action)"
+        @click="emit('roll')"
       >
-        {{ action }}
+        <IconCube />
       </button>
-    </div>
-    <div class="u-fc-bar">
       <input
+        ref="inputEl"
         v-model="text"
-        class="u-fc-input"
+        class="t-input-bar__input"
         type="text"
-        placeholder="说一句你想做的事…"
+        placeholder="输入你想做的事，或点骰子掷骰…"
         aria-label="酒馆输入"
         :disabled="sending || recording"
         maxlength="500"
         @keyup.enter="send"
       >
       <button
-        class="u-fc-send"
-        type="button"
-        title="发送"
-        aria-label="发送"
-        :disabled="!text.trim() || sending || recording"
-        @click="send"
-      >
-        <MobileIcon name="arrow" :size="20" />
-      </button>
-      <button
-        class="u-fc-mic"
-        :class="{ 'u-fc-mic--rec': recording }"
+        class="t-input-bar__btn"
+        :class="{ 'is-rec': recording }"
         type="button"
         :title="recording ? '停止录音' : '语音行动'"
         :aria-label="recording ? '停止录音' : '语音行动'"
@@ -88,6 +90,16 @@ function quick(action: string) {
         @click="emit('toggle-mic')"
       >
         <MobileIcon :name="recording ? 'stop' : 'mic'" :size="20" />
+      </button>
+      <button
+        class="t-input-bar__send"
+        type="button"
+        title="发送"
+        aria-label="发送"
+        :disabled="!text.trim() || sending || recording"
+        @click="send"
+      >
+        <IconSend />
       </button>
     </div>
   </div>

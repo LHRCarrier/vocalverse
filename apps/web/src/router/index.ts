@@ -103,6 +103,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/mobile/MobileSettingsView.vue'),
     meta: { title: '设置', requiresAuth: true },
   },
+  /* ---- 社区规范与使用条例（docs/59 · 账户抽屉直开长文页） ---- */
+  {
+    path: '/m/guidelines',
+    component: () => import('@/views/mobile/MobileGuidelinesView.vue'),
+    meta: { title: '社区规范与使用条例', requiresAuth: true },
+  },
   /* ---- 读书域（docs/45 · 书架/书详情/阅读器/生词本；阅读器沉浸无底栏） ---- */
   {
     path: '/m/bookshelf',

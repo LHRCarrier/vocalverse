@@ -4,7 +4,8 @@
 - 所有写路径收敛于此：LLM 提取（``upsert_facts``）/ 规则直写（``apply_dice_delta``）/
   DM 场景切换（``set_scene``）/ 用户编辑删除（``edit_fact`` / ``delete_fact``）；
 - 读路径墓碑过滤统一：``user_deleted_at IS NULL``（P2-35 防提取复活）；
-- 实体注册（P2-42）：LLM 发现未知实体 → pending=True 懒确认；系统/DM 写不设 pending；
+- 实体注册（P2-42，2026-09-22 修订）：LLM 发现未知实体 → **直接 active**（pending=False，
+  docs/57 §3.1）；``pending`` 仅作为未来确认流/立绘任务的预留标志（当前无生产者）；
 - 骰子直写（P2-41）：任一 delta 落表失败抛错——调用方转错误文本，杜绝「文本成功但 HP 未落表」；
 - 叙事摘要（P2-45）：由结构化状态模板渲染（非对话压缩），永远与事实表一致。
 
@@ -30,8 +31,10 @@ from app.models.trpg import (
     TrpgMessage,
     TrpgTask,
 )
-from app.trpg.constants import DOMAIN_ENTITY_KIND, STATE_DOMAINS
-from app.trpg.dice import DiceResult, delta_value
+from app.trpg import progress as progress_rules
+from app.trpg.constants import DOMAIN_ENTITY_KIND, RESERVED_ENTITY_NAMES, STATE_DOMAINS
+from app.trpg.dice import DiceResult, delta_value, format_roll_faces
+from app.trpg.encounter import format_state_change, state_key_label
 from app.trpg.facts import Adjudication, FactOp, FactRowLike, adjudicate_upsert, parse_key
 from app.trpg.snapshot import (
     SnapshotClue,
@@ -121,7 +124,13 @@ def has_messages(campaign_id: int) -> bool:
 # 实体注册（P2-42）
 # ---------------------------------------------------------------------------
 def ensure_entity(campaign_id: int, kind: str, name: str, pending: bool = False) -> int:
-    """实体注册：已存在刷新 last_mentioned_at；不存在则创建。"""
+    """实体注册：已存在刷新 last_mentioned_at；不存在则创建（缺省 active，pending=False）。
+
+    保留名（内部键，如 encounter 的 ``main``）不注册，返回 0（调用方无需处理实体 id）。
+    """
+    if name in RESERVED_ENTITY_NAMES:
+        logger.warning("酒馆实体注册拒绝保留名：%s/%s（campaign=%s）", kind, name, campaign_id)
+        return 0
     db = get_session_factory()()
     try:
         row = db.execute(
@@ -148,8 +157,40 @@ def ensure_entity(campaign_id: int, kind: str, name: str, pending: bool = False)
         db.close()
 
 
+def find_entity(campaign_id: int, name: str, kinds: tuple[str, ...] = ("npc", "pc")) -> dict | None:
+    """按名字查实体（限 kinds；重名取最近提及）→ :func:`_entity_dict` 形状 / None。
+
+    读实体场景用（如 show_portrait 的立绘展示校验）；写路径一律走 :func:`ensure_entity`。
+    """
+    db = get_session_factory()()
+    try:
+        if name in RESERVED_ENTITY_NAMES:
+            return None
+        row = (
+            db.execute(
+                select(TrpgEntity)
+                .where(
+                    TrpgEntity.campaign_id == campaign_id,
+                    TrpgEntity.name == name,
+                    TrpgEntity.kind.in_(kinds),
+                    TrpgEntity.name.not_in(RESERVED_ENTITY_NAMES),
+                )
+                .order_by(TrpgEntity.last_mentioned_at.desc())
+            )
+            .scalars()
+            .first()
+        )
+        return _entity_dict(row) if row is not None else None
+    finally:
+        db.close()
+
+
 def cleanup_idle_entities(campaign_id: int, idle_ms: float) -> int:
-    """待确认实体懒清理（P2-42）：超窗未提及 → cleared（防积压）。"""
+    """待确认实体懒清理（P2-42 预留路径）：超窗未提及 → cleared（防积压）。
+
+    2026-09-22 起（docs/57 §3.1）不再有正常的 ``pending=True`` 生产者（发现即 active），
+    本函数保留给未来的「未知实体确认流」；当前调用即空转（返回 0），无副作用。
+    """
     db = get_session_factory()()
     try:
         cutoff = datetime.now(UTC) - timedelta(milliseconds=idle_ms)
@@ -270,12 +311,15 @@ def upsert_facts(
                     if source_message_id is not None:
                         row.source_message_id = source_message_id
                     row.version = (row.version or 1) + 1
-                    results.append({"op": op, "action": "update"})
+                    result_action = "update"
                 else:
                     if decision.register_entity and parsed is not None and parsed.entity:
-                        kind = DOMAIN_ENTITY_KIND.get(parsed.domain, "npc")
-                        _register_entity_in_db(db, campaign_id, kind, parsed.entity)
-                        entities.add(parsed.entity)
+                        # 无映射域（如 encounter）不注册实体——docs/56 §2 明文「encounter 不登记
+                        # 实体」；缺省回退 "npc" 曾把 encounter.main 注册成幻影 npc.main（P1-5）
+                        kind = DOMAIN_ENTITY_KIND.get(parsed.domain)
+                        if kind is not None:
+                            _register_entity_in_db(db, campaign_id, kind, parsed.entity)
+                            entities.add(parsed.entity)
                     kind = (
                         TrpgFactKinds.STATE
                         if parsed is not None and parsed.domain in STATE_DOMAINS
@@ -293,9 +337,12 @@ def upsert_facts(
                             source_message_id=source_message_id,
                         )
                     )
-                    results.append({"op": op, "action": "create"})
+                    result_action = "create"
                 _sync_task_clue_from_op(db, campaign_id, op)
                 db.commit()
+                # 成功结果在 commit 后登记（P1-1 附带修正：成功路径先 append 再 sync 失败时，
+                # 同一 op 会同时留下 update/create 与 reject 两条结果）
+                results.append({"op": op, "action": result_action})
             except Exception as exc:  # noqa: BLE001 - 逐条隔离：单条失败不拖垮整批
                 db.rollback()
                 logger.warning("酒馆事实 upsert 失败（%s）：%s", op.key, exc)
@@ -306,6 +353,8 @@ def upsert_facts(
 
 
 def _register_entity_in_db(db, campaign_id: int, kind: str, name: str) -> None:
+    if name in RESERVED_ENTITY_NAMES:
+        return
     row = db.execute(
         select(TrpgEntity).where(
             TrpgEntity.campaign_id == campaign_id,
@@ -319,24 +368,34 @@ def _register_entity_in_db(db, campaign_id: int, kind: str, name: str) -> None:
         return
     db.add(
         TrpgEntity(
-            campaign_id=campaign_id, kind=kind, name=name, pending=True, last_mentioned_at=now
+            campaign_id=campaign_id, kind=kind, name=name, pending=False, last_mentioned_at=now
         )
     )
 
 
 def _sync_task_clue_from_op(db, campaign_id: int, op: FactOp) -> None:
-    """quest./clue. 事实写 → 同步任务/线索行（快照与面板的结构化消费源）。"""
+    """quest./clue. 事实写 → 同步任务/线索行（快照与面板的结构化消费源）。
+
+    行查找必须**容错重行**（P1-1）：历史/并发路径可能留下同名重复行，``scalar_one_or_none``
+    会抛 ``MultipleResultsFound`` 并把整条事实写回滚（结算 status=done 静默丢失、再结算多发
+    结局卡）。这里取最早一行更新，其余重行就地清理（任务/线索无墓碑字段 → 直接删除）。
+    """
     parsed = parse_key(op.key)
     if parsed is None or parsed.entity is None:
         return
     now = datetime.now(UTC)
     if parsed.domain == "quest":
-        row = db.execute(
-            select(TrpgTask).where(
-                TrpgTask.campaign_id == campaign_id, TrpgTask.title == parsed.entity
+        rows = (
+            db.execute(
+                select(TrpgTask)
+                .where(TrpgTask.campaign_id == campaign_id, TrpgTask.title == parsed.entity)
+                .order_by(TrpgTask.id.asc())
             )
-        ).scalar_one_or_none()
+            .scalars()
+            .all()
+        )
         status = op.value if op.value in _VALID_TASK_STATUSES else None
+        row = rows[0] if rows else None
         if row is not None:
             if status:
                 row.status = status
@@ -350,17 +409,29 @@ def _sync_task_clue_from_op(db, campaign_id: int, op: FactOp) -> None:
                     last_mentioned_at=now,
                 )
             )
+        _drop_duplicate_rows(db, campaign_id, rows[1:], "任务", parsed.entity)
     elif parsed.domain == "clue":
-        row = db.execute(
-            select(TrpgClue).where(
-                TrpgClue.campaign_id == campaign_id, TrpgClue.title == parsed.entity
+        rows = (
+            db.execute(
+                select(TrpgClue)
+                .where(TrpgClue.campaign_id == campaign_id, TrpgClue.title == parsed.entity)
+                .order_by(TrpgClue.id.asc())
             )
-        ).scalar_one_or_none()
+            .scalars()
+            .all()
+        )
         found = True if op.value == "found" else (False if op.value == "lost" else None)
+        row = rows[0] if rows else None
         if row is not None:
             if found is not None:
                 row.found = found
             row.last_mentioned_at = now
+            # 重行里可能有更完整的正文/场景（历史写入路径不同）→ 仅补空，不覆盖
+            for extra in rows[1:]:
+                if row.content is None and extra.content:
+                    row.content = extra.content
+                if row.scene is None and extra.scene:
+                    row.scene = extra.scene
         else:
             db.add(
                 TrpgClue(
@@ -371,13 +442,26 @@ def _sync_task_clue_from_op(db, campaign_id: int, op: FactOp) -> None:
                     last_mentioned_at=now,
                 )
             )
+        _drop_duplicate_rows(db, campaign_id, rows[1:], "线索", parsed.entity)
+
+
+def _drop_duplicate_rows(db, campaign_id: int, extras: list, label: str, title: str) -> None:
+    """清理同名重行（保留最早一行）：任务/线索无墓碑字段，直接删除并留痕。"""
+    for extra in extras:
+        db.delete(extra)
+        logger.warning(
+            "酒馆%s重行清理：%s（campaign=%s，row=%s）", label, title, campaign_id, extra.id
+        )
 
 
 # ---------------------------------------------------------------------------
 # 规则直写（P2-41/44）
 # ---------------------------------------------------------------------------
 def apply_dice_delta(campaign_id: int, dice: DiceResult) -> str:
-    """骰子结果落表：逐 delta 增量写 State 行 + 落一条事件日志；失败抛错（调用方转错误文本）。"""
+    """骰子结果落表：逐 delta 增量写 State 行 + 落一条事件日志；失败抛错（调用方转错误文本）。
+
+    摘要用**展示名**（``主角 HP 7（-5）``，docs/57 §3.1：判定卡不再暴露内部键）。
+    """
     db = get_session_factory()()
     try:
         applied: list[str] = []
@@ -407,7 +491,7 @@ def apply_dice_delta(campaign_id: int, dice: DiceResult) -> str:
                         modality="fact",
                     )
                 )
-            applied.append(f"{d.key}={next_value}（{d.delta:+d}）")
+            applied.append(format_state_change(d.key, next_value, d.delta))
 
         round_no = (
             int(
@@ -419,11 +503,19 @@ def apply_dice_delta(campaign_id: int, dice: DiceResult) -> str:
             )
             + 1
         )
-        missing_note = f"（未建行跳过：{'，'.join(missing)}）" if missing else ""
+        missing_note = (
+            f"（未建行跳过：{'，'.join(state_key_label(key) for key in missing)}）"
+            if missing
+            else ""
+        )
         vs_note = ""
-        if dice.vs is not None:
-            outcome = "成功" if dice.outcome == "success" else "失败"
-            vs_note = f"（骰 {dice.total} 对抗 {dice.vs} {outcome}）"
+        if dice.rolls:
+            # 骰面明细（N4）：主持台 🎲 判定卡的文本源就是本 summary，必须带上掷骰结果
+            roll_note = format_roll_faces(dice)
+            if dice.vs is not None:
+                outcome = "成功" if dice.outcome == "success" else "失败"
+                roll_note = f"{roll_note} vs {dice.vs} {outcome}"
+            vs_note = f"（骰 {roll_note}）"
         summary = f"第 {round_no} 回合：{'；'.join(applied) or '无状态变化'}{missing_note}{vs_note}"
         db.add(TrpgEvent(campaign_id=campaign_id, round=round_no, summary=summary))
         db.commit()
@@ -529,6 +621,510 @@ def set_scene(campaign_id: int, scene: str) -> None:
         db.commit()
     finally:
         db.close()
+
+
+# ---------------------------------------------------------------------------
+# 闭环适配（docs/56 §B：quest 进度 / 实体在场 / 道具 / 遭遇 / 立绘 / 收尾）
+#
+# 纪律：本段只做「读事实 → 形状转换 → 起事务落库」，不做任何规则算术（算术/判定在
+# progress.py / encounter.py / items.py 纯模块）；写入一律经 upsert_facts(writer="system")。
+# ---------------------------------------------------------------------------
+_QUEST_PROPS: tuple[str, ...] = ("progress", "kind", "stage", "status")
+_ITEM_PROPS: tuple[str, ...] = ("qty", "owner", "effect", "consumable")
+
+
+def get_fact_value(campaign_id: int, key: str) -> str | None:
+    """按 key 读单条事实值（墓碑过滤与读路径一致）。"""
+    db = get_session_factory()()
+    try:
+        return db.execute(
+            select(TrpgFact.value).where(
+                TrpgFact.campaign_id == campaign_id,
+                TrpgFact.fact_key == key,
+                TrpgFact.user_deleted_at.is_(None),
+            )
+        ).scalar_one_or_none()
+    finally:
+        db.close()
+
+
+def _fact_values_by_prefix(campaign_id: int, prefix: str) -> dict[str, str]:
+    db = get_session_factory()()
+    try:
+        rows = db.execute(
+            select(TrpgFact.fact_key, TrpgFact.value).where(
+                TrpgFact.campaign_id == campaign_id,
+                TrpgFact.fact_key.like(f"{prefix}%"),
+                TrpgFact.user_deleted_at.is_(None),
+            )
+        ).all()
+        return {key: value for key, value in rows}
+    finally:
+        db.close()
+
+
+def _upsert_system_values(campaign_id: int, values: dict[str, str | None]) -> None:
+    ops = [
+        FactOp(op="create", key=key, value=str(value), writer="system")
+        for key, value in values.items()
+        if value is not None
+    ]
+    if ops:
+        upsert_facts(campaign_id, ops)
+
+
+def portrait_view(media_id: str | None) -> dict | None:
+    """立绘视图（``{media_id, url}``，未挂图 → None）；URL 口径 docs/56 §4。"""
+    if not media_id:
+        return None
+    from app.core.config import get_settings
+
+    return {"media_id": media_id, "url": f"{get_settings().media_url_prefix}{media_id}"}
+
+
+def get_quest_state(campaign_id: int, quest: str) -> dict:
+    """读任务闭环字段（progress/kind/stage/status；缺省 None，由工具补默认值）。"""
+    values = _fact_values_by_prefix(campaign_id, f"quest.{quest}.")
+    return {prop: values.get(f"quest.{quest}.{prop}") for prop in _QUEST_PROPS}
+
+
+def set_quest_facts(
+    campaign_id: int,
+    quest: str,
+    *,
+    progress: str | None = None,
+    kind: str | None = None,
+    stage: str | None = None,
+    status: str | None = None,
+) -> None:
+    """写任务闭环事实（系统写者；status 会经 ``_sync_task_clue_from_op`` 同步任务行）。"""
+    _upsert_system_values(
+        campaign_id,
+        {
+            f"quest.{quest}.progress": progress,
+            f"quest.{quest}.kind": kind,
+            f"quest.{quest}.stage": stage,
+            f"quest.{quest}.status": status,
+        },
+    )
+
+
+def get_item_state(campaign_id: int, name: str) -> dict:
+    """读道具条目（qty/owner/effect/consumable；无事实即 None 值）。"""
+    values = _fact_values_by_prefix(campaign_id, f"item.{name}.")
+    return {prop: values.get(f"item.{name}.{prop}") for prop in _ITEM_PROPS}
+
+
+def set_item_facts(
+    campaign_id: int,
+    name: str,
+    *,
+    qty: int | str | None = None,
+    owner: str | None = None,
+    effect: str | None = None,
+    consumable: bool | None = None,
+) -> None:
+    """写道具事实（数量/持有者/效果/是否消耗；None 字段不动）。"""
+    _upsert_system_values(
+        campaign_id,
+        {
+            f"item.{name}.qty": None if qty is None else str(int(qty)),
+            f"item.{name}.owner": owner,
+            f"item.{name}.effect": effect,
+            f"item.{name}.consumable": (
+                None if consumable is None else ("true" if consumable else "false")
+            ),
+        },
+    )
+
+
+def default_item_owner(campaign_id: int) -> str | None:
+    """道具默认持有者：最早登记的 PC 实体；无 PC 实体时取唯一的 ``pc.*`` 事实主体。
+
+    （grant_item 缺省 owner 来源；``pc.名`` 与 item.owner 契约一致。）
+    """
+    db = get_session_factory()()
+    try:
+        row = (
+            db.execute(
+                select(TrpgEntity)
+                .where(TrpgEntity.campaign_id == campaign_id, TrpgEntity.kind == "pc")
+                .order_by(TrpgEntity.id.asc())
+                .limit(1)
+            )
+            .scalars()
+            .first()
+        )
+        if row is not None:
+            return f"pc.{row.name}"
+        keys = (
+            db.execute(
+                select(TrpgFact.fact_key).where(
+                    TrpgFact.campaign_id == campaign_id,
+                    TrpgFact.fact_key.like("pc.%"),
+                    TrpgFact.user_deleted_at.is_(None),
+                )
+            )
+            .scalars()
+            .all()
+        )
+    finally:
+        db.close()
+    names: set[str] = set()
+    for key in keys:
+        parts = str(key).split(".")
+        if len(parts) == 3 and parts[0] == "pc" and parts[1]:
+            names.add(parts[1])
+    if len(names) == 1:
+        return f"pc.{names.pop()}"
+    return None
+
+
+def get_encounter(campaign_id: int, encounter_id: str = "main") -> dict:
+    """读遭遇事实（status/order/turn/round；order 在此解码为列表，工具不经手 JSON）。"""
+    from app.trpg.encounter import decode_order
+
+    prefix = f"encounter.{encounter_id}."
+    values = _fact_values_by_prefix(campaign_id, prefix)
+    return {
+        "id": encounter_id,
+        "status": values.get(f"{prefix}status"),
+        "order": decode_order(values.get(f"{prefix}order")),
+        "turn": _int_or_none(values.get(f"{prefix}turn")),
+        "round": _int_or_none(values.get(f"{prefix}round")),
+    }
+
+
+def set_encounter_facts(
+    campaign_id: int,
+    encounter_id: str,
+    *,
+    status: str | None = None,
+    order: list[str] | None = None,
+    turn: int | None = None,
+    round_no: int | None = None,
+) -> None:
+    """写遭遇事实（order 由系统编码为 JSON 数组字符串，LLM 禁写）。"""
+    from app.trpg.encounter import encode_order
+
+    prefix = f"encounter.{encounter_id}."
+    _upsert_system_values(
+        campaign_id,
+        {
+            f"{prefix}status": status,
+            f"{prefix}order": None if order is None else encode_order(order),
+            f"{prefix}turn": None if turn is None else str(int(turn)),
+            f"{prefix}round": None if round_no is None else str(int(round_no)),
+        },
+    )
+
+
+def get_active_encounter(campaign_id: int) -> dict | None:
+    """当前进行中的遭遇（``encounter.{id}.status == active`` 中最近写入的一条）。"""
+    db = get_session_factory()()
+    try:
+        row = (
+            db.execute(
+                select(TrpgFact)
+                .where(
+                    TrpgFact.campaign_id == campaign_id,
+                    TrpgFact.fact_key.like("encounter.%.status"),
+                    TrpgFact.value == "active",
+                    TrpgFact.user_deleted_at.is_(None),
+                )
+                .order_by(TrpgFact.id.desc())
+                .limit(1)
+            )
+            .scalars()
+            .first()
+        )
+    finally:
+        db.close()
+    if row is None:
+        return None
+    encounter_id = row.fact_key[len("encounter.") : -len(".status")]
+    if not encounter_id:
+        return None
+    return get_encounter(campaign_id, encounter_id)
+
+
+def _int_or_none(value: str | None) -> int | None:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _entity_dict(row: TrpgEntity) -> dict:
+    return {
+        "id": row.id,
+        "kind": row.kind,
+        "name": row.name,
+        "status": row.status,
+        "pending": row.pending,
+        "portrait_media_id": row.portrait_media_id,
+        "portrait": portrait_view(row.portrait_media_id),
+    }
+
+
+def get_entity(campaign_id: int, entity_id: int) -> dict | None:
+    """按 id 读实体（立绘挂载端点用）。"""
+    db = get_session_factory()()
+    try:
+        row = db.execute(
+            select(TrpgEntity).where(
+                TrpgEntity.id == entity_id, TrpgEntity.campaign_id == campaign_id
+            )
+        ).scalar_one_or_none()
+        return _entity_dict(row) if row is not None else None
+    finally:
+        db.close()
+
+
+def find_pc_entity(campaign_id: int) -> dict | None:
+    """最近提及的 PC 实体（attack 默认攻击者来源）；无 PC 实体 → None。"""
+    db = get_session_factory()()
+    try:
+        row = (
+            db.execute(
+                select(TrpgEntity)
+                .where(TrpgEntity.campaign_id == campaign_id, TrpgEntity.kind == "pc")
+                .order_by(TrpgEntity.last_mentioned_at.desc(), TrpgEntity.id.desc())
+            )
+            .scalars()
+            .first()
+        )
+        return _entity_dict(row) if row is not None else None
+    finally:
+        db.close()
+
+
+def set_entity_presence(
+    campaign_id: int,
+    kind: str,
+    name: str,
+    *,
+    pending: bool | None = None,
+    status: str | None = None,
+) -> bool:
+    """实体在场状态适配（docs/56 §B 映射：arriving↔pending=true / departed↔status=cleared）。"""
+    db = get_session_factory()()
+    try:
+        row = db.execute(
+            select(TrpgEntity).where(
+                TrpgEntity.campaign_id == campaign_id,
+                TrpgEntity.kind == kind,
+                TrpgEntity.name == name,
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return False
+        if pending is not None:
+            row.pending = pending
+        if status is not None:
+            row.status = status
+        row.last_mentioned_at = datetime.now(UTC)
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
+def mark_entity_arriving(campaign_id: int, kind: str, name: str) -> None:
+    """登场中（**预留**）：注册并标记 pending=True——「正在赶来」只留给未来的立绘任务。
+
+    2026-09-22 起正常登场路径不再调用本函数（enter_character 直接 active，docs/57 §3.1）。
+    """
+    ensure_entity(campaign_id, kind, name, pending=True)
+    set_entity_presence(campaign_id, kind, name, pending=True, status="active")
+
+
+def mark_entity_departed(campaign_id: int, name: str) -> dict | None:
+    """离场：``status=cleared`` + ``pending=False``；实体不存在 → None。"""
+    entity = find_entity(campaign_id, name)
+    if entity is None:
+        return None
+    set_entity_presence(campaign_id, str(entity["kind"]), name, pending=False, status="cleared")
+    return find_entity(campaign_id, name)
+
+
+def set_entity_portrait(campaign_id: int, entity_id: int, media_id: str | None) -> bool:
+    """挂/卸实体立绘（media_id=None 为卸下）；实体不存在返回 False。"""
+    db = get_session_factory()()
+    try:
+        row = db.execute(
+            select(TrpgEntity).where(
+                TrpgEntity.id == entity_id, TrpgEntity.campaign_id == campaign_id
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return False
+        row.portrait_media_id = media_id
+        row.last_mentioned_at = datetime.now(UTC)
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
+def get_entity_portrait(
+    campaign_id: int, name: str, kinds: tuple[str, ...] = ("npc", "pc")
+) -> str | None:
+    """按名字取实体立绘 media_id（重名取最近提及；无 → None）。"""
+    db = get_session_factory()()
+    try:
+        return (
+            db.execute(
+                select(TrpgEntity.portrait_media_id)
+                .where(
+                    TrpgEntity.campaign_id == campaign_id,
+                    TrpgEntity.name == name,
+                    TrpgEntity.kind.in_(kinds),
+                )
+                .order_by(TrpgEntity.last_mentioned_at.desc())
+            )
+            .scalars()
+            .first()
+        )
+    finally:
+        db.close()
+
+
+def mark_campaign_finished(campaign_id: int) -> None:
+    """一局收尾标记（complete_quest 结算后调用；finished_at 为归档/新篇章判据）。"""
+    db = get_session_factory()()
+    try:
+        row = db.get(TrpgCampaign, campaign_id)
+        if row is not None:
+            row.finished_at = datetime.now(UTC)
+            db.commit()
+    finally:
+        db.close()
+
+
+def campaign_finished_at(campaign_id: int) -> datetime | None:
+    """一局收尾时间（None=尚在冒险中；GET state 的 finished/finished_at 数据源）。"""
+    db = get_session_factory()()
+    try:
+        row = db.get(TrpgCampaign, campaign_id)
+        return row.finished_at if row is not None else None
+    finally:
+        db.close()
+
+
+def get_ending_payload(campaign_id: int, quest: str) -> dict | None:
+    """读已落库的结局系统卡 payload（幂等结算返回「既有结局」的数据源）。
+
+    返回 ``{quest, outcome, title, text, epilogue}``（剥掉 trpg_sys）；无卡/字段残缺 → None。
+    """
+    db = get_session_factory()()
+    try:
+        rows = (
+            db.execute(
+                select(TrpgMessage)
+                .where(
+                    TrpgMessage.campaign_id == campaign_id,
+                    TrpgMessage.kind == "system",
+                )
+                .order_by(TrpgMessage.id.desc())
+            )
+            .scalars()
+            .all()
+        )
+    finally:
+        db.close()
+    for row in rows:
+        payload = row.payload if isinstance(row.payload, dict) else {}
+        if payload.get("trpg_sys") != "ending" or payload.get("quest") != quest:
+            continue
+        ending = {
+            key: payload.get(key) for key in ("quest", "outcome", "title", "text", "epilogue")
+        }
+        if not all(isinstance(ending[key], str) and ending[key] for key in ending):
+            return None
+        return ending
+    return None
+
+
+def persist_system_card(campaign_id: int, trpg_sys: str, payload: dict) -> None:
+    """系统卡落库（kind=system + payload.trpg_sys；与 service._post_system_row 同协议）。"""
+    add_message(
+        campaign_id,
+        "assistant",
+        "",
+        kind="system",
+        payload={"trpg_sys": trpg_sys, **payload},
+        meta={"trpg_sys": trpg_sys},
+    )
+
+
+def settle_quest(campaign_id: int, quest: str, outcome: str | None = None) -> dict:
+    """确定性结算门面（complete_quest 工具与 settle 路由共用；docs/57 §3.1）。
+
+    规则算术在 :mod:`app.trpg.progress`（纯函数），此处只做「读状态 → 落表 → 组装返回」：
+    - 未结算：判定档位（显式 outcome 优先，否则按进度/威胁钟自动）→ ``quest.status`` 落表
+      → 营地 ``finished_at`` 置位；
+    - 已 done/failed：**幂等**——已有结局卡则原样返回其 payload；无卡（如提取器直接置 done）
+      则补渲染一张（``existing=False``，由调用方决定落卡）。
+    返回 ``{quest, outcome, status, title, text, epilogue, settled, existing, finished}``。
+    """
+    state = get_quest_state(campaign_id, quest)
+    status = state.get("status")
+    if status in ("done", "failed"):
+        existing = get_ending_payload(campaign_id, quest)
+        finished = campaign_finished_at(campaign_id) is not None
+        if not finished:
+            # 收敛：已结算但收尾标记缺失（历史数据/异常路径）→ 补置位，保证 finished 语义可信
+            mark_campaign_finished(campaign_id)
+            finished = True
+        if existing is not None:
+            return {
+                "quest": quest,
+                "status": status,
+                "settled": False,
+                "existing": True,
+                "finished": finished,
+                **existing,
+            }
+        plan = progress_rules.plan_settlement(
+            quest,
+            progress=state.get("progress"),
+            kind=state.get("kind"),
+            stage=state.get("stage"),
+            status=status,
+        )
+        return {
+            "quest": quest,
+            "settled": False,
+            "existing": False,
+            "finished": finished,
+            "outcome": plan.outcome,
+            "status": plan.status,
+            "title": plan.title,
+            "text": plan.text,
+            "epilogue": plan.epilogue,
+        }
+
+    plan = progress_rules.plan_settlement(
+        quest,
+        requested=outcome,
+        progress=state.get("progress"),
+        kind=state.get("kind"),
+        stage=state.get("stage"),
+    )
+    set_quest_facts(campaign_id, quest, status=plan.status)
+    mark_campaign_finished(campaign_id)
+    return {
+        "quest": quest,
+        "settled": True,
+        "existing": False,
+        "finished": True,
+        "outcome": plan.outcome,
+        "status": plan.status,
+        "title": plan.title,
+        "text": plan.text,
+        "epilogue": plan.epilogue,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -749,39 +1345,76 @@ def list_entities(campaign_id: int) -> list[dict]:
     db = get_session_factory()()
     try:
         rows = (
-            db.execute(select(TrpgEntity).where(TrpgEntity.campaign_id == campaign_id))
+            db.execute(
+                select(TrpgEntity).where(
+                    TrpgEntity.campaign_id == campaign_id,
+                    # 幻影实体（历史 npc.main 等保留名）不再暴露给面板/攻击目标列表
+                    TrpgEntity.name.not_in(RESERVED_ENTITY_NAMES),
+                )
+            )
             .scalars()
             .all()
         )
         return [
-            {"kind": r.kind, "name": r.name, "status": r.status, "pending": r.pending} for r in rows
+            {
+                "id": r.id,
+                "kind": r.kind,
+                "name": r.name,
+                "status": r.status,
+                "pending": r.pending,
+                "portrait_media_id": r.portrait_media_id,
+                "portrait": portrait_view(r.portrait_media_id),
+            }
+            for r in rows
         ]
     finally:
         db.close()
 
 
 def create_task(campaign_id: int, title: str, scene: str | None = None) -> bool:
-    """主持台建任务：任务行 + 同步 quest 事实（立即进快照）。"""
+    """主持台/场景卡建任务：**按 title 幂等 upsert**（P1-1：模板 facts 与 tasks 同名时
+    不再产生重复行），任务行 + 同步 quest 事实（立即进快照）。
+
+    已存在：只刷新 last_mentioned_at（可选补 scene），保留既有状态，不复活已结算任务；
+    现存重行：保留最早一行，其余清理。
+    """
     t = (title or "").strip()[:60]
     if not t:
         return False
     db = get_session_factory()()
+    now = datetime.now(UTC)
     try:
-        db.add(
-            TrpgTask(
+        rows = (
+            db.execute(
+                select(TrpgTask)
+                .where(TrpgTask.campaign_id == campaign_id, TrpgTask.title == t)
+                .order_by(TrpgTask.id.asc())
+            )
+            .scalars()
+            .all()
+        )
+        row = rows[0] if rows else None
+        if row is None:
+            row = TrpgTask(
                 campaign_id=campaign_id,
                 title=t,
                 status=TrpgTaskStatuses.ACTIVE,
                 scene=(scene or None),
-                last_mentioned_at=datetime.now(UTC),
+                last_mentioned_at=now,
             )
-        )
+            db.add(row)
+        else:
+            row.last_mentioned_at = now
+            if scene:
+                row.scene = scene
+        _drop_duplicate_rows(db, campaign_id, rows[1:], "任务", t)
         db.commit()
+        status = row.status
     finally:
         db.close()
     upsert_facts(
         campaign_id,
-        [FactOp(op="create", key=f"quest.{t}.status", value="active", writer="system")],
+        [FactOp(op="create", key=f"quest.{t}.status", value=status, writer="system")],
     )
     return True
 

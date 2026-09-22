@@ -4,8 +4,8 @@
 1. ``trpg_ready`` → 首回合先落「开场卡」（剧本名/场景/任务）→ 玩家消息（ASR 可选）落库；
 2. 首回合恢复校验（P2-34）→【待记住】补丁；
 3. 组装 DM 上下文（P2-36：不注入画像/记忆；快照在动态段最末，P2-31）；
-4. 工具循环流式生成（roll_dice / set_scene）；
-5. DM 消息落库 → ``turn_end``；
+4. 工具循环流式生成（roll_dice / set_scene / 闭环工具：进度钟·结算·人物·战斗·道具）；
+5. DM 消息落库 → ``turn_end``（工具闭环事件随流转发；ending 另落系统卡，刷新不丢）；
 6. 系统卡协议（P2-44）：场景变化 → 过场卡；新事件 → 判定卡（落库 + 流内下发，刷新不丢）；
 7. DM 回复逐句 TTS（上限 :data:`TTS_MAX_SENTENCES`，缓存命中零成本）；
 8. 叙事摘要刷新（P2-45 状态渲染）+ 事实提取（每 2 回合，后台 fire-and-forget）。
@@ -25,6 +25,7 @@ from app.audio.duration import audio_duration_seconds
 from app.audio.textproc.normalize import normalize_for_tts
 from app.audio.textproc.sentence_splitter import StreamSentenceSplitter
 from app.audio.tts_cache import tts_synthesize_cached
+from app.audio.voices import default_voice_for_lang
 from app.console.trace.recorder import span
 from app.core.config import get_settings
 from app.models.trpg import TrpgCampaign
@@ -196,6 +197,17 @@ async def stream_turn(
                     yield ev.TextDelta(text=str(item["text"]))
                 elif item["type"] == "status":
                     yield ev.TrpgStatus(stage=str(item["stage"]))
+                elif item["type"] == "portrait":
+                    yield ev.PortraitShow(**(item.get("portrait") or {}))
+                elif item["type"] == "sse":
+                    # 闭环事件（quest/ending/character/encounter）：ending 额外落系统卡保刷新
+                    event = item.get("event")
+                    if isinstance(event, ev.Ending):
+                        await _post_system_row(
+                            campaign_id, "ending", event.model_dump(exclude={"type"})
+                        )
+                    if event is not None:
+                        yield event
     except Exception as exc:  # noqa: BLE001 - 流内错误交给前端（节奏优先）
         logger.exception("酒馆 DM 生成失败：%s", exc)
         fallback = "（DM 似乎走神了，请把你的行动再说一遍。）"
@@ -238,7 +250,7 @@ async def stream_turn(
 
     # DM 回复逐句 TTS（前端排队播放；失败逐句降级为无音频；用户关闭语音则不合成）
     if voice_enabled:
-        async for chunk in _tts_chunks(tts, content, voice_name):
+        async for chunk in _tts_chunks(tts, content, voice_name, lang=lang):
             yield chunk
 
     await asyncio.to_thread(st.touch_campaign, campaign_id)
@@ -393,11 +405,15 @@ async def _post_system_row(campaign_id: int, trpg_sys: str, payload: dict) -> No
 
 
 async def _tts_chunks(
-    tts: TTSClient, content: str, voice_name: str | None = None
+    tts: TTSClient, content: str, voice_name: str | None = None, lang: str = "zh"
 ) -> AsyncIterator[ev.AudioChunk]:
-    """DM 回复逐句 TTS（并发合成、按序下发；逐句失败静默跳过，绝不阻塞回合）。"""
+    """DM 回复逐句 TTS（并发合成、按序下发；逐句失败静默跳过，绝不阻塞回合）。
+
+    音色优先级：用户显式 ``voice_name`` > 按 DM 输出语言 ``lang`` 的默认音色
+    （zh → 中文音色 / en → Jenny；见 :func:`app.audio.voices.default_voice_for_lang`）。
+    """
     settings = get_settings()
-    voice = (voice_name or "").strip() or settings.tts_voice
+    voice = (voice_name or "").strip() or default_voice_for_lang(lang)
     splitter = StreamSentenceSplitter()
     sentences = splitter.push(content) + splitter.flush()
     sentences = [s for s in sentences if any(c.isalnum() for c in s)][:TTS_MAX_SENTENCES]
@@ -415,7 +431,7 @@ async def _tts_chunks(
 
     tasks: dict[int, asyncio.Task] = {}
     for i, (sentence, _) in enumerate(located):
-        tasks[i] = asyncio.create_task(_tts_one(tts, sentence, voice, settings.tts_rate))
+        tasks[i] = asyncio.create_task(_tts_one(tts, sentence, voice, settings.tts_rate, lang))
     for i, (sentence, offset) in enumerate(located):
         url, duration = await tasks[i]
         if url:
@@ -423,10 +439,10 @@ async def _tts_chunks(
 
 
 async def _tts_one(
-    tts: TTSClient, sentence: str, voice: str, rate: str
+    tts: TTSClient, sentence: str, voice: str, rate: str, lang: str = "zh"
 ) -> tuple[str | None, float | None]:
     try:
-        text = normalize_for_tts(sentence, language="en")
+        text = normalize_for_tts(sentence, language=lang)
         data = await tts_synthesize_cached(tts, text, voice, rate)
         if not data:
             return None, None

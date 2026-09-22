@@ -1,14 +1,24 @@
 <script setup lang="ts">
 /**
- * 酒馆 · 消息项（迁移自 ai4u MessageItem；2026-09-21 改造）：
+ * 酒馆 · 消息项（迁移自 ai4u MessageItem；2026-09-21 改造 · 2026-09-22 对设计稿完整参考）：
  * - 系统卡：open（开场重卡）、scene（过场细线）、dice（判定卡，成功绿/失败红）；
- * - 玩家气泡（右｜炭黑）；DM 气泡（左｜白卡）；
- * - **DM 台词按「名字：」分人名段**（纯文本插值，禁 v-html；docs/13 §5）；
- * - **卡拉OK逐词高亮**：服务端 audio_chunk 带句子文本 + 偏移，播放时按进度点亮到当前词
- *   （token 按原始字符偏移切分，渲染层只做标记字符过滤，不动偏移）；
- * - **长按消息卡 → 弹出操作菜单**（听这句/标注/复制；替代旧气泡尾重播按钮）。
+ * - **三种说话人三种呈现**（设计稿 dialog-stream）：
+ *   ① DM 叙述 = 米白气泡（左，头像 = 设计稿 DM 头像）；
+ *   ② 玩家 = 暗茶色气泡（右，头像 = 账号头像，无则设计稿 PC 头像占位）；
+ *   ③ **NPC 台词 = 独立 whisper 卡**（虚线琥珀卡 + NPC 头像 + 名牌 + 斜体台词，**不塞进 DM 气泡**）；
+ * - **引号整行**（「…」/“…”）按设计稿 dm-quote 样式高亮（整行才高亮，避免误伤行内引号）；
+ * - 卡拉OK逐词高亮 + 长按操作菜单 + 译文（气泡脚注），均保持；
+ * - 文本插值禁 v-html（docs/13 §5）。
  */
 import { computed, ref } from 'vue'
+
+import IconCrown from '~icons/tabler/crown'
+
+import MobileAvatar from '@/components/mobile/MobileAvatar.vue'
+
+import { TAVERN_ART, npcAvatar } from './art'
+import { buildTrpgLines, diceOutcomeOf, groupTrpgParts, prettifyDiceText, tokenizeTrpg } from './segments'
+import TrpgEndingCard from './TrpgEndingCard.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -21,6 +31,9 @@ const props = withDefaults(
     /** NPC 名单（实体表 kind=npc；决定「名字：」是否渲染成人名标签） */
     npcNames?: Set<string>
     avatarLetter?: string
+    /** 玩家头像/昵称（账号；立绘抽屉与消息头像用） */
+    avatarUrl?: string | null
+    userName?: string
     /** 已标注（长按菜单切换；展示左侧标记） */
     marked?: boolean
     /** 该条为长按选中项（动作条打开期间高亮描边） */
@@ -36,6 +49,8 @@ const props = withDefaults(
     live: false,
     npcNames: () => new Set<string>(),
     avatarLetter: '我',
+    avatarUrl: null,
+    userName: '冒险者',
     marked: false,
     active: false,
     translation: null,
@@ -43,23 +58,24 @@ const props = withDefaults(
   },
 )
 
-const emit = defineEmits<{ actions: []; translate: [] }>()
+const emit = defineEmits<{ actions: []; translate: []; standee: [role: 'user' | 'assistant'] }>()
 
 const isSystem = computed(() => props.kind === 'system')
 const sysType = computed(() => String(props.payload?.trpg_sys ?? ''))
 const scenePayload = computed(() => props.payload ?? {})
+/** DM 头像加载失败 → 回退 Tabler crown（离线/资源缺失时不出现破图） */
+const dmAvatarFailed = ref(false)
 
 const openTasks = computed<string[]>(() => {
   const raw = scenePayload.value.tasks
   return Array.isArray(raw) ? raw.map((x) => String(x)) : []
 })
-const diceLines = computed(() => String(scenePayload.value.text ?? '').split('\n').filter(Boolean))
-const diceOutcome = computed<'success' | 'failure' | null>(() => {
-  const text = String(scenePayload.value.text ?? '')
-  if (text.includes('成功')) return 'success'
-  if (text.includes('失败')) return 'failure'
-  return null
-})
+const diceLines = computed(() =>
+  prettifyDiceText(String(scenePayload.value.text ?? ''))
+    .split('\n')
+    .filter(Boolean),
+)
+const diceOutcome = computed(() => diceOutcomeOf(String(scenePayload.value.text ?? '')))
 
 /* ---------------- 长按 → 操作菜单 ---------------- */
 const LONG_PRESS_MS = 420
@@ -105,17 +121,8 @@ function movePress(event: TouchEvent) {
   if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) cancelPress()
 }
 
-/* ---------------- 逐词高亮（卡拉OK） ---------------- */
-interface Token {
-  text: string
-  /** 全局 token 序号（高亮比较用；跨行拆分的片段沿用父 token 序号） */
-  idx: number
-  start: number
-  /** 渲染用文本（过滤 markdown 标记字符，偏移不变） */
-  plain: string
-}
-
-const tokens = computed<Token[]>(() => tokenize(props.content))
+/* ---------------- 逐词高亮（卡拉OK）+ 行/说话块（纯函数见 segments.ts） ---------------- */
+const tokens = computed(() => tokenizeTrpg(props.content))
 const litThrough = computed(() => {
   const hl = props.highlight
   if (!hl || hl.offset == null) return -1
@@ -131,71 +138,13 @@ const litThrough = computed(() => {
   return idx
 })
 
-/** token 化：拉丁词/数字为一个 token；CJK 字符逐字；标点/空白并入前一 token */
-function tokenize(text: string): Token[] {
-  const out: Token[] = []
-  const re = /[A-Za-z0-9''-]+|[\u4e00-\u9fff]|[\s\S]/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(text)) !== null) {
-    const piece = m[0]
-    const start = m.index
-    const isSpaceOrPunct = /^[\s\S]$/.test(piece) && !/[A-Za-z0-9\u4e00-\u9fff]/.test(piece)
-    if (isSpaceOrPunct && out.length) {
-      const last = out[out.length - 1]!
-      last.text += piece
-      last.plain += piece
-      continue
-    }
-    out.push({ text: piece, idx: out.length, start, plain: stripMarks(piece) })
-  }
-  return out
-}
+const lines = computed(() => buildTrpgLines(props.content, props.npcNames))
+const parts = computed(() => groupTrpgParts(lines.value))
 
-function stripMarks(s: string): string {
-  return s.replace(/\*\*|`|^#{1,6}\s*/g, '')
-}
-
-interface Line {
-  npc: string | null
-  tokens: Token[]
-}
-
-const lines = computed<Line[]>(() => {
-  const result: Line[] = []
-  let current: Line = { npc: null, tokens: [] }
-  const flush = () => {
-    const hasText = current.tokens.some((t) => t.plain.trim())
-    if (hasText) result.push(current)
-    current = { npc: null, tokens: [] }
-  }
-  for (const tok of tokens.value) {
-    const parts = tok.text.split('\n')
-    if (parts.length === 1) {
-      current.tokens.push(tok)
-      continue
-    }
-    // 跨行 token（换行并入前一 token）：切开，前缀入当前行，后续按新行续
-    let cursor = tok.start
-    parts.forEach((part, i) => {
-      if (i > 0) {
-        flush()
-      }
-      if (part) {
-        current.tokens.push({ text: part, idx: tok.idx, start: cursor, plain: stripMarks(part) })
-      }
-      cursor += part.length + 1 // +1 = 换行符
-    })
-  }
-  flush()
-  // NPC 行识别：行首 token 以「名字：」开头且名字在名单内
-  for (const line of result) {
-    const joined = line.tokens.map((t) => t.text).join('')
-    const m = /^([^：:\n]{1,12})[：:]\s*/.exec(joined)
-    if (m && props.npcNames.has(m[1]!.trim())) {
-      line.npc = m[1]!.trim()
-    }
-  }
-  return result
+/** 最后一个旁白块的下标（脚注=译文/标注挂在它里面，对应设计稿 bubble-footer） */
+const lastTextPart = computed(() => {
+  for (let i = parts.value.length - 1; i >= 0; i--) if (!parts.value[i]!.npc) return i
+  return -1
 })
 </script>
 
@@ -225,6 +174,9 @@ const lines = computed<Line[]>(() => {
     <div v-for="(line, i) in diceLines" :key="i" class="t-card__dice-line">{{ line }}</div>
   </section>
 
+  <!-- 系统卡：任务结算尾声（docs/56 §5：ending 额外落系统卡，刷新仍在） -->
+  <TrpgEndingCard v-else-if="isSystem && sysType === 'ending'" :payload="scenePayload" />
+
   <!-- 未知系统卡：降级为文本（前向兼容） -->
   <div v-else-if="isSystem" class="t-scene-line">{{ content || `系统卡：${sysType}` }}</div>
 
@@ -244,56 +196,137 @@ const lines = computed<Line[]>(() => {
     @touchcancel="cancelPress"
     @contextmenu.prevent="isSystem || emit('actions')"
   >
-    <span v-if="role === 'assistant'" class="u-ava t-ava--dm" aria-hidden="true">
-      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-        <path
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          d="M4 8h13a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2Zm15 3h1a2 2 0 0 1 0 4h-1"
-        />
-      </svg>
-    </span>
-    <div class="u-bubble" :class="role === 'user' ? 'u-bubble--user' : 'u-bubble--ai'">
-      <!-- 翻译（X 式：右上角文字按钮；点击翻译 → 再点看原文） -->
-      <button
-        v-if="role === 'assistant' && content.trim()"
-        class="t-tr"
-        type="button"
-        :class="{ 'is-on': translation?.showing }"
-        :title="translation?.showing ? '查看原文' : '翻译这段'"
-        @click.stop="emit('translate')"
+    <!-- 头像框：点击打开角色立绘（设计稿 avatar-frame；DM = 设计稿头像，加载失败回退 Tabler） -->
+    <button
+      v-if="role === 'assistant'"
+      class="t-ava-frame t-ava-frame--dm"
+      type="button"
+      title="查看守密人立绘"
+      aria-label="查看守密人立绘"
+      @click.stop="emit('standee', 'assistant')"
+    >
+      <img
+        v-if="!dmAvatarFailed"
+        :src="TAVERN_ART.dmAvatar"
+        alt=""
+        @error="dmAvatarFailed = true"
       >
-        {{ translation?.status === 'loading' ? '翻译中…' : translation?.showing ? '原文' : '翻译' }}
-      </button>
+      <IconCrown v-else />
+    </button>
+
+    <div class="t-msg__body">
+      <div class="t-msg__meta">
+        <template v-if="role === 'assistant'">
+          <span class="t-msg__name">守密人 (DM)</span>
+          <span class="t-msg__role">地下城主</span>
+          <button
+            class="t-msg__link"
+            type="button"
+            @click.stop="emit('standee', 'assistant')"
+          >
+            [查看全身立绘]
+          </button>
+        </template>
+        <template v-else>
+          <button class="t-msg__link" type="button" @click.stop="emit('standee', 'user')">
+            [查看立绘]
+          </button>
+          <span class="t-msg__role t-msg__role--me">玩家</span>
+          <span class="t-msg__name t-msg__name--me">{{ userName }}</span>
+        </template>
+      </div>
+
       <template v-if="role === 'assistant'">
         <!-- 展示译文：原文保留在服务端/本地，点击「原文」切回 -->
-        <p v-if="translation?.showing" class="t-seg t-seg--translated">{{ translation.text }}</p>
-        <p v-else-if="translation?.status === 'error'" class="t-seg t-seg--error">
-          翻译失败，点击「翻译」重试
-        </p>
+        <div v-if="translation?.showing" class="u-bubble t-bubble">
+          <p class="t-seg t-seg--translated">{{ translation.text }}</p>
+          <div class="t-msg__foot">
+            <span v-if="marked" class="t-mark">🔖 已标注</span>
+            <span v-else class="t-msg__foot-space" />
+            <button class="t-tr is-on" type="button" @click.stop="emit('translate')">原文</button>
+          </div>
+        </div>
+        <div v-else-if="translation?.status === 'error'" class="u-bubble t-bubble">
+          <p class="t-seg t-seg--error">翻译失败，点击「译文」重试</p>
+          <div class="t-msg__foot">
+            <span class="t-msg__foot-space" />
+            <button class="t-tr" type="button" @click.stop="emit('translate')">译文</button>
+          </div>
+        </div>
         <template v-else>
-          <p
-            v-for="(line, i) in lines"
-            :key="i"
-            class="t-seg"
-            :class="{ 't-seg--npc': line.npc }"
-          >
-            <span v-if="line.npc" class="t-seg__npc">{{ line.npc }}</span>
-            <span
-              v-for="(tok, j) in line.tokens"
-              :key="j"
-              class="t-tok"
-              :class="{ 'is-lit': litThrough >= 0 && tok.idx <= litThrough }"
-            >{{ tok.plain }}</span>
-          </p>
+          <!-- 说话块流：DM 旁白 = 米白气泡；NPC 台词 = 独立 whisper 卡（不塞进 DM 气泡） -->
+          <template v-for="(part, pi) in parts" :key="pi">
+            <div v-if="part.npc" class="t-npc-card">
+              <span class="t-npc-card__ava" aria-hidden="true">
+                <img v-if="npcAvatar(part.npc)" :src="npcAvatar(part.npc)!" alt="">
+                <template v-else>{{ part.npc.slice(0, 1) }}</template>
+              </span>
+              <div class="t-npc-card__body">
+                <div class="t-npc-card__name">{{ part.npc }}</div>
+                <div class="t-npc-card__line">
+                  <span
+                    v-for="(tok, j) in part.lines[0]!.tokens.slice(part.lines[0]!.skip)"
+                    :key="j"
+                    class="t-tok"
+                    :class="{ 'is-lit': litThrough >= 0 && tok.idx <= litThrough }"
+                  >{{ tok.plain }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="u-bubble t-bubble">
+              <p
+                v-for="(line, li) in part.lines"
+                :key="li"
+                class="t-seg"
+                :class="{ 't-seg--quote': line.quote }"
+              >
+                <span
+                  v-for="(tok, j) in line.tokens"
+                  :key="j"
+                  class="t-tok"
+                  :class="{
+                    'is-lit': litThrough >= 0 && tok.idx <= litThrough,
+                    't-tok--quote': tok.quote,
+                  }"
+                >{{ tok.plain }}</span>
+              </p>
+              <!-- 脚注：标注状态 + 译文按钮（设计稿 bubble-footer），挂在最后一个旁白气泡内 -->
+              <div v-if="pi === lastTextPart && content.trim()" class="t-msg__foot">
+                <span v-if="marked" class="t-mark">🔖 已标注</span>
+                <span v-else class="t-msg__foot-space" />
+                <button
+                  class="t-tr"
+                  type="button"
+                  :class="{ 'is-on': translation?.showing }"
+                  :title="translation?.showing ? '查看原文' : '翻译这段'"
+                  @click.stop="emit('translate')"
+                >
+                  {{ translation?.status === 'loading' ? '翻译中…' : translation?.showing ? '原文' : '译文' }}
+                </button>
+              </div>
+            </div>
+          </template>
+          <!-- 纯 NPC 台词（无旁白气泡）时脚注兜底 -->
+          <div v-if="lastTextPart < 0 && content.trim()" class="t-msg__foot t-msg__foot--bare">
+            <span v-if="marked" class="t-mark">🔖 已标注</span>
+            <span v-else class="t-msg__foot-space" />
+            <button class="t-tr" type="button" @click.stop="emit('translate')">译文</button>
+          </div>
         </template>
         <span v-if="live" class="t-caret" aria-hidden="true">▍</span>
-        <span v-if="marked" class="t-mark" title="已标注">🔖 已标注</span>
       </template>
-      <template v-else>{{ content || '…' }}</template>
+      <div v-else class="u-bubble t-bubble u-bubble--user">{{ content || '…' }}</div>
     </div>
-    <span v-if="role === 'user'" class="u-ava u-ava--me" aria-hidden="true">{{ avatarLetter }}</span>
+
+    <button
+      v-if="role === 'user'"
+      class="t-ava-frame t-ava-frame--me"
+      type="button"
+      title="查看我的立绘"
+      aria-label="查看我的立绘"
+      @click.stop="emit('standee', 'user')"
+    >
+      <MobileAvatar :src="avatarUrl || TAVERN_ART.pcAvatar" :name="userName || avatarLetter" size="md" />
+    </button>
   </div>
 </template>

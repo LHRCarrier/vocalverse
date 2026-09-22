@@ -30,9 +30,9 @@ from app.practice import events as practice_events
 from app.trpg import cards as card_domain
 from app.trpg import events as ev
 from app.trpg import state as st
+from app.trpg.constants import ENTITY_NAME_MAX
 from app.trpg.dice import format_dice_text, parse_dice
 from app.trpg.service import stream_turn
-from app.trpg.tools import set_scene
 
 router = APIRouter(prefix="/api/v1/trpg", tags=["trpg"])
 logger = logging.getLogger("vocalverse")
@@ -121,6 +121,42 @@ class RollBody(BaseModel):
     effects: list[dict] | None = None
 
 
+class EntityPortrait(BaseModel):
+    """实体立绘挂载（media_id = ``media_assets.public_id``；docs/56 §4）。"""
+
+    media_id: str
+
+
+class QuestSettle(BaseModel):
+    """确定性结算（docs/57 §3.1）：quest 必填；outcome 可省 → 按进度自动判定。"""
+
+    quest: str
+    outcome: str | None = None
+
+
+def _media_owned_by(public_id: str, user_id: int) -> bool:
+    """媒体归属校验：public_id 命中且 owner 为调用者且 ready；否则 False（不泄露存在性）。"""
+    from sqlalchemy import select
+
+    from app.db import get_session_factory
+    from app.models.media import MediaAsset, MediaStatus
+
+    db = get_session_factory()()
+    try:
+        return (
+            db.execute(
+                select(MediaAsset.id).where(
+                    MediaAsset.public_id == public_id,
+                    MediaAsset.owner_id == user_id,
+                    MediaAsset.status == MediaStatus.READY,
+                )
+            ).first()
+            is not None
+        )
+    finally:
+        db.close()
+
+
 def _require_campaign(campaign_id: int, user_id: int):
     campaign = st.get_campaign_owned(campaign_id, user_id)
     if campaign is None:
@@ -130,7 +166,7 @@ def _require_campaign(campaign_id: int, user_id: int):
 
 @router.get("/campaigns")
 async def list_campaigns(user_id: int = Depends(get_current_user_id)):
-    """我的剧本列表（按最近活跃倒序）。"""
+    """我的剧本列表（按最近活跃倒序；``finished``/``finished_at`` 供大堂页显示「已完结」）。"""
     rows = await asyncio.to_thread(st.list_campaigns, user_id)
     return ok(
         [
@@ -139,6 +175,8 @@ async def list_campaigns(user_id: int = Depends(get_current_user_id)):
                 "name": r.name,
                 "last_active_at": r.last_active_at.isoformat() if r.last_active_at else None,
                 "create_time": r.created_at.isoformat() if r.created_at else None,
+                "finished": r.finished_at is not None,
+                "finished_at": r.finished_at.isoformat() if r.finished_at else None,
             }
             for r in rows
         ]
@@ -171,6 +209,8 @@ async def get_campaign_state(
                 "id": campaign.id,
                 "name": campaign.name,
                 "narrative_summary": campaign.narrative_summary,
+                "finished": campaign.finished_at is not None,
+                "finished_at": campaign.finished_at.isoformat() if campaign.finished_at else None,
             },
             "messages": history,
             **state,
@@ -184,6 +224,38 @@ async def clear_messages(campaign_id: int, user_id: int = Depends(get_current_us
     _require_campaign(campaign_id, user_id)
     removed = await asyncio.to_thread(st.clear_messages, campaign_id)
     return ok({"removed": removed})
+
+
+# ---------------------------------------------------------------------------
+# 确定性结算（docs/57 §3.1：与 complete_quest 工具共用逻辑；幂等 + 落结局卡）
+# ---------------------------------------------------------------------------
+@router.post("/campaigns/{campaign_id}/quests/settle")
+async def settle_quest(
+    campaign_id: int, body: QuestSettle, user_id: int = Depends(get_current_user_id)
+):
+    """结算任务（owner 校验）。已 done/failed → 幂等返回既有结局（不再落卡）。
+
+    响应 ``data={quest, outcome, title, text, epilogue, finished}``。
+    """
+    _require_campaign(campaign_id, user_id)
+    quest = body.quest.strip()
+    if not quest or len(quest) > ENTITY_NAME_MAX:
+        raise BizError(http_status=422, code=47001, message="任务名不能为空且最长 60 字")
+    outcome = (body.outcome or "").strip().lower() or None
+    if outcome is not None and outcome not in ("strong", "weak", "miss"):
+        raise BizError(http_status=422, code=47001, message="outcome 需为 strong|weak|miss")
+
+    result = await asyncio.to_thread(st.settle_quest, campaign_id, quest, outcome)
+    ending = {
+        "quest": quest,
+        "outcome": result["outcome"],
+        "title": result["title"],
+        "text": result["text"],
+        "epilogue": result["epilogue"],
+    }
+    if not result["existing"]:
+        await asyncio.to_thread(st.persist_system_card, campaign_id, "ending", ending)
+    return ok({**ending, "finished": result["finished"]})
 
 
 @router.post("/campaigns/{campaign_id}/turns")
@@ -359,7 +431,45 @@ async def set_campaign_scene(
     scene = body.scene.strip()[:40]
     if not scene:
         raise BizError(http_status=422, code=47001, message="场景名不能为空")
-    await asyncio.to_thread(set_scene, campaign_id, scene)
+    await asyncio.to_thread(st.set_scene, campaign_id, scene)
+    return ok({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# 实体立绘（docs/56 §4：owner 校验 + 媒体归属校验；实体列表回带 portrait）
+# ---------------------------------------------------------------------------
+@router.post("/campaigns/{campaign_id}/entities/{entity_id}/portrait")
+async def attach_entity_portrait(
+    campaign_id: int,
+    entity_id: int,
+    body: EntityPortrait,
+    user_id: int = Depends(get_current_user_id),
+):
+    """给实体挂立绘（媒体必须是调用者本人 ready 资产；缺失/非本人 → 40403）。"""
+    _require_campaign(campaign_id, user_id)
+    media_id = body.media_id.strip()
+    if not (8 <= len(media_id) <= 64):
+        raise BizError(http_status=422, code=47001, message="media_id 非法")
+    entity = await asyncio.to_thread(st.get_entity, campaign_id, entity_id)
+    if entity is None:
+        raise BizError(http_status=404, code=40401, message="entity not found")
+    owned = await asyncio.to_thread(_media_owned_by, media_id, user_id)
+    if not owned:
+        raise BizError(http_status=404, code=40403, message="media not found")
+    await asyncio.to_thread(st.set_entity_portrait, campaign_id, entity_id, media_id)
+    return ok({"ok": True, **(st.portrait_view(media_id) or {})})
+
+
+@router.delete("/campaigns/{campaign_id}/entities/{entity_id}/portrait")
+async def detach_entity_portrait(
+    campaign_id: int, entity_id: int, user_id: int = Depends(get_current_user_id)
+):
+    """卸下实体立绘（前端回退内置素材/占位）。"""
+    _require_campaign(campaign_id, user_id)
+    entity = await asyncio.to_thread(st.get_entity, campaign_id, entity_id)
+    if entity is None:
+        raise BizError(http_status=404, code=40401, message="entity not found")
+    await asyncio.to_thread(st.set_entity_portrait, campaign_id, entity_id, None)
     return ok({"ok": True})
 
 

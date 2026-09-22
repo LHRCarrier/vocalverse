@@ -170,7 +170,7 @@ function baseState(overrides: Partial<TrpgState> = {}): TrpgState {
     ],
     tasks: [{ id: 1, title: '打听怪谈', status: 'active', scene: '酒馆', last_mentioned_at: null }],
     clues: [],
-    entities: [{ kind: 'npc', name: '莉亚', status: 'active', pending: false }],
+    entities: [{ id: 1, kind: 'npc', name: '莉亚', status: 'active', pending: false, portrait: null }],
     events: [],
     scene: '酒馆',
     snapshot: '【当前状态】\nPC：HP 12',
@@ -203,13 +203,14 @@ beforeEach(() => {
 })
 
 describe('MobileTavernView（酒馆 · 剧本/回合/系统卡）', () => {
-  it('有剧本 → 进游玩态：状态带/HP/场景渲染', async () => {
+  it('有剧本 → 进游玩态：副本任务卡/HP/场景渲染', async () => {
     const wrapper = await mountView()
     const text = wrapper.text()
     expect(text).toContain('迷雾酒馆')
     expect(text).toContain('HP 12')
     expect(text).toContain('吧台')
-    expect(text).toContain('任务 1')
+    expect(text).toContain('待办 1')
+    expect(text).toContain('目标：')
   })
 
   it('无剧本 → 开局引导；示例剧本一键开局（场景/HP/任务/线索）', async () => {
@@ -252,7 +253,8 @@ describe('MobileTavernView（酒馆 · 剧本/回合/系统卡）', () => {
     const text = wrapper.text()
     expect(text).toContain('欢迎来到迷雾酒馆')
     expect(text).toContain('判定')
-    expect(text).toContain('pc.主角.hp=7')
+    expect(text).toContain('主角 HP 7') // 内部键名 pc.主角.hp=7 已玩家化
+    expect(text).not.toContain('pc.主角.hp=')
     // 回合结束（流关闭）→ 状态刷新（事实/任务对齐）
     expect(mocks.fetchCampaignState.mock.calls.length).toBeGreaterThanOrEqual(2)
   })
@@ -275,7 +277,7 @@ describe('MobileTavernView（酒馆 · 剧本/回合/系统卡）', () => {
       }),
     )
     const wrapper = await mountView()
-    const segs = wrapper.findAll('.t-seg--npc')
+    const segs = wrapper.findAll('.t-npc-card')
     expect(segs).toHaveLength(1)
     expect(segs[0]!.text()).toContain('莉亚')
     expect(segs[0]!.text()).toContain('这边坐')
@@ -359,7 +361,7 @@ describe('MobileTavernView（酒馆 · 剧本/回合/系统卡）', () => {
     await wrapper.findAll('button').find((b) => b.text() === '掷骰')!.trigger('click')
     await flushPromises()
     expect(mocks.rollDice).toHaveBeenCalledWith(1, expect.objectContaining({ dice: 'd20' }))
-    expect(wrapper.text()).toContain('pc.主角.hp=7')
+    expect(wrapper.text()).toContain('主角 HP 7')
   })
 
   it('流内错误提示（error 事件 + onError）', async () => {

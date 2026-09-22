@@ -22,6 +22,10 @@ public interface ModerationCaseRepository extends JpaRepository<ModerationCaseEn
   /**
    * 列表查询（docs/50 §10.2 GET /moderation/cases）。
    *
+   * <p><b>{@code status='open'} 是聚合筛选</b>（docs/58 §5.1）：{@code pending + escalated}。 升级件把 {@code
+   * priority} 提到 1 之后**仍然是待办**，若默认筛选只看 {@code pending}，升级过的单会从队列里消失 ——
+   * 页面文案「升级后仍留在队列里」与查询结果必须一致，否则升级 = 单子失踪。
+   *
    * <p><b>⚠️ 空值判断都要 {@code cast}</b>（2026-09-10 真 PG 实测）：PostgreSQL 在 Parse 阶段就要确定 每个 {@code $n}
    * 的类型，而 `{@code ? is null}` 不提供任何线索、参数为 NULL 时驱动也不补类型 OID （非 NULL 会补 —— 于是"带筛选正常、清空筛选
    * 500"，表现极具误导性）。 加 cast 后类型确定、语义不变。**H2 测试抓不到这一类**（本仓同类已第四次）， 详见 {@code
@@ -29,7 +33,9 @@ public interface ModerationCaseRepository extends JpaRepository<ModerationCaseEn
    */
   @Query(
       "select c from ModerationCaseEntity c "
-          + "where (cast(:status as string) is null or c.status = :status) "
+          + "where (cast(:status as string) is null "
+          + "or (:status = 'open' and c.status in ('pending','escalated')) "
+          + "or c.status = :status) "
           + "and (cast(:targetType as string) is null or c.targetType = :targetType) "
           + "and (cast(:priority as short) is null or c.priority = :priority) "
           + "and (cast(:assigneeId as long) is null or c.assigneeId = :assigneeId) "

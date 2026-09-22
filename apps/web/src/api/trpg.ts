@@ -14,6 +14,9 @@ export interface TrpgCampaignItem {
   name: string
   last_active_at?: string | null
   create_time?: string | null
+  /** 本局是否已完结（列表契约，2026-09-22 起：供大堂「已完结」分组） */
+  finished?: boolean
+  finished_at?: string | null
 }
 
 export interface TrpgFactItem {
@@ -47,11 +50,19 @@ export interface TrpgClueItem {
   last_mentioned_at?: string | null
 }
 
+/** 实体立绘（docs/56 §4；未挂图 → null，前端按名字命中内置素材） */
+export interface TrpgEntityPortrait {
+  media_id: string
+  url: string
+}
+
 export interface TrpgEntityItem {
+  id: number
   kind: string
   name: string
   status: string
   pending: boolean
+  portrait: TrpgEntityPortrait | null
 }
 
 export interface TrpgEventItem {
@@ -81,7 +92,14 @@ export interface TrpgVerifyResult {
 }
 
 export interface TrpgState {
-  campaign: { id: number; name: string; narrative_summary?: string | null }
+  campaign: {
+    id: number
+    name: string
+    narrative_summary?: string | null
+    /** 本局是否已完结（权威位置，docs/57 P1-2：刷新后已完结条/收尾门控靠它） */
+    finished?: boolean
+    finished_at?: string | null
+  }
   messages: TrpgMessageItem[]
   facts: TrpgFactItem[]
   tasks: TrpgTaskItem[]
@@ -92,6 +110,19 @@ export interface TrpgState {
   snapshot: string
   narrative_summary?: string | null
   verify: TrpgVerifyResult
+  /** @deprecated 旧契约顶层字段；权威位置是 `campaign.finished`（读取保留兼容，写入不再使用） */
+  finished?: boolean
+  finished_at?: string | null
+}
+
+/** 确定性结算结果（`POST /campaigns/{id}/quests/settle`，幂等） */
+export interface TrpgSettleResult {
+  quest: string
+  outcome: 'strong' | 'weak' | 'miss'
+  title: string
+  text: string
+  epilogue: string
+  finished: boolean
 }
 
 export interface TrpgRollResult {
@@ -250,6 +281,21 @@ export function refreshNarrative(campaignId: number) {
   return post<{ narrative_summary: string }>(
     `/api/v1/trpg/campaigns/${campaignId}/narrative/refresh`,
   )
+}
+
+/**
+ * 确定性结算（docs/57 §3.1）：钟满/玩家主动收尾时直接调后端，
+ * 幂等——已结算任务返回既有结局，不新发结局卡。
+ */
+export function settleQuest(
+  campaignId: number,
+  quest: string,
+  outcome?: 'strong' | 'weak' | 'miss',
+) {
+  return post<TrpgSettleResult>(`/api/v1/trpg/campaigns/${campaignId}/quests/settle`, {
+    quest,
+    outcome,
+  })
 }
 
 // ---------------------------------------------------------------------------

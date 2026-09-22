@@ -69,9 +69,10 @@ describe('checkin store（手动打卡 · 2026-09-21 改版）', () => {
   })
 
   it('refresh：从我的打卡卡算今日状态与连续天数（不写死演示值）', async () => {
-    mocks.fetchFeed.mockResolvedValue(
-      feedOf([checkinPost(3, localDateKey()), checkinPost(2, '2026-09-20')]),
-    )
+    const today = localDateKey()
+    const y = new Date()
+    y.setDate(y.getDate() - 1) // 昨天按日历回拨（不用固定日期：跨天会让用例过期）
+    mocks.fetchFeed.mockResolvedValue(feedOf([checkinPost(3, today), checkinPost(2, localDateKey(y))]))
     const store = useCheckinStore()
     await store.refresh()
 

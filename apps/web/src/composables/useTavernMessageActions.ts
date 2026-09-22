@@ -97,3 +97,5 @@ export function useTavernMessageActions(
     close,
   }
 }
+
+export type TavernMessageActions = ReturnType<typeof useTavernMessageActions>

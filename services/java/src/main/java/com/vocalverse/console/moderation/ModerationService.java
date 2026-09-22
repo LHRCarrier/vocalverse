@@ -187,7 +187,40 @@ public class ModerationService {
     if (!open.isEmpty()) {
       return open.get(0); // 幂等：复用既有待审单
     }
-    return insertCase(principal, v, null);
+    return insertCase(principal, v, null, null);
+  }
+
+  /**
+   * 自动送审建单（docs/58 §3.3）：由 Jev 判定命中阈值后调用，{@code source='auto'}。
+   *
+   * <p><b>无管理端主体</b>：审计以系统身份落行（{@code adminUserId=null}、{@code username="-"}）， 动作名仍是 {@code
+   * moderation.case.create}（docs/50 §5.3.7 的单一审计流不新增动作），{@code detail.source='auto'} 用于区分来源。
+   *
+   * <p><b>幂等</b>：目标已有待审/升级单 → 直接复用（**不覆盖**既有快照）——同一目标可能先被举报建单、 再被自动送审命中，复用保证审核员只面对一张单。
+   *
+   * @param aiEvidence Jev 判定证据（写进 {@code snapshot.ai}）；null = 不写
+   */
+  @Transactional
+  public ModerationCaseEntity createAuto(
+      String targetType,
+      Long targetId,
+      String reasonCode,
+      short priority,
+      Map<String, Object> aiEvidence) {
+    Validated v =
+        validate(
+            new CreateRequest(
+                targetType,
+                targetId,
+                ModerationCaseEntity.SOURCE_AUTO,
+                reasonCode,
+                priority,
+                null));
+    List<ModerationCaseEntity> open = cases.findOpen(v.targetType(), v.targetId());
+    if (!open.isEmpty()) {
+      return open.get(0);
+    }
+    return insertCase(null, v, null, aiEvidence);
   }
 
   /** 建单入参校验结果（校验与落库分离，便于复用与测试）。 */
@@ -231,9 +264,13 @@ public class ModerationService {
    * 落库建单（**不重读 reports**；{@code reportCount} 由调用方在「先 cases 后 reports」的顺序下取得）。
    *
    * @param reportCount 快照里的举报数；null = 由本方法读一次（仅限没有 reports 写操作参与的路径）
+   * @param aiEvidence 自动送审证据（写进 {@code snapshot.ai}）；null = 不写
    */
   private ModerationCaseEntity insertCase(
-      ConsolePrincipal principal, Validated v, Integer reportCount) {
+      ConsolePrincipal principal,
+      Validated v,
+      Integer reportCount,
+      Map<String, Object> aiEvidence) {
     Instant now = Instant.now();
     ModerationCaseEntity e = new ModerationCaseEntity();
     e.setTargetType(v.targetType());
@@ -243,7 +280,7 @@ public class ModerationService {
     e.setPriority(v.priority());
     e.setStatus(ModerationCaseEntity.STATUS_PENDING);
     e.setSnippet(targets.snippet(v.targetType(), v.targetId()));
-    e.setSnapshot(buildSnapshot(v.targetType(), v.targetId(), reportCount));
+    e.setSnapshot(buildSnapshot(v.targetType(), v.targetId(), reportCount, aiEvidence));
     e.setAssigneeId(v.assigneeId());
     e.setCreatedAt(now);
     e.setUpdatedAt(now);
@@ -269,6 +306,7 @@ public class ModerationService {
         "建审核单：" + v.targetType() + "#" + v.targetId(),
         detail(
             "targetType", v.targetType(),
+            "source", v.source(),
             "priority", v.priority(),
             "reasonCode", v.reasonCode(),
             "prevStatus", null,
@@ -518,7 +556,8 @@ public class ModerationService {
                     before.getReasonCode(),
                     (short) 2,
                     null),
-                openCount);
+                openCount,
+                null);
         linkedCaseId = created.getId();
       } else if (cases.findById(linkedCaseId).isEmpty()) {
         throw ConsoleException.of(ConsoleErrorCodes.INVALID_PARAM, "caseId 不存在：" + linkedCaseId);
@@ -775,9 +814,11 @@ public class ModerationService {
 
   /**
    * 送审快照（docs/50 §5.3.8：{@code
-   * {authorId,authorHandle,domain,kind,mediaPublicIds,postId,reportCount}}）。
+   * {authorId,authorHandle,domain,kind,mediaPublicIds,postId,reportCount}}；{@code source='auto'}
+   * 时另有 {@code ai} —— docs/58 §3.3）。
    */
-  private String buildSnapshot(String targetType, Long targetId, Integer reportCount) {
+  private String buildSnapshot(
+      String targetType, Long targetId, Integer reportCount, Map<String, Object> aiEvidence) {
     Map<String, Object> snap = new LinkedHashMap<>();
     snap.put("kind", targetType);
     snap.put("targetId", targetId);
@@ -791,6 +832,10 @@ public class ModerationService {
     snap.put(
         "reportCount",
         reportCount != null ? reportCount : cases.countOpenForTarget(targetType, targetId));
+    if (aiEvidence != null && !aiEvidence.isEmpty()) {
+      // AI 判定证据：给审核员看的「为什么这单在队列里」，也是事后复核阈值的唯一凭据
+      snap.put("ai", aiEvidence);
+    }
     try {
       return mapper.writeValueAsString(snap);
     } catch (Exception e) {

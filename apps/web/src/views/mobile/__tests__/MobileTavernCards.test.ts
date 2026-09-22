@@ -136,6 +136,14 @@ async function mountView() {
   return wrapper
 }
 
+/** 游玩态打开场景卡抽屉：顶栏「切换剧本」→ 抽屉内「＋ 用场景卡开新局」 */
+async function openCardsSheet(wrapper: Awaited<ReturnType<typeof mountView>>) {
+  await wrapper.find('button[aria-label="切换剧本"]').trigger('click')
+  await flushPromises()
+  await wrapper.findAll('button').find((b) => b.text().includes('用场景卡开新局'))!.trigger('click')
+  await flushPromises()
+}
+
 beforeEach(() => {
   setActivePinia(createPinia())
   localStorage.clear()
@@ -153,14 +161,15 @@ beforeEach(() => {
 describe('酒馆设置 + 场景卡（docs/52 §12）', () => {
   /**
    * 2026-09-21 组长反馈：标题居中 + 功能项可放左。
-   * 结构断言 = 左右两组钮数配平（游玩态 2:3、无剧本态 1:2）；happy-dom 无布局，
-   * 真实居中量由 Playwright 坐标实测（见 worklog 安卓日志同日条）。
+   * 2026-09-22 设计稿改版：新增「角色立绘」入口（游玩态左一）；游玩态去掉场景卡顶栏钮
+   * （收敛进「切换剧本」抽屉的「＋ 用场景卡开新局」，docs/35 规则 5）→ 2:3 / 1:2 配平。
+   * 结构断言 = 左右两组钮数配平；happy-dom 无布局，真实居中量由 Playwright 坐标实测。
    */
-  it('顶栏配平：游玩态 设置+场景卡 在左；无剧本态星标回右', async () => {
+  it('顶栏配平：游玩态 立绘+设置 在左；无剧本态 设置 在左、场景卡在右', async () => {
     const wrapper = await mountView()
     expect(
       wrapper.findAll('.u-topbar__leftacts .u-topbar__act').map((b) => b.attributes('aria-label')),
-    ).toEqual(['酒馆设置', '场景卡'])
+    ).toEqual(['角色立绘', '酒馆设置'])
     expect(wrapper.findAll('.u-topbar__acts .u-topbar__act').map((b) => b.attributes('aria-label'))).toEqual([
       '切换剧本',
       '主持台',
@@ -215,8 +224,7 @@ describe('酒馆设置 + 场景卡（docs/52 §12）', () => {
     )
 
     const wrapper = await mountView()
-    await wrapper.find('button[aria-label="场景卡"]').trigger('click')
-    await flushPromises()
+    await openCardsSheet(wrapper)
     const text = wrapper.text()
     expect(text).toContain('我的场景卡')
     expect(text).toContain('精选场景卡')
@@ -240,8 +248,7 @@ describe('酒馆设置 + 场景卡（docs/52 §12）', () => {
     mocks.startCard.mockResolvedValue(88)
 
     const wrapper = await mountView()
-    await wrapper.find('button[aria-label="场景卡"]').trigger('click')
-    await flushPromises()
+    await openCardsSheet(wrapper)
     await wrapper.findAll('button').find((b) => b.text().includes('按关键词生成'))!.trigger('click')
     await flushPromises()
     await wrapper.find('input[aria-label="场景关键词"]').setValue('海盗 幽灵船')
@@ -262,8 +269,7 @@ describe('酒馆设置 + 场景卡（docs/52 §12）', () => {
     mocks.updateCard.mockResolvedValue(userCard(31, '改过的卡'))
 
     const wrapper = await mountView()
-    await wrapper.find('button[aria-label="场景卡"]').trigger('click')
-    await flushPromises()
+    await openCardsSheet(wrapper)
 
     await wrapper.find('button[aria-label="编辑"]').trigger('click')
     await flushPromises()

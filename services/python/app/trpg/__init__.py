@@ -6,7 +6,7 @@
 - :mod:`app.trpg.snapshot`：状态快照组装（纯函数）；
 - :mod:`app.trpg.verify`：悬空/落差/矛盾（纯函数）；
 - :mod:`app.trpg.state`：事实/任务/线索/实体/事件的唯一写入口（DB）；
-- :mod:`app.trpg.tools`：roll_dice / set_scene 工具定义与执行；
+- :mod:`app.trpg.tools`：工具注册表 + 内置工具（roll_dice / set_scene，一工具一文件）；
 - :mod:`app.trpg.turn`：LLM 工具循环（流式正文 + 工具回放）；
 - :mod:`app.trpg.service`：DM 门面（上下文组装 + SSE 事件流 + 系统卡）；
 - :mod:`app.trpg.extractor`：叙事事实提取（每 2 回合，后台 fire-and-forget）；

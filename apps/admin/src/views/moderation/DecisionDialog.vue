@@ -7,8 +7,12 @@
  * 2. **决定的真实效果**——每个决定都写明它对目标表做什么。特别是 `hide` / `delete`：
  *    服务端会写 `status='hidden'|'deleted'`，**用户可见范围内立即不可见（作者也一样）**，
  *    这不是"标记一下待复核"（§6.2 处置动作映射表）；
- * 3. **给作者的说明**——`decision_note` 经公开面白名单下发给作者，会被本人看到（§6.2 联动硬点 3），
- *    所以标签直接这么写，不让审核员以为它只是内部备注。
+ * 3. **内部备注不是对外文案**——`decision_note` **不下发作者**（docs/51 B-4 拍板：避免审核员身份与
+ *    内部理由外泄）；作者侧只会看到固定 `reason_code` 的中文标签（P6 后续 PR）。标签必须这么写，
+ *    否则审核员会把它当"给用户的话"来写。
+ *
+ * 自动送审单（`source='auto'`）额外展示 `snapshot.ai` 判定证据（docs/58）：审核员要能看到
+ * 「这单为什么在队列里」，而不是只能信任一次黑箱。
  *
  * 46010（`CASE_STATE_CONFLICT`）是**预期内**结果：另一个审核员抢先处置了同一单，
  * 服务端的条件 UPDATE 匹配 0 行（§6.2）。这里不弹红色报错，而是提示 + 关框 + 触发刷新。
@@ -25,6 +29,7 @@ import {
   DECISION_META,
   REASON_CODE_OPTIONS,
   SOURCE_LABEL,
+  aiEvidenceText,
   decisionMeta,
   describeFailure,
   failureLines,
@@ -45,6 +50,7 @@ const note = ref('')
 const submitting = ref(false)
 
 const chosen = computed(() => decisionMeta(decision.value))
+const aiEvidence = computed(() => aiEvidenceText(props.item?.snapshot))
 
 const submitText = computed(() => {
   switch (decision.value) {
@@ -145,6 +151,12 @@ function handleFailure(err: unknown): void {
           <span class="c-weak">建单 {{ fmtDateTime(item.createdAt) }}</span>
         </div>
         <p class="mdq-snippet">{{ item.snippet || '（本单没有内容快照）' }}</p>
+        <p v-if="aiEvidence" class="mdq-ai">
+          <span class="mdq-ai-tag">AI 送审</span>{{ aiEvidence }}
+          <span class="mdq-ai-note">
+            （自动判定只负责把它送进队列，是否处置由你决定；证据仅供判断参考）
+          </span>
+        </p>
         <p class="mdq-snap-hint">
           快照是送审时的截断留存（≤500 字），不是全文；判断以「目标 + 原因码 + 举报数」为准。
         </p>
@@ -185,17 +197,18 @@ function handleFailure(err: unknown): void {
       </div>
 
       <div class="mdq-field">
-        <div class="mdq-label">给作者的说明（作者本人会看到这段文字）</div>
+        <div class="mdq-label">处置备注（内部留痕，不对外展示）</div>
         <n-input
           v-model:value="note"
           type="textarea"
           :rows="3"
           maxlength="500"
           show-count
-          placeholder="例如：内容含站外引流信息，已按社区规范处理"
+          placeholder="例如：与审核单 #123 合并处理；内容确认违规"
         />
         <p class="mdq-hint">
-          这段文字会随处置结果展示给作者（白名单下发，不含审核员身份），请写"能对外说"的话。
+          只写进审核单与审计日志，不会下发给作者或举报人（docs/51 B-4 定稿）；作者侧看到的
+          只是固定原因码的标签（P6 落地）。请写"内部可读"的话，不要写审核员身份信息。
         </p>
       </div>
     </div>
@@ -253,6 +266,28 @@ function handleFailure(err: unknown): void {
 .mdq-snap-hint {
   margin: 6px 0 0;
   font-size: 11.5px;
+  color: var(--c-text-3);
+}
+.mdq-ai {
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  border-radius: var(--c-ctl-radius);
+  background: var(--c-primary-soft);
+  font-size: 12px;
+  color: var(--c-text);
+  word-break: break-word;
+}
+.mdq-ai-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--c-primary);
+  color: #fff;
+  font-size: 11px;
+  line-height: 17px;
+}
+.mdq-ai-note {
   color: var(--c-text-3);
 }
 .mdq-field {

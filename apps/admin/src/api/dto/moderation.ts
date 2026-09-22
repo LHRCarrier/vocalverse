@@ -6,9 +6,31 @@ export type ModerationTargetType = 'post' | 'comment' | 'media' | 'direct_messag
 export type ModerationStatus = 'pending' | 'approved' | 'rejected' | 'escalated' | 'withdrawn'
 
 /**
+ * Jev（TypeSafe System One）自动送审证据（docs/58 §3.3）——`snapshot.ai`。
+ *
+ * 只有 `source='auto'` 的单才有；`violation` 是送给 Jev 的违规概率，`clause` 是命中的
+ * 《社区规范》条款号（R1~R9，见 docs/59），`category` 是条款映射出的原因码。
+ * 审核员据此判断「这单为什么自动进来、违反哪一条」，也为事后调阈值留下可对账的凭据（不保留正文）。
+ */
+export interface ModerationAiEvidence {
+  model?: string
+  violation?: number
+  /** 命中的规范条款号（R1~R9；none = 未命中） */
+  clause?: string
+  category?: string
+  /** 条款分类的置信度（choice 分布导出） */
+  clauseConfidence?: number
+  severity?: number
+  severityConfidence?: number
+  latencyMs?: number
+  inputTokens?: number
+  [key: string]: unknown
+}
+
+/**
  * 审核单的结构化上下文（`moderation_cases.snapshot` jsonb）。
  *
- * ⚠️ **形状随来源变化**：`source='auto'` 是引擎给的、`'report'` 是举报聚合出来的、
+ * ⚠️ **形状随来源变化**：`source='auto'` 是引擎给的（含 `ai` 证据）、`'report'` 是举报聚合出来的、
  * `'manual'` 是审核员手填的。因此这里只声明**已知会读**的键，其余走索引签名。
  * **不要把它当成稳定契约**——真正稳定的字段在上面一层（targetType/targetId/status）。
  */
@@ -21,6 +43,8 @@ export interface ModerationSnapshot {
   postId?: number | null
   /** 举报数**只有**在 snapshot 里有（`CaseView` 没有顶层 reportCount） */
   reportCount?: number
+  /** 自动送审证据（docs/58；仅 `source='auto'`） */
+  ai?: ModerationAiEvidence | null
   [key: string]: unknown
 }
 
@@ -81,7 +105,20 @@ export interface ModerationStats {
   /** 可选：后端若未提供，UI 显示「—」并给出原因，而不是显示 0（0 是错误信息） */
   approvedToday?: number
   rejectedToday?: number
-  trend?: { date: string; pending: number; approved: number; rejected: number }[]
+  /**
+   * 逐日趋势（Java `ModerationService.stats` 的 `trend`）。
+   *
+   * ⚠️ 三个计数的口径**不同**：`created` = 当日新建；`pending` = 当日结束时仍未决定（**积压**，不是新建，
+   * 且是下界）；`approved`/`rejected` = 当日决定数。图表必须按此各就各位（v1 把 `pending` 当「新建」画，
+   * 图与图例不符）。
+   */
+  trend?: {
+    date: string
+    created?: number
+    pending: number
+    approved: number
+    rejected: number
+  }[]
   decisions?: { decision: string; count: number }[]
   /** 其余后端可能返回的扁平计数（total / withdrawn / reportsPending / byStatus…） */
   [key: string]: unknown

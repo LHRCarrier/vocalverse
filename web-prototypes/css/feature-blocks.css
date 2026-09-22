@@ -18,8 +18,8 @@
      .fs-duo       成对段：一栏文字 + 一张真卡（.project-card），逐段左右换边
      .fs-band      通栏宣言带（上下 hairline）
 
-   动效约定：只依赖既有的 .fade-in / .is-inview（js/animations.js），
-   条形为静态宽度，不新增动画，故无需 prefers-reduced-motion 分支。
+   动效约定：版块外壳由 .fade-in / .is-inview（js/animations.js）负责，
+   卡片的显隐改由第 7 节接管；条形为静态宽度，不新增动画。
    ============================================================ */
 
 /* —— 版块外壳：与页面其它容器同宽（275 × .25rem = 68.75rem = 1100px）—— */
@@ -510,4 +510,133 @@
   line-height: 1.65;
   letter-spacing: -0.005em;
   color: color-mix(in srgb, var(--foreground) 68%, transparent);
+}
+
+/* ============================================================
+   7. 卡片与文字的入场动画
+   ------------------------------------------------------------
+   触发：js/animations.js 观察到「揭示组」进入视口后给它加 .is-revealed。
+        揭示组 = .fs-head / .fs-steps / .fs-duo__text / .fs-duo__card /
+                 .fs-kpis / .fs-list / .fs-band
+   实现：动画常态是 animation-play-state: paused + fill-mode: backwards。
+        paused 停在第 0 帧、backwards 填充显示 from 状态 —— 于是"隐藏"
+        完全由动画自己承担，不必再写 opacity: 0，也就不会出现"动画跑完
+        回落到低态又变透明"的坑（只加 backwards、不加 forwards）。
+   为什么不用 .fade-in：.fade-in 是 transition 实现，跑完仍常驻
+        transform: translateY(0) 与 will-change，会在卡片外层留一个合成层，
+        并与 .project-card:hover 的 transform 打架（见第 5 节约束）。
+        这里动画一结束就把 transform 交还给元素，hover 抬升不受影响。
+   减弱动效：整块包在 prefers-reduced-motion: no-preference 里 ——
+        不想看动效的用户直接看到静态内容，不存在任何隐藏态。
+   ============================================================ */
+
+/* 外壳不再自己淡入：入场交给组内子元素错开播放，避免两层透明度/位移叠加 */
+.fs-section.fade-in {
+  opacity: 1;
+  transform: none;
+  transition: none;
+  will-change: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+
+  @keyframes fs-text-in {
+    from { opacity: 0; transform: translate3d(0, 14px, 0); }
+    to   { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+
+  @keyframes fs-card-in {
+    from { opacity: 0; transform: translate3d(0, 26px, 0) scale(0.985); }
+    to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  }
+
+  /* —— 文字：小位移淡入 —— */
+  .fs-head > *,
+  .fs-duo__text > .fs-kicker,
+  .fs-duo__text > .fs-title,
+  .fs-duo__text > .fs-lead,
+  .fs-duo__text > .fs-body,
+  .fs-duo__text > .fs-note {
+    animation: fs-text-in .62s cubic-bezier(.22, 1, .36, 1) backwards;
+    animation-play-state: paused;
+    animation-delay: var(--fs-d, 0ms);
+  }
+
+  /* —— 卡片：位移略大，带一点"落定"缩放 —— */
+  .fs-duo__card,
+  .fs-band,
+  .fs-steps > .fs-step,
+  .fs-kpis > .fs-kpi,
+  .fs-list > .fs-item {
+    animation: fs-card-in .72s cubic-bezier(.22, 1, .36, 1) backwards;
+    animation-play-state: paused;
+    animation-delay: var(--fs-d, 0ms);
+  }
+
+  /* —— 明细行：比标题更轻的一档 —— */
+  .fs-duo__text .fs-rows > .fs-row {
+    animation: fs-text-in .55s cubic-bezier(.22, 1, .36, 1) backwards;
+    animation-play-state: paused;
+    animation-delay: var(--fs-d, 0ms);
+  }
+
+  /* —— 错开节奏 ——
+     每组内部按 nth-child 依次延后；长列表封顶，避免排队过久。
+     --fs-d 只影响 delay，写在基础态即可（揭示后才真正生效）。 */
+  .fs-head > :nth-child(1) { --fs-d: 0ms; }
+  .fs-head > :nth-child(2) { --fs-d: 90ms; }
+  .fs-head > :nth-child(3) { --fs-d: 180ms; }
+
+  .fs-duo__text > :nth-child(1) { --fs-d: 0ms; }
+  .fs-duo__text > :nth-child(2) { --fs-d: 80ms; }
+  .fs-duo__text > :nth-child(3) { --fs-d: 160ms; }
+  .fs-duo__text > :nth-child(4) { --fs-d: 240ms; }
+  .fs-duo__text > :nth-child(5) { --fs-d: 320ms; }
+
+  .fs-duo__text .fs-rows > .fs-row:nth-child(1) { --fs-d: 150ms; }
+  .fs-duo__text .fs-rows > .fs-row:nth-child(2) { --fs-d: 210ms; }
+  .fs-duo__text .fs-rows > .fs-row:nth-child(3) { --fs-d: 270ms; }
+  .fs-duo__text .fs-rows > .fs-row:nth-child(4) { --fs-d: 330ms; }
+  .fs-duo__text .fs-rows > .fs-row:nth-child(n+5) { --fs-d: 390ms; }
+
+  .fs-duo__card { --fs-d: 120ms; }  /* 让文字先起、卡片跟上 */
+
+  .fs-steps > .fs-step:nth-child(1) { --fs-d: 0ms; }
+  .fs-steps > .fs-step:nth-child(2) { --fs-d: 90ms; }
+  .fs-steps > .fs-step:nth-child(3) { --fs-d: 180ms; }
+  .fs-steps > .fs-step:nth-child(4) { --fs-d: 270ms; }
+  .fs-steps > .fs-step:nth-child(n+5) { --fs-d: 340ms; }
+
+  .fs-kpis > .fs-kpi:nth-child(1) { --fs-d: 0ms; }
+  .fs-kpis > .fs-kpi:nth-child(2) { --fs-d: 80ms; }
+  .fs-kpis > .fs-kpi:nth-child(3) { --fs-d: 160ms; }
+  .fs-kpis > .fs-kpi:nth-child(4) { --fs-d: 240ms; }
+  .fs-kpis > .fs-kpi:nth-child(n+5) { --fs-d: 300ms; }
+
+  .fs-list > .fs-item:nth-child(1) { --fs-d: 0ms; }
+  .fs-list > .fs-item:nth-child(2) { --fs-d: 55ms; }
+  .fs-list > .fs-item:nth-child(3) { --fs-d: 110ms; }
+  .fs-list > .fs-item:nth-child(4) { --fs-d: 165ms; }
+  .fs-list > .fs-item:nth-child(5) { --fs-d: 220ms; }
+  .fs-list > .fs-item:nth-child(6) { --fs-d: 275ms; }
+  .fs-list > .fs-item:nth-child(7) { --fs-d: 330ms; }
+  .fs-list > .fs-item:nth-child(8) { --fs-d: 385ms; }
+  .fs-list > .fs-item:nth-child(n+9) { --fs-d: 440ms; }
+
+  /* —— 揭示：分组触发 ——
+     每条都带上 .is-revealed，特异性高于上面各条基础态，稳定覆盖 paused。 */
+  .fs-head.is-revealed > *,
+  .fs-band.is-revealed,
+  .fs-duo__card.is-revealed,
+  .fs-steps.is-revealed > .fs-step,
+  .fs-kpis.is-revealed > .fs-kpi,
+  .fs-list.is-revealed > .fs-item,
+  .fs-duo__text.is-revealed > .fs-kicker,
+  .fs-duo__text.is-revealed > .fs-title,
+  .fs-duo__text.is-revealed > .fs-lead,
+  .fs-duo__text.is-revealed > .fs-body,
+  .fs-duo__text.is-revealed > .fs-note,
+  .fs-duo__text.is-revealed .fs-rows > .fs-row {
+    animation-play-state: running;
+  }
 }
