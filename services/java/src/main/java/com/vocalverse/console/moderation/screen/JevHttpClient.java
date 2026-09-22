@@ -41,18 +41,37 @@ public class JevHttpClient implements JevDecisionClient {
 
   private static final Logger log = LoggerFactory.getLogger(JevHttpClient.class);
 
-  /** 违规类型选项（键 = reason code；描述只用于让模型区分相近类别）。 */
-  private static final Map<String, Object> CATEGORY_CRITERIA =
+  /**
+   * 内容准则条款（键 = 《社区规范》条款号，值 = 条款摘要）——**判据唯一真源是 `docs/59`**， 这里保持逐条同义（用户页 `MobileGuidelinesView.vue`
+   * 是全文呈现）。
+   *
+   * <p>{@code none} 不是条款，是「不违规」选项：choice 必须给全选项集，否则内容合规时模型也会被迫选一条。
+   */
+  private static final Map<String, Object> CLAUSE_RULES =
       orderedMap(
-          "spam", "无意义的重复刷屏、灌水、纯表情/乱码",
-          "abuse", "辱骂、人身攻击、骚扰、歧视、仇恨言论",
-          "porn", "色情、低俗、性暗示内容",
-          "violence", "暴力、血腥、自残、恐怖主义",
-          "politics", "涉政敏感、煽动对立",
-          "ad", "广告、站外引流、推销、拉群",
-          "copyright", "盗版、未授权转载、侵犯版权",
-          "misinfo", "虚假信息、谣言、伪科学、诈骗",
-          "other", "其他违反社区规范但不属于以上类别的内容");
+          "R1", "垃圾信息：重复刷屏、灌水、纯符号/乱码、恶意 @",
+          "R2", "辱骂骚扰：辱骂、人身攻击、歧视、跟踪骚扰、死亡威胁",
+          "R3", "色情低俗：色情、露骨性暗示、擦边引流、未成年人性化表达",
+          "R4", "暴力血腥：宣扬暴力、血腥、自残、恐怖主义与极端组织",
+          "R5", "涉政敏感：煽动对立与仇恨、政治谣言、国家主权与安全敏感表述",
+          "R6", "广告引流：广告、站外引流、拉群推销、刷单返利、博彩赌博",
+          "R7", "版权侵权：盗版资源、未授权全文转载、冒用他人作品",
+          "R8", "虚假信息：谣言、伪科学、诈骗、伪造成绩或经历",
+          "R9", "其他违规：泄露隐私、冒充官方等破坏社区秩序的内容",
+          "none", "内容不违规，未命中任何条款");
+
+  /** 条款号 → 控制台原因码（值集 = {@code ModerationService.REASON_CODES}，测试钉死覆盖）。 */
+  private static final Map<String, String> CLAUSE_TO_REASON =
+      orderedMap(
+          "R1", "spam",
+          "R2", "abuse",
+          "R3", "porn",
+          "R4", "violence",
+          "R5", "politics",
+          "R6", "ad",
+          "R7", "copyright",
+          "R8", "misinfo",
+          "R9", "other");
 
   private final RestClient http;
   private final boolean enabled;
@@ -139,6 +158,14 @@ public class JevHttpClient implements JevDecisionClient {
       state.put("title", truncate(request.title()));
     }
     state.put("body", truncate(request.body() == null ? "" : request.body()));
+    // 判据随请求下发（docs/59 §维护说明）：条款文本在 state，问题只引用 `communityRules`
+    Map<String, Object> rules = new LinkedHashMap<>();
+    for (Map.Entry<String, Object> e : CLAUSE_RULES.entrySet()) {
+      if (!"none".equals(e.getKey())) {
+        rules.put(e.getKey(), e.getValue());
+      }
+    }
+    state.put("communityRules", rules);
     return state;
   }
 
@@ -152,10 +179,10 @@ public class JevHttpClient implements JevDecisionClient {
             "true", "存在垃圾信息、辱骂骚扰、色情低俗、暴力血腥、涉政敏感、广告引流、版权侵权、虚假信息等违规",
             "false", "正常的英语学习交流内容，不违反社区规范"));
 
-    Map<String, Object> choice = new LinkedHashMap<>();
-    choice.put("type", "choice");
-    choice.put("instructions", "如果该内容违反社区规范，它属于哪一类？若内容不违规，选 other。");
-    choice.put("criteria", CATEGORY_CRITERIA);
+    Map<String, Object> clause = new LinkedHashMap<>();
+    clause.put("type", "choice");
+    clause.put("instructions", "这段内容违反了 `communityRules` 的哪一条？逐条对照；若内容不违规，选 none。");
+    clause.put("criteria", CLAUSE_RULES);
 
     Map<String, Object> score = new LinkedHashMap<>();
     score.put("type", "score");
@@ -164,7 +191,7 @@ public class JevHttpClient implements JevDecisionClient {
 
     Map<String, Object> questions = new LinkedHashMap<>();
     questions.put("is_violation", noul);
-    questions.put("category", choice);
+    questions.put("clause", clause);
     questions.put("severity", score);
     return questions;
   }
@@ -180,15 +207,17 @@ public class JevHttpClient implements JevDecisionClient {
     if (violation.isMissingNode() || !violation.isNumber()) {
       return Optional.empty();
     }
-    JsonNode category = answers.path("category");
+    JsonNode clause = answers.path("clause");
     JsonNode severity = answers.path("severity");
     String modelId = root.path("model").asText(model);
+    String clauseId = clause.path("choice").asText("none");
     return Optional.of(
         new JevVerdict(
             modelId,
             violation.asDouble(),
-            category.path("choice").asText("other"),
-            category.path("confidence").asDouble(0),
+            clauseId,
+            CLAUSE_TO_REASON.getOrDefault(clauseId, "other"),
+            clause.path("confidence").asDouble(0),
             severity.path("score").asDouble(0),
             severity.path("confidence").asDouble(0),
             latencyMs,
@@ -201,16 +230,22 @@ public class JevHttpClient implements JevDecisionClient {
   }
 
   /** 保持插入顺序的 map（Jackson 序列化时顺序稳定，便于对账）。 */
-  private static Map<String, Object> orderedMap(Object... kv) {
-    Map<String, Object> map = new LinkedHashMap<>();
+  @SuppressWarnings("unchecked")
+  private static <V> Map<String, V> orderedMap(Object... kv) {
+    Map<String, V> map = new LinkedHashMap<>();
     for (int i = 0; i + 1 < kv.length; i += 2) {
-      map.put(String.valueOf(kv[i]), kv[i + 1]);
+      map.put(String.valueOf(kv[i]), (V) kv[i + 1]);
     }
     return map;
   }
 
-  /** 供测试断言的问题定义（选项键必须与 {@code ModerationService.REASON_CODES} 同集合）。 */
-  static Map<String, Object> categoryCriteria() {
-    return CATEGORY_CRITERIA;
+  /** 供测试断言：choice 选项键（R1~R9 + none）。 */
+  static Map<String, Object> clauseCriteria() {
+    return CLAUSE_RULES;
+  }
+
+  /** 供测试断言：条款号 → 原因码映射。 */
+  static Map<String, String> clauseToReason() {
+    return CLAUSE_TO_REASON;
   }
 }

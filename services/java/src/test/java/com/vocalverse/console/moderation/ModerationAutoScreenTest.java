@@ -44,7 +44,7 @@ class ModerationAutoScreenTest extends AbstractConsoleApiTest {
       """
       {"model":"jev-1.13.0","answers":{
         "is_violation":{"type":"noul","noul":0.96},
-        "category":{"type":"choice","choice":"abuse","probabilities":{"abuse":0.88,"other":0.12},"confidence":0.81},
+        "clause":{"type":"choice","choice":"R2","probabilities":{"R2":0.88,"none":0.12},"confidence":0.81},
         "severity":{"type":"score","score":1.96,"legend":{"0":"无问题","1":"轻微","2":"中等","3":"严重"},
                     "probabilities":{"0":0.0,"1":0.21,"2":0.62,"3":0.17},"confidence":0.61}},
        "usage":{"input_tokens":362,"output_tokens":36}}
@@ -54,7 +54,7 @@ class ModerationAutoScreenTest extends AbstractConsoleApiTest {
       """
       {"model":"jev-1.13.0","answers":{
         "is_violation":{"type":"noul","noul":0.05},
-        "category":{"type":"choice","choice":"other","probabilities":{"other":0.95},"confidence":0.9},
+        "clause":{"type":"choice","choice":"none","probabilities":{"none":0.95},"confidence":0.9},
         "severity":{"type":"score","score":0.1,"legend":{"0":"无问题"},"probabilities":{"0":0.95},"confidence":0.9}},
        "usage":{"input_tokens":120,"output_tokens":20}}
       """;
@@ -196,12 +196,13 @@ class ModerationAutoScreenTest extends AbstractConsoleApiTest {
     assertEquals(2, row.path("priority").asInt(), "severity 1.96 → 中优先级");
     assertEquals("pending", row.path("status").asText());
 
-    // 判定证据写进 snapshot.ai：审核员要能看到「为什么这单在队列里」
+    // 判定证据写进 snapshot.ai：审核员要能看到「为什么这单在队列里」+ 命中哪条规范
     JsonNode ai = row.path("snapshot").path("ai");
     assertEquals("jev-1.13.0", ai.path("model").asText());
     assertEquals(0.96, ai.path("violation").asDouble(), 1e-9);
+    assertEquals("R2", ai.path("clause").asText(), "条款号是判据锚点（docs/59）");
     assertEquals("abuse", ai.path("category").asText());
-    assertEquals(0.81, ai.path("categoryConfidence").asDouble(), 1e-9);
+    assertEquals(0.81, ai.path("clauseConfidence").asDouble(), 1e-9);
     assertEquals(1.96, ai.path("severity").asDouble(), 1e-9);
     assertEquals(362, ai.path("inputTokens").asInt());
   }

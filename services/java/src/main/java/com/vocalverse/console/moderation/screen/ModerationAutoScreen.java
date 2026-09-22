@@ -93,10 +93,11 @@ public class ModerationAutoScreen {
         moderation.createAuto(
             event.targetType(), event.targetId(), reasonCode, priority, evidence(verdict));
     log.info(
-        "自动送审命中：ref={} caseId={} p={} category={} severity={} priority={} model={}",
+        "自动送审命中：ref={} caseId={} p={} clause={} category={} severity={} priority={} model={}",
         event.targetType() + "#" + event.targetId(),
         created.getId(),
         round(verdict.violation()),
+        verdict.clause(),
         reasonCode,
         round(verdict.severity()),
         priority,
@@ -130,8 +131,10 @@ public class ModerationAutoScreen {
     Map<String, Object> ai = new LinkedHashMap<>();
     ai.put("model", verdict.model());
     ai.put("violation", round(verdict.violation()));
+    // 条款号是判据的对外锚点（docs/59）：审核员据此对照《社区规范》原文
+    ai.put("clause", verdict.clause());
     ai.put("category", verdict.category());
-    ai.put("categoryConfidence", round(verdict.categoryConfidence()));
+    ai.put("clauseConfidence", round(verdict.clauseConfidence()));
     ai.put("severity", round(verdict.severity()));
     ai.put("severityConfidence", round(verdict.severityConfidence()));
     ai.put("latencyMs", verdict.latencyMs());
