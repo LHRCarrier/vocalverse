@@ -3,6 +3,32 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 酒馆工具注册表重构：平铺 tools.py → tools/ 包（一工具一文件 + 注册表）· 1 op
+
+> 归属：Python 后端（`app/trpg`）。**零接口/SSE 契约变化**（trpg 回归用例证明）；`docs/52 §6` 已同步。
+
+- **背景**：`app/trpg/tools.py` 平铺（两个工具 schema + `build_trpg_tools` + `execute_tool` 的 if/elif 分发），
+  新增工具要在同一文件改三处、无注册机制（多人/AI 协作易漂移）。本次按组长要求抽注册表。
+- **重构**（新增 `app/trpg/tools/` 包，删除 `tools.py`）：
+  - `registry.py`：`ToolSpec(name/schema/handler)` + `register / build_trpg_tools / parse_tool_args / execute_tool`；
+    **新增错误隔离**——未注册工具 / handler 抛异常 → 返回错误文本（不打断回合；旧版只有各分支内 try 兜底）；
+  - `roll_dice.py` / `set_scene.py`：schema 与 handler 同文件（文件名 = 工具名），文件末尾 `register(...)`；
+  - `__init__.py`：import 即注册（**注册顺序 = 下发顺序**），扩展三步写进包 docstring；
+  - 新增工具 = 一个文件 + 一行 import，`turn.py` 不动。
+- **引用修正**：`api/routes/trpg.py` 原先借道 `from app.trpg.tools import set_scene` 拿 state 层函数（隐式 re-export，
+  重构后会拿到同名模块）→ 已改回 `st.set_scene`；`app/trpg/__init__.py` 模块地图同步。
+- **测试**：新增 `tests/test_trpg_tools.py` 6 例（注册顺序与 schema 形状 / 参数宽容解析 / 未知工具不抛 /
+  handler 异常不打断回合 / 重复注册报错 / args+campaign_id 透传）；用例用注册表副本隔离（monkeypatch，不污染全局）。
+- **门禁**：ruff check + format 绿；`pytest tests/test_trpg*.py` **38 passed**；全量 **774 passed, 4 skipped**，
+  另 1 例**存量失败**（与本次无关，已 `git stash` 在干净 HEAD 复现）：`test_internal_checkin.py::test_manual_checkin_aggregates_day_and_delegates`
+  ——根因：用例以 `now=datetime.now(UTC)` 播种 `now-2h/now-3h`，而聚合按 **UTC 日界**切片，
+  本地 08:00~11:00（UTC 00:00~03:00）运行时种子落到前一 UTC 日（断言差 9 回合 / 3 次练习）。
+  修法建议（未做）：播种锚点固定到 UTC 当日 12:00。
+- **遗留**：立绘展示工具（`show_portrait`）可注册表新增，但需先扩 `turn.py` 的 outcome→SSE 通路
+  （现仅透传 text/status_stage）与 docs/54 的实体挂图字段，待方案拍板另开。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-21 M3 收口 P4 尾项 + P5/P6（后端与契约）：搜索/XP/笔记三端点 + 契约刷新 + 死代码清理 · 1 op
 
 > 归属：Python 后端 + 契约 + Web 全局（App UI 部分见 `worklog/安卓开发日志.md` 同日条）。计划与 DoD 见 `docs/53`。

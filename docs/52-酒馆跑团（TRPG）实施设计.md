@@ -110,7 +110,8 @@ App（/m/tavern）  ── POST /api/v1/trpg/campaigns/{id}/turns（multipart te
 
 ## 6. DM 回合与工具循环
 
-- **工具**（`tools.py`）：`roll_dice`（骰面 2-1000/骰数 1-10/|调整值|≤50/effects 仅 pc|scene 域；系统判定并先落表再回文本）、`set_scene`（显式切场景）；
+- **工具**（`tools/` 注册表，一工具一文件）：`roll_dice`（骰面 2-1000/骰数 1-10/|调整值|≤50/effects 仅 pc|scene 域；系统判定并先落表再回文本）、`set_scene`（显式切场景）；
+  新增工具 = 新文件（schema + handler）+ `register(ToolSpec(...))` + 包内 import；执行契约（未注册/异常 → 错误文本不打断回合）见 `tools/registry.py`；
 - **循环**（`turn.py`）：最多 2 轮可调工具 + 最后 1 轮 `tool_choice=none` 强制正文；工具轮 max_tokens 4096 / 正文轮 1200；工具文本回填后继续生成；
 - **LLM 能力**：`DeepSeekLLMClient.stream_with_tools`（流式工具调用，事件 `delta|tool_calls|usage`）+ Fake 同形桩；
 - **上下文**（`service.py::_build_dm_context`）：DM system 人设（NPC 台词「名：……」一行一句协议）→ 叙事摘要 → 快照 →【待记住】补丁 → 最近 8 条 **kind=text** 历史（修复 ai4u 系统卡空 assistant 混入 prompt 的缺陷）→ 本回合输入；
