@@ -6,7 +6,8 @@
  *    供「按可见窗取点」绘制与实时分比对，避免每帧遍历整曲句数组；
  * ② 用户帧环形缓冲：两个 Float64Array（tMs/f0）交替，**零分配零响应式代理**
  *    （旧实现每帧 `[...frames]` 重建 + 逐点走 Vue proxy，见 2026-09-18 性能基线）；
- * ③ 可见窗二分 + 全帧绘制（renderChart）：只画窗内点，末尾点按静音时长淡出。
+ * ③ 可见窗二分 + 全帧绘制（renderChart）：只画窗内点，末尾点按静音时长淡出；
+ *    **没出声的时间段用底部灰线表示**（eachSilenceSpan → drawSilenceLine，2026-09-18 需求）。
  *
  * 口径与后端一致：hop 512@16k = 32ms（services/python app/audio/pitch.py）。
  */
@@ -108,8 +109,11 @@ export function createFrameRing(capacity: number): FrameRing {
 
 // —— 绘制（组件给几何与淡出系数；本模块只画，不持有响应式状态/定时器）——
 
-/** 停摆淡出时单独降透明度的末尾点数 */
-const FADE_PTS = 6
+/** 静音灰线：判据（相邻浊音帧间隔超过它才算「没在唱」，≈3 个检测 tick） */
+export const SILENCE_GAP_MS = 300
+/** 静音灰线：位置（画布底部、低于 65Hz 轴下限，避免与最低音混淆） */
+const SILENCE_Y_OFFSET = 9
+const SILENCE_COLOR = '#b9bdbc'
 
 export interface ChartFrame {
   /** 逻辑宽高（CSS px；调用方已按 dpr setTransform） */
@@ -123,6 +127,17 @@ export interface ChartFrame {
   headAlpha: number
   refF0s: Float32Array
   ring: FrameRing
+  /**
+   * 头部插值点（2026-09-18 平滑）：新帧到达后由调用方在 ~90ms 内把头部从上一位置插值到新帧值，
+   * **只影响最后一段**，历史曲线仍是原始采样值（不掩盖音高抖动）；null = 用原始末点。
+   */
+  head?: HeadPoint | null
+}
+
+/** 头部插值点（t = 数据时间 ms；f = Hz；插值在 log 域做，屏幕上即线性） */
+export interface HeadPoint {
+  t: number
+  f: number
 }
 
 function drawGrid(g: CanvasRenderingContext2D, w: number, y2f: (f: number) => number) {
@@ -177,7 +192,13 @@ function drawRefLine(
   g.globalAlpha = 1
 }
 
-/** 用户轨迹：二分可见窗 + 末尾点静音淡出（仅透明度，符合 docs/31） */
+/**
+ * 用户轨迹：二分可见窗 + 折线圆角化 + 头部插值。
+ *
+ * 静音语义（2026-09-21 调整）：**静音段不画橙线**——橙色轨迹在「最后一次出声」处干净结束，
+ * 之后交给底部灰线（{@link drawSilenceLine}）。原先"末尾 N 点渐隐"会在停唱位置留下一个
+ * 淡不干净的橙点，现已去掉；只保留**头部圆点**随静音时长淡出到 0（无残留）。
+ */
 function drawUserTrace(
   g: CanvasRenderingContext2D,
   ring: FrameRing,
@@ -186,6 +207,7 @@ function drawUserTrace(
   x2p: (t: number) => number,
   y2f: (f: number) => number,
   headAlpha: number,
+  head: HeadPoint | null,
 ) {
   const n = ring.length()
   if (!n) return
@@ -194,67 +216,54 @@ function drawUserTrace(
   if (i1 <= i0) return
   g.strokeStyle = '#e07a3f'
   g.lineWidth = 1.8
-  const tailFrom = headAlpha < 1 ? Math.max(i0, i1 - FADE_PTS) : i1
+  // 中点二次贝塞尔圆角化（消锯齿折角）：历史点用原始采样值，仅末点可被 head 插值替换
   g.beginPath()
   let started = false
-  for (let i = i0; i < tailFrom; i += 1) {
-    const px = x2p(ring.tAt(i))
-    const py = y2f(ring.fAt(i))
+  let cx = 0
+  let cy = 0
+  const push = (x: number, y: number) => {
     if (!started) {
-      g.moveTo(px, py)
+      g.moveTo(x, y)
       started = true
     } else {
-      g.lineTo(px, py)
+      g.quadraticCurveTo(cx, cy, (cx + x) / 2, (cy + y) / 2)
     }
+    cx = x
+    cy = y
+  }
+  for (let i = i0; i < i1; i += 1) push(x2p(ring.tAt(i)), y2f(ring.fAt(i)))
+  const lastI = i1 - 1
+  const headT = head ? head.t : ring.tAt(lastI)
+  const headF = head ? head.f : ring.fAt(lastI)
+  const headIn = headT >= x0 && headT <= x1
+  if (headIn) push(x2p(headT), y2f(headF))
+  if (started) {
+    g.lineTo(cx, cy) // 收尾：二次贝塞尔只画到中点，需补到最后一个顶点
   }
   g.stroke()
-  if (tailFrom < i1) {
-    let prevX = NaN
-    let prevY = NaN
-    if (tailFrom > i0) {
-      prevX = x2p(ring.tAt(tailFrom - 1))
-      prevY = y2f(ring.fAt(tailFrom - 1))
-    }
-    for (let i = tailFrom; i < i1; i += 1) {
-      const px = x2p(ring.tAt(i))
-      const py = y2f(ring.fAt(i))
-      g.globalAlpha = headAlpha * ((i1 - i) / (i1 - tailFrom + 1))
-      g.beginPath()
-      if (Number.isNaN(prevX)) {
-        g.moveTo(px, py)
-      } else {
-        g.moveTo(prevX, prevY)
-        g.lineTo(px, py)
-      }
-      g.stroke()
-      prevX = px
-      prevY = py
-    }
-    g.globalAlpha = 1
-  }
-  const li = i1 - 1
-  const lt = ring.tAt(li)
-  if (lt >= x0 && lt <= x1) {
+  // 头部圆点：静音后随 headAlpha 淡出到 0（< 0.02 直接不画，避免残留）
+  if (headIn && headAlpha > 0.02) {
     g.fillStyle = '#e07a3f'
     g.globalAlpha = headAlpha
     g.beginPath()
-    g.arc(x2p(lt), y2f(ring.fAt(li)), 3, 0, Math.PI * 2)
+    g.arc(x2p(headT), y2f(headF), 3, 0, Math.PI * 2)
     g.fill()
     g.globalAlpha = 1
   }
 }
 
-/** 画一帧（网格 + 参考线 + 用户轨迹 + 进度竖线） */
+/** 画一帧（网格 + 静音灰线 + 参考线 + 用户轨迹 + 进度竖线） */
 export function renderChart(g: CanvasRenderingContext2D, f: ChartFrame): void {
-  const { w, h, x1, playheadT, headAlpha, refF0s, ring } = f
+  const { w, h, x1, playheadT, headAlpha, refF0s, ring, head } = f
   const x0 = x1 - WIN_MS
   const x2p = (t: number) => 4 + ((t - x0) / WIN_MS) * (w - 8)
   const logFmin = Math.log2(FMIN)
   const y2f = (fq: number) => 6 + (1 - (Math.log2(fq) - logFmin) / (Math.log2(FMAX) - logFmin)) * (h - 24)
 
   drawGrid(g, w, y2f)
+  drawSilenceLine(g, ring, x0, x1, playheadT, x2p, h)
   drawRefLine(g, refF0s, w, x0, x1, x2p, y2f)
-  drawUserTrace(g, ring, x0, x1, x2p, y2f, headAlpha)
+  drawUserTrace(g, ring, x0, x1, x2p, y2f, headAlpha, head ?? null)
 
   g.strokeStyle = 'rgba(0,0,0,.25)'
   g.lineWidth = 1
@@ -263,4 +272,71 @@ export function renderChart(g: CanvasRenderingContext2D, f: ChartFrame): void {
   g.moveTo(px, 6)
   g.lineTo(px, h - 14)
   g.stroke()
+}
+
+/**
+ * 遍历「无浊音」时间段（2026-09-18 需求：没出声时也要有时间轴信息，用底部灰线表示「无音高」）。
+ *
+ * 三处来源：① 首个浊音帧之前（含录音开头未唱）② 相邻浊音帧之间的空隙 ③ 末帧之后仍在静音（延伸到 now）。
+ * 每段按 [from, to] 视窗与 t>=0 裁剪，且长度须 > SILENCE_GAP_MS——正常换气/顿音（几十~两百毫秒）
+ * 不会被误画成静音。纯计算、回调式（绘制热路径零数组分配），绘制见 {@link drawSilenceLine}。
+ */
+export function eachSilenceSpan(
+  ring: FrameRing,
+  from: number,
+  to: number,
+  now: number,
+  fn: (a: number, b: number) => void,
+): void {
+  const add = (a: number, b: number) => {
+    const s = Math.max(a, from, 0)
+    const e = Math.min(b, to, now)
+    if (e - s > SILENCE_GAP_MS) fn(s, e)
+  }
+  const n = ring.length()
+  if (!n) {
+    add(0, now)
+    return
+  }
+  add(0, ring.tAt(0))
+  for (let i = 1; i < n; i += 1) add(ring.tAt(i - 1), ring.tAt(i))
+  add(ring.tAt(n - 1), now)
+}
+
+/** 静音段画成底部灰线（横线；用户轨迹在上方，不会与之混淆） */
+function drawSilenceLine(
+  g: CanvasRenderingContext2D,
+  ring: FrameRing,
+  x0: number,
+  x1: number,
+  now: number,
+  x2p: (t: number) => number,
+  h: number,
+): void {
+  const y = h - SILENCE_Y_OFFSET
+  g.strokeStyle = SILENCE_COLOR
+  g.lineWidth = 2
+  g.beginPath()
+  eachSilenceSpan(ring, x0, x1, now, (a, b) => {
+    g.moveTo(x2p(a), y)
+    g.lineTo(x2p(b), y)
+  })
+  g.stroke()
+}
+
+/**
+ * 实时分 → 读数颜色（2026-09-18 读数动画）：低分暖橙 → 中分青 → 高分绿，**连续插值**，
+ * 配合 CSS `transition: color` 平滑过渡；null（参考不足）→ 中性灰。
+ */
+export function scoreColorOf(score: number | null): string {
+  if (score == null) return '#999999'
+  const t = Math.max(0, Math.min(1, score / 100))
+  const mix = (c1: number[], c2: number[], k: number) =>
+    `rgb(${Math.round(c1[0] + (c2[0] - c1[0]) * k)},${Math.round(c1[1] + (c2[1] - c1[1]) * k)},${Math.round(
+      c1[2] + (c2[2] - c1[2]) * k,
+    )})`
+  const low = [176, 106, 59]
+  const mid = [44, 127, 143]
+  const high = [31, 122, 77]
+  return t < 0.5 ? mix(low, mid, t / 0.5) : mix(mid, high, (t - 0.5) / 0.5)
 }

@@ -11,7 +11,22 @@
 
 export const YIN_MIN_HZ = 65
 export const YIN_MAX_HZ = 800
-export const YIN_THRESHOLD = 0.1
+/**
+ * 检出阈值（CMNDF 谷值上限）。**越高越灵敏**（更易接受周期性较弱的轻声/气声），
+ * 越低越保守。2026-09-21 由 0.1 放宽到 0.22，依据实测（`local/yin-sensitivity.mjs`）：
+ * 「轻唱 + 底噪大」场景检出率 0.10→0.00、**0.15→0.00（无效区）**、0.20→0.07、0.22→0.20；
+ * 而"没人唱只有房间底噪/工频"的误检率在各阈值下**均为 0.000**（阈值放宽并未引入误检）。
+ * 另注：CMNDF 已做归一化，**幅度会被约掉**——放大增益对检出率无影响（实测 f0 逐位相同），
+ * 故"麦克风更敏感"只能靠阈值与窗长，不能靠增益。
+ */
+export const YIN_THRESHOLD = 0.22
+/**
+ * 默认分析窗（采样点）。窗越长积分越多 → 弱信号检出率越高，代价是单帧 CPU 与读数时延上升。
+ * 2026-09-21 由 2048（43ms@48k）加长到 4096（85ms）：同一「轻唱+底噪大」场景下 0.20 档检出率
+ * 0.07→0.14；单帧 CPU 实测 1.8ms→4.0ms（跑在 Worker 内，60ms 帧预算内可忽略）。
+ * AnalyserNode.fftSize 必须与此值一致（见 composables/useLivePitch.ts）。
+ */
+export const YIN_WINDOW_SIZE = 4096
 
 export interface YinResult {
   f0: number
@@ -54,7 +69,7 @@ export interface YinDetector {
 
 export function createYinDetector(
   sampleRate: number,
-  n = 2048,
+  n = YIN_WINDOW_SIZE,
   threshold: number = YIN_THRESHOLD,
 ): YinDetector {
   const tauMax = Math.min(Math.floor(n / 2), Math.floor(sampleRate / YIN_MIN_HZ))

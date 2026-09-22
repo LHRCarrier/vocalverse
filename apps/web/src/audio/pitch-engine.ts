@@ -10,7 +10,7 @@
  * 消息协议也在此定义（worker 与主线程共用类型，worker 文件保持"薄适配器"）。
  */
 import { createLiveScore, refF0AtMs, type LiveScore, type LiveScoreRead } from '@/lib/live-score'
-import { centOf, createYinDetector, midiOf, noteNameOf, type YinDetector } from '@/lib/yin'
+import { centOf, createYinDetector, midiOf, noteNameOf, YIN_WINDOW_SIZE, type YinDetector } from '@/lib/yin'
 
 export interface PitchFrameOut {
   /** 相对录音起点（t0）的毫秒 */
@@ -63,7 +63,8 @@ export function createPitchEngine(): PitchEngine {
     },
     init(sr) {
       sampleRate = sr
-      detector = createYinDetector(sr, 2048)
+      // 窗长与主线程 AnalyserNode.fftSize 必须一致（见 useLivePitch）；默认 4096（85ms@48k）
+      detector = createYinDetector(sr, YIN_WINDOW_SIZE)
       ref = null
       score = createLiveScore()
       lastScoreMs = Number.NEGATIVE_INFINITY

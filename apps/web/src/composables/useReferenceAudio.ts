@@ -24,6 +24,11 @@ export interface ReferenceAudio {
   toggle: () => Promise<void>
   /** 停止并回收资源（幂等；换歌/关面板/卸载都要调） */
   stop: () => void
+  /**
+   * 参考音频当前位置（ms；未播放 → 0）。**主动采样**接口，不加 `ontimeupdate` 监听：
+   * `timeupdate` 只有 ~4Hz，驱动不了 60fps 的句内进度与逐句吸附滚动（歌词滚动用，2026-09-21）。
+   */
+  currentMs: () => number
 }
 
 export function useReferenceAudio(
@@ -74,5 +79,8 @@ export function useReferenceAudio(
 
   onUnmounted(stop) // 卸载兜底（原实现只清引用，URL 泄漏）
 
-  return { playing, toggle, stop }
+  /** 当前播放位置（ms）；无音频/未播放 → 0（`stop()` 已把 audio 置空） */
+  const currentMs = () => (audio && !audio.paused ? audio.currentTime * 1000 : 0)
+
+  return { playing, toggle, stop, currentMs }
 }

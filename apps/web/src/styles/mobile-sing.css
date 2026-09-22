@@ -1,16 +1,65 @@
-/* 移动端 · 唱吧（歌单收藏行 & 跟唱面板 & 报告）样式 —— MobileSingView.vue 专用（类名加 m-sing 前缀防污染） */
+/* 移动端 · 唱吧（歌单收藏行 & 深色跟唱面板 & 报告）—— MobileSingView.vue 专用（类名 m-sing 前缀防污染）
+ *
+ * 2026-09-22 深色录唱页重做：跟唱面板整体改**深色沉浸**（对齐用户给的全民K歌「录唱」参考图：
+ * 顶栏评级条 / 大歌名 / 音准引导条 / 居中歌词 / 底部五键 / 已录·全长）。
+ * 歌单屏（`.m-sing-row*` / `.m-sing-fav`）与报告图表仍是浅色 —— 参考图只给了录唱页。
+ * 面板内的深色 token 集中在 `.m-sing-sheet` 上（`--sing-*`），报告与降级档共用同一组值。
+ */
 
-/* 歌单行：主点击区 + 收藏按钮（两颗独立 button，避免 button 嵌套的无效 HTML） */
+/* ============================================================
+ * 一、歌单屏（浅色）：主点击区 + 收藏按钮
+ *
+ * 2026-09-22 歌单排版优化：`.u-item` / `.u-item__sub` 是**共享类**（`MobileReportView` 同用），
+ * 故本行的一切调整都限定在 `.m-sing-row` 作用域内，绝不改全局定义。
+ * ============================================================ */
 .m-sing-row {
-  padding-right: 8px;
-  gap: 4px;
+  /* 右内边距 8 → 12px：与 `.u-item` 左侧内边距呼应（原来心形贴卡片右边缘），
+     同时给副文腾 4px（360 宽屏上「L1 · 6 句 · Traditional」实测需要 108px，文本列原为 107px） */
+  padding-right: 12px;
+  gap: 8px;
+}
+/* 图标块与文本之间的 16 → 12px（同上，纯内部间距，不动跨页对齐） */
+.m-sing-row__hit {
+  gap: 12px;
+}
+/* 状态徽标左右内边距 10 → 8px（3 个字的徽标不需要 20px 内边距），再腾 4px 给副文 */
+.m-sing-row .u-badge {
+  padding: 0 8px;
+}
+/* 副文行 = 左「L1 · 6 句 · Traditional」+ 右状态徽标。
+   徽标 `flex: none` 不参与文本宽度分配 → 副文过长时只省略中间，状态永远可见。 */
+.m-sing-row .u-item__sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.m-sing-row__meta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-sing-row__state {
+  flex: none;
+}
+/* 专辑封面（2026-09-22）：几何沿用共享 `.u-icon-block`（48×48 / 圆角 14），此处只做裁切 +
+  图片铺满（`object-fit: cover` 防非正方形封面被拉伸）。无封面/图裂时组件退回原音符图标，
+   底色由组件的行内 style 提供（level ≤2 深绿 / 其余深青），加载中不闪白。 */
+.m-sing-row__cover {
+  overflow: hidden;
+}
+.m-sing-row__cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .m-sing-row__hit {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 16px;
   padding: 0;
   border: none;
   background: none;
@@ -55,18 +104,17 @@
   outline-offset: 2px;
 }
 
-/* 跟唱面板（全屏 sheet，移动端真形态）
+/* ============================================================
+ * 二、跟唱面板（全屏深色 sheet，移动端真形态）
  *
  * 2026-09-10 P0 修复（拷问报告 A-F1 / D-F1）：原实现 `position:absolute; inset:0` 挂在
  * `.u-phone`（`position:relative; min-height:100vh`，**随内容长高**）上 → 面板以"整页高度"为
- * 参照：页面滚动后打开面板，面板顶部（含关闭钮/开始跟唱）落在视口**上方**，实测 head
- * `bottom=-1102`、开始跟唱 `top=-822` → 用户看到纯灰空白页（除右上角关闭外无控件可点）。
- * 修法：改为**视口锚定**（照抄仓内 `.u-tabbar` 的写法 `mobile-uic.css:2070-2079`），
- * 宽度与 `.u-phone` 同源（`width:100%; max-width:480px; left:50%; translateX(-50%)`），
- * 面板高度由视口上界决定（`top:0; bottom:0`）→ 内部 `__body{flex:1; overflow-y:auto}` 才真正滚动。
- * 依据：docs/35（App 端 UI 迭代 SOP：容器 bottom ≤ 视口高、"页面总高超视口"为典型陷阱）、
- * docs/31:36（硬规则 4：safe-area 底部留白）、`worklog/BUG实测/跟唱面板滚动后白屏.md`。
- */
+ * 参照：页面滚动后打开面板，面板顶部（含关闭钮/开始跟唱）落在视口**上方**（实测 head
+ * `bottom=-1102`、开始跟唱 `top=-822`）→ 用户看到纯灰空白页。
+ * 修法：**视口锚定**（照抄仓内 `.u-tabbar` 的写法），宽度与 `.u-phone` 同源
+ * （`width:100%; max-width:480px; left:50%; translateX(-50%)`），高度由视口上界决定
+ * （`top:0; bottom:0`）→ 内部 `__body{flex:1; overflow-y:auto}` 才真正滚动。
+ * ============================================================ */
 .m-sing-sheet {
   position: fixed;
   left: 50%;
@@ -75,76 +123,440 @@
   bottom: 0;
   width: 100%;
   max-width: 480px;
-  background: var(--u-bg, #f4f7f8);
+  /* 深色沉浸（2026-09-22 参考图口径）：面板内所有颜色取自这一组 token，报告/降级档共用 */
+  --sing-bg: #0b1114;
+  --sing-ink: #eef4f6;
+  --sing-weak: rgba(255, 255, 255, 0.45);
+  --sing-line: rgba(255, 255, 255, 0.1);
+  --sing-accent: #f5a524;
+  --sing-card: rgba(255, 255, 255, 0.05);
+  --sing-live: #5ad2c0;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(245, 165, 36, 0.12) 0%, transparent 60%),
+    radial-gradient(90% 50% at 50% 100%, rgba(90, 210, 192, 0.08) 0%, transparent 60%),
+    var(--sing-bg);
+  color: var(--sing-ink);
   display: flex;
   flex-direction: column;
   z-index: 30;
 }
-.m-sing-sheet__head {
-  flex: none; /* 头部不参与压缩：body 才可滚动（否则长歌词会把关闭钮挤走） */
+
+/* —— 顶栏：关闭 + 评级条 + 模式 + 录音进度线 —— */
+.m-sing-top {
+  flex: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+}
+.m-sing-top__back {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--sing-ink);
+  cursor: pointer;
+  transition: transform 120ms var(--u-ease-out, ease-out);
+}
+.m-sing-top__back:active {
+  transform: scale(0.94);
+}
+/* 评级条：字母 + 进度（宽度 = 实时分/100）+ 分数；不是歌曲进度 */
+.m-sing-grade {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  /* 顶部安全区（与 .u-drawer 同款约定，mobile-uic.css:2774）：刘海屏不被状态栏遮挡 */
-  padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
 }
-.m-sing-sheet__sub {
-  color: #8a9aa2;
+.m-sing-grade__letter {
+  flex: none;
+  width: 16px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.m-sing-grade__track {
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+/* 只动 transform（docs/31 规则 4）：进度用 scaleX 而不是 width */
+.m-sing-grade__fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 3px;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 220ms var(--u-ease-out, ease-out);
+}
+.m-sing-grade__num {
+  flex: none;
+  min-width: 26px;
+  text-align: right;
   font-size: 12px;
+  color: var(--sing-weak);
+  font-variant-numeric: tabular-nums;
 }
+.m-sing-top__mode {
+  flex: none;
+  padding: 5px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--sing-weak);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.m-sing-top__mode.is-live {
+  background: rgba(208, 48, 80, 0.18);
+  color: #ff8fa3;
+}
+.m-sing-top__mode.is-paused {
+  background: rgba(245, 165, 36, 0.18);
+  color: var(--sing-accent);
+}
+/* 录音进度线（3 分钟上限）：只动 transform */
+.m-sing-top__recbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: #d03050;
+  transform: scaleX(0);
+  transform-origin: left center;
+  pointer-events: none;
+}
+html[data-motion='off'] .m-sing-grade__fill,
+html[data-motion='off'] .m-sing-top__recbar {
+  transition: none;
+}
+
+/* —— 正文：大歌名 + 音准引导条 + 歌词 + 底部控制区 —— */
 .m-sing-sheet__body {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   overflow-y: auto;
-  padding: 12px 16px 24px;
+  /* 左右 12px（2026-09-22 尺寸优化起）；底部补 safe-area（docs/31 规则 4） */
+  padding: 4px 12px calc(12px + env(safe-area-inset-bottom));
 }
-.m-sing-sheet__lyrics {
-  background: #fff;
-  border-radius: 14px;
-  padding: 12px 14px;
-  margin-top: 8px;
-}
-.m-sing-lyric {
-  margin: 6px 0;
-  color: #2b3d45;
-  font-size: 14px;
-  line-height: 1.5;
-}
-.m-sing-lyric--more {
-  color: #8a9aa2;
+/* 大歌名（参考图 PERFECT 的位置）：居中、白色加粗；超长两行内省略 */
+.m-sing-song {
+  flex: none;
+  margin: 2px 0 0;
   text-align: center;
+  font-size: clamp(20px, 6vw, 26px);
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  line-height: 1.25;
+  color: #fff;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
-.m-sing-sheet__stopbar {
+/* 音准引导条（LivePitchChart 组件自带深色皮肤，这里只管占位与间距） */
+.m-sing-lane {
+  flex: none;
+}
+
+/* —— 歌词区（深色版，几何口径不变）——
+   2026-09-22 尺寸优化定下的几何：行高 L = clamp(42px, 6.6vh, 56px)（与容器解耦）、
+   卡片高度上限 = 可见行数上限 × L + 卡头；深色重做只换配色，几何一字未动。 */
+.m-sing-lyrics {
+  /* 占面板中段，但受 max-height 约束（不再吃满：底部控制区要常驻可见） */
+  flex: 1 1 auto;
+  /* 行高是**整个歌词区的几何基准**：pad / 行 / 边缘渐隐带都由它推导（改这一行即改全部） */
+  --line-h: clamp(42px, 6.6vh, 56px);
+  /* 极矮屏（横屏/小窗）不塌成一条缝：至少留 3 行，不够时由 .m-sing-sheet__body 自身滚动 */
+  min-height: calc(var(--line-h) * 3);
+  /* 高度上限：可见行数上限（--rows-cap，由 SingLyrics 注入）× 行高 + 卡头(head 16 + padding 14) */
+  max-height: calc(var(--line-h) * var(--rows-cap, 7) + 30px);
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  padding: 0;
+}
+.m-sing-lyrics__head {
+  flex: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 12px;
+  /* 时钟行：无论显示与否都占同样高度（避免有/无游标切换时歌词区跳动） */
+  min-height: 16px;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--sing-weak);
 }
+.m-sing-lyrics__time {
+  letter-spacing: 0.5px;
+}
+.m-sing-lyrics__scroller {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* 边缘渐隐带按**行高**表达（0.45L）：H 不再是 L 的整数倍 → 边行可能被裁一半，
+     渐隐把这半行柔和地化进底色；焦点句恒在正中，永远不落在带内。 */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 calc(var(--line-h) * 0.45),
+    #000 calc(100% - var(--line-h) * 0.45),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 calc(var(--line-h) * 0.45),
+    #000 calc(100% - var(--line-h) * 0.45),
+    transparent 100%
+  );
+}
+.m-sing-lyrics__scroller::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+/* 上下留白 = (H − L)/2（max 防极矮屏算出负高 → 声明失效） */
+.m-sing-lyrics__pad {
+  height: max(0px, calc((100% - var(--line-h)) / 2));
+}
+/* 每行 = L；min-height 便于极窄屏某句换行时撑开 */
+.m-sing-lyric {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: var(--line-h);
+  margin: 0;
+  /* 深色：未唱句是浅灰白，靠 opacity 分级拉开远近（参考图的灰/白对照） */
+  color: rgba(255, 255, 255, 0.72);
+  font-size: clamp(14px, 4vw, 17px);
+  line-height: 1.35;
+  transition:
+    color 140ms ease-out,
+    opacity 160ms ease-out;
+}
+/* 焦点句：最亮 + 加粗 + 略放大（参考图当前句是白色粗体，其余灰色） */
+.m-sing-lyric.is-focus {
+  color: #fff;
+  font-weight: 700;
+  font-size: clamp(16px, 4.6vw, 19px);
+}
+/* 远近用透明度渐隐（越远越淡）：深色底上同样抬高下限，保证可读 */
+.m-sing-lyric.is-dim-0 {
+  opacity: 1;
+}
+.m-sing-lyric.is-dim-1 {
+  opacity: 0.74;
+}
+.m-sing-lyric.is-dim-2 {
+  opacity: 0.52;
+}
+.m-sing-lyric.is-dim-3 {
+  opacity: 0.34;
+}
+/* 已唱部分：同文案叠加 + clip-path 裁出已唱宽度（颜色推进即进度指示，不触发布局） */
+.m-sing-lyric__sung {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  color: var(--sing-live);
+  font-weight: 700;
+  pointer-events: none;
+  white-space: pre-wrap;
+}
+html[data-motion='off'] .m-sing-lyric {
+  transition: none;
+}
+
+/* —— 底部控制区（六键：原唱/曲线/选曲 + 主钮 + 重录/完成）+ 已录/全长 —— */
+.m-sing-dock {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0 0;
+}
+/* 左右键组（2026-09-21 加「选曲」键时引入）：两组各 flex:1 → 中间主钮**由结构居中**，
+   与每组里放几个键无关。旧布局是「N 个 flex:1 键 + 定宽主钮」，主钮居中依赖左右键数相等，
+   加第 6 键（3|2）会把麦克风顶偏约 29px（375px 宽实测）。 */
+.m-sing-dock__group {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 6px;
+}
+.m-sing-dock__key {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 2px;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 140ms ease-out,
+    opacity 140ms ease-out,
+    transform 120ms var(--u-ease-out, ease-out);
+}
+.m-sing-dock__key span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m-sing-dock__key:active {
+  transform: scale(0.95);
+}
+.m-sing-dock__key:disabled {
+  opacity: 0.35;
+}
+.m-sing-dock__key.is-on {
+  color: var(--sing-live);
+}
+.m-sing-dock__key--done:not(:disabled) {
+  color: var(--sing-accent);
+}
+/* 中心主钮：开始 / 暂停 / 继续（62px 圆） */
+.m-sing-dock__main {
+  flex: none;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #0b1114;
+  cursor: pointer;
+  transition:
+    transform 120ms var(--u-ease-out, ease-out),
+    background-color 150ms ease-out,
+    color 150ms ease-out;
+}
+.m-sing-dock__main:active {
+  transform: scale(0.95);
+}
+.m-sing-dock__main:disabled {
+  opacity: 0.4;
+}
+/* 录音中：红底（暂停） */
+.m-sing-dock__main.is-rec {
+  background: #d03050;
+  color: #fff;
+}
+/* 暂停中：琥珀底（继续） */
+.m-sing-dock__main.is-paused {
+  background: var(--sing-accent);
+  color: #0b1114;
+}
+/* 底部一行：已录 / 全长（参考图「若梦 · 00:42 / 04:04」的位置） */
+.m-sing-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--sing-weak);
+  font-variant-numeric: tabular-nums;
+}
+.m-sing-foot__name {
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 「歌名 · 时长」之间的分隔点用伪元素：不进 textContent（读屏与测试读到的是干净的两个字段） */
+.m-sing-foot__name::after {
+  content: ' ·';
+}
+.m-sing-foot__times {
+  color: rgba(255, 255, 255, 0.75);
+}
+.m-sing-foot__flag {
+  color: var(--sing-accent);
+  font-size: 11px;
+}
+.m-sing-foot__flag::before {
+  content: '·';
+  margin-right: 4px;
+}
+
+/* —— 评分进度 / 提示 —— */
 .m-sing-sheet__progress {
-  margin-top: 14px;
+  flex: none;
 }
 .m-sing-sheet__bar {
   height: 8px;
-  background: rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 4px;
   overflow: hidden;
 }
 .m-sing-sheet__bar-inner {
   height: 100%;
-  background: #1677a8;
+  background: var(--sing-accent);
   transition: width 0.4s;
 }
 .m-sing-sheet__progress span {
   display: block;
   margin-top: 6px;
-  color: #8a9aa2;
+  color: var(--sing-weak);
   font-size: 12px;
 }
 .m-sing-sheet__hint {
-  margin-top: 14px;
-  color: #8a9aa2;
+  flex: none;
+  color: var(--sing-weak);
   font-size: 12px;
+  text-align: center;
+}
+/* 深色面板里的「幽灵按钮」（报告页「返回歌单」）：全局 `.u-btn--ghost` 是浅色主题的墨色描边，
+   在深底上几乎看不见 → 在面板作用域内改成白色描边（不动全局定义） */
+.m-sing-sheet .u-btn--ghost {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.06);
+}
+.m-sing-report__back {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* ============================================================
+ * 三、报告阶段（深色）
+ * ============================================================ */
+.m-sing-report {
+  display: flex;
+  flex-direction: column;
 }
 .m-sing-report__score {
   display: flex;
@@ -155,17 +567,17 @@
 .m-sing-report__num {
   font-size: 44px;
   font-weight: 700;
-  color: #16303a;
+  color: #fff;
 }
 .m-sing-report__label {
-  color: #8a9aa2;
+  color: var(--sing-weak);
   font-size: 12px;
 }
 .m-sing-report__sub {
   display: flex;
   justify-content: center;
   gap: 14px;
-  color: #2b3d45;
+  color: rgba(255, 255, 255, 0.8);
   font-size: 13px;
   margin-bottom: 8px;
 }
@@ -178,7 +590,7 @@
 }
 .m-sing-report__lines {
   margin-top: 10px;
-  background: #fff;
+  background: var(--sing-card);
   border-radius: 12px;
   padding: 8px 12px;
 }
@@ -186,24 +598,253 @@
   display: flex;
   justify-content: space-between;
   padding: 5px 0;
-  border-bottom: 1px dashed rgba(0, 0, 0, 0.06);
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
   font-size: 13px;
 }
 .m-sing-line:last-child {
   border-bottom: none;
 }
 .m-sing-line__text {
-  color: #5a6c75;
+  color: rgba(255, 255, 255, 0.72);
 }
 .m-sing-line__score b {
   margin-right: 8px;
 }
 .m-sing-line__score i {
   font-style: normal;
-  color: #8a9aa2;
+  color: var(--sing-weak);
 }
 
-.m-sing-live {
-  margin: 8px 0;
+/* ============================================================
+ * 六、跟唱曲目选择弹层（导航栏集成 · 2026-09-21；**深色改版 2026-09-22**）
+ *
+ * 深色口径（用户要求）：弹层由跟唱面板的「选曲」键唤起，叠在**深色沉浸面板**之上——
+ * 白底浅色 sheet 与面板割裂。整层改成与 `.m-sing-sheet` 同族配色（同一组色值）。
+ *
+ * ⚠️ `--sing-*` 必须在本选择器上**重声明**：弹层经 `Teleport to="body"` 挂到 body，
+ * 不在 `.m-sing-sheet` 子树里，继承不到那组 token（这就是重写一遍的原因，改色值要两处同步）。
+ * 共享类 `.u-sheet*` / `.u-badge--warn` / `.u-btn` 的定义一律不动 ——
+ * 覆盖全部限定在 `.m-sing-pick` 作用域内（同 `.m-sing-row` 对 `.u-item` 的做法）。
+ *
+ * 「超过 5 首显示滚动条」的落点：行高固定为 `--m-sing-pick-row`（44px = 仓库触控最小尺寸），
+ * 列表 `max-height` = 该值 × 5 → `overflow-y: auto` 只在第 6 首起才出现滚动条
+ * （不足 5 首不会留下空轨道）。改行高必须与这里的 5 倍口径同步，单测锁死这行声明。
+ * ============================================================ */
+.m-sing-pick {
+  --sing-bg: #0b1114;
+  --sing-ink: #eef4f6;
+  --sing-weak: rgba(255, 255, 255, 0.45);
+  --sing-line: rgba(255, 255, 255, 0.1);
+  --sing-accent: #f5a524;
+  --sing-card: rgba(255, 255, 255, 0.05);
+  background:
+    radial-gradient(130% 40% at 50% 0%, rgba(245, 165, 36, 0.1) 0%, transparent 62%),
+    var(--sing-bg);
+  color: var(--sing-ink);
+  /* 原生滚动条/控件跟着转深：深底 + 浅色 scrollbar 在真机上非常刺眼 */
+  color-scheme: dark;
+}
+.m-sing-pick .u-sheet__title {
+  color: var(--sing-ink);
+}
+.m-sing-pick .u-sheet__sub {
+  color: var(--sing-weak);
+}
+.m-sing-pick .u-sheet__close {
+  background: var(--sing-card);
+  color: var(--sing-ink);
+}
+.m-sing-pick .u-sheet__close:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+/* 错误态的「重试」按钮（.u-btn--secondary 是浅底样式，深板上会突兀） */
+.m-sing-pick .u-btn--secondary {
+  background: var(--sing-card);
+  border-color: var(--sing-line);
+  color: var(--sing-ink);
+}
+.m-sing-pick__list {
+  --m-sing-pick-row: 44px;
+  max-height: calc(var(--m-sing-pick-row) * 5);
+  overflow-y: auto;
+  margin-top: 6px;
+}
+.m-sing-pick__row {
+  width: 100%;
+  height: var(--m-sing-pick-row);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--u-r-inner);
+  background: none;
+  font: inherit;
+  color: var(--sing-weak);
+  text-align: left;
+  cursor: pointer;
+  /* 只动颜色（无位移）：满足降级纪律 docs/31 §2 —— off 档下面整段 transition 关掉 */
+  transition: background-color var(--u-dur-quick) var(--u-ease-out);
+}
+.m-sing-pick__row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+/* 选中态（需求 4）：深色卡片底 + 左侧强调竖条 + 标题变强调色加粗 —— 三重区分，不只靠颜色深浅 */
+.m-sing-pick__row.is-on {
+  background: var(--sing-card);
+}
+.m-sing-pick__row.is-on .m-sing-pick__title {
+  color: var(--sing-accent);
+  font-weight: 600;
+}
+.m-sing-pick__bar {
+  flex: none;
+  width: 2px;
+  height: 16px;
+  border-radius: var(--u-r-pill);
+  background: transparent;
+}
+.m-sing-pick__row.is-on .m-sing-pick__bar {
+  background: var(--sing-accent);
+}
+.m-sing-pick__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  color: var(--sing-ink);
+}
+.m-sing-pick__artist {
+  flex: none;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  /* 不直接用 --sing-weak（0.45 alpha 实测对比度 ≈4.52:1，只压线过 AA，
+     且顶部还叠着琥珀渐变会再压低一点）→ 本行单独抬到 0.55（≈5.9:1），不动面板共享 token */
+  color: rgba(255, 255, 255, 0.55);
+}
+/* 难度徽标：`.u-badge--warn` 是浅蓝底 + 强调蓝字，深板上换中性半透明白
+   （双类选择器抬高优先级，不依赖两文件 import 顺序） */
+.m-sing-pick .m-sing-pick__level {
+  flex: none;
+  padding: 0 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+}
+/* 顶栏入口（复用 `.u-topbar__act` 的 44px icon-only 规格）：已选曲目时图标转强调色，
+   只改颜色不改几何 —— 顶栏三轨居中布局对宽度变化敏感，宽度恒定才不会顶偏标题 */
+.m-sing-pick-entry.is-on {
+  color: var(--u-accent);
+}
+html[data-motion='off'] .m-sing-pick__row {
+  transition: none;
 }
 
+/* ============================================================
+ * 七、歌单滚动动画列表（MobileSongList.vue · 2026-09-22）
+ *
+ * 上游是 React Bits `AnimatedList`（React + #120F17 深色皮肤），这里落到本页真形态：
+ * 纸面米白 + 纯白卡 + `--u-*` token，绝不引入上游那套深色配色（在浅色页上会像一道黑缝）。
+ *
+ * 核心目标（用户口径「后面还会加很多歌曲，这样空间太小」）：**滚动区高度与曲库规模解耦**。
+ * `.m-sing-list__scroll` 的 `max-height` 是唯一的高度来源（行高 × 可见行数上限 + 内边距），
+ * 曲库从 3 首涨到 30 首，页面高度不变 —— 只多一条内部滚动条。
+ * 改行高必须同步这里的行数口径；单测锁死 `max-height` 的存在与滚动声明。
+ * ============================================================ */
+.m-sing-list {
+  position: relative;
+  width: 100%;
+}
+
+.m-sing-list__scroll {
+  /* 行高口径：入场动画壳 padding 8 + `.u-item` 内容高 + 行距 8。 */
+  --m-sing-list-row: 92px;
+  /* 可见约 3.5 行：第 4 行露出小半张卡 —— 这个"被裁一半的卡"就是可滚动的信号
+     （底部渐隐带进一步强化）。整行显示（3 行）会让用户以为列表就这么多。 */
+  max-height: calc(var(--m-sing-list-row) * 3.5);
+  overflow-y: auto;
+  /* 惯性滚动（iOS 老 WebView 专用） */
+  -webkit-overflow-scrolling: touch;
+  /* 右侧 10px = 自定义滚动条（8px）的通槽，卡片不会压在滚动条下面 */
+  padding: 4px 10px 4px 0;
+}
+
+/* 滚动链抑制：**只在真有可滚内容时**才声明（类由 MobileSongList 的 measureGradients 挂）。
+   需求 =「滑列表时只滑列表、不滑整页」，`contain` 正是这个语义；但无条件加它有风险 ——
+   宿主若把"元素不可滚"也当作"链到此为止"，手指落在列表上就既滑不动列表也滑不动页面（死区）。
+   只在有溢出时 contain：有内容 → 手势归列表；没内容 → 不写这条声明，滚动链天然交给页面。
+   真机（Android WebView 412×876）：列表内滑动时 pageY 纹丝不动（0→0），列表自身 0→152。 */
+.m-sing-list.is-scrollable .m-sing-list__scroll {
+  overscroll-behavior: contain;
+}
+
+/* —— 自定义滚动条（上游同款三段式，配色改本页 token）——
+   滑块用 `--u-weak`：比纯灰更浅，保证不与"白卡 + 浅纸面"抢视觉。 */
+.m-sing-list__scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.m-sing-list__scroll::-webkit-scrollbar-track {
+  background: var(--u-track);
+  border-radius: 4px;
+}
+.m-sing-list__scroll::-webkit-scrollbar-thumb {
+  background: var(--u-weak);
+  border-radius: 4px;
+}
+/* `displayScrollbar=false`（上游同义 props）：只藏滑块，**不锁滚动** */
+.m-sing-list__scroll.is-nobar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.m-sing-list__scroll.is-nobar::-webkit-scrollbar {
+  display: none;
+}
+
+/* —— 上下渐隐（上游 `top-gradient` / `bottom-gradient`）——
+   上游是 50px/100px + 不透明深色起手；这里按 8px 网格取 48/96px，
+   起点用纸面色 `--u-paper`（不是 #120F17），末端 transparent —— 白卡边缘被柔和地化进纸面。
+   渐隐带 `pointer-events:none`：绝不挡点击（收藏钮在最右，正是渐隐带覆盖区）。
+   宽度 `calc(100% - 10px)` 与滚动区右内边距对齐，不盖住滚动条。 */
+.m-sing-list__grad {
+  position: absolute;
+  left: 0;
+  width: calc(100% - 10px);
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.m-sing-list__grad--top {
+  top: 0;
+  height: 48px;
+  background: linear-gradient(to bottom, var(--u-paper), transparent);
+}
+.m-sing-list__grad--bottom {
+  bottom: 0;
+  height: 96px;
+  background: linear-gradient(to top, var(--u-paper), transparent);
+}
+
+/* —— 行（入场动画壳）—— */
+.m-sing-list__item {
+  /* 内边距 = 选中态的"底衬"：选中/悬停时底色铺在卡片四周，而不是把白卡涂脏 */
+  padding: 8px;
+  border-radius: var(--u-r-card);
+  transition: background-color var(--u-dur-quick) var(--u-ease-out);
+}
+.m-sing-list__item + .m-sing-list__item {
+  margin-top: 8px;
+}
+/* 选中态（键盘 ↑↓ / 悬停）：底色 + 左侧强调竖条 —— 与跟唱弹层 `.m-sing-pick__row.is-on`
+   同一套多重区分思路，不只靠颜色深浅。竖条用**内阴影**而不是伪元素：不新增定位上下文、
+   不参与行宽计算，也不会把白卡顶偏。 */
+.m-sing-list__item.is-selected {
+  background: var(--u-track);
+  box-shadow: inset 2px 0 0 var(--u-accent);
+}
+html[data-motion='off'] .m-sing-list__item,
+html[data-motion='off'] .m-sing-list__grad {
+  transition: none;
+}

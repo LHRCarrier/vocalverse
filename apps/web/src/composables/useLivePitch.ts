@@ -21,6 +21,7 @@
 
 import type { PitchWorkerOut } from '@/audio/pitch-engine'
 import type { LiveScoreRead } from '@/lib/live-score'
+import { YIN_WINDOW_SIZE } from '@/lib/yin'
 
 export interface LivePitchFrame {
   /** 相对检测起点（录音开始）的毫秒 */
@@ -81,7 +82,9 @@ export function createLivePitch(
       ctx = new Ctor()
       source = ctx.createMediaStreamSource(stream)
       analyser = ctx.createAnalyser()
-      analyser.fftSize = 2048
+      // 窗长 = YIN_WINDOW_SIZE（4096@48k ≈ 85ms）：更长窗 = 更多积分 = 弱信号检出率更高
+      // （2026-09-21 实测，见 lib/yin.ts 注释）。必须与 Worker 侧 detector 的窗长一致。
+      analyser.fftSize = YIN_WINDOW_SIZE
       analyser.smoothingTimeConstant = 0
       source.connect(analyser)
       // Vite 要求 new URL 参数为字面量（勿拼接/勿用别名）

@@ -7,38 +7,57 @@
  * GET /sing/attempts/{id}(/status)（api/sing.ts；错误码映射见 singErrorMessage）。
  * 视觉：沿用重制版基线（深青精选卡/56px 分段/点线时间轴歌单）；交互逻辑接真。
  */
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import IconShare from '~icons/tabler/share'
 
 import { shareDemoLink } from '@/composables/share'
-import { useSingPlay } from '@/composables/sing'
+import { SING_MAX_RECORD_MS, useSingPlay } from '@/composables/sing'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { useReferenceAudio } from '@/composables/useReferenceAudio'
+import { useLivePitchPref } from '@/composables/useLivePitchPref'
+import { useSingLyricClock } from '@/composables/useSingLyricClock'
 import { useUiStore } from '@/stores/ui'
+import { useSingStore } from '@/stores/sing'
 import { hapticTap } from '@/utils/haptic'
 
+import { toLyricLines } from '@/lib/sing-lyrics'
 import type { SongSummary } from '@/api/sing'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
-import MobileSongRow from '@/components/mobile/MobileSongRow.vue'
+import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
+import MobileSongList from '@/components/mobile/MobileSongList.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import SingActionBar from '@/components/sing/SingActionBar.vue'
+import SingFeaturedCard from '@/components/sing/SingFeaturedCard.vue'
+import SingLyrics from '@/components/sing/SingLyrics.vue'
+import SingSheetHead from '@/components/sing/SingSheetHead.vue'
+import SingSongPickerSheet from '@/components/sing/SingSongPickerSheet.vue'
 import LivePitchChart from '@/components/LivePitchChart.vue'
-import { renderSingChart } from '@/lib/sing-chart'
+import SingReport from '@/components/sing/SingReport.vue'
+import { formatClock } from '@/lib/sing-lyrics'
 import '@/styles/mobile-uic.css'
 import '@/styles/mobile-sing.css'
 
 const router = useRouter()
 const ui = useUiStore()
+/** 选曲真源（与桌面顶栏同一份；跨模块读 `currentSong` 即可同步，2026-09-21） */
+const sing = useSingStore()
 
 const play = useSingPlay()
 
 /** 跟唱面板（同页全屏 sheet）：null=关闭 */
 const sheetOpen = ref(false)
 
-/** 报告图容器（P1-8：模板 ref 取代 document.getElementById） */
-const chartEl = ref<HTMLElement | null>(null)
+/** 跟唱曲目选择弹层（顶栏入口 · 2026-09-21）：底部 sheet，列表/选中态来自 store */
+const pickerOpen = ref(false)
+
+/** 顶栏选曲入口的文案（icon-only 按钮的语义补充：把「当前在唱哪首」带出去） */
+const pickerLabel = computed(() =>
+  sing.currentSong ? `选择跟唱曲目（当前：${sing.currentSong.title}）` : '选择跟唱曲目',
+)
 
 type Tab = 'all' | 'hot' | 'fav'
 
@@ -46,7 +65,9 @@ const tab = ref<Tab>('all')
 
 const tabs: { key: Tab; label: string; icon: 'chart' | 'note' | 'heart' }[] = [
   { key: 'all', label: '全部', icon: 'chart' },
-  { key: 'hot', label: '热门', icon: 'note' },
+  // 「热门」→「短歌」（2026-09-22 歌单排版优化）：这个分类的口径就是 `expected_lines ≤ 8`，
+  // 与「热度/播放量」无关，旧文案会让用户以为排的是人气。
+  { key: 'hot', label: '短歌', icon: 'note' },
   { key: 'fav', label: '收藏', icon: 'heart' },
 ]
 
@@ -61,18 +82,30 @@ const visibleSongs = computed(() => {
 const featured = computed(() => play.songs.value[0] ?? null)
 const sheetDetail = computed(() => play.detail.value)
 const recording = computed(() => play.phase.value === 'recording')
+/** 录音暂停中（2026-09-22 深色录唱页：中心钮变「继续」，计时/歌词游标冻结） */
+const paused = play.paused
 const processing = computed(
   () => play.phase.value === 'processing' || play.phase.value === 'uploading',
 )
-/** 分数→颜色（P1-14：契约生成类型里逐句分项是可选字段，签名同时接 null/undefined） */
-const scoreColor = (v: number | null | undefined) =>
-  v == null ? '#999' : v >= 85 ? '#18a058' : v >= 60 ? '#f2a43a' : '#d03050'
 
 /** 有效句计数（覆盖率提示文案由后端 `alignment.coverage_note` 下发，v4 口径） */
 const evaluatedCount = computed(
   () => play.result.value?.lines.filter((x) => !x.skipped).length ?? 0,
 )
 const expectedCount = computed(() => play.result.value?.expected_lines ?? 0)
+
+/** 实时分（顶栏评级条数据源；由 LivePitchChart 的 `score` 事件上报，≤4Hz） */
+const liveScore = ref<number | null>(null)
+/** 顶栏模式 chip 文案 */
+const headModeText = computed(() =>
+  paused.value ? '暂停中' : recording.value ? '跟唱中' : refPlaying.value ? '原唱中' : '待开始',
+)
+/** 底部一行「已录 / 全长」：全长取歌曲时长（契约 `duration_s`），缺失时退回录音上限 */
+const totalMs = computed(
+  () => (sheetDetail.value?.duration_s ? sheetDetail.value.duration_s * 1000 : SING_MAX_RECORD_MS),
+)
+const recClock = computed(() => formatClock(recElapsedMs.value ?? 0))
+const totalClock = computed(() => formatClock(totalMs.value))
 
 /** 参考旋律回放（2026-09-09 真机反馈：先听一遍再跟唱，避免凭记忆清唱音准普遍偏低）。
  *  播放/回收/重入守卫抽到 `useReferenceAudio`（P1-7；视图受 max-lines 门禁约束）。 */
@@ -86,6 +119,30 @@ const reference = useReferenceAudio(
 )
 const refPlaying = reference.playing
 
+/** 实时音准线显示开关（2026-09-22：按视频模板移到面板底部按钮行；只管显示，检测照常跑） */
+const { on: livePitchOn, toggle: toggleLivePitch } = useLivePitchPref()
+
+/**
+ * 跟唱歌词锚点（2026-09-21 用户口径）：**开口那一刻回到第一句**。
+ * 由 `LivePitchChart` 的 `firstVoice` 事件给出「本次录音首帧人声」的相对时刻；
+ * 尚未开口 → null（歌词不预跑，停在顶部等开口）。
+ */
+const voiceAtMs = ref<number | null>(null)
+/** 首句起点（锚点目标；随换歌更新） */
+const lyricFirstMs = computed(() => toLyricLines(sheetDetail.value?.lines)[0]?.startMs ?? 0)
+
+/** 歌词游标：参考播放取音频位置；跟唱取「首句 + 已开口时长」（同一条 LRC 时间轴）。
+ *  另取 `elapsedMs`（录音轴已用时长，整秒量化）供底部「已录 / 全长」；
+ *  `paused` 传入后，暂停段不计入游标与时长（2026-09-22 新增暂停能力）。 */
+const { timeMs: lyricTimeMs, elapsedMs: recElapsedMs, recMs } = useSingLyricClock({
+  playing: refPlaying,
+  recording,
+  paused,
+  audioMs: reference.currentMs,
+  voiceAtMs,
+  firstLineMs: () => lyricFirstMs.value,
+})
+
 /**
  * 开始跟唱（P1-5，2026-09-10）：**先停参考旋律再开录**。
  * 修复前录音按钮直接 `play.startRecording()`：外放先听后唱时原唱被麦克风一起录进去
@@ -93,8 +150,25 @@ const refPlaying = reference.playing
  * 依据：docs/31（跟唱为练习辅助，输入须为用户本人）、拷问报告 A-F3/D-F3。
  */
 function startSinging() {
+  voiceAtMs.value = null // 新一轮跟唱：锚点等首帧人声
+  liveScore.value = null // 上一轮的实时分不带进新的一轮
   reference.stop()
   play.startRecording()
+}
+
+/**
+ * 首帧人声锚点（2026-09-22 加固）：**同一轮只认第一个**，且必须早于当前已开口时长。
+ *
+ * 修复前直接把事件值写进 `voiceAtMs`：检测重启（暂停/切歌等）会再次触发 `firstVoice`，
+ * 而 Worker 的帧时间戳是**跨会话累加**的（不复位）→ 第二次锚点是个很大的值 →
+ * 游标算成 `首句 + (已开口 − 大锚点)` = 负数 → clamp 到 0 → **歌词进度与高亮整个归零**
+ * （用户实测「暂停后进度有时候会归零」）。现在第二个及以后的锚点一律忽略。
+ */
+function onFirstVoice(tMs: number) {
+  if (voiceAtMs.value != null) return // 本轮已有锚点：不覆盖
+  const elapsed = recMs.value
+  if (elapsed != null && tMs > elapsed + 1000) return // 明显来自上一轮/跨会话的时间戳：丢弃
+  voiceAtMs.value = tMs
 }
 
 async function openSong(songId: number) {
@@ -138,26 +212,13 @@ onMounted(play.loadSongs)
 /** 列表加载失败（P1-6）：`phase='failed'` 且列表为空 → 页面级错误态（原实现只在 sheet 内显示错误） */
 const loadFailed = computed(() => play.phase.value === 'failed' && play.songs.value.length === 0)
 
-/** 结果就绪 → 渲染 D3 对齐图（参考 + 用户曲线）。
- *
- * P1-8（2026-09-10）：原实现用 `document.getElementById` + 一次性 60ms 延时——若结果在
- * **面板关闭时**落地（如评分中关面板），元素不存在 → 静默跳过，且再打开时不会重画 →
- * 报告页图表区永久空盒（实测 `#m-sing-chart` innerHTML 长度 0）。现改为**模板 ref** +
- * 监听 `[result, sheetOpen]`：面板打开且结果就绪时才画，两种情况都能出图。
- * 依据：docs/35（状态覆盖：交互后/重新进入）、拷问报告 A-F4/D-F28。
- */
-watch(
-  [() => play.result.value, sheetOpen],
-  async ([v, open]) => {
-    if (!v || !open) return
-    await nextTick()
-    await new Promise((r) => setTimeout(r, 60))
-    if (chartEl.value && sheetDetail.value) {
-      renderSingChart(chartEl.value, sheetDetail.value, v)
-    }
-  },
-  { flush: 'post' },
+/** 加载态骨架防抖（docs/31 硬规则 3：>300ms 才出现；与其余移动端页同款写法） */
+const { visible: skelVisible, pending: skelPending } = useDelayedLoading(
+  computed(() => play.phase.value === 'loading'),
 )
+
+/** 结果就绪 → 渲染 D3 对齐图：**已随报告一起下沉到 `SingReport.vue`**（视图不再自己找元素画图，
+ *  P1-8 的模板 ref 口径在那边继续成立）；这里只保留「结果在面板关闭时落地也不白画」的外层条件。 */
 
 /** 顶栏 · 分享歌曲（演示：系统面板 / 复制链接）——架构级功能，保留演示入口 */
 async function shareSong() {
@@ -178,6 +239,20 @@ async function shareSong() {
     <!-- 统一顶栏（← 回学习主页 + 全局头像 / 唱吧 / 分享歌曲） -->
     <MobileTopBar title="唱吧" back @back="router.push('/m/learn')">
       <template #actions>
+        <!-- 跟唱曲目入口（2026-09-21）：44px icon-only，与相邻分享钮同规格——
+             不在这里放「当前曲名」文本：顶栏是 `minmax(min-content,1fr)` 三轨居中布局，
+             右侧变宽会把居中标题顶偏（2026-09-10 长标题吞头像那次就是这类几何问题）；
+             当前曲目改在弹层副标题与跟唱面板标题里显示（同一 store，天然一致）。 -->
+        <button
+          class="u-topbar__act m-sing-pick-entry"
+          :class="{ 'is-on': !!sing.currentSong }"
+          type="button"
+          :title="pickerLabel"
+          :aria-label="pickerLabel"
+          @click="pickerOpen = true"
+        >
+          <MobileIcon name="music" :size="20" />
+        </button>
         <button class="u-topbar__act" type="button" title="分享歌曲" aria-label="分享歌曲" @click="shareSong">
           <IconShare />
         </button>
@@ -185,55 +260,30 @@ async function shareSong() {
     </MobileTopBar>
 
     <div class="u-content">
-      <p class="u-head__sub" style="margin: 0 0 16px">英文歌逐句跟唱，音准与节奏即时评分。</p>
-
-      <!-- 本周精选（深青卡 · 每屏唯一深色卡 · 音符线稿锚点） -->
-      <section v-if="featured" class="u-dark-card u-dark-card--teal">
-        <div class="u-dark-card__art" aria-hidden="true">
-          <MobileArt name="note" :size="104" />
-        </div>
-        <span class="u-chip u-chip--teal">
-          {{ featured.pitch_ref_status === 'ready' ? '本周精选' : '参考旋律提取中' }}
-        </span>
-        <span class="u-dark-card__meta">
-          {{ featured.artist ?? '歌单' }} · {{ featured.expected_lines }} 句 ·
-          {{ featured.pitch_ref_status === 'ready' ? '可跟唱' : '稍后开放' }}
-        </span>
-        <h2 class="u-dark-card__title">{{ featured.title }}</h2>
-        <p class="u-dark-card__desc">
-          {{
-            featured.pitch_ref_status === 'ready'
-              ? `整首跟唱 ≤3 分钟，逐句音准/节奏/发音 + D3 对齐图。`
-              : '参考旋律正在离线提取，完成后即可跟唱（自动刷新）。'
-          }}
-        </p>
-        <button
-          class="u-btn u-btn--ghost"
-          type="button"
-          style="margin-top: 16px"
-          @click="openSong(featured.id)"
-        >
-          <MobileIcon name="mic" :size="16" /> 去跟唱
+      <!-- 2026-09-22 用户要求删掉页面副标题「英文歌逐句跟唱，音准与节奏即时评分。」：
+           与精选卡的说明行重复，页面直接从精选卡开场 -->
+      <!-- 本周精选（深色卡 · 每屏唯一深色卡）——版式见 components/sing/SingFeaturedCard.vue -->
+      <!-- 加载态：骨架卡（docs/31 硬规则 3：>300ms 才出现；防抖见 useDelayedLoading）
+           ——与其余 7 个移动端页同款，不再用「深青大卡写加载中…」再跳变成内容卡（P0-6 的跳变） -->
+      <MobileSkeleton
+        v-if="!featured && skelPending"
+        :class="{ 'is-pending': !skelVisible }"
+        variant="feed"
+        :count="3"
+        label="歌曲库加载中"
+      />
+      <SingFeaturedCard v-else-if="featured" :song="featured" @open="openSong" />
+      <!-- 错误态（P1-6）：与兄弟页同款 u-comm-empty（原来用深青内容卡承载错误，与内容态同形、语义混淆）；
+           「歌曲库加载失败」文案是既有测试锚点，必须保留。 -->
+      <div v-else-if="loadFailed" class="u-comm-empty" role="status">
+        <span class="u-comm-empty__icon"><MobileIcon name="info" :size="28" /></span>
+        <p class="u-comm-empty__title">歌曲库加载失败</p>
+        <p class="u-comm-empty__sub">{{ play.error.value ?? '网络异常，请重试' }}</p>
+        <button class="u-comm-empty__btn" type="button" @click="play.loadSongs()">
+          <MobileIcon name="refresh" :size="15" />
+          重试
         </button>
-      </section>
-      <!-- 加载失败态（P1-6）：原实现在 v-else 里一律显示「加载中…」，且错误只写进 sheet 内的
-           play.error → 断网/500/401 时页面永久「加载中…」+ 列表空态「这个分类还没有歌」两句
-           自相矛盾的话，且没有重试入口。这里把三者拆开：loading / error（含重试）/ empty。
-           依据：docs/35（状态覆盖：空态/错误态）、拷问报告 A-F5/D-F4。 -->
-      <section v-else-if="loadFailed" class="u-dark-card u-dark-card--teal">
-        <div class="u-dark-card__art" aria-hidden="true"><MobileArt name="note" :size="104" /></div>
-        <span class="u-chip u-chip--teal">加载失败</span>
-        <h2 class="u-dark-card__title">歌曲库加载失败</h2>
-        <p class="u-dark-card__desc">{{ play.error.value ?? '网络异常，请重试' }}</p>
-        <button class="u-btn u-btn--ghost" type="button" style="margin-top: 16px" @click="play.loadSongs()">
-          <MobileIcon name="refresh" :size="16" /> 重试
-        </button>
-      </section>
-      <section v-else class="u-dark-card u-dark-card--teal">
-        <div class="u-dark-card__art" aria-hidden="true"><MobileArt name="note" :size="104" /></div>
-        <span class="u-chip u-chip--teal">歌曲库</span>
-        <h2 class="u-dark-card__title">加载中…</h2>
-      </section>
+      </div>
 
       <!-- 分段筛选（56px） -->
       <div class="u-segment" role="tablist">
@@ -250,15 +300,22 @@ async function shareSong() {
         </button>
       </div>
 
-      <!-- 歌单（点线时间轴 · 真实数据 + 每首歌收藏按钮） -->
-      <div class="u-section-title">歌曲库</div>
-      <template v-for="(s, i) in visibleSongs" :key="s.id">
-        <MobileSongRow :song="s" @open="openSong" @favorite="toggleFav" />
-        <div v-if="i < visibleSongs.length - 1" class="u-dotline" aria-hidden="true">
-          <span class="dot" /><span class="line" />
-        </div>
-      </template>
-      <div v-if="!visibleSongs.length" class="u-empty">
+      <!-- 歌单（滚动动画列表 · 真实数据 + 每首歌收藏按钮）。
+           2026-09-22：原来是 `.u-dotline` 连接的一长串卡片，**随曲库长高** —— 歌一多整页被拉到
+           几千像素，精选卡/筛选/页脚注释全被推走。现收进 `MobileSongList` 的定高滚动区
+           （React Bits AnimatedList 的 Vue 移植）：页面高度从此与曲库规模无关，列表内部自己滚。
+           区块标题与空态在**加载中/加载失败**时不渲染：否则会出现「共 0 首」+「这个分类还没有歌」
+           与骨架/错误态自相矛盾的两句话（P1-6 对 hero 卡修过同一类问题，这里补齐列表侧）。 -->
+      <div v-if="!skelPending && !loadFailed" class="u-section-title">
+        歌曲库 · 共 {{ visibleSongs.length }} 首
+      </div>
+      <MobileSongList
+        v-if="visibleSongs.length"
+        :songs="visibleSongs"
+        @open="openSong"
+        @favorite="toggleFav"
+      />
+      <div v-if="!skelPending && !loadFailed && !visibleSongs.length" class="u-empty">
         <div class="u-empty__art"><MobileArt name="note" :size="96" /></div>
         <div class="u-empty__title">
           {{ tab === 'fav' ? '还没有收藏的歌曲' : '这个分类还没有歌' }}
@@ -271,130 +328,93 @@ async function shareSong() {
           }}
         </div>
       </div>
-
-      <p class="u-note" style="margin-top: 24px">
-        跟唱评分 = 0.5·音准 + 0.2·节奏 + 0.3·发音（发音=抽样句，默认前 3 句）；蓝图与抽检见 docs/06 §9.4。
-      </p>
+      <!-- 2026-09-22 用户要求删掉页脚评分公式（「跟唱评分 = 0.5·音准 + 0.2·节奏 + 0.3·发音…」）：
+           属研发口径（口径真源在 docs/06 §9.4 与报告页），不该占歌单屏的版面 -->
     </div>
 
     <!-- 跟唱面板（全屏 sheet） -->
     <div v-if="sheetOpen" class="m-sing-sheet">
-      <div class="m-sing-sheet__head">
-        <button class="u-topbar__act" type="button" aria-label="关闭" @click="startOver">
-          <MobileIcon name="chevron" :size="20" style="transform: rotate(90deg)" />
-        </button>
-        <strong>{{ sheetDetail?.title ?? '跟唱' }}</strong>
-        <span class="m-sing-sheet__sub">{{ sheetDetail?.expected_lines }} 句 · 整首 ≤180s</span>
-      </div>
+      <!-- 顶栏（抽出为组件）：关闭 + 实时评级条 + 模式 chip + 3 分钟录音进度线 -->
+      <SingSheetHead
+        :title="sheetDetail?.title ?? '跟唱'"
+        :score="liveScore"
+        :mode-text="headModeText"
+        :recording="recording"
+        :paused="paused"
+        :elapsed-ms="recElapsedMs"
+        :max-ms="SING_MAX_RECORD_MS"
+        @close="startOver"
+      />
 
       <div class="m-sing-sheet__body">
-        <!-- 录音/评分阶段 -->
+        <!-- 录音/评分阶段（2026-09-22 深色录唱页：大歌名 → 音准引导条 → 歌词 → 底部五键 → 已录/全长） -->
         <template v-if="!play.result.value">
-          <div v-if="play.error.value" class="m-sing-sheet__hint" style="color: #c0392b; margin: 8px 0">
+          <div v-if="play.error.value" class="m-sing-sheet__hint" style="color: #ff8fa3">
             {{ play.error.value }}
           </div>
-          <div class="m-sing-sheet__lyrics">
-            <p v-for="line in (sheetDetail?.lines ?? []).slice(0, 6)" :key="line.seq" class="m-sing-lyric">
-              {{ line.text }}
-            </p>
-            <p v-if="(sheetDetail?.lines.length ?? 0) > 6" class="m-sing-lyric m-sing-lyric--more">
-              …共 {{ sheetDetail?.lines.length }} 句
-            </p>
-          </div>
-          <button
-            class="u-btn u-btn--secondary"
-            type="button"
-            style="width: 100%; margin-top: 12px"
-            :disabled="recording"
-            @click="reference.toggle()"
-          >
-            <MobileIcon name="play" :size="16" />
-            {{ refPlaying ? '停止参考旋律' : '听参考旋律（建议先听一遍再跟唱）' }}
-          </button>
-          <button
-            class="u-btn u-btn--primary"
-            type="button"
-            style="width: 100%; margin-top: 8px"
-            :disabled="recording || processing"
-            @click="startSinging"
-          >
-            <MobileIcon name="mic" :size="16" />
-            {{ recording ? '录音中…' : processing ? '上传/评分中…' : '开始跟唱（≤3 分钟）' }}
-          </button>
-          <div v-if="recording" class="m-sing-sheet__stopbar">
-            <button class="u-btn u-btn--secondary" type="button" style="width: 48%" @click="play.cancelRecording()">
-              放弃重录
-            </button>
-            <button class="u-btn u-btn--primary" type="button" style="width: 48%" @click="play.stopRecording()">
-              停止并评分
-            </button>
-          </div>
-          <!-- 实时音准线（docs/06 §9.4 注记：练习辅助，同流分析，评分以离线为准） -->
+          <h1 class="m-sing-song">{{ sheetDetail?.title ?? '跟唱' }}</h1>
+          <!-- 音准引导条（目标音符块 + 走针 + 用户轨迹）。开关「曲线」只管是否画用户轨迹，
+               检测照常跑——歌词滚动的首帧人声锚点依赖 `firstVoice`；实时分经 `score` 上报顶栏。 -->
           <LivePitchChart
             v-if="sheetDetail"
-            class="m-sing-live"
+            class="m-sing-lane"
             :detail="sheetDetail"
             :stream="play.getLiveStream()"
             :active="recording"
+            :enabled="livePitchOn"
+            :paused="paused"
+            :clock-ms="recMs"
+            @first-voice="onFirstVoice"
+            @score="liveScore = $event"
           />
+          <!-- 歌词（几何与时间轴口径不变，仅换深色配色；见 lib/sing-lyrics.ts） -->
+          <SingLyrics :lines="sheetDetail?.lines" :time-ms="lyricTimeMs" />
           <div v-if="processing" class="m-sing-sheet__progress">
             <div class="m-sing-sheet__bar">
               <div class="m-sing-sheet__bar-inner" :style="{ width: `${play.progressPct.value}%` }" />
             </div>
             <span>{{ play.progressPct.value }}% · {{ play.progressPct.value < 100 ? '评分计算中…' : '正在生成报告…' }}</span>
           </div>
-          <div class="m-sing-sheet__hint">
-            移动端提示：授权后请保持前台；录音自动在 3 分钟停止。
+          <!-- 底部六键：原唱 / 曲线 / 选曲 / 开始·暂停·继续 / 重录 / 完成（参考图布局；调音键不做——无该能力）。
+               「选曲」只负责开列表（本页的 SingSongPickerSheet），切歌仍走 openSong()。 -->
+          <SingActionBar
+            :recording="recording"
+            :paused="paused"
+            :processing="processing"
+            :ref-playing="refPlaying"
+            :live-on="livePitchOn"
+            @toggle-reference="reference.toggle()"
+            @start="startSinging"
+            @pause="play.pauseRecording()"
+            @resume="play.resumeRecording()"
+            @stop="play.stopRecording()"
+            @cancel="play.cancelRecording()"
+            @toggle-live="toggleLivePitch()"
+            @pick="pickerOpen = true"
+          />
+          <!-- 已录 / 全长（参考图「若梦 · 00:42 / 04:04」的位置）；暂停中显式标出，避免「卡住了」的误会 -->
+          <div class="m-sing-foot">
+            <span class="m-sing-foot__name">{{ sheetDetail?.title ?? '跟唱' }}</span>
+            <span class="m-sing-foot__times">{{ recClock }} / {{ totalClock }}</span>
+            <span v-if="paused" class="m-sing-foot__flag">已暂停</span>
           </div>
         </template>
 
-        <!-- 报告阶段 -->
+        <!-- 报告阶段（已抽成组件：视图守 max-lines 门禁；图表渲染随之下沉） -->
         <template v-else>
-          <div class="m-sing-report">
-            <div class="m-sing-report__score">
-              <span class="m-sing-report__num">{{ play.result.value.overall?.toFixed(1) ?? '—' }}</span>
-              <span class="m-sing-report__label">综合分</span>
-            </div>
-            <div class="m-sing-report__sub">
-              <span>音准 {{ play.result.value.pitch?.toFixed(1) ?? '—' }}</span>
-              <span>节奏 {{ play.result.value.rhythm?.toFixed(1) ?? '—' }}</span>
-              <span>发音 {{ play.result.value.pron?.toFixed(1) ?? '—' }}</span>
-            </div>
-            <div ref="chartEl" class="m-sing-chart" />
-            <div class="m-sing-report__lines">
-              <div v-for="(l, i) in play.result.value.lines" :key="l.seq" class="m-sing-line">
-                <span class="m-sing-line__text">
-                  {{ i + 1 }}.
-                  <template v-if="l.skipped">未评测（{{ l.reason ?? 'skipped' }}）</template>
-                  <template v-else-if="l.onset_dev_ms != null">
-                    起唱偏差 {{ Math.round(l.onset_dev_ms) }}ms
-                  </template>
-                  <template v-else>✓</template>
-                </span>
-                <span class="m-sing-line__score">
-                  <b :style="{ color: scoreColor(l.pitch_score) }">{{ l.pitch_score?.toFixed(0) ?? '—' }}</b>
-                  <i :style="{ color: scoreColor(l.rhythm_score) }">{{ l.rhythm_score?.toFixed(0) ?? '—' }}</i>
-                </span>
-              </div>
-            </div>
-            <!-- 有效句 + v3/v4 提示（音域/在调音符/覆盖率置信度；docs/06 §9.4） -->
-            <div class="m-sing-sheet__hint" style="margin: 8px 0">
-              有效句 {{ evaluatedCount }}/{{ expectedCount }}
-              <template v-if="evaluatedCount < expectedCount">
-                · 未评测 {{ expectedCount - evaluatedCount }} 句（无音高/参考缺失/有效帧不足），综合按有效句均分（docs/06 §9.4 D5）
-              </template>
-              <template v-if="play.result.value.alignment?.range_hint"> · {{ play.result.value.alignment.range_hint }}</template>
-              <template v-if="play.result.value.alignment?.note_hit_rate != null"> · 在调音符 {{ Math.round((play.result.value.alignment.note_hit_rate ?? 0) * 100) }}%（未唱到的音符按比例扣减音准分）</template>
-            </div>
-            <div v-if="play.result.value.alignment?.coverage_note" class="m-sing-sheet__hint" style="color: #c0392b; margin: 8px 0">
-              {{ play.result.value.alignment.coverage_note }}
-            </div>
-            <button class="u-btn u-btn--ghost" type="button" style="width: 100%; margin-top: 10px" @click="startOver">
-              返回歌单
-            </button>
-          </div>
+          <SingReport
+            :detail="sheetDetail"
+            :result="play.result.value"
+            :evaluated-count="evaluatedCount"
+            :expected-count="expectedCount"
+            @back="startOver"
+          />
         </template>
       </div>
     </div>
+
+    <!-- 跟唱曲目选择（顶栏入口的弹层；选曲直接复用页面既有 openSong：
+         内部已停参考旋律 + 停录音 + 作废旧轮询 + 40905 门禁 → 即「先停止再切换」） -->
+    <SingSongPickerSheet v-model:open="pickerOpen" @select="openSong" />
   </div>
 </template>
