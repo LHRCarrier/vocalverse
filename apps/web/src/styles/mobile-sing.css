@@ -9,25 +9,26 @@
 /* ============================================================
  * 一、歌单屏（浅色）：主点击区 + 收藏按钮
  *
- * 2026-09-22 歌单排版优化：`.u-item` / `.u-item__sub` 是**共享类**（`MobileReportView` 同用），
+ * 2026-09-22 歌单排版优化（第三轮 · 用户截图：状态徽标叠两遍 + 排版空/信息量低）：
+ * ① 封面 48 → 56px、副文行右端补时长（QQ 音乐式一行信息）；
+ * ② 行高 80 → 72px（上下内边距 16 → 8），同屏更紧凑；
+ * 第五轮起状态徽标整体下架（上架曲目必须可唱，见组件头注释）。
+ * `.u-item` / `.u-item__sub` 是**共享类**（`MobileReportView` 同用），
  * 故本行的一切调整都限定在 `.m-sing-row` 作用域内，绝不改全局定义。
  * ============================================================ */
 .m-sing-row {
-  /* 右内边距 8 → 12px：与 `.u-item` 左侧内边距呼应（原来心形贴卡片右边缘），
-     同时给副文腾 4px（360 宽屏上「L1 · 6 句 · Traditional」实测需要 108px，文本列原为 107px） */
-  padding-right: 12px;
-  gap: 8px;
+  /* 上下 16 → 8px（封面 56 + 8×2 = 行高 72）；右 12px 与心形按钮的视觉边距呼应
+     （原来心形贴卡片右边缘）；左 20px 沿用共享值，保证与区块标题对齐 */
+  padding: 8px 12px 8px 20px;
+  gap: 12px;
 }
 /* 图标块与文本之间的 16 → 12px（同上，纯内部间距，不动跨页对齐） */
 .m-sing-row__hit {
   gap: 12px;
 }
-/* 状态徽标左右内边距 10 → 8px（3 个字的徽标不需要 20px 内边距），再腾 4px 给副文 */
-.m-sing-row .u-badge {
-  padding: 0 8px;
-}
-/* 副文行 = 左「L1 · 6 句 · Traditional」+ 右状态徽标。
-   徽标 `flex: none` 不参与文本宽度分配 → 副文过长时只省略中间，状态永远可见。 */
+/* 副文行 = 左「歌手 · 专辑」+ 右时长（状态徽标 2026-09-22 第五轮整体下架：
+   上架曲目必须可唱，卡片不再讲跟唱状态）。
+   时长 `flex: none` 不参与文本宽度分配 → 副文过长时只省略中间。 */
 .m-sing-row .u-item__sub {
   display: flex;
   align-items: center;
@@ -40,13 +41,17 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.m-sing-row__state {
+/* 时长（`mm:ss`）：等宽数字，避免不同时长把行右缘推来推去 */
+.m-sing-row__dur {
   flex: none;
+  font-variant-numeric: tabular-nums;
 }
-/* 专辑封面（2026-09-22）：几何沿用共享 `.u-icon-block`（48×48 / 圆角 14），此处只做裁切 +
-  图片铺满（`object-fit: cover` 防非正方形封面被拉伸）。无封面/图裂时组件退回原音符图标，
-   底色由组件的行内 style 提供（level ≤2 深绿 / 其余深青），加载中不闪白。 */
+/* 专辑封面：几何在本页作用域内定义（56×56 / 圆角 12，QQ 音乐式行版），
+   不再从共享 `.u-icon-block` 借 48px —— 共享类改尺寸会波及全站。 */
 .m-sing-row__cover {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
   overflow: hidden;
 }
 .m-sing-row__cover img {
@@ -718,7 +723,8 @@ html[data-motion='off'] .m-sing-lyric {
 }
 .m-sing-pick__artist {
   flex: none;
-  max-width: 96px;
+  /* 2026-09-22：难度徽标下架后，「歌手 · 专辑」用这条宽度；标题仍占剩余空间 */
+  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -726,14 +732,6 @@ html[data-motion='off'] .m-sing-lyric {
   /* 不直接用 --sing-weak（0.45 alpha 实测对比度 ≈4.52:1，只压线过 AA，
      且顶部还叠着琥珀渐变会再压低一点）→ 本行单独抬到 0.55（≈5.9:1），不动面板共享 token */
   color: rgba(255, 255, 255, 0.55);
-}
-/* 难度徽标：`.u-badge--warn` 是浅蓝底 + 强调蓝字，深板上换中性半透明白
-   （双类选择器抬高优先级，不依赖两文件 import 顺序） */
-.m-sing-pick .m-sing-pick__level {
-  flex: none;
-  padding: 0 8px;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.72);
 }
 /* 顶栏入口（复用 `.u-topbar__act` 的 44px icon-only 规格）：已选曲目时图标转强调色，
    只改颜色不改几何 —— 顶栏三轨居中布局对宽度变化敏感，宽度恒定才不会顶偏标题 */
@@ -761,8 +759,8 @@ html[data-motion='off'] .m-sing-pick__row {
 }
 
 .m-sing-list__scroll {
-  /* 行高口径：入场动画壳 padding 8 + `.u-item` 内容高 + 行距 8。 */
-  --m-sing-list-row: 92px;
+  /* 行高口径：入场动画壳 padding 8×2 + `.u-item` 内容高 72 + 行距 8 = 96px。 */
+  --m-sing-list-row: 96px;
   /* 可见约 3.5 行：第 4 行露出小半张卡 —— 这个"被裁一半的卡"就是可滚动的信号
      （底部渐隐带进一步强化）。整行显示（3 行）会让用户以为列表就这么多。 */
   max-height: calc(var(--m-sing-list-row) * 3.5);

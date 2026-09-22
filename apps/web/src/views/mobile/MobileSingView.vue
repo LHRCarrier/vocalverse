@@ -59,25 +59,25 @@ const pickerLabel = computed(() =>
   sing.currentSong ? `选择跟唱曲目（当前：${sing.currentSong.title}）` : '选择跟唱曲目',
 )
 
-type Tab = 'all' | 'hot' | 'fav'
+type Tab = 'songs' | 'fav'
 
-const tab = ref<Tab>('all')
+const tab = ref<Tab>('songs')
 
-const tabs: { key: Tab; label: string; icon: 'chart' | 'note' | 'heart' }[] = [
-  { key: 'all', label: '全部', icon: 'chart' },
-  // 「热门」→「短歌」（2026-09-22 歌单排版优化）：这个分类的口径就是 `expected_lines ≤ 8`，
-  // 与「热度/播放量」无关，旧文案会让用户以为排的是人气。
-  { key: 'hot', label: '短歌', icon: 'note' },
+/**
+ * 分段只有两档（2026-09-22 第三轮 · 用户口径「短歌改成歌曲」）：
+ * 原「全部 / 短歌 / 收藏」里，短歌档的口径是 `expected_lines ≤ 8`（与「热度」无关），
+ * 改名「歌曲」后名实不符；用户拍板**去掉「全部」档、歌曲档显示全部曲目**——
+ * 标签与内容对齐，也不再有两档内容完全相同的冗余分区。
+ */
+const tabs: { key: Tab; label: string; icon: 'note' | 'heart' }[] = [
+  { key: 'songs', label: '歌曲', icon: 'note' },
   { key: 'fav', label: '收藏', icon: 'heart' },
 ]
 
-/* 分类规则：hot=短歌（句数少）；fav=**用户自主收藏**（服务端 favorited 为准，2026-09-10） */
-const visibleSongs = computed(() => {
-  if (tab.value === 'fav') return play.favorites.value
-  return tab.value === 'hot'
-    ? play.songs.value.filter((s) => s.expected_lines <= 8)
-    : play.songs.value
-})
+/* 分类规则：songs=全部曲目；fav=**用户自主收藏**（服务端 favorited 为准，2026-09-10） */
+const visibleSongs = computed(() =>
+  tab.value === 'fav' ? play.favorites.value : play.songs.value,
+)
 
 const featured = computed(() => play.songs.value[0] ?? null)
 const sheetDetail = computed(() => play.detail.value)
@@ -100,11 +100,12 @@ const liveScore = ref<number | null>(null)
 const headModeText = computed(() =>
   paused.value ? '暂停中' : recording.value ? '跟唱中' : refPlaying.value ? '原唱中' : '待开始',
 )
-/** 底部一行「已录 / 全长」：全长取歌曲时长（契约 `duration_s`），缺失时退回录音上限 */
+/** 底部一行「歌曲位置 / 全长」：全长取歌曲时长（契约 `duration_s`），缺失时退回录音上限。
+ *  时间与歌词区左上角数字、引导条走针**同一条歌曲轴**（2026-09-22 用户口径）：
+ *  听原唱 = 播放位置（旧实现恒 00:00）；跟唱 = 首句锚点位置（开口前即首句起点，不是录音已用时长）。 */
 const totalMs = computed(
   () => (sheetDetail.value?.duration_s ? sheetDetail.value.duration_s * 1000 : SING_MAX_RECORD_MS),
 )
-const recClock = computed(() => formatClock(recElapsedMs.value ?? 0))
 const totalClock = computed(() => formatClock(totalMs.value))
 
 /** 参考旋律回放（2026-09-09 真机反馈：先听一遍再跟唱，避免凭记忆清唱音准普遍偏低）。
@@ -132,9 +133,15 @@ const voiceAtMs = ref<number | null>(null)
 const lyricFirstMs = computed(() => toLyricLines(sheetDetail.value?.lines)[0]?.startMs ?? 0)
 
 /** 歌词游标：参考播放取音频位置；跟唱取「首句 + 已开口时长」（同一条 LRC 时间轴）。
- *  另取 `elapsedMs`（录音轴已用时长，整秒量化）供底部「已录 / 全长」；
+ *  另取 `elapsedMs`（录音轴已用时长，整秒量化）供面板头部计时/进度线；
+ *  `positionMs`（歌曲轴，跟唱开口前回退首句起点）供底部时间与引导条——三者分工见各注释。
  *  `paused` 传入后，暂停段不计入游标与时长（2026-09-22 新增暂停能力）。 */
-const { timeMs: lyricTimeMs, elapsedMs: recElapsedMs, recMs } = useSingLyricClock({
+const {
+  timeMs: lyricTimeMs,
+  elapsedMs: recElapsedMs,
+  positionMs,
+  recMs,
+} = useSingLyricClock({
   playing: refPlaying,
   recording,
   paused,
@@ -142,6 +149,17 @@ const { timeMs: lyricTimeMs, elapsedMs: recElapsedMs, recMs } = useSingLyricCloc
   voiceAtMs,
   firstLineMs: () => lyricFirstMs.value,
 })
+
+/**
+ * 引导条用户轨迹的轴映射（2026-09-22）：检测帧时间戳是**录音轴**（检测起点起算），
+ * 而引导条的走针/目标音符块用**歌曲轴**（开口即首句锚点）。不加这个偏移，有前奏的歌
+ * （如 demo 曲首句 22.48s）整段跟唱的目标音符块都会错位——真机表现为「歌词唱第 1 句、
+ * 引导条却是前奏（空白）」。开口前无轨迹，偏移值无影响。
+ */
+const laneOffsetMs = computed(() => lyricFirstMs.value - (voiceAtMs.value ?? 0))
+
+/** 底部时间 = 歌曲轴位置（听原唱 = 播放位置；跟唱 = 首句锚点位置；空闲 = 00:00） */
+const songClock = computed(() => formatClock(positionMs.value ?? 0))
 
 /**
  * 开始跟唱（P1-5，2026-09-10）：**先停参考旋律再开录**。
@@ -304,7 +322,7 @@ async function shareSong() {
            2026-09-22：原来是 `.u-dotline` 连接的一长串卡片，**随曲库长高** —— 歌一多整页被拉到
            几千像素，精选卡/筛选/页脚注释全被推走。现收进 `MobileSongList` 的定高滚动区
            （React Bits AnimatedList 的 Vue 移植）：页面高度从此与曲库规模无关，列表内部自己滚。
-           区块标题与空态在**加载中/加载失败**时不渲染：否则会出现「共 0 首」+「这个分类还没有歌」
+           区块标题与空态在**加载中/加载失败**时不渲染：否则会出现「共 0 首」+「歌曲库还没有歌」
            与骨架/错误态自相矛盾的两句话（P1-6 对 hero 卡修过同一类问题，这里补齐列表侧）。 -->
       <div v-if="!skelPending && !loadFailed" class="u-section-title">
         歌曲库 · 共 {{ visibleSongs.length }} 首
@@ -318,7 +336,7 @@ async function shareSong() {
       <div v-if="!skelPending && !loadFailed && !visibleSongs.length" class="u-empty">
         <div class="u-empty__art"><MobileArt name="note" :size="96" /></div>
         <div class="u-empty__title">
-          {{ tab === 'fav' ? '还没有收藏的歌曲' : '这个分类还没有歌' }}
+          {{ tab === 'fav' ? '还没有收藏的歌曲' : '歌曲库还没有歌' }}
         </div>
         <div class="u-empty__sub">
           {{
@@ -361,9 +379,11 @@ async function shareSong() {
             :detail="sheetDetail"
             :stream="play.getLiveStream()"
             :active="recording"
+            :playing="refPlaying"
             :enabled="livePitchOn"
             :paused="paused"
-            :clock-ms="recMs"
+            :clock-ms="positionMs"
+            :offset-ms="laneOffsetMs"
             @first-voice="onFirstVoice"
             @score="liveScore = $event"
           />
@@ -392,10 +412,11 @@ async function shareSong() {
             @toggle-live="toggleLivePitch()"
             @pick="pickerOpen = true"
           />
-          <!-- 已录 / 全长（参考图「若梦 · 00:42 / 04:04」的位置）；暂停中显式标出，避免「卡住了」的误会 -->
+          <!-- 歌曲位置 / 全长（参考图「若梦 · 00:42 / 04:04」的位置）；与歌词区时间、引导条同轴；
+               暂停中显式标出，避免「卡住了」的误会 -->
           <div class="m-sing-foot">
             <span class="m-sing-foot__name">{{ sheetDetail?.title ?? '跟唱' }}</span>
-            <span class="m-sing-foot__times">{{ recClock }} / {{ totalClock }}</span>
+            <span class="m-sing-foot__times">{{ songClock }} / {{ totalClock }}</span>
             <span v-if="paused" class="m-sing-foot__flag">已暂停</span>
           </div>
         </template>

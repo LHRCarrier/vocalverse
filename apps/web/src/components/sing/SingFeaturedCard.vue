@@ -10,10 +10,14 @@
  *   **单一强调动作**（白底实心 CTA）；chip 降级为发丝描边标签（无色块），色彩噪音归零。
  * - **层次**：靠字重/字号/色阶说话（20/600 标题 → 12/600 .78 属性 → 13/400 .62 说明 → 12/400 .55 署名），
  *   全部落在同一中性底上，对比度自检 ≥5.5:1（见安卓日志）。
- * - 版式（meta 排标题之后、署名可省略、「N 句 · 状态」永不省略、padding 18/24）沿用上一轮口径。
+ * - 版式（meta 排标题之后、署名可省略、「时长」永不省略、padding 18/24）沿用上一轮口径。
+ * - **2026-09-22 第四轮（用户口径「卡片上应该是歌曲信息」）**：meta 改「歌手 · 专辑」
+ *   （`songs.album`，可空）+ 右端**时长**；原来的「N 句 · 可跟唱」属练习元数据/默认态噪音，
+ *   整体下架（就绪与否仍由 chip 与说明行表达）。
  */
 import { computed } from 'vue'
 
+import { formatClock } from '@/lib/sing-lyrics'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import type { SongSummary } from '@/api/sing'
 
@@ -24,6 +28,16 @@ const emit = defineEmits<{ (e: 'open', id: number): void }>()
 const ready = computed(() => props.song.pitch_ref_status === 'ready')
 /** 署名：只取 `·` 前第一段（`Traditional · 合成旋律（公有领域童谣）` → `Traditional`） */
 const artistShort = computed(() => (props.song.artist ?? '').split('·')[0].trim() || '歌单')
+/** 专辑（可空）：缺失时整段不出现，不留空分隔符 */
+const albumText = computed(() => (props.song.album ?? '').trim())
+/** meta：歌曲信息「歌手 · 专辑」 */
+const metaText = computed(() =>
+  [artistShort.value, albumText.value].filter(Boolean).join(' · '),
+)
+/** 时长（`duration_s` 秒 → `mm:ss`；缺失时不渲染，不留 `--:--`） */
+const durationText = computed(() =>
+  props.song.duration_s ? formatClock(props.song.duration_s * 1000) : '',
+)
 </script>
 
 <template>
@@ -31,8 +45,8 @@ const artistShort = computed(() => (props.song.artist ?? '').split('·')[0].trim
     <span class="u-chip m-feat__chip">{{ ready ? '本周精选' : '参考旋律提取中' }}</span>
     <h2 class="u-dark-card__title m-feat__title">{{ song.title }}</h2>
     <p class="u-dark-card__meta m-feat__meta">
-      <span class="m-feat__artist">{{ artistShort }}</span>
-      <span class="m-feat__facts">{{ song.expected_lines }} 句 · {{ ready ? '可跟唱' : '稍后开放' }}</span>
+      <span class="m-feat__artist">{{ metaText }}</span>
+      <span v-if="durationText" class="m-feat__facts">{{ durationText }}</span>
     </p>
     <p class="u-dark-card__desc m-feat__desc">
       {{
@@ -81,7 +95,7 @@ const artistShort = computed(() => (props.song.artist ?? '').split('·')[0].trim
   font-weight: 600;
   letter-spacing: -0.01em;
 }
-/* 元信息一行两段：署名（出处，最弱）在前、「N 句 · 状态」（决策依据，次强）在后 */
+/* 元信息一行两段：歌曲信息（歌手 · 专辑，最弱）在前、时长（次强）在后 */
 .m-feat__meta {
   display: flex;
   align-items: center;

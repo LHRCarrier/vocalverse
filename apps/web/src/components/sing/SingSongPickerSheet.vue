@@ -23,9 +23,12 @@ const emit = defineEmits<{
 
 const sing = useSingStore()
 
-/** 署名只取 `·` 前第一段（与 MobileSongRow 同口径：`Traditional · 合成旋律（…）` → `Traditional`） */
-function artistShort(artist: string | null | undefined): string {
-  return (artist ?? '').split('·')[0].trim() || '歌单'
+/** 歌曲信息「歌手 · 专辑」（与 MobileSongRow 同口径：`Traditional · 合成旋律（…）` → `Traditional`；
+ *  2026-09-22 用户口径「卡片上应该是歌曲信息」——难度 Lx 徽标已从本列表下架） */
+function artistMeta(s: { artist?: string | null; album?: string | null }): string {
+  const artist = (s.artist ?? '').split('·')[0].trim() || '歌单'
+  const album = (s.album ?? '').trim()
+  return [artist, album].filter(Boolean).join(' · ')
 }
 
 /** 懒加载：打开才拉（列表通常已被页面拉过 → store 幂等直接返回，不会重复请求） */
@@ -92,8 +95,7 @@ function pick(songId: number) {
             >
               <span class="m-sing-pick__bar" aria-hidden="true" />
               <span class="m-sing-pick__title">{{ s.title }}</span>
-              <span class="m-sing-pick__artist">{{ artistShort(s.artist) }}</span>
-              <span class="u-badge u-badge--warn m-sing-pick__level">{{ `L${s.level}` }}</span>
+              <span class="m-sing-pick__artist">{{ artistMeta(s) }}</span>
             </button>
           </div>
         </section>

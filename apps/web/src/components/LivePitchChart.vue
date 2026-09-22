@@ -13,6 +13,9 @@
  * - `enabled`（视图的「实时曲线」开关）**只管是否画用户轨迹**：检测照常跑，
  *   因为歌词滚动的「首帧人声锚点」依赖 `firstVoice`；
  * - `paused`（录音暂停）→ 走针冻结、整带降亮（暂停段不入音频，游标也不该前进）；
+ * - `playing`（听原唱）→ 引导条随音频走针（**不启动检测**，否则会误报 `firstVoice`）；
+ * - `clockMs`/`offsetMs`（2026-09-22 用户口径「音频歌词和时间轴对不上」的修复）：
+ *   走针/目标音符块用**歌曲轴**（`clockMs`），用户轨迹是录音轴 → 加 `offsetMs` 映射到歌曲轴；
  * - 实时分经 `score` 事件上报给顶栏评级条（≤4Hz；旧实现把读数画在组件内）。
  */
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -31,15 +34,27 @@ const props = withDefaults(
     active: boolean
     /** 是否画**用户轨迹**（开关见 `useLivePitchPref`）；检测不受它影响 */
     enabled?: boolean
+    /**
+     * 参考旋律在播（2026-09-22 用户口径「听原唱时引导条随音频滚动」）：
+     * 只负责**让引导条走针**（rAF + 音频时钟），**不启动检测**——检测只由 `active` 控制，
+     * 否则听原唱时麦克风会被提前分析并误报 `firstVoice`（锚点被污染）。
+     */
+    playing?: boolean
     /** 录音暂停中：走针冻结、整带降亮 */
     paused?: boolean
     /**
-     * 当前**有效录音时刻**（ms，已扣掉暂停；由 `useSingLyricClock.recMs` 提供）。
-     * 录音中必须传：引导条与歌词共用同一条时间轴，暂停才不会错位。
+     * 当前**歌曲轴**位置（ms）——由 `useSingLyricClock.positionMs` 提供（听原唱 = 音频位置；
+     * 跟唱 = 首句锚点 + 已开口时长；开口前 = 首句起点）。引导条、歌词、底部时间共用这一条轴。
      */
     clockMs?: number | null
+    /**
+     * 用户轨迹的**轴映射**（ms）：检测帧时间戳是「录音轴」（检测起点起算），歌曲轴位置 =
+     * `帧时间戳 + offsetMs`。跟唱 = `首句起点 − 首帧人声时刻`（开口那一刻把轨迹对齐到首句）；
+     * 听原唱/未检测时无轨迹，传 0 即可。
+     */
+    offsetMs?: number
   }>(),
-  { enabled: true, paused: false, clockMs: null },
+  { enabled: true, playing: false, paused: false, clockMs: null, offsetMs: 0 },
 )
 
 const emit = defineEmits<{
@@ -102,6 +117,7 @@ function resetState() {
   ring.clear()
   dataVersion = 0
   drawnVersion = -1
+  drawnClock = null
   lastFrameWall = 0
   voiceReported = false
   readText.value = null
@@ -135,7 +151,7 @@ watch(
   },
 )
 
-// —— 绘制编排（rAF 仅在 enabled/active 时跑；停止即零开销）——
+// —— 绘制编排（rAF 仅在录音/原唱播放时跑；停止即零开销）——
 /** 检测停摆阈值（worker/定时器死亡）→ 冻结视口；与「用户没出声」严格区分 */
 const DEAD_MS = 1000
 /** 静音淡出 */
@@ -143,8 +159,12 @@ const SILENT_MS = 300
 const FADE_MS = 1200
 /** 引导带视口宽度（ms）：参考图是「一段可读的乐句」，8 秒正好 1~2 句 */
 const LANE_WINDOW_MS = 8000
+/** 动效档 off 下的走针重画步长（ms）：只在新数据/走针移动 ≥ 此值时重画（≈10fps） */
+const OFF_TIER_CLOCK_STEP_MS = 100
 let raf = 0
 let drawnVersion = -1
+/** 动效档 off：上一次重画时的走针位置（走针本身也要推进，不能只等新帧） */
+let drawnClock: number | null = null
 
 let ctx2d: CanvasRenderingContext2D | null = null
 let cw = 0
@@ -173,13 +193,15 @@ function ensureCtx(el: HTMLCanvasElement): CanvasRenderingContext2D | null {
   return g
 }
 
-/** 用户轨迹点（Hz → MIDI）；只取可见窗内，避免长歌逐帧遍历整环 */
+/** 用户轨迹点（Hz → MIDI；只取可见窗内，避免长歌逐帧遍历整环）。
+ *  帧时间戳是**录音轴**，先加 `offsetMs` 映射到歌曲轴再与走针/目标音符块比较。 */
 function userPoints(windowFrom: number, windowTo: number): { t: number; midi: number }[] {
   const out: { t: number; midi: number }[] = []
   const n = ring.length()
   if (!n) return out
+  const offset = props.offsetMs
   for (let i = 0; i < n; i += 1) {
-    const t = ring.tAt(i)
+    const t = ring.tAt(i) + offset
     if (t < windowFrom - 100) continue
     if (t > windowTo) break
     const f = ring.fAt(i)
@@ -204,10 +226,10 @@ function draw() {
   const tickAt = live.lastTickAt
   const startedAt = live.startedAt
   const alive = tickAt != null && now - tickAt <= DEAD_MS
-  // 时间基：**单一时基** —— 录音中一律用视图传进来的「有效录音时刻」（已扣暂停），
-  // 不再用 `now - startedAt`（那是检测起点，**含暂停时长** → 暂停后曲线会整体前跳/错位：
-  // 2026-09-22 用户实测「曲线跳回上一次暂停的位置」的根因）。
-  // 没有外部时基（未录音/未给）时退回检测起点或最后一帧。
+  // 时间基：**单一时基** —— 视图传进来的「歌曲轴位置」（听原唱 = 音频位置；跟唱 = 首句锚点 +
+  // 已开口时长，已扣暂停），不再用 `now - startedAt`（那是检测起点，**含暂停时长**且与歌词
+  // 锚点差一个前奏 → 暂停后/有前奏的歌整条错位：2026-09-22 用户实测「音频歌词和时间轴对不上」）。
+  // 没有外部时基（预览页未给）时退回检测起点或最后一帧。
   const anchor =
     props.clockMs != null
       ? props.clockMs
@@ -240,9 +262,14 @@ function loop() {
   const now = performance.now()
   if (readText.value && lastFrameWall > 0 && now - lastFrameWall > SILENT_MS) readText.value = null
   if (tier.value === 'off') {
-    // 降级档：无连续插值，只在新数据时重画（docs/31 规则 4）
-    if (dataVersion !== drawnVersion) {
+    // 降级档：无连续插值，只在新数据或走针移动 ≥ 100ms 时重画（docs/31 规则 4）。
+    // 走针也必须推进（否则听原唱/静音跟唱时引导条整条冻住）。
+    const clock = props.clockMs
+    const clockMoved =
+      clock != null && (drawnClock == null || Math.abs(clock - drawnClock) >= OFF_TIER_CLOCK_STEP_MS)
+    if (dataVersion !== drawnVersion || clockMoved) {
       drawnVersion = dataVersion
+      drawnClock = clock
       draw()
     }
     return
@@ -251,15 +278,17 @@ function loop() {
   draw()
 }
 
+const animating = computed(() => props.active || props.playing)
 watch(
-  // 2026-09-22 深色录唱页修正：rAF **只跟 `active`**——引导条本身（目标音符 + 走针）要一直走，
+  // 2026-09-22 深色录唱页修正：rAF 跟 **录音或原唱播放**——引导条本身（目标音符 + 走针）要一直走，
   // 「曲线」开关只管**用户轨迹**是否绘制。旧写法把开关也算进循环条件，关掉开关后引导条
   // 只剩挂载那**一帧**（真机实测：走针停在 0s，整条只剩最右边一个音符块）。
-  () => props.active,
+  // 听原唱时也走针（用户口径）：时钟由 `clockMs` 给（音频位置），检测不启动（只由 `active` 控制）。
+  animating,
   (on) => {
     cancelAnimationFrame(raf)
     if (on) loop()
-    else draw() // 停止录音：画一帧静态引导条（不残留用户轨迹）
+    else draw() // 停止录音/停播：画一帧静态引导条（不残留用户轨迹）
   },
   { immediate: true },
 )
