@@ -49,6 +49,8 @@ public final class AuditFieldAllowlist {
           "targetType",
           "reportCount",
           "duplicate",
+          // 建单来源（auto|report|manual，docs/58 §3.3）——审核台账要能回答「这单是谁送进来的」
+          "source",
           // ── RBAC 域
           "roleCode",
           "roleId",

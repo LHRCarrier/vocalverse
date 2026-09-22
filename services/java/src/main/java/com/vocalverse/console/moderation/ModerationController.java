@@ -134,7 +134,7 @@ public class ModerationController {
       @RequestParam(defaultValue = "1") @Min(1) int page,
       @RequestParam(name = "page_size", defaultValue = "20") @Min(1) @Max(100) int pageSize,
       @RequestParam(required = false)
-          @Pattern(regexp = "pending|approved|rejected|escalated|withdrawn")
+          @Pattern(regexp = "open|pending|approved|rejected|escalated|withdrawn")
           String status,
       @RequestParam(required = false) @Pattern(regexp = "post|comment|media|direct_message")
           String targetType,
@@ -262,6 +262,10 @@ public class ModerationController {
     out.put(
         "caseStatuses",
         java.util.List.of("pending", "approved", "rejected", "escalated", "withdrawn"));
+    // open = pending + escalated 的聚合筛选（docs/58 §5.1）；它不是状态值，是队列默认视图
+    out.put(
+        "caseStatusFilters",
+        java.util.List.of("open", "pending", "approved", "rejected", "escalated", "withdrawn"));
     out.put("reportStatuses", java.util.List.of("pending", "accepted", "rejected", "duplicate"));
     out.put("targetTypes", java.util.List.of("post", "comment", "media", "direct_message"));
     out.put("javaWritableTargetTypes", java.util.List.of("post", "comment"));

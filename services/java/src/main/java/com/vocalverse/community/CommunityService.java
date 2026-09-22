@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -97,6 +98,7 @@ public class CommunityService {
   private final UserProfileRepository profiles;
   private final ObjectMapper mapper;
   private final MediaRefValidator mediaValidator;
+  private final ApplicationEventPublisher events;
   private final boolean postEnabled;
 
   public CommunityService(
@@ -109,6 +111,7 @@ public class CommunityService {
       UserProfileRepository profiles,
       ObjectMapper mapper,
       MediaRefValidator mediaValidator,
+      ApplicationEventPublisher events,
       @Value("${vocalverse.community.post-enabled:false}") boolean postEnabled) {
     this.posts = posts;
     this.comments = comments;
@@ -119,6 +122,7 @@ public class CommunityService {
     this.profiles = profiles;
     this.mapper = mapper;
     this.mediaValidator = mediaValidator;
+    this.events = events;
     this.postEnabled = postEnabled;
   }
 
@@ -180,6 +184,10 @@ public class CommunityService {
     e.setCreatedAt(now);
     e.setUpdatedAt(now);
     e = posts.save(e);
+    // 自动送审（docs/58）：事务内发布、AFTER_COMMIT 异步消费；送审失败不影响发布（监听器侧兜底）
+    events.publishEvent(
+        ContentPublishedEvent.post(
+            e.getId(), e.getKind(), e.getTitle(), e.getBody(), e.getDomain()));
     return buildViews(List.of(e), userId).get(0);
   }
 
@@ -245,6 +253,8 @@ public class CommunityService {
     c.setUpdatedAt(now);
     c = comments.save(c);
     posts.incrementComment(postId);
+    // 自动送审（docs/58）：与帖子同链路；评论是社区最高频的 UGC，最需要自动发现
+    events.publishEvent(ContentPublishedEvent.comment(c.getId(), c.getBody()));
     return toCommentView(c);
   }
 

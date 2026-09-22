@@ -971,7 +971,7 @@
           "in" : "query",
           "required" : false,
           "schema" : {
-            "pattern" : "pending|approved|rejected|escalated|withdrawn",
+            "pattern" : "open|pending|approved|rejected|escalated|withdrawn",
             "type" : "string"
           }
         }, {
