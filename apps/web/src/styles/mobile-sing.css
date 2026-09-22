@@ -1057,3 +1057,39 @@ html[data-motion='off'] .m-sing-row__wave i {
   box-shadow: inset 2px 0 0 var(--u-accent);
   border-radius: 10px;
 }
+
+/* ----------------------------------------------------------------------------
+ * 窄屏（≤400px，含真机 375/390）：行内右侧控件收窄，把宽度让给歌名。
+ *
+ * 背景（2026-09-23 真机反馈「歌名显示有问题」）：375px 宽下 .m-sing-row 仅 307px，
+ * 固定控件（52 封面 + 69 药丸 + 44 红心 + 间距/内边距）吃掉 225px → 歌名只剩 82px，
+ * 「Cyberangel」这类短标题都被截成「Cybera...」。窄屏下「去跟唱」收成图标键（32px，
+ * aria-label 不变），封面 52→46、红心 44→36、内外边距收紧 → 歌名可用宽度 ≈150px。
+ * 宽屏（>400px，桌面预览 480 帧）仍保留原型「🎤 去跟唱」药丸文案。
+ * ---------------------------------------------------------------------------- */
+@media (max-width: 400px) {
+  .m-sing-row {
+    padding: 8px 8px 8px 12px;
+    gap: 6px;
+  }
+  .m-sing-row__hit {
+    gap: 10px;
+  }
+  .m-sing-row__cover {
+    width: 46px;
+    height: 46px;
+  }
+  .m-sing-row__sing {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    justify-content: center;
+  }
+  .m-sing-row__sing-text {
+    display: none; /* 只留麦克风图标（语义由 aria-label 承载） */
+  }
+  .m-sing-fav {
+    width: 36px;
+    height: 44px; /* 触控高度保持 44px，只收视觉宽度 */
+  }
+}

@@ -94,7 +94,7 @@ const durationText = computed(() =>
       :aria-label="`去跟唱 ${song.title}`"
       @click="emit('open', song.id)"
     >
-      <MobileIcon name="mic" :size="13" /> 去跟唱
+      <MobileIcon name="mic" :size="13" /><span class="m-sing-row__sing-text">去跟唱</span>
     </button>
     <button
       class="m-sing-fav"
