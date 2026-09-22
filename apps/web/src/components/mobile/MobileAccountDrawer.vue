@@ -34,7 +34,7 @@ interface MenuChild {
 }
 
 interface MenuItem {
-  icon: 'user' | 'bell' | 'settings' | 'mail'
+  icon: 'user' | 'bell' | 'settings' | 'mail' | 'shield'
   label: string
   path: string | null
   children?: MenuChild[]
@@ -72,6 +72,8 @@ const items: MenuItem[] = [
       { icon: 'wave', label: '关于声语界', path: '/m/settings/about' },
     ],
   },
+  // 社区规范与使用条例（docs/59）：顶层直开长文页；文案里的 R1~R9 是审核判据的对外锚点
+  { icon: 'shield', label: '社区规范与使用条例', path: '/m/guidelines' },
 ]
 
 /** 各项展开态（独立 toggle · 2026-09-09：我的学习四模块 / 设置子项） */

@@ -15,7 +15,7 @@ const mountDrawer = (open = true) =>
   mount(MobileAccountDrawer, { props: { open, me }, global: { stubs: { teleport: true } } })
 
 describe('MobileAccountDrawer', () => {
-  it('渲染用户卡、三个菜单项与退出登录', () => {
+  it('渲染用户卡、四个菜单项与退出登录', () => {
     const wrapper = mountDrawer()
     const text = wrapper.text()
     expect(text).toContain('演示用户')
@@ -23,13 +23,14 @@ describe('MobileAccountDrawer', () => {
     expect(text).toContain('我的学习')
     expect(text).toContain('通知')
     expect(text).toContain('设置与隐私')
+    expect(text).toContain('社区规范与使用条例')
     expect(text).toContain('退出登录')
   })
 
   it('菜单项 click：我的学习 → 四模块；通知 → 三子项（私信/互动/关注?tab=）；设置 → 子项 toast', async () => {
     const wrapper = mountDrawer()
     const items = wrapper.findAll('.u-drawer__item')
-    expect(items).toHaveLength(3)
+    expect(items).toHaveLength(4)
     // 我的学习：展开四模块
     expect(wrapper.find('.u-drawer__submenu').exists()).toBe(false)
     await items[0].trigger('click')
@@ -63,6 +64,14 @@ describe('MobileAccountDrawer', () => {
       ['/m/settings/help'],
     ])
     expect(wrapper.find('.u-drawer__submenu').exists()).toBe(false)
+    // 社区规范与使用条例：顶层直开长文页（无子项，点击即 navigate）
+    await items[3].trigger('click')
+    expect(wrapper.emitted('navigate')).toEqual([
+      ['/m/learn/speaking'],
+      ['/m/notifications?tab=follow'],
+      ['/m/settings/help'],
+      ['/m/guidelines'],
+    ])
   })
 
   it('退出登录触发 logout', async () => {
