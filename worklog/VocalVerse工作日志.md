@@ -3,6 +3,21 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 匿名/过期令牌统一 401 + 40101（Java 补 AuthenticationEntryPoint · 修「开超 1 小时加载失败」）· 1 op
+
+> 归属：Java 安全链（`SecurityConfig`）；契约 `docs/api/error-codes.md` 补记。用户口径：「处理一下」（演示前修）。
+> 根因：Java 此前未配 entry point → 匿名/过期令牌落默认 `Http403ForbiddenEntryPoint` → **403**；前端「401 静默续期」钩子只认 401
+> （`apps/web/src/api/client.ts`）→ access token 过期后页面「加载失败 HTTP 403」，必须刷新才恢复（刷新时 bootstrap 续期成功）。
+
+- **改动**：`SecurityConfig` 补 `AuthenticationEntryPoint` → 匿名 / 令牌无效或过期 = **401 + Envelope{40101}**（与 `JwtAuthFilter` 同码同形）；
+  「已认证但无权」仍 403（业务 40302 等不受影响）。
+- **测试**：4 个既有断言同步 403→401（AuthFlowTest 匿名 logout / CommunityApiTest `unauth_401`（并断言 40101）/ TicketApiTest / UserMeApiTest）；
+  全量 **190 tests 全绿**；`mvn spotless:apply` 通过。
+- **实测**：匿名 → 401 + `{"code":40101,...}`；伪造过期令牌（同 JWT_SECRET 签、exp 已过）→ Java 401 / Python 401；
+  Playwright 端到端：会话中把 `vv_token` 换成过期令牌 → 切 tab 触发 Java 请求 → **静默续期成功、列表正常渲染**（无「加载失败/403」）。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-22 社区流打卡可见性：他人打卡不进流（Java 谓词 + 回归测试）· 1 op
 
 > 归属：社区 feed 读路径（`PostRepository.feed` + `CommunityService.feed`）。用户口径：「社区里的打卡全部去掉，只能看到自己的打卡（影响体验）」。
