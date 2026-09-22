@@ -170,7 +170,7 @@ function baseState(overrides: Partial<TrpgState> = {}): TrpgState {
     ],
     tasks: [{ id: 1, title: '打听怪谈', status: 'active', scene: '酒馆', last_mentioned_at: null }],
     clues: [],
-    entities: [{ kind: 'npc', name: '莉亚', status: 'active', pending: false }],
+    entities: [{ id: 1, kind: 'npc', name: '莉亚', status: 'active', pending: false, portrait: null }],
     events: [],
     scene: '酒馆',
     snapshot: '【当前状态】\nPC：HP 12',

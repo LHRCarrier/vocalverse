@@ -146,4 +146,27 @@ describe('TrpgMessageItem（逐词高亮 + 长按操作 + NPC 分段）', () => 
     const me = mount(TrpgMessageItem, { props: { role: 'user', content: '我走进去。' } })
     expect(me.find('.t-ava-frame--me img').attributes('src')).toContain('pc-avatar.webp')
   })
+
+  it('ending 系统卡走尾声卡（刷新恢复路径；不退化成未知系统卡）', () => {
+    const wrapper = mount(TrpgMessageItem, {
+      props: {
+        role: 'assistant',
+        kind: 'system',
+        content: '',
+        payload: {
+          trpg_sys: 'ending',
+          quest: '寻找戒指',
+          outcome: 'weak',
+          title: '尘埃落定 · 寻找戒指',
+          text: '事情没有变得更好，但也没有彻底失控。',
+          epilogue: '有些账，只能留给下一次相遇。',
+        },
+      },
+    })
+    const card = wrapper.find('.t-ending')
+    expect(card.exists()).toBe(true)
+    expect(card.text()).toContain('尘埃落定')
+    expect(card.find('.t-ending__epilogue').text()).toContain('下一次相遇')
+    expect(wrapper.find('.t-scene-line').exists()).toBe(false)
+  })
 })

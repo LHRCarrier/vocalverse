@@ -108,7 +108,7 @@ function baseState(overrides: Partial<TrpgState> = {}): TrpgState {
     ],
     tasks: [{ id: 1, title: '打听怪谈', status: 'active', scene: '酒馆', last_mentioned_at: null }],
     clues: [],
-    entities: [{ kind: 'npc', name: '莉亚', status: 'active', pending: false }],
+    entities: [{ id: 1, kind: 'npc', name: '莉亚', status: 'active', pending: false, portrait: null }],
     events: [],
     scene: '酒馆',
     snapshot: '',
@@ -230,5 +230,62 @@ describe('酒馆设计稿改版（页内底栏 / 立绘抽屉 / dock）', () => 
     expect(npc.exists()).toBe(true)
     expect(npc.text()).toContain('莉亚')
     expect(npc.text()).toContain('这边坐')
+  })
+
+  it('闭环面板：进度钟条 + 在场角色条 + 动作面板（道具点击即发行动）', async () => {
+    const facts = baseState().facts
+    mocks.fetchCampaignState.mockResolvedValue(
+      baseState({
+        facts: [
+          ...facts,
+          {
+            id: 10,
+            key: 'quest.寻找戒指.progress',
+            value: '3/6',
+            kind: 'state',
+            modality: 'fact',
+            speaker: null,
+            importance: 0.5,
+            user_touched_at: null,
+            user_deleted_at: null,
+          },
+          {
+            id: 11,
+            key: 'item.治疗药水.qty',
+            value: '2',
+            kind: 'state',
+            modality: 'fact',
+            speaker: null,
+            importance: 0.5,
+            user_touched_at: null,
+            user_deleted_at: null,
+          },
+          {
+            id: 12,
+            key: 'item.治疗药水.owner',
+            value: 'pc.主角',
+            kind: 'state',
+            modality: 'fact',
+            speaker: null,
+            importance: 0.5,
+            user_touched_at: null,
+            user_deleted_at: null,
+          },
+        ],
+      }),
+    )
+    const wrapper = await mountView()
+    expect(wrapper.find('.t-clock').text()).toContain('寻找戒指')
+    expect(wrapper.find('.t-clock__num').text()).toBe('3/6')
+    expect(wrapper.find('.t-cast__item').text()).toContain('莉亚')
+
+    const panel = wrapper.find('.t-act-panel')
+    expect(panel.exists()).toBe(true)
+    expect(panel.text()).toContain('攻击 莉亚')
+    expect(panel.text()).toContain('治疗药水 ×2')
+
+    await panel.find('.t-act-chip--item').trigger('click')
+    await flushPromises()
+    expect(mocks.streamTrpgTurn).toHaveBeenCalled()
   })
 })
