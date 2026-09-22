@@ -3,6 +3,19 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 演示曲 flac「听参考旋律」400 修复（回放白名单/MIME/嗅探补 flac）· 1 op
+
+> 归属：`GET /api/v1/audio/{name}` 回放链路（Python）。契约零改动（白名单不是对外契约）；归档见 `worklog/BUG实测/演示曲flac回放400.md`。
+
+- **用户报障（附浏览器网络面板截图）**：`demo_honkai-moon-halo.flac` 等 **7 首连续 400**，同屏 `demo_miku-receiver.mp3` 200——即本地演示曲库 8 首里只有那首 mp3 能「听原唱」。
+- **根因（两层都不认 flac，第一层在入口就挡）**：① `practice.py` `_SAFE_NAME` 只认 `mp3|wav|m4a|ogg|webm` → `400 bad audio name`；② `app/audio/upload.py` 的 MIME 表与魔数嗅探也无 flac（即使放行会回落 `audio/mpeg`，与 BUG-5 同类）。白名单历史口径只覆盖「用户录音 + 公有领域 wav 素材」，导入商用真歌（flac）时未同步扩展。
+- **修复**：`_SAFE_NAME` 补 `flac`；`AUDIO_MEDIA_TYPE` 补 `audio/flac`；`sniff_audio_ext` 补 `fLaC` 魔数。
+- **验证**：8 首接口全部 200（flac → `audio/flac`，mp3 → `audio/mpeg`）；新增路由级回归 `test_published_song_flac_asset_playable`（**修复前必失败**：stash 生产文件后 `40001 bad audio name / 400 == 200`）；`test_audio_container` 补 flac 嗅探/MIME 断言；全量 **826 passed / 4 skipped**、ruff 通过；桌面 CDP 实测 Moon Halo「原唱」可播（按钮转「停止原唱」、底部/歌词时钟推进 `00:03`、请求 200、无错误 toast，截图 `local/ui-check/sing-flac-play.png`）。
+- **顺带发现（未修，待定夺）**：① **10 首公有领域曲在库内是 `archived`**（`GET /songs` 不列出、`song_*.wav` 回放 403）——若演示仍要「公有领域曲跟唱/评分」这一档需改回 `published`；② `vocal_ref_url`（分离人声轨）不在平台素材豁免内（豁免只查 `audio_url`），直点该 URL 403——前端不请求，属潜在缺口；③ 本机 `services/python/.env` 的 `APP_REDIS_URL` 指向 `localhost:16379`（无监听，docker 实际映射 6379）→ 跟唱任务态一直走**内存兜底**（日志 `sing task store redis set failed`），演示不重启无感、但重启即丢任务态。
+- **踩坑**：uvicorn `--reload` 在 Windows 上偶发「看着在跑但不重载」（改完 curl 仍 400，直到监听 PID 自己变化才生效）——改后端代码要用一次真实请求复验。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-22 匿名/过期令牌统一 401 + 40101（Java 补 AuthenticationEntryPoint · 修「开超 1 小时加载失败」）· 1 op
 
 > 归属：Java 安全链（`SecurityConfig`）；契约 `docs/api/error-codes.md` 补记。用户口径：「处理一下」（演示前修）。
