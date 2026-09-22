@@ -29,6 +29,17 @@ export interface SingLyricClock {
   /** 当前歌词时间轴位置（ms）；无有效来源 → null（歌词回顶部、无高亮） */
   timeMs: Ref<number | null>
   /**
+   * **歌曲轴位置**（ms）——引导条与底部「时间 / 全长」的统一时间基（2026-09-22 用户口径：
+   * 「音频 / 歌词 / 时间轴对不上」的根因就是这三处各用各的轴）。与 `timeMs` 的差别只在两处：
+   * - **跟唱尚未开口**：`timeMs` 为 null（歌词不预跑），本值 = 首句起点（冻结）——
+   *   引导条先把首句目标音符亮在走针处，底部也显示「即将唱到的歌曲位置」；
+   * - **空闲**（未播放/未录音）：本值为 null（视图回退 0），与 `timeMs` 一致。
+   *
+   * 听原唱与跟唱已开口时本值 = `timeMs`（音频位置 / 首句锚点 + 已开口时长），
+   * 因此歌词区左上角数字、底部时间、引导条走针三者天然同轴。
+   */
+  positionMs: Ref<number | null>
+  /**
    * 本次录音**已用时长**（ms，**整秒量化**）；未在录音 → null。
    *
    * 与 `timeMs` 的区别：`timeMs` 是「首帧人声锚点 + 已开口时长」的**歌词轴**位置（跟唱时约等于
@@ -47,6 +58,7 @@ export interface SingLyricClock {
 
 export function useSingLyricClock(opts: SingLyricClockOptions): SingLyricClock {
   const timeMs = ref<number | null>(null)
+  const positionMs = ref<number | null>(null)
   const elapsedMs = ref<number | null>(null)
   const recMs = ref<number | null>(null)
   /** 本次录音起点（`performance.now()`）：`recording` 上升沿记录，下降沿清空 */
@@ -84,6 +96,9 @@ export function useSingLyricClock(opts: SingLyricClockOptions): SingLyricClock {
         ? Math.floor(Math.max(0, now - recStartAt) / 1000) * 1000
         : null
     recMs.value = opts.recording.value && recStartAt != null ? Math.max(0, now - recStartAt) : null
+    // 歌曲轴：跟唱开口前回退到首句起点（引导条/底部时间用），其余与歌词轴一致
+    positionMs.value =
+      timeMs.value ?? (opts.recording.value ? Math.max(0, opts.firstLineMs()) : null)
   }
 
   function loop() {
@@ -134,5 +149,5 @@ export function useSingLyricClock(opts: SingLyricClockOptions): SingLyricClock {
 
   onUnmounted(() => cancelAnimationFrame(raf))
 
-  return { timeMs, elapsedMs, recMs }
+  return { timeMs, positionMs, elapsedMs, recMs }
 }
