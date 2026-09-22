@@ -1,11 +1,12 @@
 """规则推荐引擎（**Python 写方**；local/31 §4.3 · local/29 §9）。
 
 基于 SQLAlchemy ORM（跨 SQLite/PG），等价实现 local/31 §4.3 的 CTE SQL：候选过滤 [L, L+1]；
-排序 未掌握>难度>兴趣>新鲜；同 scene_type ≤2（top-6 互异）；不足扩档；L4 复习席；曝光埋点。
+排序 未掌握>难度>兴趣>新鲜；不足扩档；L4 复习席；曝光埋点。
 
-写方唯一性：只读 scenarios/shadow_materials/user_profiles/user_skill_state/user_mastery/
-material_difficulty；只写 events（曝光，仅追加）。Redis 缓存 rec:{uid}:{type}，写入后主动失效
-（invalidate_recommendation_cache，local/32 A-2.4）。
+2026-09-21（酒馆迁移）：`scene`（英语场景）推荐随场景对话移除；仅保留 `shadow`
+（影子跟读素材）。写方唯一性：只读 shadow_materials/user_profiles/user_skill_state/
+user_mastery/material_difficulty；只写 events（曝光，仅追加）。Redis 缓存 rec:{uid}:{type}，
+写入后主动失效（invalidate_recommendation_cache，local/32 A-2.4）。
 """
 
 from __future__ import annotations
@@ -25,7 +26,6 @@ from app.db import get_session_factory
 from app.models import (
     Event,
     MaterialDifficulty,
-    Scenario,
     ShadowMaterial,
     UserMastery,
     UserProfile,
@@ -106,73 +106,41 @@ def _rank(items: list[dict], user_lvl: str, tags: set[str]) -> list[dict]:
     return items
 
 
-def _candidates(db: Session, user_id: int, ctype: str, levels: set[str]) -> list[dict]:
-    """候选：published 内容 + 难度档 ∈ levels（md 优先，缺行内容方初评兜底）+ 掌握度。"""
-    if ctype == "scene":
-        stmt = (
-            select(
-                Scenario,
-                MaterialDifficulty.diff_level,
-                UserMastery.status,
-                UserMastery.last_practiced_at,
-            )
-            .outerjoin(
-                MaterialDifficulty,
-                and_(
-                    MaterialDifficulty.content_type == "scene",
-                    MaterialDifficulty.content_id == Scenario.id,
-                ),
-            )
-            .outerjoin(
-                UserMastery,
-                and_(
-                    UserMastery.user_id == user_id,
-                    UserMastery.content_type == "scene",
-                    UserMastery.content_id == Scenario.id,
-                ),
-            )
-            .where(Scenario.status == "published")
+def _candidates(db: Session, user_id: int, levels: set[str]) -> list[dict]:
+    """候选（shadow）：published 素材 + 难度档 ∈ levels（md 优先，缺行内容方初评兜底）+ 掌握度。"""
+    stmt = (
+        select(
+            ShadowMaterial,
+            MaterialDifficulty.diff_level,
+            UserMastery.status,
+            UserMastery.last_practiced_at,
         )
-    else:
-        stmt = (
-            select(
-                ShadowMaterial,
-                MaterialDifficulty.diff_level,
-                UserMastery.status,
-                UserMastery.last_practiced_at,
-            )
-            .outerjoin(
-                MaterialDifficulty,
-                and_(
-                    MaterialDifficulty.content_type == "shadow",
-                    MaterialDifficulty.content_id == ShadowMaterial.id,
-                ),
-            )
-            .outerjoin(
-                UserMastery,
-                and_(
-                    UserMastery.user_id == user_id,
-                    UserMastery.content_type == "shadow",
-                    UserMastery.content_id == ShadowMaterial.id,
-                ),
-            )
-            .where(ShadowMaterial.status == "published")
+        .outerjoin(
+            MaterialDifficulty,
+            and_(
+                MaterialDifficulty.content_type == "shadow",
+                MaterialDifficulty.content_id == ShadowMaterial.id,
+            ),
         )
+        .outerjoin(
+            UserMastery,
+            and_(
+                UserMastery.user_id == user_id,
+                UserMastery.content_type == "shadow",
+                UserMastery.content_id == ShadowMaterial.id,
+            ),
+        )
+        .where(ShadowMaterial.status == "published")
+    )
     out = []
     for head, diff_level, mstatus, last_practiced in db.execute(stmt).all():
-        fb = (
-            _FALLBACK.get(head.difficulty, "L1")
-            if ctype == "scene"
-            else _FALLBACK.get(head.level, "L1")
-        )
-        lvl = diff_level or fb
+        lvl = diff_level or _FALLBACK.get(head.level, "L1")
         if lvl not in levels:
             continue
         out.append(
             {
                 "id": int(head.id),
                 "title": head.title,
-                "scene_type": getattr(head, "scene_type", None),
                 "interest_tags": head.interest_tags or [],
                 "diff_level": lvl,
                 "mstatus": mstatus or "not_mastered",
@@ -209,14 +177,14 @@ def _diversify(
     return out
 
 
-def _review_slots(db: Session, user_id: int, user_lvl: str, ctype: str, n: int) -> list[dict]:
+def _review_slots(db: Session, user_id: int, user_lvl: str, n: int) -> list[dict]:
     """复习席：L−1 档、in_progress/mastered、距上次 ≥review_gap_days，掌握度最弱优先（A-4.4）。"""
     cfg = get_settings()
     lvl = REVIEW_LEVEL.get(user_lvl)
     if lvl is None:
         return []
     cutoff = datetime.now(UTC) - timedelta(days=cfg.review_gap_days)
-    rows = _candidates(db, user_id, ctype, {lvl})
+    rows = _candidates(db, user_id, {lvl})
     pool = [
         it
         for it in rows
@@ -277,17 +245,20 @@ async def invalidate_recommendation_cache(user_id: int) -> None:
     if r is None:
         return
     with contextlib.suppress(Exception):
-        await r.delete(f"rec:{user_id}:scene", f"rec:{user_id}:shadow")
+        await r.delete(f"rec:{user_id}:shadow")
 
 
 def _clean(items: list[dict], ctype: str) -> list[dict]:
-    """对外返回/落缓存：剥离内部字段（_tag_hit/_dist/interest_tags/datetime）。"""
+    """对外返回/落缓存：剥离内部字段（_tag_hit/_dist/interest_tags/datetime）。
+
+    注（2026-09-21 酒馆迁移）：`scene_type` 字段随场景推荐移除（保留键会永远为 None，
+    前端/联调按 content_type=shadow 消费）。
+    """
     return [
         {
             "id": it["id"],
             "content_type": ctype,
             "title": it["title"],
-            "scene_type": it.get("scene_type"),
             "diff_level": it["diff_level"],
             "mstatus": it["mstatus"],
             "tag_hit": it.get("_tag_hit", 0),
@@ -306,23 +277,23 @@ def _recommend_impl(user_id: int, ctype: str, limit: int, db: Session | None) ->
     try:
         lvl = resolve_level(session, user_id)
         tags = _user_tags(session, user_id)
-        cands = _rank(_candidates(session, user_id, ctype, _effective_levels(lvl)), lvl, tags)
+        cands = _rank(_candidates(session, user_id, _effective_levels(lvl)), lvl, tags)
         counts: dict[str, int] = {}
-        items = _diversify(cands, scene_type_key=(ctype == "scene"), limit=limit, counts=counts)
+        items = _diversify(cands, scene_type_key=False, limit=limit, counts=counts)
         if len(items) < limit:  # 扩档：先近后远
             for lv in _order(_effective_levels(lvl), lvl):
                 if len(items) >= limit:
                     break
-                extra = _rank(_candidates(session, user_id, ctype, {lv}), lvl, tags)
+                extra = _rank(_candidates(session, user_id, {lv}), lvl, tags)
                 seen = {it["id"] for it in items}
                 items += _diversify(
                     [it for it in extra if it["id"] not in seen],
-                    scene_type_key=(ctype == "scene"),
+                    scene_type_key=False,
                     limit=limit - len(items),
                     counts=counts,
                 )
         if lvl in REVIEW_LEVEL and len(items) < limit:  # 复习席
-            got = _review_slots(session, user_id, lvl, ctype, max(1, limit // 3))
+            got = _review_slots(session, user_id, lvl, max(1, limit // 3))
             seen = {it["id"] for it in items}
             items += [it for it in got if it["id"] not in seen]
         items = items[:limit]
@@ -351,16 +322,6 @@ async def _recommend_cached(user_id: int, ctype: str, limit: int) -> list[dict]:
     items = await asyncio.to_thread(_recommend_impl, user_id, ctype, limit, None)
     await _cache_set(key, items, cfg.rec_cache_ttl_s)
     return items
-
-
-async def recommend_scenes(
-    user_id: int, limit: int | None = None, db: Session | None = None
-) -> list[dict]:
-    """场景推荐（主窗 [L,L+1] + 扩档 + 复习席 + 曝光埋点；Redis 缓存读热路径）。"""
-    cfg = get_settings()
-    if db is not None:
-        return _recommend_impl(user_id, "scene", limit or cfg.rec_limit_scenes, db)
-    return await _recommend_cached(user_id, "scene", limit or cfg.rec_limit_scenes)
 
 
 async def recommend_shadow(

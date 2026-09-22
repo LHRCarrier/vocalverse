@@ -1,8 +1,9 @@
 """回合执行器（docs/26 runtime/turn-runner：ai4u turn-runner 的 VocalVerse 版）。
 
 职责：LLM 流式循环 + `[-META-]` 边界拆分（跨 chunk 安全）+ **META 泄漏门**（模型把标记
-当正文透传 / 尾部再出现标记时防污染回复）+ 结果归一。上下文组装在 context_builder，
-结构化输出的**权威执行**在 meta_executor——本层只负责"拿回文本并拆出 META"。
+当正文透传 / 尾部再出现标记时防污染回复）+ 结果归一。消费方为自由对话/答辩/影子跟读
+（2026-09-21 酒馆迁移后；dialog 的 context_builder/meta_executor 已删除）——本层只负责
+"拿回文本并拆出 META"，结构化执行的旧权威层不再存在。
 
 泄漏防护（对应 ai4u DsmlLeakGate 同族隐患，docs/16 有 M2 先例性讨论）：
 - 正文中第一个 `[-META-]` 是协议边界（既有行为）；

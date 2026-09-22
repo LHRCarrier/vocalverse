@@ -31,16 +31,21 @@
 ```
 web-prototypes/
 ├── *.html                   # 上表 9 个整站页面
+├── 第2周.md                 # 原型二期工作日志（2026-09-07~09-11，执行人：xiaoqing-one）
 ├── styles.css               # index 等页共用的编译后样式（含 Tailwind 产物 + 手写覆盖）
 ├── common.js / nav.js       # 页面壳：背景视频、移动端菜单、滚动状态
 ├── reveal.js                # 滚动入场（IntersectionObserver）
 ├── css/                     # 分页样式：styles / report / gooey-nav / nav-reveal / site-nav /
-│                            #           scroll-expand / experience / aero-shards / footer / tailwind.input
+│                            #           scroll-expand / experience / aero-shards / card-art /
+│                            #           feature-blocks / footer / tailwind.input
 ├── js/                      # 交互脚本：gooey-nav / scroll-expand / shader-flow / split-text /
 │                            #           portrait-morph / stack / report-interactions / showcase-interactions …
 ├── js/vendor/               # 第三方库（版本与许可见第四节）
 └── assets/
     ├── app-screens/         # App 移动端三屏静态稿（home / speaking / report，iPhone 框单文件页面）
+    ├── app-shots/           # showcase 页引用的界面截图 12 张（390×844 @2x = 780×1688）：
+    │                        #   9 张 App 稿被 `showcase.html` + `js/showcase-interactions.js` 引用；
+    │                        #   web-practice / web-defense / web-skeleton 3 张（Web 端稿）暂未被页面引用
     ├── feature-screens/     # 组件六屏展示（输入 / 按钮 / 控件 / 图片卡 / 灯箱 / 弹窗）+ gen.js 生成脚本
     ├── app-screens-iphone.png / feature-*.png   # 上面两组合集的截图
     ├── josh.webp / josh_wave.webp               # 人像素材
@@ -92,4 +97,7 @@ python -m http.server 8080     # 或： npx --yes serve .
 - 产品内可交互的概念预览页在 `apps/web/src/views/preview/`（UIC 概念三页 `uic-*`，dev-only 子树），
   与本目录各自演进，互不同步；
 - 页面文案为原型英文稿，非最终产品文案；
+- **本地回滚脚手架不入库**：`.orig` 副本 + `restore.ps1` 之类的一次性回滚包只放本机（`local/` 或原型工作目录），
+  归档只收原型内容本身——回滚点由 git 历史承担（先例：`starter-rollback/` 2026-09-11 移除、
+  `showcase-rollback/` 2026-09-20 合入前移除，二者删除后仍可用 `git checkout <commit>^ -- <path>` 取回）；
 - 归档前请确认不含密钥/真实用户数据（红线见仓库根 `README.md` 与 `AGENTS.md`）。

@@ -4,6 +4,7 @@
  * - 整章预合成为 SSE 流（openSseFetch + FormData；事件类型见 ReadingStreamEvent）。
  */
 import { openSseFetch } from '@/audio/sse'
+import { DEFAULT_TTS_VOICE } from '@/audio/tts-config'
 import { PYTHON_BASE, loadAudioBlob, request } from '@/api/client'
 
 /**
@@ -212,7 +213,7 @@ export async function deleteVocab(id: number): Promise<void> {
 }
 
 /** 查词词卡「读词音」（缓存命中 0 扣；返回音频 blob） */
-export function wordAudioUrl(word: string, voice = 'en-US-JennyNeural'): string {
+export function wordAudioUrl(word: string, voice = DEFAULT_TTS_VOICE): string {
   return `/api/v1/reading/tts/word/${encodeURIComponent(word)}?voice=${voice}`
 }
 
@@ -259,6 +260,21 @@ export async function patchAnnotation(
 
 export async function deleteAnnotation(id: number): Promise<void> {
   await request(`/api/v1/reading/annotations/${id}`, { method: 'DELETE' })
+}
+
+/** 「我的笔记」跨章列表行（docs/53 P5）：批注 + 章节/书名，供 /m/notes 展示与跳回阅读器 */
+export interface NoteItem extends AnnotationItem {
+  chapter_id: number
+  book_id: number
+  chapter_title: string
+  book_title: string
+}
+
+export async function fetchNotes(kind?: 'highlight' | 'note'): Promise<{ items: NoteItem[]; has_more: boolean }> {
+  const res = await request<{ items: NoteItem[]; has_more: boolean }>(
+    `/api/v1/reading/notes${kind ? `?kind=${kind}` : ''}`,
+  )
+  return res.data
 }
 
 // ---------------------------------------------------------------- 进度/音色

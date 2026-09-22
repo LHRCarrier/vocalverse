@@ -180,4 +180,60 @@ describe('messages store（私信 IM · docs/49 §2/§4）', () => {
     store.stopStream()
     expect(store.streamMode).toBe('idle')
   })
+
+  it('SSE 回放已读消息：未读不被重新加回（服务端计数为准；修复「看完回来还是新消息」）', async () => {
+    vi.mocked(communityApi.fetchConversations).mockResolvedValue([conversation(2, 0, 'theirs-2')])
+    vi.mocked(communityApi.fetchUnreadTotal).mockResolvedValue(0)
+
+    type Deliver = (p: { message: DirectMessageView; unreadCount: number }) => void
+    const box: { deliver: Deliver | null } = { deliver: null }
+    vi.mocked(communityApi.openMessageStream).mockImplementation((_since, handlers) => {
+      box.deliver = handlers.onMessage ?? null
+      handlers.onOpen?.()
+    })
+
+    const store = useMessagesStore()
+    await store.loadConversations() // 列表口径：已读 → 未读 0
+    store.startStream()
+
+    // 服务端按 since 回放已读旧信（水位已推进 → unreadCount=0）：不得把 0 加回成 2
+    box.deliver?.({ message: msg(1, 2, 'theirs-1', false), unreadCount: 0 })
+    box.deliver?.({ message: msg(2, 2, 'theirs-2', false), unreadCount: 0 })
+
+    expect(store.conversations[0].unreadCount).toBe(0)
+    expect(store.unreadTotal).toBe(0)
+  })
+
+  it('实时新消息：未读用服务端回带的 per-peer 计数（不本地求和）', async () => {
+    vi.mocked(communityApi.fetchConversations).mockResolvedValue([conversation(2, 1, 'hi')])
+    vi.mocked(communityApi.fetchUnreadTotal).mockResolvedValue(1)
+
+    type Deliver = (p: { message: DirectMessageView; unreadCount: number }) => void
+    const box: { deliver: Deliver | null } = { deliver: null }
+    vi.mocked(communityApi.openMessageStream).mockImplementation((_since, handlers) => {
+      box.deliver = handlers.onMessage ?? null
+      handlers.onOpen?.()
+    })
+
+    const store = useMessagesStore()
+    await store.loadConversations()
+    store.startStream()
+    box.deliver?.({ message: msg(7, 2, 'new', false), unreadCount: 4 })
+
+    expect(store.conversations[0].unreadCount).toBe(4)
+    expect(store.unreadTotal).toBe(4) // 1 → 4（按服务端值对齐，不是 1+1=2）
+  })
+
+  it('loadUnreadTotal：10s 内节流（Tab 栏导航不重复打点），force 强制对齐', async () => {
+    vi.mocked(communityApi.fetchUnreadTotal).mockResolvedValue(5)
+    const store = useMessagesStore()
+
+    await store.loadUnreadTotal()
+    await store.loadUnreadTotal()
+    expect(communityApi.fetchUnreadTotal).toHaveBeenCalledTimes(1)
+
+    await store.loadUnreadTotal(true)
+    expect(communityApi.fetchUnreadTotal).toHaveBeenCalledTimes(2)
+    expect(store.unreadTotal).toBe(5)
+  })
 })

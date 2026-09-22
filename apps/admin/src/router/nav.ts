@@ -36,6 +36,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: '运维',
     items: [
       { label: '服务总览', path: '/ops', icon: 'activity', permission: 'ops:overview:read' },
+      { label: '学习指标', path: '/insight', icon: 'chart-dots', permission: 'ops:metric:read' },
       { label: '性能指标', path: '/ops/metrics', icon: 'chart-line', permission: 'ops:metric:read' },
       { label: '预警中心', path: '/ops/alerts', icon: 'alert-triangle', permission: 'ops:alert:read' },
       { label: 'LLM Trace', path: '/ops/traces', icon: 'route', permission: 'ops:trace:read' },
@@ -53,7 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'content:listening:read',
       },
       { label: '书籍', path: '/content/books', icon: 'book', permission: 'content:book:read' },
-      { label: '场景库', path: '/content/scenarios', icon: 'messages', permission: 'content:scenario:read' },
+      { label: '场景卡', path: '/content/scenarios', icon: 'dice', permission: 'content:scenario:read' },
       { label: '题库', path: '/content/questions', icon: 'list-check', permission: 'content:question:read' },
       { label: '媒体库', path: '/content/media', icon: 'photo', permission: 'content:media:read' },
       { label: '工单', path: '/content/tickets', icon: 'ticket', permission: 'content:ticket:read' },

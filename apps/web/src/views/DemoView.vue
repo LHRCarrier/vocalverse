@@ -76,12 +76,6 @@ onMounted(checkServices)
       >
         进入预览画廊 →
       </RouterLink>
-      <RouterLink
-        to="/preview/agent-lab"
-        class="rounded-full border border-brand px-4 py-1.5 text-sm text-brand transition-colors hover:bg-white"
-      >
-        直达 Agent Lab 测试台 →
-      </RouterLink>
       <span class="text-xs text-[#667085]">可反向往返：画廊侧栏「回到骨架 Demo」</span>
     </section>
 

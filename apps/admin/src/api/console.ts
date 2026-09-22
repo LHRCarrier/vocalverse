@@ -29,9 +29,6 @@ import type {
   QuestionPatch,
   QuestionRow,
   QuestionUpsert,
-  ScenarioDetail,
-  ScenarioRow,
-  ScenarioUpsert,
   SongDetail,
   SongRow,
   SongUpsert,
@@ -51,7 +48,7 @@ import type {
  * - 口令重置体是 `{password}` 而不是 `{newPassword}`（`ConsoleRbacController.PasswordReset`）；
  * - 会话列表是 `GET /admins/sessions`（全局分页），**不是** `GET /admins/{id}/sessions`；
  * - 内容列表多传了一个后端不接收的 `q`（四个 `listXxx` 都没有该参数），已去掉；
- * - 上架流水按 `targetType`（`song|listening_material|scenario|book|chapter`）而不是 `domain` 过滤；
+ * - 上架流水按 `targetType`（`song|listening_material|book|chapter`）而不是 `domain` 过滤；
  * - 审计多了个后端不接收的 `adminUserId` 之外的想象参数；`actionPrefix` 才是前缀查询的正式参数。
  */
 const P = '/api/v1/console'
@@ -232,10 +229,6 @@ export const consoleApi = {
   listMaterials: (query: { page?: number; page_size?: number; status?: string }) =>
     consoleHttp.get<PageView<MaterialRow>>(`${P}/content/listening-materials`, { query }),
 
-  /** 场景：`GET /content/scenarios?page&page_size&status&sceneType`（多一个 sceneType 过滤） */
-  listScenarios: (query: { page?: number; page_size?: number; status?: string; sceneType?: string }) =>
-    consoleHttp.get<PageView<ScenarioRow>>(`${P}/content/scenarios`, { query }),
-
   /** 题库：`GET /content/questions?page&page_size&examRevision&status`，只读（无 publish） */
   listQuestions: (query: {
     page?: number
@@ -244,7 +237,7 @@ export const consoleApi = {
     status?: string
   }) => consoleHttp.get<PageView<QuestionRow>>(`${P}/content/questions`, { query }),
 
-  /** 上下架：路径域是 `song|listening|scenario`（`@PathVariable` 拼出来的端点路径用复数） */
+  /** 上下架：路径域是 `song|listening`（`@PathVariable` 拼出来的端点路径用复数） */
   publish: (domain: PublishDomain, id: number, status: PublishStatus) =>
     consoleHttp.post<PublishResult>(`${P}/content/${domainPath(domain)}/${id}/publish`, { status }),
 
@@ -314,16 +307,6 @@ export const consoleApi = {
   archiveMaterial: (id: number) =>
     consoleHttp.del<MaterialDetail>(`${P}/content/listening-materials/${id}`),
 
-  getScenario: (id: number) => consoleHttp.get<ScenarioDetail>(`${P}/content/scenarios/${id}`),
-
-  createScenario: (body: ScenarioUpsert) =>
-    consoleHttp.post<ScenarioDetail>(`${P}/content/scenarios`, body),
-
-  updateScenario: (id: number, body: ScenarioUpsert) =>
-    consoleHttp.put<ScenarioDetail>(`${P}/content/scenarios/${id}`, body),
-
-  archiveScenario: (id: number) => consoleHttp.del<ScenarioDetail>(`${P}/content/scenarios/${id}`),
-
   getQuestion: (id: number) => consoleHttp.get<QuestionDetail>(`${P}/content/questions/${id}`),
 
   /** 新建题目：同版本内 `itemIndex` 撞车被服务端以 46007 拒绝（`createQuestion` 显式查重） */
@@ -350,8 +333,6 @@ function domainPath(domain: PublishDomain): string {
       return 'songs'
     case 'listening':
       return 'listening-materials'
-    case 'scenario':
-      return 'scenarios'
   }
 }
 

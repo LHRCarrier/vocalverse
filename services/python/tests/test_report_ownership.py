@@ -13,34 +13,37 @@ complete_session 重复调用撞 uq_reports_scope_period → 500。
 from __future__ import annotations
 
 from app.db import get_session_factory
-from app.models import Report, Scenario
+from app.models import Report, ShadowMaterial
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 _OTHER_HEADERS = {"X-Test-User-Id": "2"}
 
 
-def _create_dialog_session(client: TestClient, auth_headers) -> int:
-    """建一个已发布场景 + 建会话(返回 session_id)。"""
+def _create_shadow_session(client: TestClient, auth_headers) -> int:
+    """建一个已发布影子素材 + 建会话(返回 session_id)。"""
     db = get_session_factory()()
     try:
-        scenario = Scenario(
-            title="归属测试场景",
-            scene_type="cafe",
-            difficulty=1,
-            system_prompt="You are Bella, a friendly barista.",
-            opening_line="Hi there!",
-            target_corpus="I'd like a coffee, please.|请给我来杯咖啡",
+        material = ShadowMaterial(
+            title="归属测试素材",
+            level=2,
+            text_content="Hi there.",
+            audio_url="/demo/audio/shadow/ownership.mp3",
+            wpm=120,
+            duration_s=10,
             interest_tags=[],
+            source="demo_only",
             status="published",
         )
-        db.add(scenario)
+        db.add(material)
         db.commit()
-        sid = scenario.id
+        mid = material.id
     finally:
         db.close()
     resp = client.post(
-        "/api/v1/sessions", json={"kind": "dialog", "scenario_id": sid}, headers=auth_headers
+        "/api/v1/sessions",
+        json={"kind": "shadow", "shadow_material_id": mid},
+        headers=auth_headers,
     )
     assert resp.status_code == 200, resp.text
     return resp.json()["data"]["id"]
@@ -48,7 +51,7 @@ def _create_dialog_session(client: TestClient, auth_headers) -> int:
 
 def test_report_not_visible_to_other_user(client, auth_headers) -> None:
     """P0-3 失败用例:user1 的报告,user2 读取 → 404/40401(修复前 200 可拖走)。"""
-    session_id = _create_dialog_session(client, auth_headers)
+    session_id = _create_shadow_session(client, auth_headers)
     resp = client.post(f"/api/v1/sessions/{session_id}/complete", headers=auth_headers)
     assert resp.status_code == 200, resp.text
     report_id = resp.json()["data"]["report_id"]
@@ -60,7 +63,7 @@ def test_report_not_visible_to_other_user(client, auth_headers) -> None:
 
 def test_turn_rejects_other_user(client, auth_headers) -> None:
     """P0-3 失败用例:user2 向 user1 的会话提交回合(action=start)→ 404/40401(修复前可通过预检)。"""
-    session_id = _create_dialog_session(client, auth_headers)
+    session_id = _create_shadow_session(client, auth_headers)
     resp = client.post(
         f"/api/v1/sessions/{session_id}/turns",
         data={"action": "start"},
@@ -72,7 +75,7 @@ def test_turn_rejects_other_user(client, auth_headers) -> None:
 
 def test_complete_rejects_other_user(client, auth_headers) -> None:
     """P0-3 失败用例:user2 收尾 user1 的会话 → 404/40401(修复前 200 且不耗 LLM 摘要)。"""
-    session_id = _create_dialog_session(client, auth_headers)
+    session_id = _create_shadow_session(client, auth_headers)
     resp = client.post(f"/api/v1/sessions/{session_id}/complete", headers=_OTHER_HEADERS)
     assert resp.status_code == 404, resp.text
     assert resp.json()["code"] == 40401
@@ -80,7 +83,7 @@ def test_complete_rejects_other_user(client, auth_headers) -> None:
 
 def test_complete_twice_returns_same_report(client, auth_headers) -> None:
     """P0-8 失败用例:重复 complete → 200 且同一 report_id(修复前第二次撞约束 500)。"""
-    session_id = _create_dialog_session(client, auth_headers)
+    session_id = _create_shadow_session(client, auth_headers)
     first = client.post(f"/api/v1/sessions/{session_id}/complete", headers=auth_headers)
     assert first.status_code == 200, first.text
     second = client.post(f"/api/v1/sessions/{session_id}/complete", headers=auth_headers)

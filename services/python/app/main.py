@@ -30,7 +30,10 @@ from app.api.routes import (
     reading,
     reading_tts,
     recommendations,
+    search,
     singing,
+    stats,
+    trpg,
 )
 from app.console.api.deps import ConsoleBizError
 from app.console.ops.middleware import HttpMetricsMiddleware
@@ -66,10 +69,11 @@ logger.addFilter(RequestIdLogFilter())  # 每条日志带 request_id（docs/06 �
 
 
 async def _prewarm_asr() -> None:
-    """预热 whisper（首个请求免 30s 卡顿）；失败仅告警不阻塞启动（docs/06 §8）。
+    """预热 ASR 引擎（首个请求免 30s 卡顿）；失败仅告警不阻塞启动（docs/06 §8）。
 
     vasr-09：模型加载是 CPU 重活 → 必须进线程（旧实现同步 `_get_model()` 跑在事件循环，
-    阻塞就绪探测 10~30s）；显式 `warm()` 替代 `getattr(client, '_get_model')` 脆弱探针。
+    阻塞就绪探测 10~30s）。2026-09 重构：预热接口统一为 ``ASRClient.ensure_ready()``
+    （与 ``TTSClient`` 对齐），不再鸭子类型调 ``warm()``——引擎换了也不会静默不预热。
     """
     import asyncio
 
@@ -81,10 +85,10 @@ async def _prewarm_asr() -> None:
 
         client = get_asr_client()
         if client is not None:
-            await asyncio.to_thread(client.warm)
-            logger.info("whisper 模型预热完成")
+            await asyncio.to_thread(client.ensure_ready)
+            logger.info("ASR 引擎预热完成（%s）", getattr(client, "provider_id", "unknown"))
     except Exception as exc:
-        logger.warning("whisper 预热失败（不阻塞启动）: %s", exc)
+        logger.warning("ASR 预热失败（不阻塞启动）: %s", exc)
 
 
 @asynccontextmanager
@@ -107,10 +111,8 @@ async def lifespan(app: FastAPI):
                 _dir,
             )
     await _prewarm_asr()  # whisper 预热（docs/06 §8：防首个请求卡 30s；testing/无模型跳过）
-    # TTS 预合成预热（docs/06 §8「开场/常用句预合成」；后台异步不阻塞启动；testing 跳过）
-    from app.audio.warmup import schedule_startup_warmup
-
-    app.state.tts_warm_task = schedule_startup_warmup()
+    # 注：启动期 TTS 预热随英语场景对话移除（2026-09-21）——现存已知文本仅影子会话逐句，
+    # 由 create_session 的 schedule_texts_warm 在建会话时预热（docs/06 §8）。
     # 听书任务孤儿清扫（docs/45 §5.2：进程崩溃残留 running/queued → failed，不假转圈）
     from app.reading import orchestrator as reading_orchestrator
 
@@ -249,22 +251,24 @@ app.include_router(defense.router)
 app.include_router(placement.router)
 app.include_router(events.router)
 app.include_router(recommendations.router)
+app.include_router(stats.router)  # 学习指标（docs/53 P2：四指标 + 个人报表）
+app.include_router(search.router)  # C 端搜索（docs/53 P5：帖子/用户/教程三 tab 真源）
 app.include_router(reading.router)  # 读书域（docs/45：书架/查词/生词/批注/进度/音色）
 app.include_router(reading_tts.router)  # 听书（单句音频/预合成 SSE/任务）
 app.include_router(media.router)  # 媒体（社区 S3 · docs/47 §4.1：图片/视频/头像上传与读取）
+app.include_router(trpg.router)  # 酒馆（TRPG 跑团 · docs/52：剧本/主持台/SSE 回合）
 # 管理端控制台 · Python 侧端点（docs/50 §10.3）：运维/遥测 + 内容治理（library）。
 # 鉴权走独立的控制台令牌（get_console_admin），与学习者 JWT 双密钥双 audience；
 # 端点内部各自做功能位闸门（APP_OPS_TELEMETRY_ENABLED / APP_LLM_TRACE_ENABLED → 46014）。
+from app.console.api.routes import insight as console_insight  # noqa: E402
 from app.console.api.routes import library as console_library  # noqa: E402
 from app.console.api.routes import ops as console_ops  # noqa: E402
+from app.console.api.routes import trpg_cards as console_trpg_cards  # noqa: E402
 
 app.include_router(console_ops.router)
 app.include_router(console_library.router)
-# Agent Lab（test-only 测试台；默认关闭，开启才注册 → 404；删除无影响，见 agent_lab.py 删除清单）
-if get_settings().agent_lab_enabled:
-    from app.api.routes import agent_lab
-
-    app.include_router(agent_lab.router)
+app.include_router(console_trpg_cards.router)  # 酒馆场景卡（docs/52 §12.1：平台固定卡治理）
+app.include_router(console_insight.router)  # 学习指标看板（docs/53 P2：只读聚合）
 # 流利度特征测试台（test-only 前端联调；默认关闭，开启才注册 → 404；删除无影响，
 # 见 fluency_preview.py 删除清单）
 if get_settings().fluency_preview_enabled:

@@ -1,115 +1,180 @@
 <script setup lang="ts">
 /**
- * 移动端 · 搜索（2026-09-05 组长拍板 4：X 式底部搜索 tab → 搜索页；演示帧）
- * 结果源 = 社区演示帖 + 演示用户/教程；输入即过滤；空态展示历史/热门 chips。
- * M3 接真实搜索接口（帖子/用户/教程索引）；词汇速记「划词即查」预留挂点（docs/34 §3）。
+ * 移动端 · 搜索（2026-09-05 组长拍板 4：X 式底部搜索 tab → 搜索页；docs/53 P5 接真）
+ * 三 tab 真源 = Python `GET /api/v1/search?type=posts|users|tutorials&q=`：
+ * 帖子（可见帖标题/正文）/ 用户（active 用户昵称/@handle）/ 教程（published 听力素材）。
+ * 输入 250ms 防抖 + 请求序号防串（旧响应不覆盖新结果）；空关键词显示本地搜索历史 + 热门话题。
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
-import { fetchFollowRecommendations } from '@/api/community'
+import { searchPosts, searchTutorials, searchUsers } from '@/api/search'
+import type { SearchPostItem, SearchTutorialItem, SearchUserItem } from '@/api/search'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
-import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
-import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import '@/styles/mobile-uic.css'
 
-/**
- * 搜索（S3 后置 · A-13）：真实帖子索引随搜索接口上线；当前「帖子/教程」为静态演示样本，
- * **「用户」改为真实用户源**（2026-09-10 · 私信 IM 落地的副产物：原演示会话数据已删除，
- * 用户结果改取 `GET /community/follows/recommendations` 的真实作者，避免演示假名与品牌名入库）。
- */
-const SEARCH_SAMPLES = [
-  { id: 1, author: 'VocalVerse News', handle: '@vocalverse', tint: '#37546e', domain: '新闻稿', title: "Inside China's English learning boom", desc: 'AI partners meet human teachers' },
-  { id: 2, author: 'Teacher Amy', handle: '@amyteach', tint: '#3a2440', domain: '教学分享', title: 'Three words that make small talk easy', desc: 'Listen, shadow, compare' },
-  { id: 3, author: 'Emma English', handle: '@emmaenglish', tint: '#1e2b26', domain: '教学分享', title: '5 phrasal verbs for your next coffee order', desc: 'With example dialogues' },
-  { id: 4, author: 'Teacher Lee', handle: '@leeenglish', tint: '#232044', domain: '教学分享', title: 'How I memorize 20 new words — the shadowing method', desc: 'Listen, shadow, record, compare' },
-  { id: 5, author: 'Liz in London', handle: '@lizlondon', tint: '#0f3a44', domain: '海外生活', title: 'My first Bonfire Night in London', desc: 'A failed plot and sparks over the Thames' },
-  { id: 6, author: 'Mia in Boston', handle: '@miaboston', tint: '#2b4a3a', domain: '海外生活', title: 'Dorm life in Boston: my morning in 60 seconds', desc: 'Kitchen talk and roommate practices' },
-]
+const router = useRouter()
 
 type SearchTab = '帖子' | '用户' | '教程'
-const tabs: SearchTab[] = ['帖子', '用户', '教程']
+const TABS: { tab: SearchTab; type: 'posts' | 'users' | 'tutorials' }[] = [
+  { tab: '帖子', type: 'posts' },
+  { tab: '用户', type: 'users' },
+  { tab: '教程', type: 'tutorials' },
+]
 const activeTab = ref<SearchTab>('帖子')
-const keyword = ref('')
+const activeType = computed(() => TABS.find((t) => t.tab === activeTab.value)!.type)
 
-const HISTORY = ['phrasal verbs', 'BBC 6 minute', 'MIT dorm life']
+const keyword = ref('')
+const kw = computed(() => keyword.value.trim())
+
+const posts = ref<SearchPostItem[]>([])
+const users = ref<SearchUserItem[]>([])
+const tutorials = ref<SearchTutorialItem[]>([])
+const loading = ref(false)
+const error = ref('')
+
+const DOMAIN_LABELS: Record<string, string> = { news: '英语新闻', teaching: '学习分享', overseas: '海外生活' }
+const SOURCE_LABELS: Record<string, string> = { public_domain: '公有领域', original: '原创', demo_only: '演示素材' }
+
+/** 请求序号：快速输入/切 tab 时旧响应必须作废（不覆盖新关键词的结果） */
+let seq = 0
+let timer: ReturnType<typeof setTimeout> | null = null
+
+async function runSearch() {
+  const q = kw.value
+  if (!q) {
+    posts.value = []
+    users.value = []
+    tutorials.value = []
+    error.value = ''
+    loading.value = false
+    return
+  }
+  const mySeq = ++seq
+  loading.value = true
+  error.value = ''
+  try {
+    if (activeType.value === 'posts') posts.value = await searchPosts(q)
+    else if (activeType.value === 'users') users.value = await searchUsers(q)
+    else tutorials.value = await searchTutorials(q)
+    if (mySeq !== seq) return
+  } catch (e) {
+    if (mySeq !== seq) return
+    error.value = (e as Error).message || '搜索失败'
+  } finally {
+    if (mySeq === seq) loading.value = false
+  }
+}
+
+watch([kw, activeType], () => {
+  if (timer) clearTimeout(timer)
+  timer = setTimeout(() => void runSearch(), 250)
+})
+
+onBeforeUnmount(() => {
+  if (timer) clearTimeout(timer)
+})
+
+/* ---------- 最近搜索（真实本地历史）+ 热门话题（运营策展） ---------- */
+const HISTORY_KEY = 'vv_search_history'
+const history = ref<string[]>(readHistory())
 const HOT = ['#Shadowing', '#EnglishLearning', '#BonfireNight']
 
-/** 真实用户源（推荐关注候选 = 全库用户分页，排除自己） */
-const users = ref<{ name: string; handle: string; tint: string }[]>([])
-const usersLoading = ref(true)
-
-/** 用户 tab 骨架防抖（docs/31 硬规则 3）：原实现拉取期间静默空 */
-const { visible: usersSkelVisible } = useDelayedLoading(usersLoading)
-
-onMounted(async () => {
+function readHistory(): string[] {
   try {
-    const recs = await fetchFollowRecommendations()
-    users.value = recs.map((r) => ({
-      name: r.author.nickname,
-      handle: r.author.handle ? `@${r.author.handle}` : '—',
-      tint: r.author.tint ?? '#37546e',
-    }))
+    const raw = localStorage.getItem(HISTORY_KEY)
+    const parsed = raw ? (JSON.parse(raw) as unknown) : []
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string').slice(0, 8) : []
   } catch {
-    users.value = [] // 拉取失败：用户 tab 走空态，不阻塞其余搜索分类
-  } finally {
-    usersLoading.value = false
+    return []
   }
-})
-const tutorials = [
-  { title: '影子跟读法入门 · 10 分钟中文教程', tag: '口语' },
-  { title: '5 个让口语更自然的连接词组', tag: '词汇' },
-]
+}
 
-/** 三个结果集分开（模板按分类引用，避免 union 类型收窄问题） */
-const kw = computed(() => keyword.value.trim().toLowerCase())
-const posts = computed(() =>
-  kw.value
-    ? SEARCH_SAMPLES.filter((p) => `${p.author} ${p.title} ${p.desc}`.toLowerCase().includes(kw.value)).slice(0, 10)
-    : [],
-)
-const foundUsers = computed(() =>
-  kw.value ? users.value.filter((u) => `${u.name} ${u.handle}`.toLowerCase().includes(kw.value)).slice(0, 10) : [],
-)
-const foundTutorials = computed(() =>
-  kw.value ? tutorials.filter((t) => t.title.toLowerCase().includes(kw.value)).slice(0, 10) : [],
-)
-const currentCount = computed(() => {
-  if (!kw.value) return 0
-  if (activeTab.value === '帖子') return posts.value.length
-  if (activeTab.value === '用户') return foundUsers.value.length
-  return foundTutorials.value.length
-})
+function remember(k: string) {
+  const word = k.trim()
+  if (!word) return
+  history.value = [word, ...history.value.filter((x) => x !== word)].slice(0, 8)
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.value))
+}
 
 function pick(k: string) {
+  remember(k)
   keyword.value = k
+}
+
+function clearHistory() {
+  history.value = []
+  localStorage.removeItem(HISTORY_KEY)
+}
+
+/* ---------- 结果渲染 ---------- */
+const currentCount = computed(() => {
+  if (!kw.value) return 0
+  if (activeType.value === 'posts') return posts.value.length
+  if (activeType.value === 'users') return users.value.length
+  return tutorials.value.length
+})
+
+function openPost(id: number) {
+  void router.push(`/m/post/${id}`)
+}
+
+function postMeta(p: SearchPostItem) {
+  return [p.author.nickname, p.author.handle ? `@${p.author.handle}` : '', DOMAIN_LABELS[p.domain ?? ''] ?? '']
+    .filter(Boolean)
+    .join(' · ')
 }
 </script>
 
 <template>
   <div class="u-phone">
-    <MobileTopBar title="搜索" />
+    <!-- 顶栏 + 搜索条（+ 结果分类行）→ 同一吸顶区：翻长结果时也能随时改词/切分类（2026-09-21 组长反馈） -->
+    <div class="u-head">
+      <MobileTopBar title="搜索" />
 
-    <div class="u-search">
       <!-- 搜索输入条（X 式：放大镜 + 圆角大输入） -->
-      <div class="u-searchbar">
-        <MobileIcon name="search" :size="16" />
-        <input
-          v-model="keyword"
-          class="u-searchbar__input"
-          type="search"
-          maxlength="60"
-          placeholder="搜索帖子、用户、教程"
-          aria-label="搜索关键词"
-        >
+      <div class="u-head__search">
+        <div class="u-searchbar">
+          <MobileIcon name="search" :size="16" />
+          <input
+            v-model="keyword"
+            class="u-searchbar__input"
+            type="search"
+            maxlength="60"
+            placeholder="搜索帖子、用户、教程"
+            aria-label="搜索关键词"
+            @keyup.enter="remember(keyword)"
+          >
+        </div>
       </div>
 
-      <!-- 无关键词：历史 + 热门（演示 chips，点击回填） -->
-      <template v-if="!keyword.trim()">
-        <section class="u-search__section">
-          <h2 class="u-search__label">最近搜索</h2>
+      <!-- 有关键词：分类标签行（X 式，跟随吸顶） -->
+      <nav v-if="kw" class="u-x-tabs u-search__tabs u-head__row" aria-label="搜索分类">
+        <button
+          v-for="t in TABS"
+          :key="t.tab"
+          class="u-x-tab"
+          :class="{ active: activeTab === t.tab }"
+          type="button"
+          :aria-selected="activeTab === t.tab"
+          @click="activeTab = t.tab"
+        >
+          {{ t.tab }}
+        </button>
+      </nav>
+    </div>
+
+    <div class="u-search">
+      <!-- 无关键词：最近搜索（本地真实历史）+ 热门话题（运营策展） -->
+      <template v-if="!kw">
+        <section v-if="history.length" class="u-search__section">
+          <div class="u-search__head">
+            <h2 class="u-search__label">最近搜索</h2>
+            <button class="u-search__clear" type="button" @click="clearHistory">清空</button>
+          </div>
           <div class="u-search__chips">
-            <button v-for="h in HISTORY" :key="h" class="u-chip u-chip--ink u-search__chip" type="button" @click="pick(h)">
+            <button v-for="h in history" :key="h" class="u-chip u-chip--ink u-search__chip" type="button" @click="pick(h)">
               {{ h }}
             </button>
           </div>
@@ -124,53 +189,51 @@ function pick(k: string) {
         </section>
       </template>
 
-      <!-- 有关键词：分类标签行（X 式）+ 结果列表 -->
+      <!-- 有关键词：结果列表 -->
       <template v-else>
-        <nav class="u-x-tabs u-search__tabs" aria-label="搜索分类">
-          <button
-            v-for="t in tabs"
-            :key="t"
-            class="u-x-tab"
-            :class="{ active: activeTab === t }"
-            type="button"
-            :aria-selected="activeTab === t"
-            @click="activeTab = t"
-          >
-            {{ t }}
-          </button>
-        </nav>
+        <section v-if="loading" class="u-comm-skel" aria-label="搜索中" aria-busy="true">
+          <div v-for="i in 3" :key="i" class="u-comm-skel__card"><span class="u-comm-skel__lines" /></div>
+        </section>
 
-        <div v-if="currentCount" class="u-search__list">
-          <!-- 帖子结果 -->
-          <template v-if="activeTab === '帖子'">
-            <div v-for="p in posts" :key="p.id" class="u-search__row">
-              <span class="u-search__ava" :style="{ background: p.tint }">{{ p.author.slice(0, 1) }}</span>
+        <div v-else-if="error" class="u-comm-empty" role="status">
+          <span class="u-comm-empty__title">搜索失败</span>
+          <p class="u-comm-empty__sub">{{ error }}</p>
+        </div>
+
+        <div v-else-if="currentCount" class="u-search__list">
+          <!-- 帖子结果（点击进详情） -->
+          <template v-if="activeType === 'posts'">
+            <button v-for="p in posts" :key="p.id" class="u-search__row" type="button" @click="openPost(p.id)">
+              <span class="u-search__ava" :style="{ background: p.author.tint ?? '#37546e' }">
+                {{ p.author.nickname.slice(0, 1) }}
+              </span>
               <span class="u-search__body">
                 <span class="u-search__title">{{ p.title }}</span>
-                <span class="u-search__sub">{{ p.author }} · {{ p.handle }} · {{ p.domain }}</span>
+                <span class="u-search__sub">{{ postMeta(p) }}</span>
+              </span>
+            </button>
+          </template>
+          <!-- 用户结果 -->
+          <template v-else-if="activeType === 'users'">
+            <div v-for="u in users" :key="u.user_id" class="u-search__row">
+              <span class="u-search__ava" :style="{ background: u.tint ?? '#37546e' }">{{ u.nickname.slice(0, 1) }}</span>
+              <span class="u-search__body">
+                <span class="u-search__title">{{ u.nickname }}</span>
+                <span class="u-search__sub">{{ u.handle ? `@${u.handle}` : '—' }} · {{ u.cefr_level ?? '—' }}</span>
               </span>
             </div>
           </template>
-          <!-- 用户结果 -->
-          <template v-else-if="activeTab === '用户'">
-            <MobileSkeleton v-if="usersSkelVisible" variant="lines" :count="3" label="用户加载中" />
-            <template v-else>
-              <div v-for="u in foundUsers" :key="u.handle" class="u-search__row">
-                <span class="u-search__ava" :style="{ background: u.tint }">{{ u.name.slice(0, 1) }}</span>
-                <span class="u-search__body">
-                  <span class="u-search__title">{{ u.name }}</span>
-                  <span class="u-search__sub">{{ u.handle }}</span>
-                </span>
-              </div>
-            </template>
-          </template>
-          <!-- 教程结果 -->
+          <!-- 教程结果（听力素材） -->
           <template v-else>
-            <div v-for="t in foundTutorials" :key="t.title" class="u-search__row">
+            <div v-for="t in tutorials" :key="t.id" class="u-search__row">
               <span class="u-search__ava u-search__ava--tutorial"><MobileIcon name="book" :size="16" /></span>
               <span class="u-search__body">
                 <span class="u-search__title">{{ t.title }}</span>
-                <span class="u-search__sub">{{ t.tag }} · 教程</span>
+                <span class="u-search__sub">
+                  Lv{{ t.level }}<template v-if="t.duration_s"> · {{ Math.round(t.duration_s / 60) }} 分钟</template>
+                  <template v-if="t.source"> · {{ SOURCE_LABELS[t.source] ?? t.source }}</template>
+                  <template v-if="t.tags.length"> · {{ t.tags.join('/') }}</template>
+                </span>
               </span>
             </div>
           </template>

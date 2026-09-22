@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 /**
  * 权限目录自证（docs/50 §4.2）。
  *
- * <p>把目录条数钉死（**34**，推导见 {@code PermissionCatalog} 类注释与下方说明）。刻意用**精确计数**而不是「≥ 某个数」：目录少登记一个码时，
+ * <p>把目录条数钉死（**36**，推导见 {@code PermissionCatalog} 类注释与下方说明）。刻意用**精确计数**而不是「≥ 某个数」：目录少登记一个码时，
  * 拥有对应权限的角色会在运行时拿到 46002，而那种缺陷在功能测试里极难定位 （端点存在、角色存在、就是点不动）。这里让它在构建期就红。
  *
  * <h2>这个数字是逐个从 §4.2 表格数出来的</h2>
@@ -28,15 +28,18 @@ import org.junit.jupiter.api.Test;
  *       而不是凑一个没有端点的码出来。
  * </ol>
  *
+ * <p>2026-09-21：英语场景对话移除时曾删 3 个 {@code content:scenario:*} 码 → 33；同日「酒馆场景卡」 （docs/52 §12，Python
+ * 控制台端点）上线，三码按原语义复用 → 当前 **36**（content 18）。
+ *
  * <p>取整过程与「若上游要 36/35 该怎么改」写在 {@code PermissionCatalog} 类注释。
  */
 class PermissionCatalogTest {
 
-  /** 目录条数（34；推导见类注释）。 */
+  /** 目录条数（36；推导见类注释）。 */
   private static final int EXPECTED_TOTAL = 36;
 
   @Test
-  void catalog_has_exactly_thirty_four_codes() {
+  void catalog_has_exactly_thirty_six_codes() {
     assertEquals(
         EXPECTED_TOTAL,
         PermissionCatalog.size(),
@@ -145,7 +148,7 @@ class PermissionCatalogTest {
     assertTrue(ops.permissionCodes().contains(PermissionCatalog.CONSOLE_AUDIT_READ));
   }
 
-  /** 运营角色只拿 Java 侧 content 码（Python 的 book/media 不发放）。 */
+  /** 运营角色：Java 侧 content + 酒馆场景卡（Python 控制台）；book/media 仍不发放。 */
   @Test
   void operator_role_excludes_python_owned_content_codes() {
     BuiltinRoles.Role operator = BuiltinRoles.byCode(BuiltinRoles.OPERATOR);
@@ -153,7 +156,8 @@ class PermissionCatalogTest {
     assertEquals(
         16,
         operator.permissionCodes().size(),
-        "运营 = Java 侧 content 13（song/listening/scenario 各 3 = 9 + question 2 + ticket 2）"
+        "运营 = Java 侧 content 10（song/listening 各 3 = 6 + question 2 + ticket 2）"
+            + " + content:scenario 3（酒馆场景卡，2026-09-21 docs/52 §12：Python 控制台端点，属运营内容治理）"
             + " + console:user:read/write 2（App 用户管理已随旧管理端退役搬进控制台，运营要能管用户）"
             + " + console:audit:read 1 = 16。"
             + "⚠️ 这个数**从 BuiltinRoles 的实现推导**，不是抄文档——文档里的权限码数量已错过三次"
@@ -163,11 +167,11 @@ class PermissionCatalogTest {
           !c.startsWith("content:book") && !c.startsWith("content:media"),
           "运营不该持有 Python 侧内容码（无 Java 端点可消费）：" + c);
     }
-    assertTrue(operator.permissionCodes().contains(PermissionCatalog.CONTENT_SONG_PUBLISH));
-    assertTrue(operator.permissionCodes().contains(PermissionCatalog.CONTENT_TICKET_WRITE));
     assertTrue(
         operator.permissionCodes().contains(PermissionCatalog.CONTENT_SCENARIO_PUBLISH),
-        "运营必须能上下架场景");
+        "运营必须能维护酒馆场景卡（上架固定卡）：" + operator.permissionCodes());
+    assertTrue(operator.permissionCodes().contains(PermissionCatalog.CONTENT_SONG_PUBLISH));
+    assertTrue(operator.permissionCodes().contains(PermissionCatalog.CONTENT_TICKET_WRITE));
     // 题库在 Java 侧只读（§4.2：题库无 draft，故无 publish）
     assertTrue(operator.permissionCodes().contains(PermissionCatalog.CONTENT_QUESTION_READ));
   }
@@ -202,6 +206,7 @@ class PermissionCatalogTest {
    *
    * <ul>
    *   <li>{@code content:book:*}（3）+ {@code content:media:write}：端点归 **Python**（docs/50 §3.2）；
+   *       （{@code content:scenario:*} 已由 operator 持有，不在此列）
    *   <li>{@code content:question:*}（2）：§4.2 已定义，但 Java 侧题库端点为**只读** （docs/50 §10.2 只有 {@code GET
    *       /content/questions}），写端点归 Python。
    * </ul>

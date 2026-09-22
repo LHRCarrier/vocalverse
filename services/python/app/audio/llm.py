@@ -219,6 +219,121 @@ class DeepSeekLLMClient(LLMClient):
                 duration_ms=int((time.perf_counter() - started) * 1000),
             )
 
+    async def stream_with_tools(
+        self,
+        messages: list[dict],
+        *,
+        tools: list[dict] | None = None,
+        tool_choice: str = "auto",
+        temperature: float = 0.8,
+        max_tokens: int = 1200,
+    ) -> AsyncIterator[tuple[str, object]]:
+        """流式 + 工具调用（酒馆 TRPG 跑团 DM 用；2026-09-21 迁移自 ai4u chatStreamRich）。
+
+        事件形状（消费方 app/trpg/turn.py）：
+        - ("delta", text)：正文增量（**不含**工具调用参数）；
+        - ("tool_calls", [{id, name, arguments}])：流结束后一次性汇总（跨 chunk 拼接）；
+        - ("usage", usage)：尾块用量。
+
+        与 :meth:`stream_rich` 分离实现（后者为练习域稳定契约，事件形状被 turn_runner
+        与测试依赖，不在此改动；两处共用的 trace 回填口径保持一致）。
+        """
+        payload: dict = {
+            "model": self._model,
+            "stream": True,
+            "stream_options": {"include_usage": True},
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "messages": messages,
+        }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = tool_choice
+        _note_request(self._model, messages)
+        started = time.perf_counter()
+        ttft_ms: int | None = None
+        finish_reason: str | None = None
+        acc: list[str] = []
+        usage: dict | None = None
+        # index → {id, name, arguments}（OpenAI 流式工具调用按 index 分片）
+        tool_acc: dict[int, dict[str, str]] = {}
+        try:
+            async with self._client.stream(
+                "POST",
+                f"{self._base_url}/chat/completions",
+                headers=self._headers(),
+                json=payload,
+            ) as resp:
+                try:
+                    resp.raise_for_status()
+                except httpx.HTTPStatusError as exc:
+                    await _drain_error_body(exc)
+                    raise
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    body = line[5:].strip()
+                    if body == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(body)
+                    except json.JSONDecodeError:
+                        continue
+                    reason = self._finish_reason(chunk)
+                    if reason:
+                        finish_reason = reason
+                    if chunk.get("usage"):
+                        usage = self._usage_of(chunk, self._model)
+                        yield ("usage", usage)
+                        continue
+                    choices = chunk.get("choices") or []
+                    if not choices or not isinstance(choices[0], dict):
+                        continue
+                    delta = choices[0].get("delta") or {}
+                    text = delta.get("content")
+                    if text:
+                        if ttft_ms is None:
+                            ttft_ms = int((time.perf_counter() - started) * 1000)
+                        acc.append(text)
+                        yield ("delta", text)
+                    for tc in delta.get("tool_calls") or []:
+                        if not isinstance(tc, dict):
+                            continue
+                        idx = int(tc.get("index") or 0)
+                        entry = tool_acc.setdefault(idx, {"id": "", "name": "", "arguments": ""})
+                        if tc.get("id"):
+                            entry["id"] = str(tc["id"])
+                        fn = tc.get("function") or {}
+                        if fn.get("name"):
+                            entry["name"] += str(fn["name"])
+                        if fn.get("arguments"):
+                            entry["arguments"] += str(fn["arguments"])
+        except BaseException as exc:  # noqa: BLE001 - 含 CancelledError：先留痕再抛
+            _note_error(exc)
+            raise
+        finally:
+            _note_result(
+                ttft_ms=ttft_ms,
+                finish_reason=finish_reason,
+                model=(usage or {}).get("model") or self._model,
+                prompt_tokens=(usage or {}).get("prompt_tokens"),
+                completion_tokens=(usage or {}).get("completion_tokens"),
+                output_text="".join(acc) if acc else None,
+                duration_ms=int((time.perf_counter() - started) * 1000),
+            )
+        if tool_acc:
+            yield (
+                "tool_calls",
+                [
+                    {
+                        "id": entry["id"],
+                        "name": entry["name"],
+                        "arguments": entry["arguments"],
+                    }
+                    for _, entry in sorted(tool_acc.items(), key=lambda item: item[0])
+                ],
+            )
+
 
 async def _drain_error_body(exc: httpx.HTTPStatusError) -> None:
     """流式响应在 raise_for_status 时正文尚未读取 → 主动读完，供错误详情落 trace。

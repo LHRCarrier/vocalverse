@@ -4,14 +4,14 @@
 
 VocalVerse 面向不同年龄段英语学习者，产品形态 = **「练」+「浸」+「唱」三线**：
 
-- **口语 · 场景练习（练）**：8 套生活/工作/学习预置场景固定题卡，AI 数字人实时互动，发音、流利度、语法三维评分 + 语言点覆盖度 + 教练笔记 + 评分报告；
+- **口语 · 酒馆跑团（练 · 2026-09-21 迁移）**：AI 担任主持人（DM）的 TRPG 玩法——**场景卡开局**（管理端精选卡 + 按关键词让 LLM 现写一张 + 自建），打字或语音说行动，DM 流式叙述 + NPC 角色扮演（逐句 TTS，可在设置里关），系统掷骰判定、任务/线索/事实全程留痕（主持台可手改）；右上角设置支持语言中英切换（DM 输出语言）与语音开关，docs/52；
 - **口语 · AI 自由说（说）**：想聊就聊——麦克风或打字，DeepSeek LLM 实时对聊 + TTS 语音播报，无题卡也有反馈；
 - **英语社区（浸）**：英文氛围沉浸——英语新闻稿 / 英文教学与学习分享 / 海外学习生活与风俗习惯，帖子 + 视频双形态（排版参考 X），点赞/评论/投币/分享互动；
 - **英文小说阅读（读 · 2026-09-10）**：听读浸润线——公版英文小说纯文本阅读，点词查义（词形→头词 + 音标解读）、一键生词本、划词高亮批注、整章听书（TTS 本地/云端双引擎 · 句级高亮跟随 · 倍速/音色设置），docs/45（设计）+ docs/46（拷问）；
 - **英文歌练唱（唱）**：英文歌曲跟唱，音准、节奏、发音逐句评分（特色扩展，M3 深化中）；
 - **个性化与测评**：入学测试定级、学习画像、推荐（M3 深化中）；答辩导师（粘贴论文 → AI 评委英文提问 → 等级反馈）作为高校场景特色功能。
 
-「学英语」不只落在一个功能上：场景练习管**开口说**，自由说话语环境差一点也能**先聊起来**，社区帖子新闻补**阅读与语感**，海外生活风俗维度的内容让语言**带着文化**，唱英文歌则是**高强度跟读训练**——各功能都往学英语这件事上使劲。
+「学英语」不只落在一个功能上：酒馆跑团管**开口说**，自由说话语环境差一点也能**先聊起来**，社区帖子新闻补**阅读与语感**，海外生活风俗维度的内容让语言**带着文化**，唱英文歌则是**高强度跟读训练**——各功能都往学英语这件事上使劲。
 
 ## 技术栈
 
@@ -49,10 +49,13 @@ VocalVerse 面向不同年龄段英语学习者，产品形态 = **「练」+「
 
 ### 0. 先明确当前阶段能测什么
 
-- ✅ **能测**：注册/登录（Java JWT，演示账号 `demoadult`/`demoteen`/`demosenior`，密码 `demo123456`）→ 移动端全流程：**社区首页（S1 真实流：三领域 Tab + 为你推荐混排（含每日打卡卡）+ 发帖/评论/点赞/支持/分享，Java 社区接口）** → **口语**（先选场景 → 播放开场白 → 录音 ≤15s → 三维评分 + 语言点覆盖 + 教练笔记 → 8 轮收尾 → 评分报告）→ **AI 自由说**（麦克风或打字 → DeepSeek 流式 + TTS 播报）→ **英文小说阅读**（学习页「书房」→ 书架 → 书详情 → 阅读器：点词查义/生词本/划词批注/听书句级高亮/字号主题设置，docs/45；种子：`uv run python -m app.db.seed_reading`）→ **我的**；自定义答辩导师（粘贴论文 → AI 评委英文提问 → 等级反馈）；埋点 15 类事件；SSE 流式（音频为时间轴权威、文本字幕）。
+- ✅ **能测**：注册/登录（Java JWT，演示账号 `demoadult`/`demoteen`/`demosenior`，密码 `demo123456`）→ 移动端全流程：**社区首页（S1 真实流：三领域 Tab + 为你推荐混排（含每日打卡卡）+ 发帖/评论/点赞/支持/分享，Java 社区接口）** → **口语 · 酒馆**（开局引导选/建剧本 → 打字或语音说行动 → DM 流式叙述 + NPC 台词 + 逐句 TTS → 掷骰判定卡/过场卡 → 主持台：状态/事实表/任务线索/桌骰，docs/52）→ **AI 自由说**（麦克风或打字 → DeepSeek 流式 + TTS 播报）→ **英文小说阅读**（学习页「书房」→ 书架 → 书详情 → 阅读器：点词查义/生词本/划词批注/听书句级高亮/字号主题设置，docs/45；种子：`uv run python -m app.db.seed_reading`）→ **我的**；自定义答辩导师（粘贴论文 → AI 评委英文提问 → 等级反馈）；埋点 15 类事件；SSE 流式（音频为时间轴权威、文本字幕）。
 - ✅ **唱歌（M3 P0 · 2026-09-09 落地）**：`/m/sing` 唱吧全链路——选歌（参考旋律就绪门禁，未就绪/提取中/失败徽标）→ 整首跟唱（≤180s，保持前台；停止或 3min 自动收）→ 上传 → 异步评分（轮询 queued→processing→done|failed）→ 逐句音准/节奏/发音 + 综合（`0.5·音准+0.2·节奏+0.3·发音`）+ **D3 对齐图**（参考旋律线 + 用户曲线 + 逐句分柱）→ 报告（未评测句标注，发音=抽样句）。**演示曲目**：`python scripts/setup-assets.py` 合成 3 首公有领域童谣旋律（音频落 `data/audio/`，gitignored，不入库）→ Java `SongSeeder` 启动播种元数据/逐句 LRC → Python 离线 pyin 提取自动置 `pitch_ref_status=ready`（实测 6/4/4 句全部就绪）。**联调测试页**：`/preview/singing`（dev-only）。
 - ⏳ 真实语音链路需 `.env` 密钥（DeepSeek/讯飞）+ ffmpeg + whisper 模型；缺省时全链路走 Fake（`APP_TESTING=true`），联调冒烟脚本：`python scripts/poc/demo_smoke.py`。
-- ⏳ **听书引擎**：默认 edge（联网即可）；本地 KittenTTS（Apache-2.0 · CPU 实时 · 8 英文音色）可选启用——`services/python` 下 `uv sync --extra local-tts` + `.env` 置 `APP_VOICE_MODELS_DIR=<VoiceStudio 模型目录>`（模型权重不入库，docs/45 §5.1）。
+- ⏳ **TTS 引擎**：默认 `APP_TTS_PROVIDER=auto`，**本地优先**——omnivoice（本地克隆音色，需起边车）→ kitten（本地 ONNX）→ edge（联网即可），任一环不可用自动回落，不阻塞链路。启用本地档：
+  - **OmniVoice（英语用 The Anchor / The Podcaster）**：① 装环境 `pwsh -File scripts/setup-omnivoice-env.ps1`（约 3~5 GB，装到 `<仓库>/.venv-omnivoice`；只跑 CPU 加 `-Torch cpu`）；② 下权重 `pwsh -File scripts/fetch-omnivoice-weights.ps1`（约 3.3 GB，默认走 hf-mirror 镜像下到 `<仓库>/data/models`；本机已有缓存用 `-FromLocal`）；③ 起边车 —— **`pwsh -File scripts/dev-up.ps1 start` 默认就会带上它**（也可单独 `pwsh -File scripts/start-omnivoice-sidecar.ps1`；无 GPU/无环境加 `-Fake` 先验链路）。音色参考件已随仓库分发在 `data/seed/voices/`，**零配置**。详见 `services/omnivoice-sidecar/README.md`。
+  - **KittenTTS**（CPU 实时 · 8 英文音色）：`services/python` 下 `uv sync --extra local-tts` + `.env` 置 `APP_VOICE_MODELS_DIR=<VoiceStudio 模型目录>`（模型权重不入库）。
+  - 引擎清单/优先级/扩展方式见 `docs/audit/ASR-TTS链路审计与重构方案.md`。
 - ⏳ 推荐/报表仍按 M3 排期推进；社区 S1 真实流已上线（发帖开关 `VOICEVERSE_COMMUNITY_POST_ENABLED=true` 演示开启、生产默认关）；**S2 关注 + 互动通知已真实化**（通知中心「通知/关注」两 tab = 真实流）；**私信 IM 已真实化**（会话列表/会话页/未读 + **SSE 长连实时推送**，弱网自动降级轮询；种子 `demoadult ↔ demoteen/demosenior`，docs/49）；搜索/嵌套楼/视频播放器（S3）后置。
 
 ### 1. 一次性准备（工具链）
@@ -99,7 +102,9 @@ cd services/python
 uv sync
 Copy-Item .env.example .env                # 填 DeepSeek/讯飞密钥（M2 真实管线需要；不填则走 Fake）
 uv run alembic upgrade head                # 建表（schema 真源=Alembic；合并后需升到最新 revision）
-uv run python -m app.db.seed               # 幂等 seed：8 套场景内容 + 入学测试题库
+uv run python -m app.db.seed               # 幂等 seed：入学测试题库（场景内容已随酒馆迁移移除）
+uv run python -m app.db.seed_recommend     # 演示数据：影子跟读素材 + 推荐演示账号（可选）
+uv run python -m app.db.seed_trpg          # 演示数据：酒馆平台场景卡（迷雾酒馆/雨夜驿站）
 uv run uvicorn app.main:app --reload --port 8000   # 注意：uv 前缀不能省（Windows 下 venv 不在 PATH）
 
 # 4. Java（终端 3）——首次先 mvn -N wrapper:wrapper 生成 mvnw
@@ -198,6 +203,7 @@ cd apps/mobile/android; .\gradlew.bat assembleDebug
 | Docker 卡顿/服务起不来（WSL2 默认内存 2GB） | 按 `infra/dev/.wslconfig` 示例设 `memory=8GB,processors=4`，执行 `wsl --shutdown` 后重启 Docker |
 | 首次 `dev.ps1` 很慢 | 正常：基础镜像 + Python 依赖（含 CPU torch ≈200MB）；网络差可给 Docker 配镜像加速 |
 | 语音接口返回固定文本 | 预期行为：M1 全部为 Fake 实现（`services/python/app/audio/stubs.py`），M2 替换为 faster-whisper / edge-tts / 讯飞 ISE |
+| 合成出来的是云端音色（不是 The Anchor/The Podcaster） | 边车没起或没权重 → `auto` 链**按设计回落到 edge**（不报错）。查：`curl http://127.0.0.1:8765/health` 看 `ok`；`local/dev-logs/omnivoice-8765.*.log`；权重没下就跑 `pwsh -File scripts/fetch-omnivoice-weights.ps1`。想让它**报错而不是回落**，显式设 `APP_TTS_PROVIDER=omnivoice`（不可用即 503）。 |
 | 本地 ASR 请求 500，uvicorn 日志含 `LocalEntryNotFoundError` / `Please check your internet connection` / httpx 连接错误（httpcore `_sync`） | **whisper 模型缓存未指向仓库 `data/models`**（huggingface 被墙无法在线下载）：方式 B 本地应用启动默认注入 `HF_HOME=<仓库>\data\models` + `HF_HUB_OFFLINE=1`（docs/06 §8「被墙一律本地缓存」约定；`scripts/dev-up.ps1` 同样注入；**容器侧是另一套口径**：hf-cache 卷承载 HF 默认缓存路径，compose 当前未注入 HF 变量——K03 未闭合项，另立整改）。若手工覆盖过 `HF_HOME` 或更换 ASR 模型，确保模型完整在 `data/models/hub/`（2026-09-04 实测处置见 `worklog/BUG实测/方式B-Python-ASR-HF缓存失配.md`） |
 | Windows 长路径/编码问题 | `git config --global core.longpaths true`；`.gitattributes` 已强制 LF（.ps1/.bat 用 CRLF） |
 | Java 日志中文乱码（如「演示账号就绪」变「婕旂ず璐」） | 双重错位：① 编译期 pom 未声明编码（已钉 `project.build.sourceEncoding=UTF-8`，改 pom 后重新编译生效）；② 运行期终端码页——VSCode 终端先 `chcp 65001` 再起 Java，或 `mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"`（Java 18+ 生效）；Python/edge-tts 脚本同理：`$env:PYTHONIOENCODING='utf-8'` |
@@ -218,8 +224,9 @@ apps/admin/       管理端控制台（独立 SPA：Vue3+TS+Vite6+naive-ui；运
 apps/mobile/      Capacitor 手机壳（Android 首发；server.url 型加载线上全栈，详见 apps/mobile/README.md）
 services/python/  语音管线 + LLM Agent + 推荐（FastAPI；Alembic 唯一 schema 真源）
 services/java/    薄服务端（Spring Boot；JWT 签发；社区 C 端；`com.vocalverse.console` 管理端控制台模块）
+services/omnivoice-sidecar/  本地 GPU 合成边车（纯标准库 `http.server`；本地克隆音色的唯一合成入口）
 infra/            部署与 nginx 配置
-scripts/          dev.ps1 / bootstrap.ps1（Windows 一键）
+scripts/          dev.ps1 / bootstrap.ps1 / dev-up.ps1（一键起停）+ start-omnivoice-sidecar.ps1（边车）+ setup-omnivoice-env.ps1（装环境）+ fetch-omnivoice-weights.ps1（下权重）+ lib/omnivoice.ps1（边车 python/权重查找真源）
 docs/             00~05 规划文档 + 06 技术框架决策（ADR 唯一权威）+ 07/08 拷问报告 + 09 框架评审 + 10/11 数据库 + 12 同构Monorepo对比裁决 + 13 前端设计系统 + 14 功能规格（v2 拍板）+ 15/16 双子拷问报告 + 17 合流与拍板记录 + 18 实施计划 + 19 六路拷问报告 + 20/21 系统设计说明书（架构/接口）+ 42 App功能说明书 + 44 TTS整改计划 + 45/46 英文小说阅读（设计/拷问）+ 47~49 社区 S3/私信 + 50/51 管理端后台（设计/拷问）+ api/ 契约
 worklog/          团队工作日志（主线 VocalVerse工作日志.md + App 线 安卓开发日志.md，按日追加）
 ```
@@ -242,7 +249,7 @@ worklog/          团队工作日志（主线 VocalVerse工作日志.md + App �
 | `docs/11-数据库拷问报告.md` | 数据库拷问官报告：字段/索引/口径拷问与拍板 |
 | `docs/12-同构Monorepo对比与裁决.md` | 双子拷问官交叉拷问「能否按同构 monorepo 参照项目做」+ 多项修正 + 答辩口径；裁决已并入 docs/06 §2.1 |
 | `docs/13-前端设计系统.md` | 前端设计系统（naive-ui/UnoCSS/设计 token 三层分工 + B 多邻国活力配色 + 路由表 + 动效可视化栈 + 答辩口径） |
-| `docs/14-M2场景对话与答辩导师规格.md` | **v2 拍板稿**：场景对话回合状态机/SSE 流式协议/prompt 模板/语言点覆盖度/教练双人格/2 级救场 + 答辩导师（W3 极简：三级题库/提问依据/等级标签阶梯/软删脱敏） |
+| `docs/14-M2场景对话与答辩导师规格.md` | **【场景对话部分已退役 2026-09-21，见 docs/52；答辩导师部分仍有效】** v2 拍板稿：场景对话回合状态机/SSE 流式协议/prompt 模板/语言点覆盖度/教练双人格/2 级救场 + 答辩导师（W3 极简：三级题库/提问依据/等级标签阶梯/软删脱敏） |
 | `docs/15-M2场景对话需求拷问报告.md` | 需求/产品拷问官 28 问（覆盖缺口/达成度悖论/差异化立论/排期）+ 10 条拍板建议 |
 | `docs/16-M2场景对话技术拷问报告.md` | 技术/架构拷问官 37 问（假流式/LLM 调用预算/CHECK 迁移/安全注入/延迟复算）+ 量化表 |
 | `docs/17-M2场景对话拷问合流与拍板记录.md` | 双子拷问合流：交叉验证矩阵/分歧裁决（答辩极简·软删·等级标签）/v1→v2 对照/登记义务清单 |
@@ -270,6 +277,8 @@ worklog/          团队工作日志（主线 VocalVerse工作日志.md + App �
 | `docs/32-图标库与UI库调研与选型.md` | **图标库/UI 库选型（双原子代理全网调研）**：17 家图标库对照（主选 Tabler MIT / 深色卡大图形用 Phosphor fill-duotone 经 `@iconify-json/ph` / 对比 Lucide **ISC**；接入走 unplugin-icons 编译期按需内联）；组件基座 = reka-ui(unstyled) + cva + 自研三层 token（只抄 shadcn-vue 模式不抄 Tailwind 堆栈）；Naive 只留管理端；动效 VueUse + Motion for Vue，排除 GSAP；许可合规 + 素材库 `docs/assets/ui-lib-reference/`（48 样本 SVG + 许可原文） |
 | `docs/33-UI修改SOP.md` | **App 端 UI 修改标准作业流程**：参考源优先（B 站视频/带注释参考图/uiverse 元素）→ 反馈分类（删/改/增/不动）→ 设计决策先写 → 实现 → 截图自检（真实后端链路 + focus 态）→ 门禁 → 文档与日志归位（UI 记录进 `worklog/安卓开发日志.md`）→ 分离 commit；含踩坑清单（色板普查/@iconify-json/ph 包名/Lucide ISC/中文负字距等） |
 | `docs/34-X界面复刻开源项目参考书.md` | **X 复刻参考书（Fwitter · TheAlphamerc/flutter_twitter_clone，MIT）**：定位=参考书非移植（与 docs/27 D1/D5 冲突）；屏幕↔VocalVerse 映射（A/B/C 借鉴级）+ 帖子卡组件粒度对照 + 交互参考 P0~P2 + 反借鉴清单 + 落地建议；仓库 2026-09 API 核验（停更/Dart 2/Firebase 全家桶/4.2k★） |
+| `docs/52-酒馆跑团（TRPG）实施设计.md` | **酒馆跑团（TRPG）域权威设计（2026-09-21）**：迁移来源与四个口径/数据模型 7 表/14 接口/SSE 协议/三件套/DM 工具循环/移动端页面结构/删除清单/打卡口径修订/验证与欠账——替代原「学英语场景对话」闭环 |
+| `docs/53-M3实施计划（埋点指标·推荐·画像）.md` | **M3 收口计划（2026-09-21，执行中）**：P1 埋点链路修复与补齐 / P2 指标聚合与看板（口径按 GA4·PostHog 修订）/ P3 推荐前端联调（内容型冷启动 + 水平预测）/ P4 学习画像接真 / P5 搜索·笔记·XP·设置页 / P6 清理收尾 + 借用清单（开源实践来源）与不做项 |
 | `docs/35-App端UI迭代SOP.md` | **App 端 UI 迭代 SOP（2026-09-05 定稿）**：人工反馈驱动六步循环（反馈→归类→决策先写→实现→门禁+截图自检→规格/日志/分 commit）+ 8 条硬性设计规则（tabler 无底图标/头像最左/双场景底栏/唯一入口/全局件挂 App/等级联动…）+ Playwright mock 鉴权自检与坐标实测方法 + 踩坑红榜（.u-chat 类名冲突/陈旧 vite/测试断言注意等） |
 | `docs/36-学习画像数据展示开源调研.md` | **学习画像数据展示开源调研（To C 向）**：学习页画像焦点前置调研——候选 11 项目（首选 DuoDash/Duolingo 仪表盘 MIT，次选 GitHubPoster 热力图/Duo-Strength 技能强度条/Skill Quest 数字卡）+ 四个焦点模式解剖 + VocalVerse 真实数据映射盘点（attempts 三维评分/词级错误/语言点覆盖已全量在库）+ 落地建议（主卡→今日四数→年度热力图→周趋势→场景掌握度条→薄弱点→AI 点评；零依赖自绘） |
 | `docs/37-社区内容实施设计（S1真实流）.md` | **社区内容 S1 实施设计（定稿 · 四官拷问后重写）**：拍板封版（Java 承办 / 打卡物化 / S1 切片 / 投币一人一帖不可取消文案「支持/充电」/ 发帖纯文本 / 公众发帖默认关闭 / keyset 游标契约）；数据模型 7 处（posts 含 media 字段集对齐/tags、post_comments 含 root_id 预热、post_likes 改造、post_interactions、follows、user_profiles.handle/tint）+ 写方矩阵反转与守护同步（M-1/M-2）；Java 社区 10 端点（错误码 40402/40302/42203）+ 内部 REST `/internal/checkin`（camelCase/幂等 practice_date/统一客户端修 P0-6）；反借鉴清单（积分账户/多状态机/云转码/ES 等不做）；PR 拆分与登记 Checklist |
@@ -282,6 +291,8 @@ worklog/          团队工作日志（主线 VocalVerse工作日志.md + App �
 | `docs/44-TTS链路整改计划.md` | **TTS 链路整改计划（对抗拷问产出 · 待评审稿）**：依据 `local/grill-voice-tts.json`（9 项 P0×3/P1×5/P2×1）+ 语音链路审计 V2.0；TTS 优先四类硬伤（句切分缩写/小数点当句号、单引擎无生命周期且 Azure 备胎零代码、文本零前处理、/tts 回 hex×2 且无响度归一）；P0-A~C（切分/生命周期/Azure 兜底）+ P1-A~E（文本归一/缓存/缺句上报/duration/输出封装+loudnorm/ssml-lite 语速停顿）+ P2（听读逐词时间轴）；每项给改动文件/做法（借鉴不拷代码，算法引上游 MIT 的 Patter/voicebox，依赖引 MIT `num2words`/ffmpeg/azure SDK）/验收（修复前必失败回归测试）/风险回退/建议 PR + 测试策略（CI 不打真 TTS/Azure，走纯函数+FakeTTSClient）+ 待评估项（crossfade/m4b/speech_rate/发音词典）+ 时间线 |
 | `docs/audit/唱歌onset检测评估-频谱起音vsF0起音.md` | **唱歌 onset 检测评估（口径 v3 item7 鲁棒性）**：频谱起音 vs F0 起音——6 类合成素材（含 ground truth）+ 6 段真实录音实测（BPM 误差均值 51.8 → 6.1 且消除 None）；三个反直觉结论（现状病根是精度非检出量 / F0 起音不能替代频谱起音（同音重复盲区）/ 必须在 BPM 层仲裁而非 onset 列表融合）+ 采纳方案 `combine_bpm`（八度校正）+ 风险控制（句窗口缩放 ratio clamp [0.67,1.5]）+ 已知边界；复现脚本 `scripts/poc/onset_eval.py` |
 | `docs/audit/唱歌模块复测报告-2026-09-10.md` | **唱歌模块全方面复测报告（P0/P1 修复后 · 真容器）**：四层测试矩阵（后端 487 passed / 前端 177 passed + build / 契约与迁移对账 / 容器 41 项检查全绿）；逐条容器级复核证据（P0-1 素材 TTL、P0-5 envelope、P1-3 唯一键、P1-11 长歌 12.3s、P1-13 桶回滚、P1-14 契约）；复测新发现并修复的两个缺陷（F2 容器内内部委托地址错 → 参考旋律门禁翻不了；F1 偏慢跟唱无节奏分 → 口径 v6 时间弯折 + 能量起唱判据）；已知边界与后续项；复现脚本 `scripts/sing_container_test.py` |
+| `docs/audit/ASR-TTS链路架构调研-开源与论文.md` | **ASR/TTS 开源链路架构调研（可插拔机制专题）**：8 个 ASR 项目（Whisper / faster-whisper / whisper.cpp / WhisperX / FunASR / sherpa-onnx / Vosk / NeMo）+ 11 个 TTS 项目（edge-tts / Azure / Piper / Kokoro / KittenTTS / Coqui-XTTS / MeloTTS / ChatTTS / F5-TTS / GPT-SoVITS / espeak-ng）+ 6 个编排框架（Pipecat / LiveKit / Vocode / OpenAI Realtime / Home Assistant Assist / Wyoming）+ 17 篇论文的**模块划分 / 数据流 / 接口签名 / 可插拔点 / 配置方式 / 部署形态**横向对比；10 条共性模式 + 12 条反模式 |
+| `docs/audit/ASR-TTS链路审计与重构方案.md` | **ASR/TTS 链路审计与可插拔重构方案（含落地记录）**：现状审计（14 处零散代码的职责/耦合/重复清单 + 已删除项）→ 四层分层（L4 调用点/L3 装配 `registry.resolve` /L2 契约 `ASRClient·TTSClient` /L1 引擎/L0 资源）→ 引擎身份一等公民（`provider_id`/`media_type`/`ext`，取代 `isinstance` 反推）→ 配置表与常见组合 → 本地 ASR（sherpa-onnx）与本地 TTS（KittenTTS + OmniVoice 参考件音色，英语复用 xiaohaishi 的 The Anchor/The Podcaster，含 sha256 纪律）→ 默认档位（`auto` 本地优先，不可用自动回落 edge）→ 三步扩展路径 → 验证矩阵与残余风险 |
 | `docs/45-英文小说阅读功能设计.md` | **英文小说阅读（读书）功能设计（定稿 · 四官拷问后）**：定位（词汇速记落地主体）/用户路径 / 8 表数据模型（content_version 版本守卫/词形反向索引/批注偏移坐标系）/ 20 端点契约（45xxx 错误码）/ 听书 TTS（provider 链 edge+kitten、VoiceStudio jobs 模式借鉴、句级对齐）/ 前端 u-* 语义（书架/详情/阅读器/生词本 + 7 组件 + 5 composables）/ 种子（公版书 3 本 + ECDICT 子集）/ 测试与门禁 / 红线与后续登记 |
 | `docs/46-英文小说阅读拷问报告.md` | **读书功能四官拷问合流**：数据模型（V-1…V-20）/业务逻辑（B-1…B-22）/模块工程（M-1…M-18）/UI-UX（U-1…U-22）的裁决表（C-1…C-10：设计语言 u-*/词卡 sheet/桶 600·只扣真实合成/SSE 任务通道/联调页 A 落法等）+ 本地模型能力清单（KittenTTS mini 选为本地引擎；OmniVoice CC-BY-NC 禁商用等）+ VoiceStudio AGPL 红线注记 |
 | `docs/47-社区内容闭环（S3）实施设计.md` | **社区内容闭环 S3 实施设计（定稿 v2 · 六路拷问后）**：媒体上传（图/视频/头像）+ 帖子详情页 + 真实头像 + 社区正文划词查义；`media_assets` 迁移 0011（随机 `public_id` 对外 / 行级去重键 `(owner_id,sha256) WHERE ready` / 软删不动物理文件）+ `posts.media` jsonb 多图形状与 S1 向后兼容 + 3 新错误码（40403/41501/42205）+ Python `FileResponse` Range 读 + 前端 7 组件/2 页面/4 composable + 联调测试页与删除清单 |

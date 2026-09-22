@@ -1,25 +1,11 @@
 """素材难度评价模块（Python 写方）：专家规则标定。
 
-- rules.scenario_prior：场景语料专家先验（词汇/句法/发音三维度，CEFR 锚定 + λ 聚合）。
 - rules.shadow_prior：影子跟读三维度（语速/停顿/连读）归一化（local/28 §2.2）。
+
+2026-09-21（酒馆迁移）：场景语料专家先验（scenario_prior）随英语场景对话移除；
+material_difficulty 现仅服务 shadow 推荐候选（level 兜底）。
 """
 
-from .rules import (
-    COMMON_LEARNER,
-    dim_to_100,
-    pron_score,
-    scenario_prior,
-    shadow_prior,
-    syntax_score,
-    vocab_score,
-)
+from .rules import COMMON_LEARNER, dim_to_100, shadow_prior
 
-__all__ = [
-    "scenario_prior",
-    "shadow_prior",
-    "vocab_score",
-    "syntax_score",
-    "pron_score",
-    "dim_to_100",
-    "COMMON_LEARNER",
-]
+__all__ = ["shadow_prior", "dim_to_100", "COMMON_LEARNER"]

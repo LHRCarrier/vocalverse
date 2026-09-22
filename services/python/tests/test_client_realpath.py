@@ -1,6 +1,6 @@
 """py-08：非 testing 真实路径矩阵——mock 外部依赖（edge_tts 模块 / httpx transport），
 直测真实客户端代码（_stream_audio / stream_rich / chat_with_usage），而非 Fake 打桩；
-另加 /turns 编排真实路径一门（mock 引擎注入、真编排 run_turn）。
+另加 /turns 编排真实路径一门（mock 引擎注入、真编排 run_turn，2026-09-21 起用 shadow 会话）。
 
 模板参照 tests/rec/test_recommend_redis_cache.py：依赖注入 + monkeypatch，测真实实现。
 """
@@ -216,25 +216,32 @@ class MockScorer(ScorerClient):
         return ScoreResult(overall=88.0, pronunciation=90.0, fluency=86.0, grammar=85.0)
 
 
-def test_turns_orchestration_real_path_mock_engines(client, auth_headers, monkeypatch) -> None:
-    """mock 引擎注入 + 真编排（run_turn：DB/state/SSE/命中/TTS/turn_end 全真）。"""
+def test_shadow_turn_orchestration_real_path_mock_engines(
+    client, auth_headers, monkeypatch
+) -> None:
+    """mock 引擎注入 + 真编排（run_turn：DB/state/SSE/TTS/评分/turn_end 全真）。
+
+    2026-09-21（酒馆迁移）：dialog 回合随场景对话移除，本门改用 shadow 会话
+    （mock ASR/ISE/TTS 注入；LLM 不参与影子回合）。
+    """
     from app.db import get_session_factory
-    from app.models import Scenario
+    from app.models import ShadowMaterial
 
     db = get_session_factory()()
-    scenario = Scenario(
-        title="py08-cafe",
-        scene_type="cafe",
-        difficulty=1,
-        system_prompt="You are Bella, a friendly barista. Keep sentences short.",
-        opening_line="Hi there! Welcome to Moonbean.",
-        target_corpus="I'd like a coffee, please.|请给我来杯咖啡\nHow much is it?|多少钱",
+    material = ShadowMaterial(
+        title="py08-shadow",
+        level=2,
+        text_content="Hi, could I get a large flat white to go, please?\nThanks for having me.",
+        audio_url="/demo/audio/shadow/py08.mp3",
+        wpm=145,
+        duration_s=10,
         interest_tags=[],
+        source="demo_only",
         status="published",
     )
-    db.add(scenario)
+    db.add(material)
     db.commit()
-    sid = scenario.id
+    mid = material.id
     db.close()
 
     monkeypatch.setattr(
@@ -245,11 +252,25 @@ def test_turns_orchestration_real_path_mock_engines(client, auth_headers, monkey
     )
 
     resp = client.post(
-        "/api/v1/sessions", json={"kind": "dialog", "scenario_id": sid}, headers=auth_headers
+        "/api/v1/sessions", json={"kind": "shadow", "shadow_material_id": mid}, headers=auth_headers
     )
     assert resp.status_code == 200, resp.text
     session_id = resp.json()["data"]["id"]
 
+    # start：出句 + 示范 TTS（audio_chunk，经真 _tts_url_from_bytes 落盘）
+    resp = client.post(
+        f"/api/v1/sessions/{session_id}/turns",
+        data={"action": "start"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    evs = [json.loads(line[6:]) for line in resp.text.splitlines() if line.startswith("data: ")]
+    types = [e["type"] for e in evs]
+    assert "turn_start" in types and "audio_chunk" in types and "turn_end" in types
+    ts = [e for e in evs if e["type"] == "turn_start"][0]
+    assert ts["reference_text"] == "Hi, could I get a large flat white to go, please?"
+
+    # normal：mock ASR 转写 → ISE 评分 → score_delta/meta_block/turn_end
     resp = client.post(
         f"/api/v1/sessions/{session_id}/turns",
         data={"action": "normal"},
@@ -259,19 +280,9 @@ def test_turns_orchestration_real_path_mock_engines(client, auth_headers, monkey
     assert resp.status_code == 200, resp.text
     evs = [json.loads(line[6:]) for line in resp.text.splitlines() if line.startswith("data: ")]
     types = [e["type"] for e in evs]
-
-    # 编排事件序列：mock ASR 转写 → 流式字幕 → 音频块 → meta → turn_end
-    assert "user_transcript" in types
     assert "turn_start" in types
-    assert "text_delta" in types
-    assert "audio_chunk" in types
     assert "meta_block" in types
+    assert "score_delta" in types
     assert "turn_end" in types
-
-    ut = [e for e in evs if e["type"] == "user_transcript"][0]
-    assert "I'd like a coffee" in ut["text"]
-    meta = [e for e in evs if e["type"] == "meta_block"][0]
-    assert meta.get("coach_note") == "Nice and clear!"
-    assert meta.get("corpus_hits")  # 规则命中（transcript 含语料句）
     end = [e for e in evs if e["type"] == "turn_end"][0]
     assert end["expected_turn"] == 1

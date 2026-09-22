@@ -15,15 +15,15 @@ import type { SseStreamEvent } from './sse-types'
 
 export const SSE_IDLE_TIMEOUT_MS = 90_000 // R-18：> 3× 心跳间隔(15s)，容 LLM 首 token/长音频
 
-export interface SseHandlers {
-  onEvent?: (event: SseStreamEvent) => void
+export interface SseHandlers<T = SseStreamEvent> {
+  onEvent?: (event: T) => void
   onError?: (err: unknown) => void
   onClose?: () => void
 }
 
 /** 解析累积缓冲：返回 [消费后剩余缓冲, 已解析事件列表]。 */
-export function parseSseBuffer(buffer: string): [string, SseStreamEvent[]] {
-  const events: SseStreamEvent[] = []
+export function parseSseBuffer<T = SseStreamEvent>(buffer: string): [string, T[]] {
+  const events: T[] = []
   let idx: number
   while ((idx = buffer.indexOf('\n\n')) >= 0) {
     const block = buffer.slice(0, idx)
@@ -36,7 +36,7 @@ export function parseSseBuffer(buffer: string): [string, SseStreamEvent[]] {
     if (dataLines.length === 0) continue
     const payload = dataLines.join('\n')
     try {
-      const parsed = JSON.parse(payload) as SseStreamEvent
+      const parsed = JSON.parse(payload) as T
       if (parsed && typeof parsed === 'object' && 'type' in parsed) {
         events.push(parsed)
       }
@@ -47,10 +47,10 @@ export function parseSseBuffer(buffer: string): [string, SseStreamEvent[]] {
   return [buffer, events]
 }
 
-export function openSseFetch(
+export function openSseFetch<T = SseStreamEvent>(
   url: string,
   init: { method: string; body: FormData; headers?: HeadersInit },
-  handlers: SseHandlers,
+  handlers: SseHandlers<T>,
   signal?: AbortSignal,
 ): void {
   let buffer = ''
@@ -105,7 +105,7 @@ export function openSseFetch(
         const { done, value } = readResult
         if (done) break
         buffer += decoder.decode(value, { stream: true })
-        const [rest, events] = parseSseBuffer(buffer)
+        const [rest, events] = parseSseBuffer<T>(buffer)
         buffer = rest
         for (const event of events) {
           handlers.onEvent?.(event)

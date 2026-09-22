@@ -1,13 +1,16 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { NConfigProvider, NDialogProvider, NMessageProvider } from 'naive-ui'
 import { useRouter } from 'vue-router'
 
 import MobileAccountDrawer from '@/components/mobile/MobileAccountDrawer.vue'
+import MobileCheckinPrompt from '@/components/mobile/MobileCheckinPrompt.vue'
 import MobileTabBar from '@/components/mobile/MobileTabBar.vue'
 import { useMotionTier } from '@/composables/useMotionTier'
 import { useNativeBack } from '@/composables/useNativeBack'
 import { usePageTransition } from '@/composables/usePageTransition'
 import { useAuthStore } from '@/stores/auth'
+import { useProgressStore } from '@/stores/progress'
 import { useUiStore } from '@/stores/ui'
 import { themeOverrides } from '@/styles/theme'
 
@@ -15,6 +18,7 @@ import type { RouteLocationNormalizedLoaded } from 'vue-router'
 
 const router = useRouter()
 const auth = useAuthStore()
+const progress = useProgressStore()
 const ui = useUiStore()
 
 /** 动效分级：写入 html[data-motion]（high/low/off），供样式侧统一降级（docs/31 规则 4） */
@@ -31,6 +35,11 @@ const { dir } = usePageTransition(router)
 function pageAnimated(route: RouteLocationNormalizedLoaded): boolean {
   return route.path.startsWith('/m/') && !route.path.startsWith('/m/reader')
 }
+
+/* 全局 LV/XP 由服务端聚合（docs/53 P5 ③）：冷启动拉一次，练习完成各页再 refresh() */
+onMounted(() => {
+  if (auth.token) void progress.refresh()
+})
 
 /** Android 返回手势/按键：抽屉开着就先关抽屉（阅读器弹层由各页自己注册，见 useNativeBack） */
 useNativeBack(() => {
@@ -70,6 +79,9 @@ function onDrawerLogout() {
 
         <!-- 全局底部 Tab 栏（路由显隐规则在组件内；二级页自动隐藏） -->
         <MobileTabBar />
+
+        <!-- 今日打卡侧边提示（当天首次进入 App 出现一次；点一下进打卡页） -->
+        <MobileCheckinPrompt />
 
         <!-- 全局账户抽屉 + 全局 toast（2026-09-05：任意页面头像可开；各页不再自建 toast） -->
         <MobileAccountDrawer

@@ -18,9 +18,11 @@ import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobilePostCard from '@/components/mobile/MobilePostCard.vue'
 import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import MobileUnreadBadge from '@/components/mobile/MobileUnreadBadge.vue'
 import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { shareDemoLink } from '@/composables/share'
 import { useCommunityStore } from '@/stores/community'
+import { useMessagesStore } from '@/stores/messages'
 import { useUiStore } from '@/stores/ui'
 import '@/styles/mobile-uic.css'
 
@@ -29,6 +31,7 @@ import type { CommunityPostView } from '@/types/community'
 const router = useRouter()
 const ui = useUiStore()
 const community = useCommunityStore()
+const messages = useMessagesStore()
 
 /** 骨架屏防抖：<300ms 完成的请求不闪骨架（docs/31 硬规则 3；实测原实现仅显示 18ms）
  *  pending=请求中（渲染不可见占位，先占高度防 CLS），visible=>300ms 才真正显示 */
@@ -100,21 +103,23 @@ function tintGradient(tint: string | null | undefined): string {
 
 <template>
   <div class="u-phone">
-    <!-- 统一顶栏（全局头像 → 账户抽屉 / 标题「社区」/ 右侧：加好友 + 写消息） -->
-    <MobileTopBar title="社区">
-      <template #actions>
-        <button class="u-topbar__act" type="button" title="关注" aria-label="关注" @click="demoAddFriend">
-          <IconUserPlus />
-        </button>
-        <button class="u-topbar__act" type="button" title="写消息" aria-label="写消息" @click="openMessages">
-          <IconMail />
-        </button>
-      </template>
-    </MobileTopBar>
+    <!-- 统一顶栏（全局头像 → 账户抽屉 / 标题「社区」/ 右侧：加好友 + 写消息）
+         + 领域标签行 → 同一吸顶区：长信息流里也能随时切领域/开私信（2026-09-21 组长反馈） -->
+    <div class="u-head">
+      <MobileTopBar title="社区">
+        <template #actions>
+          <button class="u-topbar__act" type="button" title="关注" aria-label="关注" @click="demoAddFriend">
+            <IconUserPlus />
+          </button>
+          <button class="u-topbar__act" type="button" title="写消息" aria-label="写消息" @click="openMessages">
+            <IconMail />
+            <MobileUnreadBadge :count="messages.unreadTotal" />
+          </button>
+        </template>
+      </MobileTopBar>
 
-    <div class="u-comm">
       <!-- 领域标签行（X 式文字标签：为你推荐▾ + 三个领域） -->
-      <nav class="u-x-tabs" aria-label="社区领域">
+      <nav class="u-x-tabs u-head__row" aria-label="社区领域">
         <button
           v-for="t in tabs"
           :key="t.label"
@@ -128,7 +133,9 @@ function tintGradient(tint: string | null | undefined): string {
           <span v-if="t.id === null" class="u-x-caret" aria-hidden="true">▾</span>
         </button>
       </nav>
+    </div>
 
+    <div class="u-comm">
       <!-- 加载态：骨架卡（docs/31 硬规则 3：>300ms 才出现；防抖见 useDelayedLoading） -->
       <MobileSkeleton
         v-if="skelPending"
@@ -173,8 +180,6 @@ function tintGradient(tint: string | null | undefined): string {
       >
         {{ community.loadingMore ? '加载中…' : '加载更多' }}
       </button>
-
-      <p class="u-comm__note">内容为社区真实数据：三领域 Tab 服务端过滤；为你推荐=全量混排（含打卡卡）。</p>
     </div>
 
     <!-- 评论面板（真实流：服务端列表 + 发表；嵌套楼 S3；v-if 守卫下的可选链兜底） -->

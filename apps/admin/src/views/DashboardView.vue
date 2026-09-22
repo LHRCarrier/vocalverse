@@ -21,7 +21,7 @@ const auth = useAuthStore()
 const showOps = computed(() => auth.hasPermission('ops:overview:read'))
 const showModeration = computed(() => auth.hasPermission('moderation:queue:read'))
 const showContent = computed(() =>
-  auth.hasAny(['content:song:read', 'content:listening:read', 'content:book:read', 'content:scenario:read']),
+  auth.hasAny(['content:song:read', 'content:listening:read', 'content:book:read']),
 )
 
 /** 一个面板都没有（例如只授了 console:admin:read 的账号）时给明确指引，不留白屏 */

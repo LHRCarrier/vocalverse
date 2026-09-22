@@ -268,6 +268,45 @@ class TestAnnotations:
         resp4 = client.delete(f"/api/v1/reading/annotations/{ann['id']}", headers=auth_headers)
         assert resp4.json()["data"]["deleted"] is True
 
+    def test_my_notes_cross_chapter_list(self, client, auth_headers, reading_seed):
+        """「我的笔记」跨章列表（docs/53 P5）：join 章节/书名 + kind 过滤 + created_at 倒序。"""
+        chapter_id = reading_seed["chapter_id"]
+        first = client.post(
+            "/api/v1/reading/annotations",
+            headers=auth_headers,
+            json={
+                "kind": "highlight",
+                "chapter_id": chapter_id,
+                "start_offset": 0,
+                "end_offset": 5,
+                "text": "Alice",
+            },
+        ).json()["data"]
+        second = client.post(
+            "/api/v1/reading/annotations",
+            headers=auth_headers,
+            json={
+                "kind": "note",
+                "chapter_id": chapter_id,
+                "start_offset": 6,
+                "end_offset": 10,
+                "text": "knew",
+                "note": "过去式",
+            },
+        ).json()["data"]
+
+        all_notes = client.get("/api/v1/reading/notes", headers=auth_headers).json()["data"]
+        assert [n["id"] for n in all_notes["items"]] == [second["id"], first["id"]]  # 倒序
+        assert all_notes["has_more"] is False
+        top = all_notes["items"][0]
+        assert top["book_title"] == "Demo Book" and top["chapter_title"] == "Chapter 1"
+        assert top["chapter_id"] == chapter_id and top["note"] == "过去式"
+
+        highlights = client.get(
+            "/api/v1/reading/notes?kind=highlight", headers=auth_headers
+        ).json()["data"]["items"]
+        assert [n["id"] for n in highlights] == [first["id"]]
+
     def test_offset_out_of_range_45004(self, client, auth_headers, reading_seed):
         resp = client.post(
             "/api/v1/reading/annotations",

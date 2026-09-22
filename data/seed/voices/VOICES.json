@@ -1,0 +1,61 @@
+{
+  "note": "产品音色的唯一真相表（四把嗓子）。参考件按 sha256 内容寻址落在本目录，文件名即校验和语义 —— 与 content-audio/MANIFEST.json 同一套做法。本文件是给人看的索引；服务端启动时读它并把参考件读进内存（字节对不上 sha256 就拒绝启动，绝不悄悄换一把嗓子）。音色的定义 = 参考件字节 + instruct + seed，三者缺一不可：任何人拿同一套代码就能重建同一把嗓子。",
+  "engine": "omnivoice",
+  "decidedAt": "2026-09-18",
+  "decidedBy": "用户（林浩然）",
+  "sourceOfRecord": "local/audio/17-定稿音色-v2/（定稿目录，不入版本库；本目录是它在仓库内的归档副本）",
+  "voices": [
+    {
+      "personaId": "male",
+      "lang": "zh",
+      "file": "male-zh.wav",
+      "sha256": "f640afd3b7e4c63821f49c952e7ec8eeba3b11af989c44a962211ec9c20a5bff",
+      "bytes": 564560,
+      "seconds": 5.88,
+      "refText": "大家好，欢迎来到这个声音示范，希望你会喜欢这一段简单的朗读。",
+      "instruct": "male, teenager, high pitch",
+      "seed": 42,
+      "origin": "本地 OmniVoice 设计音色。instruct + seed=42 设计出参考件，再以参考件做克隆参考。可重造：按同参数重跑即可复现。",
+      "wordOfMouth": "中文男声 · B3"
+    },
+    {
+      "personaId": "female",
+      "lang": "zh",
+      "file": "female-zh.wav",
+      "sha256": "61a80d670426f90da48222a5d9502a2fa940343829586bfa100b011bf24e2180",
+      "bytes": 579920,
+      "seconds": 6.04,
+      "refText": "大家好，欢迎来到这个声音示范，希望你会喜欢这一段简单的朗读。",
+      "instruct": "female, young adult, low pitch",
+      "seed": 42,
+      "origin": "本地 OmniVoice 设计音色。instruct + seed=42 设计出参考件，再以参考件做克隆参考。可重造：按同参数重跑即可复现。",
+      "wordOfMouth": "中文女声 · 05"
+    },
+    {
+      "personaId": "male",
+      "lang": "en",
+      "file": "male-en.wav",
+      "sha256": "c0224f32098f786b3dd2cdd70bd19eceac72fb4ebb9c6b251f15c1798905f916",
+      "bytes": 354318,
+      "seconds": 7.38,
+      "refText": "Good evening. Topping our broadcast tonight: scientists at the coastal observatory have confirmed the signal is, in fact, repeating.",
+      "instruct": "male, middle-aged, moderate pitch, american accent",
+      "seed": 42,
+      "origin": "VoiceStudio 预渲染设计音色 The Anchor（预渲染件原样归档）。⚠️ 用同样 instruct + seed=42 重新设计复现不出来（实测 f0 99.8 vs 121.8）⇒ 这把嗓子的身份就是本文件本身，不可重造、不得删除。",
+      "wordOfMouth": "英文男声 · The Anchor"
+    },
+    {
+      "personaId": "female",
+      "lang": "en",
+      "file": "female-en.wav",
+      "sha256": "64406ad971bbadd6ff497e48fe8bfaec3e11e56de53056568e1bd47142670228",
+      "bytes": 389838,
+      "seconds": 8.12,
+      "refText": "Right, so here's the wild bit. Nobody told the engineers the satellite was supposed to be in orbit by Tuesday. Tuesday came and went.",
+      "instruct": "female, young adult, high pitch, australian accent",
+      "seed": 42,
+      "origin": "VoiceStudio 预渲染设计音色 The Podcaster（预渲染件原样归档）。⚠️ 用同样 instruct + seed=42 重新设计复现不出来（实测 f0 187.5 vs 214.3）⇒ 这把嗓子的身份就是本文件本身，不可重造、不得删除。",
+      "wordOfMouth": "英文女声 · The Podcaster"
+    }
+  ]
+}

@@ -64,6 +64,17 @@ from .reading import (
 )
 from .skill import UserSkillState
 from .tickets import Ticket
+from .trpg import (
+    TrpgCampaign,
+    TrpgClue,
+    TrpgEntity,
+    TrpgEvent,
+    TrpgFact,
+    TrpgMessage,
+    TrpgScenarioCard,
+    TrpgTask,
+    TrpgUserPref,
+)
 from .usage import UsageLog
 from .user import Placement, RefreshToken, User, UserProfile
 
@@ -140,6 +151,16 @@ __all__ = [
     "UserCorpusMastery",
     # LLM 框架域（docs/26 §10.3，迁移 0004）
     "UsageLog",
+    # 酒馆（TRPG 跑团）域（docs/52 · Python 写方，迁移 0018）
+    "TrpgCampaign",
+    "TrpgFact",
+    "TrpgTask",
+    "TrpgClue",
+    "TrpgEntity",
+    "TrpgEvent",
+    "TrpgMessage",
+    "TrpgScenarioCard",
+    "TrpgUserPref",
     # 分析/支持域
     "Event",
     "Report",

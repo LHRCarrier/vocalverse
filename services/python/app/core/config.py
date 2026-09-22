@@ -49,22 +49,53 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-chat"
 
-    # 语音
-    asr_model: str = "small"  # faster-whisper 模型规格
+    # =========================================================================
+    # 语音（ASR / TTS）—— 引擎可插拔（docs/audit/ASR-TTS链路架构调研与重构方案.md）
+    # 选择规则统一由 app/audio/registry.py 执行：显式名字直取；`auto` 按 priority
+    # 逐个探测 is_available()。引擎清单与优先级见各 engine 模块的 ProviderSpec 登记。
+    # =========================================================================
+    # -- ASR --
+    asr_provider: str = "auto"  # auto | whisper | sherpa
+    asr_model: str = "small"  # faster-whisper 模型规格（whisper provider）
     asr_device: str = "cpu"  # cpu | cuda
     asr_compute_type: str = "int8"
-    tts_provider: str = "edge"  # edge | azure
+    # sherpa-onnx 本地引擎（docs/28 §3.2 P0-B；可选依赖 uv sync --extra local-asr）：
+    # 模型目录留空 = 不探测该引擎；model_type ∈ transducer|sense_voice|paraformer|whisper。
+    # ⚠️ sherpa 不产出词级时间戳 → 流利度 wpm/停顿特征为空（下游已有降级路径）。
+    asr_sherpa_model_dir: str = ""
+    asr_sherpa_model_type: str = "sense_voice"
+    asr_sherpa_num_threads: int = 2
+    # -- TTS --
+    # auto = 按 app/audio/registry.py 的 priority 逐个探测 is_available()：
+    # omnivoice（本地克隆音色）→ kitten（本地 ONNX）→ edge（在线）→ azure。
+    # 即**本地引擎优先、不可用时才回落 edge**；显式写死引擎名则严格按该引擎（不可用报错）。
+    tts_provider: str = "auto"  # auto | omnivoice | kitten | edge | azure
     tts_voice: str = "en-US-JennyNeural"
     tts_rate: str = "+0%"
     azure_tts_key: str = ""  # 存在时切 Azure，见 docs/06 第 8 章
+    kitten_voice: str = "Jasper"  # KittenTTS 默认音色（8 内置英文音色之一）
+    # 本地 GPU 边车（OmniVoice 零样本克隆）——复用 xiaohaishi 的英语音色参考件：
+    #   APP_TTS_OMNIVOICE_ENDPOINT：边车地址（默认 127.0.0.1:8765，可被 .env 覆盖）
+    #   APP_VOICE_REFS_DIR：<xiaohaishi>/apps/server/assets/voices（含 VOICES.json + wav）
+    #   APP_TTS_OMNIVOICE_VOICE：anchor-en（英文男声）/ podcaster-en（英文女声）
+    # 权重与参考件**不入库**（红线：模型权重/原始音频），只做运行时路径引用。
+    tts_omnivoice_endpoint: str = "http://127.0.0.1:8765"
+    tts_omnivoice_voice: str = "anchor-en"  # anchor-en（英文男声）| podcaster-en（英文女声）
+    tts_omnivoice_seed: int | None = None  # None = 用清单里的 seed
+    tts_omnivoice_timeout_s: float = 120.0  # GPU 冷合成可达 10s+，给足余量
+    # 音色参考件目录（含 VOICES.json + wav）。**留空 = 自动用仓库内 data/seed/voices**
+    # （随仓库分发，队友 clone 下来零配置可用）；显式填则以此为准。目录不存在即视为
+    # 不启用克隆音色，auto 链跳过本引擎回落 kitten/edge。
+    voice_refs_dir: str = ""
     # 读书域 · 听书（docs/45 §5 · docs/46 B-3/B-4）：
-    # - provider：auto（kitten 可用→kitten，否则 edge）/ edge / kitten；
+    # - provider：留空 = 跟随 APP_TTS_PROVIDER；auto（探测可用本地引擎→否则 edge）/
+    #   edge / kitten / omnivoice；显式指定本地引擎但不可用 → 503（不静默换云引擎）
     # - voice_models_dir：本地模型目录（默认空=不探测 kitten；填入 VoiceStudio
     #   models 目录（如 F:\WorkingL\VoiceStudio\OmniVoiceStudio-Data\data\models）
     #   即启用本地引擎；模型权重红线不入库，只做运行时引用；
     # - 听书 bucket 独立于 /tts（60/时）：听书一章 ~200 句，只扣真实合成
     #   次数（缓存命中 0 扣；prepared 按章扣 1），600/时留足余量。
-    reading_tts_provider: str = "auto"  # auto | edge | kitten
+    reading_tts_provider: str = "auto"  # 空 = 跟随 tts_provider；auto | edge | kitten | omnivoice
     reading_tts_rate_per_hour: int = 600
     voice_models_dir: str = ""
     ise_app_id: str = ""  # 讯飞评测 API（基线）
@@ -79,6 +110,8 @@ class Settings(BaseSettings):
     max_speech_seconds: int = 60
     max_sing_seconds: int = 180
     max_dialog_seconds: int = 15  # 对话单轮录音上限（docs/14 §3.2）
+    # 酒馆（TRPG）单轮语音输入上限：玩家常需口述一段行动，较对话轮宽松（2026-09-21 迁移）
+    trpg_max_seconds: int = 30
     dialog_idle_seconds: int = 8  # 无录音救援触发（docs/14 §2.3）
     # 语言点命中（docs/14 §3.5）：规则通道（词序包含）权威；LLM 兜底命中默认**关闭**
     # （2026-09-07 真实 LLM 上线后误标「已使用」——宁漏勿误，需要语义级命中再开）。
@@ -127,6 +160,8 @@ class Settings(BaseSettings):
     #     见 docs/48 B3）。
     # =========================================================================
     media_dir: str = "./data/media"
+    # 水平预测模型持久化路径（docs/53 P3：训练一次 + 启动加载；joblib；不入库）
+    level_model_path: str = "./data/models/level_model.joblib"
     # 视频 64MB（图片/头像沿用 max_upload_bytes 20MB）
     media_max_video_bytes: int = 64 * 1024 * 1024
     media_rate_per_hour: int = 60  # 上传限流桶（docs/47 §4.1）
@@ -194,9 +229,6 @@ class Settings(BaseSettings):
     learner_max_items: int = 3  # 画像注入条数上限（≤3 防过度纠正，docs/24 拍板 P4）
     learner_cache_ttl_s: int = 900  # 画像进程内缓存 TTL（15min；会话收尾主动失效兜底）
     learner_word_error_window: int = 20  # 词级错误聚合窗口（最近 N 条 dialog attempt）
-
-    # ---- Agent Lab（test-only 前端测试台，docs/26 §8；默认关闭，生产禁止开启） ----
-    agent_lab_enabled: bool = False  # APP_AGENT_LAB_ENABLED=true 时注册 /api/v1/agent-lab/*
 
     # ---- 流利度特征测试台（test-only 前端联调页，docs/06 §9.3；默认关闭，生产禁止开启） ----
     fluency_preview_enabled: bool = False  # 开启时注册 /api/v1/fluency-preview/*

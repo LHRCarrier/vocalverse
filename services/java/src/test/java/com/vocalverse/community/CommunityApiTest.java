@@ -308,6 +308,40 @@ class CommunityApiTest extends AbstractAdminApiTest {
   }
 
   @Test
+  void static_comment_count_column_is_not_leaked() throws Exception {
+    // 种子/历史行可能带静态假数（posts.comment_count=46 而 post_comments 空）——展示口径
+    // 必须从评论表实算（2026-09-21：详情页显示 46 条评论、点开一条都没有）
+    String token = registerUser("comm_fake_cmt");
+    Long authorId = users.findByUsernameIgnoreCase("comm_fake_cmt").orElseThrow().getId();
+    PostEntity e = new PostEntity();
+    e.setAuthorId(authorId);
+    e.setKind("article");
+    e.setDomain("news");
+    e.setTitle("fake");
+    e.setBody("fake body");
+    e.setStatus("visible");
+    e.setCommentCount(46);
+    Instant now = Instant.now();
+    e.setCreatedAt(now);
+    e.setUpdatedAt(now);
+    long id = posts.save(e).getId();
+
+    JsonNode detail =
+        json(
+            mockMvc
+                .perform(
+                    get("/api/v1/community/posts/" + id).header("Authorization", bearer(token)))
+                .andReturn());
+    assertEquals(0, detail.path("data").path("commentCount").asInt());
+    JsonNode feed =
+        json(
+            mockMvc
+                .perform(get("/api/v1/community/posts").header("Authorization", bearer(token)))
+                .andReturn());
+    assertEquals(0, feed.path("data").path("items").get(0).path("commentCount").asInt());
+  }
+
+  @Test
   void comments_add_and_page() throws Exception {
     String a = registerUser("comm_cmt_a");
     long id = createPost(a, "teaching");

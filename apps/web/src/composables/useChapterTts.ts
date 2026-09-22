@@ -7,9 +7,11 @@
  * - 结束自动进下一句；失败跳句；长按划选互斥由视图调用 pause()。
  */
 import { computed, onBeforeUnmount, ref, shallowRef } from 'vue'
+import { track } from '@/api/events'
 import { loadSegmentAudio } from '@/api/reading'
 import { useBlobAudio } from '@/composables/useBlobAudio'
 import { RATES } from '@/audio/tts-player'
+import { DEFAULT_TTS_VOICE } from '@/audio/tts-config'
 import type { ReadingSentence } from '@/api/reading'
 
 export function useChapterTts(chapterId: number, getSentences: () => ReadonlyArray<ReadingSentence>) {
@@ -65,6 +67,11 @@ export function useChapterTts(chapterId: number, getSentences: () => ReadonlyArr
       el.playbackRate = rate.value
       await el.play()
       state.value = 'playing'
+      // 埋点（docs/45 §9 tts_play）：真正开始播放才记（失败自动跳句不计）
+      void track('tts_play', {
+        targetType: 'book',
+        payload: { chapter_id: chapterId, sentence_idx: idx, single },
+      })
       prefetch(idx)
     } catch (err) {
       errorText.value = `本句加载失败（${(err as Error).message ?? ''}）`
@@ -141,8 +148,8 @@ export function useChapterTts(chapterId: number, getSentences: () => ReadonlyArr
     releaseAll()
   })
 
-  // 音色在视图层绑定（Mounted 后加载 voices，默认 Jenny）
-  const voice = ref('en-US-JennyNeural')
+  // 音色在视图层绑定（Mounted 后加载 voices，默认取 tts-config 单一真源）
+  const voice = ref(DEFAULT_TTS_VOICE)
   function setVoice(v: string) {
     voice.value = v
   }

@@ -63,6 +63,19 @@ def test_tts_stub(client: TestClient, auth_headers) -> None:
     assert resp.json()["data"]["length"] > 0
 
 
+def test_tts_stub_reports_container_metadata(client: TestClient, auth_headers) -> None:
+    """2026-09 契约增补：`/tts` 必须自报容器与引擎，消费方不再一律按 mp3 猜。
+
+    测试模式 provider 顶着 `APP_TTS_PROVIDER`（默认 edge）的名字工作，故这里是 edge/mpeg；
+    真实本地引擎（kitten/omnivoice）由引擎类属性给出 wav/audio-wav。
+    """
+    resp = client.post("/api/v1/tts", data={"text": "hello"}, headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["media_type"] == "audio/mpeg"
+    assert data["provider"] == "edge"
+
+
 def test_upload_too_large(client: TestClient, auth_headers) -> None:
     """超过 20MB 返回 413 + 业务 41301（docs/api/error-codes.md）。"""
     big = b"x" * (21 * 1024 * 1024)

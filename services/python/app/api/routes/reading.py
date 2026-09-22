@@ -21,6 +21,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app.audio.voices import list_voices as list_audio_voices
 from app.core.auth import get_current_user_id
 from app.core.paths import book_cover_dir
 from app.core.response import BizError, Envelope, ok
@@ -165,6 +166,20 @@ class VoiceView(BaseModel):
 class PagedItems(BaseModel):
     items: list[Any] = []
     next_cursor: Any = None
+    has_more: bool = False
+
+
+class NoteView(AnnotationView):
+    """「我的笔记」跨章行（docs/53 P5）：附章节/书名供列表展示与跳回阅读器。"""
+
+    chapter_id: int
+    book_id: int
+    chapter_title: str
+    book_title: str
+
+
+class NotesView(BaseModel):
+    items: list[NoteView] = []
     has_more: bool = False
 
 
@@ -431,6 +446,23 @@ async def delete_vocab(
 # ---------------------------------------------------------------------------
 
 
+@router.get("/notes", response_model=Envelope[NotesView])
+async def list_notes(
+    kind: str | None = Query(default=None, pattern="^(highlight|note)$"),
+    limit: int = Query(default=50, ge=1, le=100),
+    user_id: int = Depends(get_current_user_id),
+) -> Envelope:
+    """我的笔记（docs/53 P5）：跨章批注列表（join 章节/书名），章节内列表仍走 /annotations。"""
+
+    def _q():
+        items, has_more = service.list_notes_sync(db, user_id, kind=kind, limit=limit)
+        return {"items": items, "has_more": has_more}
+
+    async with _db() as db:
+        data = await _thread(_q)
+    return ok(data)
+
+
 @router.get("/annotations", response_model=Envelope[PagedItems])
 async def list_annotations(
     chapter_id: int = Query(...),
@@ -577,46 +609,10 @@ async def put_progress(
 async def list_voices(
     user_id: int = Depends(get_current_user_id),
 ) -> Envelope:
+    """可选音色 = edge 在线档 + 已就绪的本地引擎档（app/audio/voices.py 单一真源）。
+
+    本节此前自己硬编码 edge 清单并直接 ``import KittenTTSClient`` 探测——加一个本地
+    引擎要改路由层；现在只做「领域模型 → 响应模型」的搬运。
+    """
     del user_id
-    voices = list_edge_voices()
-    from app.audio.tts_local import KITTEN_VOICES, KittenTTSClient
-    from app.core.config import get_settings
-
-    kitten = KittenTTSClient(get_settings().voice_models_dir)
-    available, _ = kitten.is_available()
-    if available:
-        voices += [
-            {"id": v, "label": f"{v} · 本地音色", "engine": "kitten", "langs": ["en"]}
-            for v in KITTEN_VOICES
-        ]
-    return ok(voices)
-
-
-def list_edge_voices() -> list[dict[str, Any]]:
-    return [
-        {
-            "id": "en-US-JennyNeural",
-            "label": "Jenny · 美式女声",
-            "engine": "edge",
-            "langs": ["en-US"],
-        },
-        {
-            "id": "en-US-AriaNeural",
-            "label": "Aria · 美式女声",
-            "engine": "edge",
-            "langs": ["en-US"],
-        },
-        {"id": "en-US-GuyNeural", "label": "Guy · 美式男声", "engine": "edge", "langs": ["en-US"]},
-        {
-            "id": "en-GB-SoniaNeural",
-            "label": "Sonia · 英式女声",
-            "engine": "edge",
-            "langs": ["en-GB"],
-        },
-        {
-            "id": "en-GB-RyanNeural",
-            "label": "Ryan · 英式男声",
-            "engine": "edge",
-            "langs": ["en-GB"],
-        },
-    ]
+    return ok([VoiceView(**spec.as_dict()) for spec in list_audio_voices()])

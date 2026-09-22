@@ -5,6 +5,7 @@
 import { reactive } from 'vue'
 
 import { ApiError } from '@/api/client'
+import { track } from '@/api/events'
 import { addVocab, lookupWord } from '@/api/reading'
 import type { WordLookupResult } from '@/api/reading'
 
@@ -35,6 +36,11 @@ export function useWordLookup() {
       state.missing = e instanceof ApiError && e.code === 45003
     } finally {
       state.loading = false
+      // 埋点（docs/45 §9 word_lookup）：命中/未收录都记，payload 白名单只放标量
+      void track('word_lookup', {
+        targetType: 'vocab',
+        payload: { word, hit: !state.missing, sentence_idx: sentenceIdx ?? undefined },
+      })
     }
   }
 
@@ -57,6 +63,11 @@ export function useWordLookup() {
         scene: ctx.scene ?? 'reading',
       })
       state.open = false
+      // 埋点（docs/45 §9 vocab_add）：加入生词本成功才记
+      void track('vocab_add', {
+        targetType: 'vocab',
+        payload: { word: state.word, book_id: ctx.bookId ?? undefined, scene: ctx.scene ?? 'reading' },
+      })
       return true
     } catch {
       return false

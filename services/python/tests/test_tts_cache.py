@@ -1,4 +1,8 @@
-"""TTS 预合成缓存测试（docs/44 P1-B：键扩容 / TTL / 容量裁剪 / 统一出入口）。"""
+"""TTS 预合成缓存测试（docs/44 P1-B：键扩容 / TTL / 容量裁剪 / 统一出入口）。
+
+2026-09 重构后：缓存实现唯一收敛在 ``app.audio.tts_cache``（旧 ``app.audio.tts``
+与 ``app.reading.tts_cache`` 两套已合并），目录按 provider 分（``cache/tts/<provider>/``）。
+"""
 
 from __future__ import annotations
 
@@ -6,10 +10,11 @@ import os
 import time
 
 from app.audio.stubs import FakeTTSClient
-from app.audio.tts import (
+from app.audio.tts_cache import (
     cache_is_fresh,
     prune_tts_cache,
     tts_cache_key,
+    tts_cache_path,
     tts_synthesize_cached,
     warm_tts_cache,
 )
@@ -118,13 +123,36 @@ async def test_synthesize_cached_expires_by_ttl(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(settings, "audio_dir", str(tmp_path))
     tts = _CountingTTS()
     await tts_synthesize_cached(tts, "Hi.", "v", "+0%")
-    # 拨旧 mtime 越过 TTL → 重新合成
+    # 拨旧 mtime 越过 TTL → 重新合成（按 provider 分目录，故 rglob）
     cache_dir = tmp_path / "cache" / "tts"
-    for p in cache_dir.glob("*.mp3"):
+    for p in cache_dir.rglob("*.mp3"):
         old = time.time() - settings.tts_cache_ttl_s - 1
         _os.utime(p, (old, old))
     await tts_synthesize_cached(tts, "Hi.", "v", "+0%")
     assert tts.calls == 2
+
+
+async def test_cache_path_is_namespaced_by_provider(tmp_path, monkeypatch) -> None:
+    """缓存按 **实际 provider** 分目录（docs/46 B-3）：WAV 引擎与 MP3 引擎物理隔离。"""
+    from app.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "audio_dir", str(tmp_path))
+    edge = tts_cache_path("edge", "v", "+0%", "Hi.")
+    kitten = tts_cache_path("kitten", "v", "+0%", "Hi.")
+    assert edge.parent.name == "edge" and edge.suffix == ".mp3"
+    assert kitten.parent.name == "kitten" and kitten.suffix == ".wav"
+
+
+async def test_provider_derived_from_client_not_caller(tmp_path, monkeypatch) -> None:
+    """provider 取自 ``tts.provider_id``：同一文本在两个引擎下互不串用缓存。"""
+    from app.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "audio_dir", str(tmp_path))
+    a, b = _CountingTTS(), _CountingTTS()
+    a.provider_id, b.provider_id = "edge", "kitten"
+    await tts_synthesize_cached(a, "Hi.", "v", "+0%")
+    await tts_synthesize_cached(b, "Hi.", "v", "+0%")
+    assert a.calls == 1 and b.calls == 1  # 各写各的目录，互不命中
 
 
 # ---------------------------------------------------------------------------

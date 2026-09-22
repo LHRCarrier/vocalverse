@@ -22,9 +22,9 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '自由对话', requiresAuth: true },
   },
   {
-    path: '/m/chat/:sceneId?',
-    component: () => import('@/views/mobile/MobileSpeakingView.vue'),
-    meta: { title: '场景对话', requiresAuth: true },
+    path: '/m/tavern',
+    component: () => import('@/views/mobile/MobileTavernView.vue'),
+    meta: { title: '酒馆', requiresAuth: true },
   },
   {
     path: '/m/report',
@@ -45,6 +45,11 @@ const routes: RouteRecordRaw[] = [
     path: '/m/learn/:module',
     component: () => import('@/views/mobile/MobileLearnModuleView.vue'),
     meta: { title: '学习模块', requiresAuth: true },
+  },
+  {
+    path: '/m/checkin',
+    component: () => import('@/views/mobile/MobileCheckinView.vue'),
+    meta: { title: '打卡', requiresAuth: true },
   },
   {
     path: '/m/notifications',
@@ -92,6 +97,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/mobile/MobileNotesView.vue'),
     meta: { title: '笔记', requiresAuth: true },
   },
+  /* ---- 设置与隐私（docs/53 P5 ④ · 账户抽屉三子页） ---- */
+  {
+    path: '/m/settings/:section(help|privacy|about)',
+    component: () => import('@/views/mobile/MobileSettingsView.vue'),
+    meta: { title: '设置', requiresAuth: true },
+  },
   /* ---- 读书域（docs/45 · 书架/书详情/阅读器/生词本；阅读器沉浸无底栏） ---- */
   {
     path: '/m/bookshelf',
@@ -130,16 +141,6 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '入学测试', requiresAuth: true },
       },
       {
-        path: 'practice',
-        component: () => import('@/views/PracticeHubView.vue'),
-        meta: { title: '练习', requiresAuth: true },
-      },
-      {
-        path: 'practice/:sceneId',
-        component: () => import('@/views/PracticeView.vue'),
-        meta: { title: '场景对话', requiresAuth: true },
-      },
-      {
         path: 'defense',
         component: () => import('@/views/DefenseView.vue'),
         meta: { title: '答辩导师', requiresAuth: true },
@@ -155,24 +156,14 @@ const routes: RouteRecordRaw[] = [
         props: { title: '推荐', desc: '内容推荐 + 水平预测模型（docs/06 §9.5）——M3' },
         meta: { title: '推荐' },
       },
-      {
-        path: 'sing',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: { title: '唱吧', desc: '英文歌跟唱：音准/节奏/发音逐句评分（docs/06 §9.4）——M3' },
-        meta: { title: '唱吧' },
-      },
+      /* Web 壳（桌面导航）指向真形态：/sing → 移动端唱吧；/community → 社区首页（docs/53 P6） */
+      { path: 'sing', redirect: '/m/sing' },
       {
         path: 'stats',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: { title: '报表', desc: '趋势/雷达图/四指标看板（docs/06 §9.1）——M3' },
-        meta: { title: '报表' },
+        component: () => import('@/views/StatsView.vue'),
+        meta: { title: '报表', requiresAuth: true },
       },
-      {
-        path: 'community',
-        component: () => import('@/views/PlaceholderView.vue'),
-        props: { title: '社区', desc: '打卡 + 成绩卡片分享 + 动态流（docs/06 §9.6）——M3' },
-        meta: { title: '社区' },
-      },
+      { path: 'community', redirect: '/m/home' },
     ],
   },
   {

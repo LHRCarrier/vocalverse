@@ -51,6 +51,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '服务总览', permission: 'ops:overview:read' },
       },
       {
+        path: 'insight',
+        name: 'insight',
+        component: () => import('@/views/insight/InsightView.vue'),
+        meta: { title: '学习指标', permission: 'ops:metric:read' },
+      },
+      {
         path: 'ops/metrics',
         name: 'ops-metrics',
         component: () => import('@/views/ops/OpsMetricsView.vue'),
@@ -95,10 +101,11 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '书籍', permission: 'content:book:read' },
       },
       {
+        // 酒馆场景卡（docs/52 §12.1）：平台固定卡上架后所有用户在 App 开局引导可选
         path: 'content/scenarios',
         name: 'content-scenarios',
-        component: () => import('@/views/content/ScenariosView.vue'),
-        meta: { title: '场景库', permission: 'content:scenario:read' },
+        component: () => import('@/views/content/ScenarioCardsView.vue'),
+        meta: { title: '场景卡', permission: 'content:scenario:read' },
       },
       {
         // 题库：端点与权限码（content:question:read/write）从控制台模块第一天起就存在，

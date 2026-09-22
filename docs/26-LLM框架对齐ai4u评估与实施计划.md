@@ -223,7 +223,7 @@ docs/14 §3.4 已按 v2.2 回写；tests/agent/test_context_builder.py 断言已
 
 ## 11. Agent Lab 测试指南（怎么用 / 测什么 / 指标口径）
 
-> 入口：`/preview/agent-lab`（前端预览画廊，dev-only）；后端 `APP_AGENT_LAB_ENABLED=true`。
+> ~~入口：`/preview/agent-lab` …后端 `APP_AGENT_LAB_ENABLED=true`。~~ **已退役（2026-09-21 酒馆迁移）**：Agent Lab 与其测的场景对话框架层一并删除（docs/52 §8）。
 > 本页所有调用走真实 DeepSeek（`.env` 的 `APP_DEEPSEEK_API_KEY`），每次点击消耗配额。
 
 ### 11.1 怎么用（三步）

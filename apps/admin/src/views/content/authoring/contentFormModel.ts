@@ -16,7 +16,6 @@ import type {
   LrcFormRow,
   MaterialForm,
   QuestionForm,
-  ScenarioForm,
   SongForm,
 } from './contentFormTypes'
 
@@ -36,23 +35,6 @@ export function emptySongForm(): SongForm {
     coverUrl: '',
     interestTags: '',
     source: 'public_domain',
-    status: 'draft',
-  }
-}
-
-export function emptyScenarioForm(): ScenarioForm {
-  return {
-    title: '',
-    sceneType: null,
-    difficulty: null,
-    description: '',
-    systemPrompt: '',
-    openingLine: '',
-    targetCorpus: '',
-    interestTags: '',
-    promptVersion: '1',
-    estimatedTurns: '',
-    estimatedMinutes: '',
     status: 'draft',
   }
 }
@@ -169,7 +151,7 @@ function collect(form: Record<string, unknown>, keys: FormFieldKey[]): FormError
   return errors
 }
 
-/** 歌曲 / 场景 / 听力素材共用的字段集合（避免每个表单各写一遍 key 列表） */
+/** 歌曲 / 听力素材共用的字段集合（避免每个表单各写一遍 key 列表） */
 const COMMON_TEXT: FormFieldKey[] = ['title', 'interestTags']
 
 export function validateSongForm(form: SongForm): FormErrors {
@@ -178,25 +160,6 @@ export function validateSongForm(form: SongForm): FormErrors {
     [...COMMON_TEXT, 'artist', 'level', 'durationS', 'bpm', 'musicalKey', 'audioUrl', 'lrcUrl', 'coverUrl', 'source'],
   )
   return errors
-}
-
-export function validateScenarioForm(form: ScenarioForm): FormErrors {
-  return collect(
-    { ...form },
-    [
-      ...COMMON_TEXT,
-      'sceneType',
-      'difficulty',
-      'description',
-      'systemPrompt',
-      'openingLine',
-      'targetCorpus',
-      'promptVersion',
-      'estimatedTurns',
-      'estimatedMinutes',
-      'status',
-    ],
-  )
 }
 
 export function validateMaterialForm(form: MaterialForm): FormErrors {

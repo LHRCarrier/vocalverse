@@ -15,3 +15,30 @@ export * from './dto/identity'
 export * from './dto/moderation'
 export * from './dto/content'
 export * from './dto/ops'
+
+/** 学习指标（docs/53 P2）：四指标 + 趋势 + 维度 TopN（口径 app/insight/service.py） */
+export interface InsightMetricValue {
+  numerator: number
+  denominator: number
+  rate: number | null
+}
+
+export interface InsightOverview {
+  period: { days: number; start: string; end: string }
+  metrics: {
+    ctr: InsightMetricValue
+    completion_rate: InsightMetricValue & { units: Record<string, { total: number; done: number }> }
+    interaction_rate: InsightMetricValue & {
+      sources: {
+        trpg: { user: number; dm: number }
+        defense: { answered: number; assigned: number }
+      }
+    }
+    bounce_rate: InsightMetricValue & { engaged_sessions: number }
+  }
+  trend: { date: string; events: number; page_views: number; sessions: number }[]
+  dimensions: Record<string, { key: string; events: number }[]>
+  notes: string[]
+  generated_at: string
+  requested_by?: string
+}

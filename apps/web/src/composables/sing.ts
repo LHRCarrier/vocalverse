@@ -12,6 +12,7 @@ import type { Ref } from 'vue'
 
 import { VoiceRecorder, micErrorMessage } from '@/audio/recorder'
 import { useSingStore } from '@/stores/sing'
+import { track } from '@/api/events'
 import {
   createSingSession,
   fetchSingResult,
@@ -107,7 +108,7 @@ export function useSingPlay(): SingPlay {
   const recorder = new VoiceRecorder()
   /**
    * recorder 状态 → 视图 phase 的映射（单一约定：**非 recording 即复位**，与
-   * MobileSpeakingView / PracticeView / PlacementView / DefenseView / MobileFreeChatView 五处录音页同款）。
+   * PlacementView / DefenseView / MobileFreeChatView / MobileTavernView 等录音页同款）。
    *
    * 2026-09-10 BUG 修复：「放弃重录」后整页按钮失效——`cancel()` 走
    * `recorder.stop() → onstop(cancelled) → setState('idle')`，旧实现只处理
@@ -325,6 +326,19 @@ export function useSingPlay(): SingPlay {
           if (my !== epoch) return
           result.value = r
           phase.value = 'done'
+          // 埋点（docs/53 P1）：唱吧评分完成 → score_event；整首完成（is_complete）→ practice_complete
+          void track('score_event', {
+            targetType: 'song',
+            songId: r.song_id,
+            payload: { overall: r.overall ?? undefined, is_complete: r.is_complete },
+          })
+          if (r.is_complete) {
+            void track('practice_complete', {
+              targetType: 'song',
+              songId: r.song_id,
+              payload: { kind: 'sing' },
+            })
+          }
           return
         }
         if (s.status === 'failed') {

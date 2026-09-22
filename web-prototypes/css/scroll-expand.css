@@ -45,10 +45,10 @@
    轨道与舞台的高度都由 JS 在 measure() 里算：
      stage = innerHeight；track = stage × (1 + scrollDistance + holdDistance)
    而 measure() 要等 defer 脚本执行才发生。在那之前两者都是 0 高，整个文档只有
-   100vh；脚本一跑轨道撑到 255vh，下方内容（如联系区）会在一帧里被推下两千多
+   100vh；脚本一跑轨道撑到 195vh，下方内容（如联系区）会在一帧里被推下近千
    像素 —— 实测冷启动 CLS 0.40，肉眼就是"跳一下/闪一下"。
    这里按同一个公式先占好位：5 个用到本组件的页面 data-se-scroll-distance 都是
-   1.2、hold-distance 都是 0.35（→ 255vh），数字与 measure() 完全一致；
+   0.6、hold-distance 都是 0.35（→ 195vh），数字与 measure() 完全一致；
    JS 就位后写行内高度覆盖它，前后一致，视觉上不再有任何跳动。
    静态降级（无 ResizeObserver）时 JS 不再设高度，故排除 --static；
    容器内滚动模式（data-se-use-window-scroll="false"）的 stage 是 root.clientHeight
@@ -59,8 +59,8 @@
 }
 
 .js-scroll-expand:not(.scroll-expand--static):not([data-se-use-window-scroll="false"]) .scroll-expand__track {
-  height: 255vh;
-  height: 255dvh;
+  height: 195vh;
+  height: 195dvh;
 }
 
 /* —— 媒体帧：clip-path / 圆角由 JS 按滚动进度驱动；背景保持透明，

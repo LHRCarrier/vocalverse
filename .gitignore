@@ -24,6 +24,9 @@ apps/web/.output/
 __pycache__/
 *.py[cod]
 .venv/
+# OmniVoice 边车专用环境（scripts/setup-omnivoice-env.ps1 建在这里；`scripts/lib/omnivoice.ps1`
+# 会优先搜它）。torch+cu128 约 3~5 GB，绝不入库。
+.venv-omnivoice/
 venv/
 .pytest_cache/
 .ruff_cache/
@@ -52,7 +55,11 @@ data/audio/
 data/media/
 services/python/data/
 data/raw/
-data/models/   # HF 模型权重（faster-whisper 等）：红线禁止提交（2026-09-04 复审补，曾未忽略）
+# HF 模型权重（faster-whisper / OmniVoice 等）：红线禁止提交（2026-09-04 复审补）
+# ⚠️ 2026-09-21 修：本行原写作 `data/models/   # HF 模型权重…` —— **行内注释会让整条模式失效**
+#    （gitignore 的 `#` 只在行首才算注释，行尾那段会被当成模式的一部分）⇒ 该忽略**从未生效**，
+#    `git add -A` 会把 3.3 GB 权重暂存进去。实测判据：`git check-ignore -v data/models/x` 有输出才算生效。
+data/models/
 # 注意：必须锚定路径！裸 `models/` 会吞掉 services/python/app/models（schema 模型，必须入库）
 /models/
 services/python/models/
@@ -88,6 +95,12 @@ Thumbs.db
 *.m4a
 # 在豁免区下方重复豁免 fixture 目录，确保优先级
 !**/tests/fixtures/**
+# 音色参考件（data/seed/voices/，2026-09-21）：OmniVoice 零样本克隆的**音色身份本体**
+# —— 音色 = 参考件字节 + 参考文本 + seed，缺了它边车合成不出任何声音，队友 clone 下来
+# 也跑不通。合计约 1.9 MB（4 个 wav + VOICES.json），随仓库分发。
+# 注意：**模型权重（约 3.3 GB）仍然不入库**（红线），只在运行时按路径引用。
+!data/seed/voices/
+!data/seed/voices/**
 
 # HF 模型下载缓存（构建上下文预下载用；红线禁止提交，2026-09-07）
 services/python/.models-cache/

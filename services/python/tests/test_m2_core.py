@@ -1,10 +1,16 @@
-"""M2 核心测试（docs/18 §5.1：语料/元数据/状态锁/回合全链路/答辩/音频/埋点/限流）。"""
+"""M2 核心测试（docs/18 §5.1：元数据/状态锁/回合全链路/答辩/音频/埋点/限流）。
+
+2026-09-21（酒馆迁移）：语料解析/命中（``app.practice.corpus``）与英语场景对话
+（dialog）用例随模块移除删除（SSE 回合链路改由影子跟读覆盖，见 test_shadow.py）；
+本文件保留 defense/shadow 的通用能力回归：META 解析（``app.practice.meta`` 仍服务
+答辩/酒馆）、状态锁与 TTL、答辩知识包校验、影子回合 SSE、答辩生命周期、音频归属/过期、
+埋点幂等、限流与 422/40002 输入守卫。
+"""
 
 from __future__ import annotations
 
 import json
 
-from app.practice.corpus import match_rule, parse_corpus
 from app.practice.meta import extract_meta, render_meta
 from app.practice.orchestrator import save_audio_bytes
 from app.practice.service import validate_bank
@@ -16,29 +22,7 @@ FAKE_AUDIO = b"fake-audio-bytes" * 128
 
 
 # ---------------------------------------------------------------------------
-# 语料匹配（规则通道权威）
-# ---------------------------------------------------------------------------
-def test_corpus_parse_and_match():
-    corpus = parse_corpus("I'd like a coffee, please.|请给我来杯咖啡\nHow much is it?|多少钱")
-    assert len(corpus) == 2
-    assert corpus[0].gloss == "请给我来杯咖啡"
-    hits = match_rule("Hi! I'd like a coffee, please. Thanks!", corpus)
-    assert hits == ["I'd like a coffee, please."]
-
-
-def test_corpus_case_punctuation_insensitive():
-    corpus = parse_corpus("Can I have a cappuccino?|能给我一杯卡布奇诺吗？")
-    hits = match_rule("sure, CAN I HAVE a cappuccino now", corpus)
-    assert hits == ["Can I have a cappuccino?"]
-
-
-def test_corpus_no_false_positive_for_single_word():
-    corpus = parse_corpus("it|它")
-    assert match_rule("it is raining", corpus) == []
-
-
-# ---------------------------------------------------------------------------
-# META 提取
+# META 提取（app.practice.meta：turn_runner / 答辩 / 酒馆共用解析器）
 # ---------------------------------------------------------------------------
 def test_extract_meta_ok():
     reply = "Hi there! How are you? "
@@ -100,7 +84,7 @@ async def test_state_ttl():
     store = StateStore()
     from app.practice.state import SessionState
 
-    state = SessionState(session_id=7, kind="dialog")
+    state = SessionState(session_id=7, kind="shadow")
     await store.put(state)
     assert (await store.get(7)) is not None
     # 手动过期：P0-1 门面化后测试环境强制内存后端（get_redis→None），内部实现为 _impl
@@ -168,85 +152,77 @@ def test_bank_validation_requires_three_tiers():
 # ---------------------------------------------------------------------------
 # 全链路（Fake clients，经由 API）
 # ---------------------------------------------------------------------------
-def test_full_dialog_turn_sse_flow(client, auth_headers):
-    # 预置场景（直接走 DB 建一条 Published 场景）
+def _seed_shadow_material(
+    sentences: str = "Hi, could I get a large flat white to go, please?\nThanks for having me.",
+    wpm: int = 145,
+) -> int:
     from app.db import get_session_factory
-    from app.models import Scenario
+    from app.models import ShadowMaterial
 
     db = get_session_factory()()
-    scenario = Scenario(
-        title="测试咖啡馆",
-        scene_type="cafe",
-        difficulty=1,
-        system_prompt="You are Bella, a friendly barista. Keep sentences short.",
-        opening_line="Hi there! Welcome to Moonbean.",
-        target_corpus="I'd like a coffee, please.|请给我来杯咖啡\nHow much is it?|多少钱",
-        interest_tags=[],
-        status="published",
-    )
-    db.add(scenario)
-    db.commit()
-    sid = scenario.id
-    db.close()
+    try:
+        material = ShadowMaterial(
+            title="m2-shadow",
+            level=2,
+            text_content=sentences,
+            audio_url="/demo/audio/shadow/m2.mp3",
+            wpm=wpm,
+            duration_s=10,
+            interest_tags=[],
+            source="demo_only",
+            status="published",
+        )
+        db.add(material)
+        db.commit()
+        return int(material.id)
+    finally:
+        db.close()
 
+
+def _make_shadow_session(client, auth_headers, sentences: str | None = None) -> int:
+    """建已发布影子素材 + 建会话，返回 session_id。"""
+    mid = _seed_shadow_material() if sentences is None else _seed_shadow_material(sentences)
     resp = client.post(
-        "/api/v1/sessions", json={"kind": "dialog", "scenario_id": sid}, headers=auth_headers
+        "/api/v1/sessions",
+        json={"kind": "shadow", "shadow_material_id": mid},
+        headers=auth_headers,
     )
     assert resp.status_code == 200, resp.text
-    session_id = resp.json()["data"]["id"]
+    return int(resp.json()["data"]["id"])
 
-    # 回合 1（正常录音 → Fake ASR 命中语料）
+
+def test_shadow_turn_sse_flow(client, auth_headers):
+    """影子回合 SSE：start 出句+示范音频；normal 跟读评分；事件全部可解析。"""
+    session_id = _make_shadow_session(client, auth_headers)
+
+    resp = client.post(
+        f"/api/v1/sessions/{session_id}/turns",
+        data={"action": "start"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    text = resp.text
+    assert "turn_start" in text and "audio_chunk" in text and "turn_end" in text
+
     resp = client.post(
         f"/api/v1/sessions/{session_id}/turns",
         data={"action": "normal"},
         files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
         headers=auth_headers,
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
     text = resp.text
-    assert "turn_start" in text and "text_delta" in text
-    assert "coach_note" in text or "meta_block" in text
-    assert "corpus_hits" in text
-    assert "turn_end" in text
+    assert "turn_start" in text and "meta_block" in text and "turn_end" in text
     # 事件全部可解析
     for line in text.splitlines():
         if line.startswith("data: "):
             ev = json.loads(line[6:])
             assert "type" in ev
 
-    # 回合 2：8 轮上限内的 continue；直接 simulate conclude via turn counter? 此处仅验状态推进
-    resp2 = client.post(
-        f"/api/v1/sessions/{session_id}/turns",
-        data={"action": "normal"},
-        files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
-        headers=auth_headers,
-    )
-    assert resp2.status_code == 200 and "turn_index" in resp2.text
-
 
 def test_turn_stale_expected_turn_rejected(client, auth_headers):
-    from app.db import get_session_factory
-    from app.models import Scenario
-
-    db = get_session_factory()()
-    scenario = Scenario(
-        title="T2",
-        scene_type="cafe",
-        difficulty=1,
-        system_prompt="x",
-        opening_line="hi",
-        target_corpus="a|A",
-        interest_tags=[],
-        status="published",
-    )
-    db.add(scenario)
-    db.commit()
-    sid = scenario.id
-    db.close()
-    resp = client.post(
-        "/api/v1/sessions", json={"kind": "dialog", "scenario_id": sid}, headers=auth_headers
-    )
-    session_id = resp.json()["data"]["id"]
+    """过期 expected_turn → 409（路由预检，与 action/kind 无关）。"""
+    session_id = _make_shadow_session(client, auth_headers)
     resp = client.post(
         f"/api/v1/sessions/{session_id}/turns",
         data={"action": "normal", "expected_turn": "99"},  # 过期轮次
@@ -257,45 +233,30 @@ def test_turn_stale_expected_turn_rejected(client, auth_headers):
 
 
 def test_fluency_features_flow_into_attempt_and_report(client, auth_headers):
-    """集成：对话回合（Fake ASR 词级时间戳）→ attempts.wpm/details.fluency → 报告透出。
+    """集成：跟读回合（Fake ASR 词级时间戳）→ attempts.wpm/details.fluency → 报告透出。
 
-    修复前 wpm 列从未写入（attempts.wpm 恒 NULL），流利度时间戳特征无处呈现。
     Fake 词表含 1.05s 停顿：wpm=145.83 / pause_count=1 / long_pause_count=1。
+    单句素材：一轮即末句系结，自动收尾并生成报告。
     """
     from app.db import get_session_factory
-    from app.models import Attempt, Scenario
+    from app.models import Attempt
     from sqlalchemy import select
 
-    db = get_session_factory()()
-    scenario = Scenario(
-        title="流利度特征测试",
-        scene_type="cafe",
-        difficulty=1,
-        system_prompt="You are Bella, a friendly barista.",
-        opening_line="Hi there!",
-        target_corpus="I'd like a coffee, please.|请给我来杯咖啡",
-        interest_tags=[],
-        status="published",
-    )
-    db.add(scenario)
-    db.commit()
-    sid = scenario.id
-    db.close()
-
-    resp = client.post(
-        "/api/v1/sessions", json={"kind": "dialog", "scenario_id": sid}, headers=auth_headers
-    )
-    session_id = resp.json()["data"]["id"]
+    session_id = _make_shadow_session(client, auth_headers, sentences="Hi there.")
     resp = client.post(
         f"/api/v1/sessions/{session_id}/turns",
         data={"action": "normal"},
         files={"audio": ("a.webm", FAKE_AUDIO, "audio/webm")},
         headers=auth_headers,
     )
-    assert resp.status_code == 200
-    # ③ 语义子分经 Fake META（stream_rich render_meta content/vocab）透出到 SSE
-    assert '"content": {"score": 88' in resp.text
-    assert '"vocab": {"score": 84' in resp.text
+    assert resp.status_code == 200, resp.text
+    report_id = None
+    for line in resp.text.splitlines():
+        if line.startswith("data: "):
+            ev = json.loads(line[6:])
+            if ev.get("type") == "session_end":
+                report_id = ev.get("report_id")
+    assert report_id is not None, resp.text
 
     db = get_session_factory()()
     try:
@@ -310,21 +271,14 @@ def test_fluency_features_flow_into_attempt_and_report(client, auth_headers):
     finally:
         db.close()
 
-    resp = client.post(f"/api/v1/sessions/{session_id}/complete", headers=auth_headers)
-    assert resp.status_code == 200
-    report_id = resp.json()["data"]["report_id"]
     resp = client.get(f"/api/v1/reports/{report_id}", headers=auth_headers)
     assert resp.status_code == 200
-    attempts = resp.json()["data"]["metrics"]["attempts"]
+    metrics = resp.json()["data"]["metrics"]
+    assert metrics["kind"] == "shadow"
+    attempts = metrics["attempts"]
     assert attempts[0]["wpm"] == 145.83
     assert attempts[0]["fluency_features"]["pause_count"] == 1
     assert attempts[0]["fluency_features"]["wpm"] == 145.83
-    # ③ 报告语义子分聚合（Fake META：content 88 / vocab 84，1 轮）
-    semantic = resp.json()["data"]["metrics"]["semantic"]
-    assert semantic == {
-        "content": {"score": 88.0, "turns": 1},
-        "vocab": {"score": 84.0, "turns": 1},
-    }
 
 
 def test_defense_profile_lifecycle(client, auth_headers):
@@ -508,39 +462,6 @@ def test_event_types_all_20_insertable(client, auth_headers):
 # ---------------------------------------------------------------------------
 # 限流：LLM 桶 429
 # ---------------------------------------------------------------------------
-def _make_dialog_session(client, auth_headers) -> int:
-    """建已发布场景 + 建会话，返回 session_id（与 test_full_dialog_turn_sse_flow 同款）。
-
-    归属校验（P0-3，2026-09-07）先于输入校验/限流：测试须用真实存在的会话，
-    否则会先撞 404/40401 而非被测分支。
-    """
-    from app.db import get_session_factory
-    from app.models import Scenario
-
-    db = get_session_factory()()
-    try:
-        scenario = Scenario(
-            title="回合守卫测试场景",
-            scene_type="cafe",
-            difficulty=1,
-            system_prompt="You are Bella, a friendly barista.",
-            opening_line="Hi there!",
-            target_corpus="I'd like a coffee, please.|请给我来杯咖啡",
-            interest_tags=[],
-            status="published",
-        )
-        db.add(scenario)
-        db.commit()
-        sid = scenario.id
-    finally:
-        db.close()
-    resp = client.post(
-        "/api/v1/sessions", json={"kind": "dialog", "scenario_id": sid}, headers=auth_headers
-    )
-    assert resp.status_code == 200, resp.text
-    return resp.json()["data"]["id"]
-
-
 def test_rate_limit_429(client, auth_headers, monkeypatch):
     import app.core.ratelimit as rl
 
@@ -548,7 +469,7 @@ def test_rate_limit_429(client, auth_headers, monkeypatch):
         raise __import__("fastapi").HTTPException(status_code=429, detail="rate limited (llm)")
 
     monkeypatch.setattr(rl, "_redis_consume", fake_consume)
-    session_id = _make_dialog_session(client, auth_headers)
+    session_id = _make_shadow_session(client, auth_headers)
     resp = client.post(
         f"/api/v1/sessions/{session_id}/turns",
         data={"action": "normal"},
@@ -581,25 +502,25 @@ def test_turn_rate_limit_buckets_by_action(client, auth_headers, monkeypatch):
         assert resp.status_code == 200, resp.text
 
     # normal（音频回合）：ASR + ISE + LLM 三桶各 1
-    sid = _make_dialog_session(client, auth_headers)
+    sid = _make_shadow_session(client, auth_headers)
     turn(sid, "normal", audio=True)
     assert buckets == ["asr", "ise", "llm"], buckets
 
-    # start：无转写/评分，仅 LLM 首句
+    # start：无转写/评分，仅 LLM 出句/示范
     buckets.clear()
-    sid = _make_dialog_session(client, auth_headers)
+    sid = _make_shadow_session(client, auth_headers)
     turn(sid, "start", audio=False)
     assert buckets == ["llm"], buckets
 
-    # hint（无音频轻分支）：零管线消耗 → 零扣
+    # hint（无音频轻分支）：零管线消耗 → 零扣（影子回合流内以 422 error 事件收场）
     buckets.clear()
-    sid = _make_dialog_session(client, auth_headers)
+    sid = _make_shadow_session(client, auth_headers)
     turn(sid, "hint", audio=False)
     assert buckets == [], buckets
 
     # abandon（收尾）：仅 LLM 摘要
     buckets.clear()
-    sid = _make_dialog_session(client, auth_headers)
+    sid = _make_shadow_session(client, auth_headers)
     turn(sid, "abandon", audio=False)
     assert buckets == ["llm"], buckets
 
@@ -632,11 +553,11 @@ def test_placement_size_guard_lets_normal_audio_through(client, auth_headers):
 
 
 def test_turn_rejects_empty_audio(client, auth_headers):
-    """对话回合同样挡空录音：否则会推进 current_turn 且不可重来。
+    """跟读回合同样挡空录音：否则会推进 current_turn 且不可重来。
 
     （P0-3 后顺序：归属校验 → 音频下界守卫 → 状态预检，故须用真实会话验证 40002。）
     """
-    session_id = _make_dialog_session(client, auth_headers)
+    session_id = _make_shadow_session(client, auth_headers)
     resp = client.post(
         f"/api/v1/sessions/{session_id}/turns",
         data={"action": "normal"},

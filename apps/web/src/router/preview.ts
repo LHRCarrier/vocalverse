@@ -30,10 +30,6 @@ export const previewRoute: RouteRecordRaw | null = import.meta.env.DEV
           component: () => import('@/views/preview/uic/UicSinging.vue'),
         },
         {
-          path: 'agent-lab',
-          component: () => import('@/views/preview/AgentLabPreview.vue'),
-        },
-        {
           path: 'fluency',
           component: () => import('@/views/preview/FluencyPreview.vue'),
         },

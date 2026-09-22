@@ -10,6 +10,7 @@
 import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 
 import { createAnnotation, deleteAnnotation, fetchAnnotations, patchAnnotation } from '@/api/reading'
+import { track } from '@/api/events'
 import { safeAnnColor } from '@/audio/annotation-colors'
 import type { AnnotationItem, ReadingChapter } from '@/api/reading'
 
@@ -186,6 +187,11 @@ export function useReaderAnnotations(
       })
       annSheet.open = false
       await refresh()
+      // 埋点（docs/45 §9 annotation_add）：创建成功才记
+      void track('annotation_add', {
+        targetType: 'book',
+        payload: { kind: payload.note ? 'note' : 'highlight', chapter_id: chapterId, sentence_idx: annSheet.sentenceIdx },
+      })
       return true
     } catch {
       return false

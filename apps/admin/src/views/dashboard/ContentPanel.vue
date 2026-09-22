@@ -8,9 +8,9 @@
  *
  * ⚠️ 每个内容库的读接口**按写方矩阵**逐个指定（docs/50 §3.2）：
  * Python 侧只服务 `library/books`（`services/python/app/console/api/routes/library.py:61`）与
- * `library/media`，歌曲/听力素材/场景在 Java 侧（`consoleApi.listSongs/listMaterials/listScenarios`）。
- * 之前用"不是 Java 就是 Python"的布尔开关，把听力素材与场景也指到了 `opsApi.listBooks`——
- * 两个类目显示的是书籍条数（数据与标题不符，且不会报错）。
+ * `library/media`，歌曲/听力素材在 Java 侧（`consoleApi.listSongs/listMaterials`）。
+ * 之前用"不是 Java 就是 Python"的布尔开关，把听力素材也指到了 `opsApi.listBooks`——
+ * 该类目显示的是书籍条数（数据与标题不符，且不会报错）。
  */
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -31,19 +31,18 @@ interface DomainStat {
   permission: string
 }
 
-type DomainKey = 'songs' | 'listening-materials' | 'scenarios' | 'books'
+type DomainKey = 'songs' | 'listening-materials' | 'books'
 
 const domains = ref<DomainStat[]>([])
 const events = useAsync(() => consoleApi.publishEvents({ page_size: 8 }))
 
-/** 域 → 读接口。书籍走 Python，其余三个域走 Java；四个域的行类型不同，这里只需要总数 */
+/** 域 → 读接口。书籍走 Python，其余两个域走 Java；三个域的行类型不同，这里只需要总数 */
 function fetchDomain(
   key: DomainKey,
   query: { page_size: number; status?: string },
 ): Promise<{ total: number }> {
   if (key === 'songs') return consoleApi.listSongs(query)
   if (key === 'listening-materials') return consoleApi.listMaterials(query)
-  if (key === 'scenarios') return consoleApi.listScenarios(query)
   return opsApi.listBooks(query)
 }
 
@@ -61,7 +60,6 @@ onMounted(async () => {
   await Promise.all([
     loadDomain('songs', '歌曲', 'content:song:read'),
     loadDomain('listening-materials', '听力素材', 'content:listening:read'),
-    loadDomain('scenarios', '场景', 'content:scenario:read'),
     loadDomain('books', '书籍', 'content:book:read'),
   ])
   void events.run()
@@ -98,7 +96,7 @@ const totalPublished = computed(() => domains.value.reduce((sum, d) => sum + d.p
 <template>
   <div class="cp-grid">
     <div class="c-stat-row cp-stats">
-      <StatTile label="内容总量" :value="fmtInt(domains.reduce((s, d) => s + d.total, 0))" unit="条" hint="歌曲 + 听力素材 + 场景 + 书籍" />
+      <StatTile label="内容总量" :value="fmtInt(domains.reduce((s, d) => s + d.total, 0))" unit="条" hint="歌曲 + 听力素材 + 书籍" />
       <StatTile label="已上架" :value="fmtInt(totalPublished)" unit="条" tone="ok" hint="status = published" />
       <StatTile
         label="未上架"
@@ -115,7 +113,7 @@ const totalPublished = computed(() => domains.value.reduce((sum, d) => sum + d.p
       sub="每个柱 = 一个内容库的总量 · 深色段 = 已上架 · 浅色段 = 草稿或已下架 · 段高 ∝ 条数"
       chart-no="F7"
       template-title="Where each region's revenue sits"
-      source="songs / listening-materials / scenarios（Java）· books（Python /library/books）"
+      source="songs / listening-materials（Java）· books（Python /library/books）"
       :height="220"
       wide
     >

@@ -1,11 +1,11 @@
 /**
  * 运营域 DTO：内容上下架与工单（docs/50 §6.1 / §10.2、docs/06 §9.6）。
  *
- * ⚠️ 内容行**不是一个形状**。权威来源：`console/content/ConsoleContentController` 的四个
- * record（`SongRow` / `MaterialRow` / `ScenarioRow` / `QuestionRow`）+ `PublishView`，
+ * ⚠️ 内容行**不是一个形状**。权威来源：`console/content/ConsoleContentController` 的三个
+ * record（`SongRow` / `MaterialRow` / `QuestionRow`）+ `PublishView`，
  * 以及 `console/content/PublishService.PublishResult`。
  *
- * v1 用**单个** `ContentRow {id,title,status,meta,updatedAt}` 覆盖四个域，而后端返回四种形状、
+ * v1 用**单个** `ContentRow {id,title,status,meta,updatedAt}` 覆盖三个域，而后端返回三种形状、
  * 且**没有** `meta` 字段 —— 于是内容页的「元数据」列在运行时恒为空（`row.meta ?? '—'` 永远走 `—`）。
  * 本版按域拆开，页面直接读真实字段。
  */
@@ -15,10 +15,10 @@
 export type PublishStatus = 'draft' | 'published' | 'archived'
 
 /** 上下架内容域（`PublishService.DOMAIN_*`）：题库无 draft 故无 publish（docs/50 §4.2） */
-export type PublishDomain = 'song' | 'listening' | 'scenario'
+export type PublishDomain = 'song' | 'listening'
 
 /** 上架流水按目标类型过滤（`ConsoleContentController.publishEvents` 的 `targetType` 正则） */
-export type PublishTargetType = 'song' | 'listening_material' | 'scenario' | 'book' | 'chapter'
+export type PublishTargetType = 'song' | 'listening_material' | 'book' | 'chapter'
 
 /**
  * 四个内容域的**公共可读字段**。
@@ -49,15 +49,6 @@ export interface MaterialRow extends ContentRowBase {
   audioUrl: string | null
   /** 服务端算好的布尔位（`transcript != null && !isBlank`），不是原文 */
   hasTranscript: boolean | null
-}
-
-/** `ConsoleContentController.ScenarioRow`（`GET /content/scenarios`） */
-export interface ScenarioRow extends ContentRowBase {
-  title: string
-  sceneType: string | null
-  difficulty: number | null
-  /** `PublishService.countCorpusItems`：按 `English|中文` 逐行计数（与 Python 解析同口径） */
-  corpusItemCount: number
 }
 
 /** `ConsoleContentController.QuestionRow`（`GET /content/questions`，只读） */
@@ -117,6 +108,51 @@ export type TicketStatus = 'open' | 'processing' | 'resolved' | 'closed'
 
 /** 工单类型：反馈 / 报错 / 内容纠误（content_correction 时才有 targetType/targetId） */
 export type TicketKind = 'feedback' | 'bug' | 'content_correction'
+
+// ── Python 写方：酒馆场景卡（`/api/v1/console/trpg/cards/**`，docs/52 §12.1） ──
+// 权威：`services/python/app/console/api/routes/trpg_cards.py` 与 `app/trpg/cards.py::card_view`。
+
+export type ScenarioCardStatus = 'draft' | 'published' | 'archived'
+export type ScenarioCardLang = 'zh' | 'en'
+
+/** 开局模板（card_view().template；服务端归一后落库的形状） */
+export interface ScenarioCardTemplate {
+  pc_name?: string
+  pc?: Record<string, string>
+  facts?: Array<{ key: string; value: string; modality?: string; speaker?: string | null }>
+  tasks?: string[]
+  clues?: Array<{ title: string; content?: string | null; scene?: string | null }>
+}
+
+/** 平台场景卡行（trpg_cards.py：owner_user_id 恒 null） */
+export interface ScenarioCardRow {
+  id: number
+  owner_user_id: number | null
+  source: 'admin' | 'user'
+  status: ScenarioCardStatus
+  title: string
+  summary?: string | null
+  language: ScenarioCardLang
+  tags: string[]
+  scene?: string | null
+  opening_line?: string | null
+  template?: ScenarioCardTemplate | null
+  keywords?: string | null
+  generated_by?: string | null
+  published_at?: string | null
+  created_at?: string | null
+}
+
+/** 新建/编辑请求体（与 CardUpsert 对齐） */
+export interface ScenarioCardUpsert {
+  title: string
+  summary?: string | null
+  language?: string | null
+  tags?: string[] | null
+  scene?: string | null
+  opening_line?: string | null
+  template?: ScenarioCardTemplate | null
+}
 
 // ── Python 写方：书籍 / 章节 / 媒体（`/api/v1/console/library/**`） ────────
 // 权威：`services/python/app/console/api/routes/library.py` 的
@@ -196,9 +232,6 @@ export type SongSource = 'public_domain' | 'original' | 'demo_only'
 /** 参考旋律状态（`SongEntity.pitchRefStatus`，Python 离线任务写、Java 只读） */
 export type PitchRefStatus = 'missing' | 'building' | 'ready' | 'invalid'
 
-/** 场景类型（`ScenarioUpsert.sceneType` 的 `@Pattern`，是**封闭**取值域，不是自由文本） */
-export type SceneType = 'cafe' | 'airport' | 'interview' | 'library' | 'other'
-
 /** 题目类型（`QuestionUpsert.kind` 的 `@Pattern`）：read = 朗读题、qa = 问答题 */
 export type QuestionKind = 'read' | 'qa'
 
@@ -219,21 +252,6 @@ export interface SongDetail extends ContentRowBase {
   interestTags: string | null
   source: string | null
   pitchRefStatus: string | null
-}
-
-/** 场景单条视图（`scenarioView`） */
-export interface ScenarioDetail extends ContentRowBase {
-  title: string
-  sceneType: string | null
-  difficulty: number | null
-  description: string | null
-  systemPrompt: string | null
-  openingLine: string | null
-  targetCorpus: string | null
-  interestTags: string | null
-  promptVersion: number | null
-  estimatedTurns: number | null
-  estimatedMinutes: number | null
 }
 
 /** 听力素材单条视图（`materialView`）；注意这里**有** transcript 原文（列表行只有布尔位） */
@@ -295,22 +313,6 @@ export interface SongUpsert {
   coverUrl: string | null
   interestTags: string | null
   source: SongSource | null
-  status: ContentStatus | null
-}
-
-/** 场景写入体（`ScenarioUpsert`） */
-export interface ScenarioUpsert {
-  title: string
-  sceneType: SceneType
-  difficulty: number
-  description: string | null
-  systemPrompt: string
-  openingLine: string
-  targetCorpus: string | null
-  interestTags: string | null
-  promptVersion: number | null
-  estimatedTurns: number | null
-  estimatedMinutes: number | null
   status: ContentStatus | null
 }
 

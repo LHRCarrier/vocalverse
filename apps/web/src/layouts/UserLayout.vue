@@ -10,11 +10,12 @@ const auth = useAuthStore()
 
 const nav = [
   { label: '骨架演示', to: '/demo' },
-  { label: '练习', to: '/practice' },
+  { label: '社区', to: '/m/home' },
+  { label: '酒馆', to: '/m/tavern' },
   { label: '答辩导师', to: '/defense' },
   { label: '入学测试', to: '/placement' },
-  { label: '唱吧 (M3)', to: '/sing' },
-  { label: '报表 (M3)', to: '/stats' },
+  { label: '唱吧', to: '/m/sing' },
+  { label: '报表', to: '/stats' },
 ]
 
 const nickname = computed(() => auth.me?.nickname ?? '登录')

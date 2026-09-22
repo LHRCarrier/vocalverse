@@ -109,26 +109,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/scenarios": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Scenarios
-         * @description 预置场景列表（读侧；写侧归 Java 管理端，Python 只读——docs/10 §3）。
-         */
-        get: operations["list_scenarios_api_v1_scenarios_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/sessions": {
         parameters: {
             query?: never;
@@ -140,6 +120,26 @@ export interface paths {
         put?: never;
         /** Post Session */
         post: operations["post_session_api_v1_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/checkin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Checkin
+         * @description 手动打卡：聚合当日练习并物化当日打卡卡；同一天重复打卡幂等（只刷新快照）。
+         */
+        post: operations["post_checkin_api_v1_checkin_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -576,9 +576,123 @@ export interface paths {
         };
         /**
          * Recommendations
-         * @description 推荐列表。type=scene 返回场景，type=shadow 返回影子跟读；limit 覆盖默认条数。
+         * @description 推荐列表：shadow = 影子跟读素材；items = 跨类内容推荐（歌/书/场景卡）。
          */
         get: operations["recommendations_api_v1_recommendations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stats Overview */
+        get: operations["stats_overview_api_v1_stats_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/learn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stats Learn
+         * @description 学习主页画像（docs/53 P4）：一句话画像 + 热力图 + 四模块摘要。
+         */
+        get: operations["stats_learn_api_v1_stats_learn_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/learn/{module}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stats Learn Module
+         * @description 模块详情（words/community/speaking/practice）——未知模块 40001。
+         */
+        get: operations["stats_learn_module_api_v1_stats_learn__module__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stats Progress
+         * @description XP/等级（docs/53 P5）：服务端从 attempts/sing_attempts/events 聚合，前端不再写死。
+         */
+        get: operations["stats_progress_api_v1_stats_progress_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stats Me */
+        get: operations["stats_me_api_v1_stats_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search
+         * @description 三 tab 统一入口（docs/53 P5）：``?type=posts|users|tutorials&q=``。
+         */
+        get: operations["search_api_v1_search_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -718,6 +832,26 @@ export interface paths {
         patch: operations["patch_vocab_api_v1_reading_vocab__vocab_id__patch"];
         trace?: never;
     };
+    "/api/v1/reading/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notes
+         * @description 我的笔记（docs/53 P5）：跨章批注列表（join 章节/书名），章节内列表仍走 /annotations。
+         */
+        get: operations["list_notes_api_v1_reading_notes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reading/annotations": {
         parameters: {
             query?: never;
@@ -779,7 +913,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Voices */
+        /**
+         * List Voices
+         * @description 可选音色 = edge 在线档 + 已就绪的本地引擎档（app/audio/voices.py 单一真源）。
+         *
+         *     本节此前自己硬编码 edge 清单并直接 ``import KittenTTSClient`` 探测——加一个本地
+         *     引擎要改路由层；现在只做「领域模型 → 响应模型」的搬运。
+         */
         get: operations["list_voices_api_v1_reading_voices_get"];
         put?: never;
         post?: never;
@@ -895,6 +1035,401 @@ export interface paths {
         post?: never;
         /** Remove */
         delete: operations["remove_api_v1_media__public_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Campaigns
+         * @description 我的剧本列表（按最近活跃倒序）。
+         */
+        get: operations["list_campaigns_api_v1_trpg_campaigns_get"];
+        put?: never;
+        /**
+         * Create Campaign
+         * @description 新建剧本（名称可空 → 未命名剧本）。
+         */
+        post: operations["create_campaign_api_v1_trpg_campaigns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Campaign State
+         * @description 全量状态（一次拉全：事实/任务/线索/实体/事件/快照/校验 + 最近消息）。
+         */
+        get: operations["get_campaign_state_api_v1_trpg_campaigns__campaign_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Clear Messages
+         * @description 清空对话流水（重开本剧本；事实/任务/线索保留）——前端「重新开始」用。
+         */
+        delete: operations["clear_messages_api_v1_trpg_campaigns__campaign_id__messages_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/turns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Turn
+         * @description 回合主入口：multipart（text / audio 至少其一）→ SSE 事件流（docs/52 §4.2）。
+         *
+         *     ``lang``：可选覆盖 DM 输出语言（zh|en）；缺省用用户偏好（服务端跨设备保存）。
+         */
+        post: operations["post_turn_api_v1_trpg_campaigns__campaign_id__turns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/facts/edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Edit Fact */
+        post: operations["edit_fact_api_v1_trpg_campaigns__campaign_id__facts_edit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/facts/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete Fact */
+        post: operations["delete_fact_api_v1_trpg_campaigns__campaign_id__facts_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/facts/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Fact */
+        post: operations["restore_fact_api_v1_trpg_campaigns__campaign_id__facts_restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Task */
+        post: operations["create_task_api_v1_trpg_campaigns__campaign_id__tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/tasks/{task_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Task Status */
+        post: operations["set_task_status_api_v1_trpg_campaigns__campaign_id__tasks__task_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/clues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Clue */
+        post: operations["create_clue_api_v1_trpg_campaigns__campaign_id__clues_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/clues/{clue_id}/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Clue Recover */
+        post: operations["set_clue_recover_api_v1_trpg_campaigns__campaign_id__clues__clue_id__recover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/scene": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Campaign Scene */
+        post: operations["set_campaign_scene_api_v1_trpg_campaigns__campaign_id__scene_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/roll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Roll Dice
+         * @description 桌骰：系统判定并落表（与 DM 的 roll_dice 工具同一条写路径）。
+         */
+        post: operations["roll_dice_api_v1_trpg_campaigns__campaign_id__roll_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/campaigns/{campaign_id}/narrative/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Narrative
+         * @description 重新渲染叙事摘要（P2-45 状态模板渲染；零 LLM 成本）。
+         */
+        post: operations["refresh_narrative_api_v1_trpg_campaigns__campaign_id__narrative_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Cards
+         * @description 可用场景卡 = 我的卡（未归档）+ 平台已上架卡（我的在前）。
+         */
+        get: operations["list_cards_api_v1_trpg_cards_get"];
+        put?: never;
+        /**
+         * Create Card
+         * @description 新建用户私有卡（手工或保存生成草稿）。
+         */
+        post: operations["create_card_api_v1_trpg_cards_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/cards/{card_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Card */
+        put: operations["update_card_api_v1_trpg_cards__card_id__put"];
+        post?: never;
+        /**
+         * Delete Card
+         * @description 归档用户私有卡（软删；不影响已开局的 campaign）。
+         */
+        delete: operations["delete_card_api_v1_trpg_cards__card_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/cards/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Card
+         * @description 按关键词让 LLM 生成卡片草稿（**不落库**；用户确认后走 POST /cards 保存并开局）。
+         *
+         *     限流：扣 llm 桶（与回合共享 30/时）；生成失败 → 47003（可重试/换词）。
+         */
+        post: operations["generate_card_api_v1_trpg_cards_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/cards/{card_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Card
+         * @description 从卡片开局：建剧本 + 应用模板（场景/初始事实/任务/线索）+ 开场叙述落库。
+         */
+        post: operations["start_card_api_v1_trpg_cards__card_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Preferences
+         * @description 酒馆偏好（lang/voice_enabled/voice_name）；未设置过返回默认值（persisted=false）。
+         */
+        get: operations["get_preferences_api_v1_trpg_preferences_get"];
+        /**
+         * Put Preferences
+         * @description 更新偏好（部分字段；未提供的字段保持不变）。
+         */
+        put: operations["put_preferences_api_v1_trpg_preferences_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trpg/translate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Translate Message
+         * @description 把一条 DM 消息译成另一种语言（中英互切；原文不动，前端切换展示）。
+         *
+         *     限流：扣 llm 桶（与回合共享）；失败 → 47003（可重试）。
+         */
+        post: operations["translate_message_api_v1_trpg_translate_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1339,6 +1874,104 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/console/trpg/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Cards
+         * @description 平台卡列表（只列 owner NULL；用户私有卡不属管理端内容）。
+         */
+        get: operations["list_cards_api_v1_console_trpg_cards_get"];
+        put?: never;
+        /**
+         * Create Card
+         * @description 新建平台卡（草稿态；编辑好再上架）。
+         */
+        post: operations["create_card_api_v1_console_trpg_cards_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/trpg/cards/{card_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Card */
+        put: operations["update_card_api_v1_console_trpg_cards__card_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/trpg/cards/{card_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Card
+         * @description 上/下架（draft|published|archived）；上架校验失败 → 46011 + violations。
+         */
+        post: operations["publish_card_api_v1_console_trpg_cards__card_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/trpg/cards/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Card
+         * @description 随机生成卡片草稿（keywords 空 = 主题池轮换）；**不落库**，人工编辑后保存/上架。
+         */
+        post: operations["generate_card_api_v1_console_trpg_cards_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/console/insight/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Insight Overview */
+        get: operations["insight_overview_api_v1_console_insight_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1494,6 +2127,15 @@ export interface components {
             /** Expected Turn */
             expected_turn?: number | null;
         };
+        /** Body_post_turn_api_v1_trpg_campaigns__campaign_id__turns_post */
+        Body_post_turn_api_v1_trpg_campaigns__campaign_id__turns_post: {
+            /** Text */
+            text?: string | null;
+            /** Audio */
+            audio?: string | null;
+            /** Lang */
+            lang?: string | null;
+        };
         /** Body_score_api_v1_score_post */
         Body_score_api_v1_score_post: {
             /** Audio */
@@ -1584,6 +2226,21 @@ export interface components {
              */
             chapters: components["schemas"]["ChapterMetaView"][];
         };
+        /** CampaignCreate */
+        CampaignCreate: {
+            /** Name */
+            name?: string | null;
+        };
+        /**
+         * CardGenerate
+         * @description 按关键词生成卡片草稿（keywords 2-200 字；lang=DM 输出语言兼卡片语言）。
+         */
+        CardGenerate: {
+            /** Keywords */
+            keywords: string;
+            /** Lang */
+            lang?: string | null;
+        };
         /** ChapterMetaView */
         ChapterMetaView: {
             /** Id */
@@ -1638,6 +2295,28 @@ export interface components {
         ChatResult: {
             /** Reply */
             reply: string;
+        };
+        /**
+         * CheckinBody
+         * @description 手动打卡入参：date = 客户端本地日期（YYYY-MM-DD），缺省 UTC 当天。
+         */
+        CheckinBody: {
+            /** Date */
+            date?: string | null;
+        };
+        /** ClueCreate */
+        ClueCreate: {
+            /** Title */
+            title: string;
+            /** Content */
+            content?: string | null;
+            /** Scene */
+            scene?: string | null;
+        };
+        /** ClueRecover */
+        ClueRecover: {
+            /** Recovered */
+            recovered: boolean;
         };
         /** Envelope[ASRResult] */
         Envelope_ASRResult_: {
@@ -1793,6 +2472,20 @@ export interface components {
              */
             message: string;
             data?: components["schemas"]["MediaView"] | null;
+        };
+        /** Envelope[NotesView] */
+        Envelope_NotesView_: {
+            /**
+             * Code
+             * @default 0
+             */
+            code: number;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            data?: components["schemas"]["NotesView"] | null;
         };
         /** Envelope[PagedItems] */
         Envelope_PagedItems_: {
@@ -2018,6 +2711,16 @@ export interface components {
             target_id?: number | null;
             /** Scene Id */
             scene_id?: number | null;
+            /** Song Id */
+            song_id?: number | null;
+            /** Session Id */
+            session_id?: number | null;
+            /** Browse Session Id */
+            browse_session_id?: string | null;
+            /** Recommend Group Id */
+            recommend_group_id?: string | null;
+            /** Channel */
+            channel?: string | null;
             /**
              * Payload
              * @default {}
@@ -2025,6 +2728,25 @@ export interface components {
             payload: {
                 [key: string]: unknown;
             };
+        };
+        /** FactEdit */
+        FactEdit: {
+            /** Key */
+            key: string;
+            /** Value */
+            value: string;
+        };
+        /** FactKey */
+        FactKey: {
+            /** Key */
+            key: string;
+        };
+        /** FactRestore */
+        FactRestore: {
+            /** Key */
+            key: string;
+            /** Value */
+            value: string;
         };
         /**
          * FavoriteState
@@ -2040,6 +2762,13 @@ export interface components {
         FinalizeIn: {
             /** Attempts */
             attempts: number[];
+        };
+        /** GenerateBody */
+        GenerateBody: {
+            /** Keywords */
+            keywords?: string | null;
+            /** Lang */
+            lang?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2093,6 +2822,55 @@ export interface components {
             /** Durations */
             durationS?: number | null;
         };
+        /**
+         * NoteView
+         * @description 「我的笔记」跨章行（docs/53 P5）：附章节/书名供列表展示与跳回阅读器。
+         */
+        NoteView: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Start Offset */
+            start_offset: number;
+            /** End Offset */
+            end_offset: number;
+            /** Content Version */
+            content_version: number;
+            /** Sentence Idx */
+            sentence_idx?: number | null;
+            /** Text Snippet */
+            text_snippet?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Chapter Id */
+            chapter_id: number;
+            /** Book Id */
+            book_id: number;
+            /** Chapter Title */
+            chapter_title: string;
+            /** Book Title */
+            book_title: string;
+        };
+        /** NotesView */
+        NotesView: {
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["NoteView"][];
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+        };
         /** PagedItems */
         PagedItems: {
             /**
@@ -2121,6 +2899,15 @@ export interface components {
             midi?: (number | null)[];
             /** Onsets Ms */
             onsets_ms?: number[] | null;
+        };
+        /** PrefsUpdate */
+        PrefsUpdate: {
+            /** Lang */
+            lang?: string | null;
+            /** Voice Enabled */
+            voice_enabled?: boolean | null;
+            /** Voice Name */
+            voice_name?: string | null;
         };
         /** ProfileIn */
         ProfileIn: {
@@ -2155,6 +2942,31 @@ export interface components {
             content_version: number;
             /** Updated At */
             updated_at?: string | null;
+        };
+        /** PublishBody */
+        PublishBody: {
+            /** Status */
+            status: string;
+        };
+        /** RollBody */
+        RollBody: {
+            /** Dice */
+            dice: string;
+            /** Modifier */
+            modifier?: number | null;
+            /** Vs */
+            vs?: number | null;
+            /** Dc */
+            dc?: number | null;
+            /** Effects */
+            effects?: {
+                [key: string]: unknown;
+            }[] | null;
+        };
+        /** SceneBody */
+        SceneBody: {
+            /** Scene */
+            scene: string;
         };
         /**
          * ScoreLine
@@ -2231,12 +3043,13 @@ export interface components {
             /** End */
             end: number;
         };
-        /** SessionCreate */
+        /**
+         * SessionCreate
+         * @description 会话创建入参（2026-09-21 起仅 defense/shadow/sing；dialog 随酒馆迁移移除）。
+         */
         SessionCreate: {
             /** Kind */
             kind: string;
-            /** Scenario Id */
-            scenario_id?: number | null;
             /** Profile Id */
             profile_id?: number | null;
             /** Difficulty */
@@ -2389,13 +3202,35 @@ export interface components {
         };
         /**
          * TTSResult
-         * @description TTS 响应数据。M1 stub 为 hex 字符串；M2 真 TTS 改二进制/URL 时更新契约（docs/06 §8）。
+         * @description TTS 响应数据（``/api/v1/tts``）。
+         *
+         *     2026-09 增补 ``media_type`` / ``provider``：此前只回 hex 字节、无容器信息，
+         *     消费方只能一律按 ``audio/mpeg`` 猜——本地引擎（KittenTTS/OmniVoice）出的是 24kHz
+         *     WAV，被当 mp3 喂给 ``<audio>`` 会播坏（docs/46 B-3 同类问题）。两字段为**纯增量**，
+         *     旧消费方忽略即可。
          */
         TTSResult: {
             /** Audio Bytes */
             audio_bytes: string;
             /** Length */
             length: number;
+            /**
+             * Media Type
+             * @default audio/mpeg
+             */
+            media_type: string;
+            /**
+             * Provider
+             * @default edge
+             */
+            provider: string;
+        };
+        /** TaskCreate */
+        TaskCreate: {
+            /** Title */
+            title: string;
+            /** Scene */
+            scene?: string | null;
         };
         /**
          * TaskProgress
@@ -2412,6 +3247,21 @@ export interface components {
              * @default 0
              */
             total: number;
+        };
+        /** TaskStatus */
+        TaskStatus: {
+            /** Status */
+            status: string;
+        };
+        /**
+         * TranslateBody
+         * @description DM 消息翻译（X 式「翻译」按钮）：text ≤2000 字；target 缺省按内容自动判方向。
+         */
+        TranslateBody: {
+            /** Text */
+            text: string;
+            /** Target */
+            target?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -2472,6 +3322,47 @@ export interface components {
              * @default []
              */
             langs: string[];
+        };
+        /**
+         * CardUpsert
+         * @description 用户私有卡写入（title 必填；其余可选，服务端宽容归一）。
+         */
+        app__api__routes__trpg__CardUpsert: {
+            /** Title */
+            title: string;
+            /** Summary */
+            summary?: string | null;
+            /** Language */
+            language?: string | null;
+            /** Tags */
+            tags?: string[] | null;
+            /** Scene */
+            scene?: string | null;
+            /** Opening Line */
+            opening_line?: string | null;
+            /** Template */
+            template?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** CardUpsert */
+        app__console__api__routes__trpg_cards__CardUpsert: {
+            /** Title */
+            title: string;
+            /** Summary */
+            summary?: string | null;
+            /** Language */
+            language?: string | null;
+            /** Tags */
+            tags?: string[] | null;
+            /** Scene */
+            scene?: string | null;
+            /** Opening Line */
+            opening_line?: string | null;
+            /** Template */
+            template?: {
+                [key: string]: unknown;
+            } | null;
         };
     };
     responses: never;
@@ -2668,7 +3559,7 @@ export interface operations {
             };
         };
     };
-    list_scenarios_api_v1_scenarios_get: {
+    post_session_api_v1_sessions_post: {
         parameters: {
             query?: never;
             header?: {
@@ -2678,7 +3569,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionCreate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -2700,7 +3595,7 @@ export interface operations {
             };
         };
     };
-    post_session_api_v1_sessions_post: {
+    post_checkin_api_v1_checkin_post: {
         parameters: {
             query?: never;
             header?: {
@@ -2710,9 +3605,9 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["SessionCreate"];
+                "application/json": components["schemas"]["CheckinBody"] | null;
             };
         };
         responses: {
@@ -3536,6 +4431,211 @@ export interface operations {
             query?: {
                 type?: string;
                 limit?: number | null;
+                kind?: string | null;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stats_overview_api_v1_stats_overview_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stats_learn_api_v1_stats_learn_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stats_learn_module_api_v1_stats_learn__module__get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                module: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stats_progress_api_v1_stats_progress_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stats_me_api_v1_stats_me_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_api_v1_search_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                type?: string;
+                limit?: number;
             };
             header?: {
                 authorization?: string;
@@ -3873,6 +4973,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_VocabView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notes_api_v1_reading_notes_get: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_NotesView_"];
                 };
             };
             /** @description Validation Error */
@@ -4441,6 +5576,874 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_dict_str__bool__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_campaigns_api_v1_trpg_campaigns_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_campaign_api_v1_trpg_campaigns_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_campaign_state_api_v1_trpg_campaigns__campaign_id__get: {
+        parameters: {
+            query?: {
+                messages?: number;
+            };
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_messages_api_v1_trpg_campaigns__campaign_id__messages_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_turn_api_v1_trpg_campaigns__campaign_id__turns_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_post_turn_api_v1_trpg_campaigns__campaign_id__turns_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_fact_api_v1_trpg_campaigns__campaign_id__facts_edit_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_fact_api_v1_trpg_campaigns__campaign_id__facts_delete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactKey"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_fact_api_v1_trpg_campaigns__campaign_id__facts_restore_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactRestore"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_task_api_v1_trpg_campaigns__campaign_id__tasks_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_task_status_api_v1_trpg_campaigns__campaign_id__tasks__task_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskStatus"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_clue_api_v1_trpg_campaigns__campaign_id__clues_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClueCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_clue_recover_api_v1_trpg_campaigns__campaign_id__clues__clue_id__recover_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+                clue_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClueRecover"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_campaign_scene_api_v1_trpg_campaigns__campaign_id__scene_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SceneBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    roll_dice_api_v1_trpg_campaigns__campaign_id__roll_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RollBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_narrative_api_v1_trpg_campaigns__campaign_id__narrative_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_cards_api_v1_trpg_cards_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_card_api_v1_trpg_cards_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__routes__trpg__CardUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_card_api_v1_trpg_cards__card_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                card_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__routes__trpg__CardUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_card_api_v1_trpg_cards__card_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                card_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_card_api_v1_trpg_cards_generate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CardGenerate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_card_api_v1_trpg_cards__card_id__start_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path: {
+                card_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_preferences_api_v1_trpg_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_preferences_api_v1_trpg_preferences_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrefsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    translate_message_api_v1_trpg_translate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+                "x-test-user-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranslateBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -5263,6 +7266,219 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_cards_api_v1_console_trpg_cards_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                status?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_card_api_v1_console_trpg_cards_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__console__api__routes__trpg_cards__CardUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_card_api_v1_console_trpg_cards__card_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                card_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__console__api__routes__trpg_cards__CardUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_card_api_v1_console_trpg_cards__card_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                card_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_card_api_v1_console_trpg_cards_generate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    insight_overview_api_v1_console_insight_overview_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

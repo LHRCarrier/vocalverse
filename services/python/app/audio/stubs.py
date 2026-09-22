@@ -2,17 +2,27 @@
 
 M2 起按 docs/06 第 8 章替换为真实现：
 - ASR → faster-whisper（small/int8/cpu）
-- TTS → edge-tts（AZURE_TTS_KEY 存在时切 Azure）
+- TTS → edge-tts（本地引擎见 app/audio/tts_local.py / tts_omnivoice.py）
 - 评分 → 讯飞 ISE（并发信号量 2）
 - LLM → DeepSeek API
+
+**注意 Fake 不参与 ``auto`` 降级链**（``in_auto_chain=False``）：生产的自动选择
+绝不允许静默落到打桩引擎——假分/假音频以真身份流入下游是审计 V2.0 点名的
+最危险静默失败。
 """
 
 from __future__ import annotations
 
 from app.audio.base import ASRClient, ASRResult, LLMClient, ScorerClient, ScoreResult, TTSClient
+from app.audio.registry import ASR as _ASR
+from app.audio.registry import TTS as _TTS
+from app.audio.registry import ProviderSpec, register
 
 
 class FakeASRClient(ASRClient):
+    provider_id = "fake"
+    is_local = True
+
     async def transcribe(self, audio_bytes: bytes, language: str = "en") -> ASRResult:
         # 词级时间戳与转写文本逐词对应（"coffee," 后接 1.05s 停顿 → 停顿特征可测）
         return ASRResult(
@@ -32,6 +42,17 @@ class FakeASRClient(ASRClient):
 
 
 class FakeTTSClient(TTSClient):
+    """CI/演示打桩合成器。
+
+    ``provider`` 让 Fake **顶着真实 provider 的名字**工作（缓存键/响应头/目录维度
+    与真实链路一致），避免「测试里永远命中同一个 provider 目录」把分目录 bug 藏起来。
+    """
+
+    def __init__(self, provider: str = "edge", *, ext: str = "mp3", media_type: str = "audio/mpeg"):
+        self.provider_id = provider
+        self.ext = ext
+        self.media_type = media_type or f"audio/{ext}"
+
     async def synthesize(
         self, text: str, voice: str = "en-US-JennyNeural", rate: str = "+0%"
     ) -> bytes:
@@ -114,3 +135,44 @@ class FakeLLMClient(LLMClient):
                 vocab={"score": 84, "note": "Good variety for this level."},
             ),
         )
+
+    async def stream_with_tools(
+        self,
+        messages: list[dict],
+        *,
+        tools: list[dict] | None = None,
+        tool_choice: str = "auto",
+        temperature: float = 0.8,
+        max_tokens: int = 1200,
+    ):
+        """Fake 工具流（酒馆 DM）：默认不调用工具，只吐一段旁白 + 用量（同真实现事件形状）。"""
+        for c in ("（DM）酒馆的", "烛火摇晃，", "角落里有人朝你举了举酒杯。"):
+            yield ("delta", c)
+        yield ("usage", {"model": "fake", "prompt_tokens": 120, "completion_tokens": 30})
+
+
+# ── 注册表登记（in_auto_chain=False：只有显式指名才用 Fake）──────────────────────
+register(
+    ProviderSpec(
+        name="fake",
+        kind=_ASR,
+        label="Fake ASR（CI/演示打桩）",
+        factory=lambda _settings: FakeASRClient(),
+        priority=999,
+        is_local=True,
+        in_auto_chain=False,
+    )
+)
+register(
+    ProviderSpec(
+        name="fake",
+        kind=_TTS,
+        label="Fake TTS（CI/演示打桩）",
+        factory=lambda _settings: FakeTTSClient(),
+        priority=999,
+        is_local=True,
+        ext="mp3",
+        media_type="audio/mpeg",
+        in_auto_chain=False,
+    )
+)

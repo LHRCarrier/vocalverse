@@ -134,6 +134,27 @@ class Channels:
     OTHER = "other"
 
 
+class TargetTypes:
+    """埋点 ``target_type`` 枚举（2026-09-21 扩展）。
+
+    四处同步：本常量 + ``analytics`` CHECK + 迁移 0020 + 前端 ``api/events.ts``。
+    - 退役保留：``SCENE``（英语场景对话已下线，历史行兼容，不再新上报）；
+    - 现役：``SONG``（唱吧/听书素材）、``HOME``（首页/学习页）、``DEFENSE``（答辩导师）、
+      ``TRPG``（酒馆剧本/回合）、``BOOK``（书房/阅读器）、``CARD``（酒馆场景卡推荐）、
+      ``VOCAB``（生词本）、``POST``（社区帖子）。
+    """
+
+    SCENE = "scene"  # 退役：英语场景对话
+    SONG = "song"
+    HOME = "home"
+    DEFENSE = "defense"
+    TRPG = "trpg"
+    BOOK = "book"
+    CARD = "card"
+    VOCAB = "vocab"
+    POST = "post"
+
+
 class PitchRefStatus:
     MISSING = "missing"
     BUILDING = "building"
@@ -161,7 +182,9 @@ class LevelSources:
 
 
 class SessionKinds:
-    DIALOG = "dialog"
+    """会话类型。DIALOG 已退役（2026-09-21 酒馆迁移）：保留取值以兼容历史行。"""
+
+    DIALOG = "dialog"  # 退役：英语场景对话（历史数据仍可能含该值）
     SING = "sing"
     DEFENSE = "defense"  # 答辩会话（docs/14 §6.1，2026-09 拍板）
     SHADOW = "shadow"  # 影子跟读会话（local/31 §2.4，2026-09-02 设计）
@@ -180,7 +203,9 @@ class MessageRoles:
 
 
 class AttemptKinds:
-    DIALOG_SPEECH = "dialog_speech"
+    """录音评分类型。DIALOG_SPEECH 已退役（2026-09-21 酒馆迁移）：保留取值兼容历史行。"""
+
+    DIALOG_SPEECH = "dialog_speech"  # 退役：英语场景对话评分（历史数据仍可能含该值）
     FREE_PRACTICE = "free_practice"
     PLACEMENT_ITEM = "placement_item"
     DEFENSE_ANSWER = "defense_answer"  # 答辩作答（docs/14 §6.1，2026-09 拍板）
@@ -204,9 +229,11 @@ class MasteryStatus:
 
 
 class EventTypes:
-    """埋点事件类型（docs/06 §9.1 定稿 9 类 + corpus_hit 共 10 类）。
+    """埋点事件类型（docs/06 §9.1；2026-09-21 修订：20 类中 2 类退役）。
 
-    新增须改本常量 + 迁移 + docs/06。
+    **退役（保留枚举兼容历史行，不再新上报）**：``FUN_ACTION``（原场景对话救场语义）、
+    ``CORPUS_HIT``（语言点覆盖度随对话下线）。
+    **新增须四处同步**：本常量 + analytics CHECK + 迁移扩 CHECK + 前端 EventName + docs/06 §9.1。
     """
 
     PAGE_VIEW = "page_view"
@@ -217,8 +244,8 @@ class EventTypes:
     RECOMMEND_IMPRESSION = "recommend_impression"
     RECOMMEND_CLICK = "recommend_click"
     PRACTICE_COMPLETE = "practice_complete"
-    FUN_ACTION = "fun_action"
-    CORPUS_HIT = "corpus_hit"  # 语言点覆盖度命中（docs/14 §6.3，2026-09 拍板）
+    FUN_ACTION = "fun_action"  # 退役：原场景对话救场动作（demo/hint/retry）
+    CORPUS_HIT = "corpus_hit"  # 退役：语言点覆盖度命中（docs/14 §6.3）
     FREE_CHAT_OPEN = "free_chat_open"  # 自由对话进页（docs/14 §12.3，2026-09-05）
     FREE_CHAT_TURN = "free_chat_turn"  # 自由对话每回合（payload audio: bool；docs/14 §12.3）
     FREE_CHAT_SWITCH = "free_chat_switch"  # 功能行切场景（payload to: scene；docs/14 §12.3）
@@ -238,3 +265,70 @@ class TicketStatuses:
     PROCESSING = "processing"
     RESOLVED = "resolved"
     CLOSED = "closed"
+
+
+# ---------------------------------------------------------------------------
+# 酒馆（TRPG 跑团）域枚举（docs/52 酒馆跑团（TRPG）实施设计 §3；表见 models/trpg.py）
+# ---------------------------------------------------------------------------
+class TrpgFactKinds:
+    """事实行类别：state=系统直写状态（pc/scene）；fact=LLM 提取叙事事实（rel/quest/clue）。"""
+
+    STATE = "state"
+    FACT = "fact"
+
+
+class TrpgFactModalities:
+    """事实模态（P2-23 防剧透）：fact=系统确认 / claim=NPC 声称 / rumor=传闻。"""
+
+    FACT = "fact"
+    CLAIM = "claim"
+    RUMOR = "rumor"
+
+
+class TrpgTaskStatuses:
+    ACTIVE = "active"
+    DONE = "done"
+    FAILED = "failed"
+
+
+class TrpgEntityKinds:
+    NPC = "npc"
+    PC = "pc"
+    TASK = "task"
+    CLUE = "clue"
+    SCENE = "scene"
+
+
+class TrpgMessageRoles:
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+class TrpgMessageKinds:
+    TEXT = "text"
+    SYSTEM = "system"  # 系统卡（开卡/过场/判定），payload.trpgSys 协议
+
+
+class TrpgCardSources:
+    """场景卡来源：admin=平台固定卡（owner NULL，管理端维护上架）；user=用户私有卡（按词汇生成）。"""  # noqa: E501
+
+    ADMIN = "admin"
+    USER = "user"
+
+
+class TrpgCardStatuses:
+    """场景卡状态：draft=草稿（仅管理端可见）；published=可用；archived=归档（不再可选）。"""
+
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
+
+
+class TrpgLangs:
+    """酒馆语言（只作用于 DM 输出；前端界面文案不随之切换）。"""
+
+    ZH = "zh"
+    EN = "en"
+
+
+TRPG_LANGS = (TrpgLangs.ZH, TrpgLangs.EN)

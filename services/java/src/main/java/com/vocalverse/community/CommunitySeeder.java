@@ -6,7 +6,6 @@ import com.vocalverse.user.UserProfileEntity;
 import com.vocalverse.user.UserProfileRepository;
 import com.vocalverse.user.UserRepository;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -21,9 +20,10 @@ import org.springframework.stereotype.Component;
  * 社区演示内容种子（docs/37 §7 · C-07：作者/标题/摘要**全部虚构原创**，禁用真实媒体品牌与原文）。
  *
  * <p>幂等：作者按 username、帖子按 slug 查重跳过（只增不改）；`vocalverse.community.seed=false` 关闭（测试环境
- * application-test.yml 关闭，单测库保持干净）；演示计数为静态展示（互动行 不逐条物化，当前用户的真实操作即时生效）。
+ * application-test.yml 关闭，单测库保持干净）；点赞/投币/分享计数为静态展示（互动行不逐条物化，当前用户的真实操作即时生效）， 评论数不预置（展示口径从
+ * post_comments 实算）。
  *
- * <p>执行顺序：@Order(2) 待 DemoSeeder(@Order(1)) 之后——历史打卡卡挂 demoadult，不存在则跳过。
+ * <p>2026-09-21：不再预置历史打卡卡——打卡改由用户手动触发，种子假卡会被误读为「系统自动打卡」。
  */
 @Component
 @Order(2)
@@ -78,7 +78,6 @@ public class CommunitySeeder implements CommandLineRunner {
         null,
         now.minus(12, ChronoUnit.MINUTES),
         328,
-        46,
         37,
         15);
     seedPost(
@@ -91,7 +90,6 @@ public class CommunitySeeder implements CommandLineRunner {
         Map.of("type", "video", "durationS", 240),
         now.minus(32, ChronoUnit.MINUTES),
         1240,
-        189,
         210,
         96);
     seedPost(
@@ -104,7 +102,6 @@ public class CommunitySeeder implements CommandLineRunner {
         null,
         now.minus(1, ChronoUnit.HOURS),
         86,
-        12,
         25,
         8);
     seedPost(
@@ -117,7 +114,6 @@ public class CommunitySeeder implements CommandLineRunner {
         Map.of("type", "video", "durationS", 492),
         now.minus(2, ChronoUnit.HOURS),
         512,
-        77,
         130,
         41);
     seedPost(
@@ -130,7 +126,6 @@ public class CommunitySeeder implements CommandLineRunner {
         null,
         now.minus(3, ChronoUnit.HOURS),
         150,
-        23,
         18,
         12);
     seedPost(
@@ -143,7 +138,6 @@ public class CommunitySeeder implements CommandLineRunner {
         Map.of("type", "video", "durationS", 62),
         now.minus(1, ChronoUnit.DAYS).plus(2, ChronoUnit.HOURS),
         73,
-        9,
         22,
         5);
     seedPost(
@@ -156,7 +150,6 @@ public class CommunitySeeder implements CommandLineRunner {
         null,
         now.minus(1, ChronoUnit.DAYS).minus(4, ChronoUnit.HOURS),
         201,
-        34,
         41,
         19);
     seedPost(
@@ -169,42 +162,13 @@ public class CommunitySeeder implements CommandLineRunner {
         null,
         now.minus(2, ChronoUnit.DAYS),
         468,
-        55,
         63,
         27);
 
-    // 历史打卡卡（演示混排；挂 demoadult——演示账号存在才插，否则跳过）
-    users
-        .findByUsernameIgnoreCase("demoadult")
-        .ifPresent(
-            demo -> {
-              seedCheckin(
-                  demo.getId(),
-                  LocalDate.now().minusDays(1),
-                  81.5,
-                  83.0,
-                  79.0,
-                  82.0,
-                  8,
-                  264,
-                  6,
-                  2,
-                  1);
-              seedCheckin(
-                  demo.getId(),
-                  LocalDate.now().minusDays(2),
-                  76.0,
-                  78.0,
-                  72.0,
-                  75.0,
-                  7,
-                  231,
-                  3,
-                  1,
-                  0);
-            });
+    // 历史打卡卡不再预置（2026-09-21）：打卡改由用户手动触发，种子里挂 demoadult 的
+    // 「没操作却出现」的假打卡卡会让用户误以为系统自动打卡——历史卡一律来自真实打卡。
 
-    logger.info("社区演示种子就绪：7 位虚构作者 + 8 条内容帖 + 2 条历史打卡卡");
+    logger.info("社区演示种子就绪：7 位虚构作者 + 8 条内容帖（打卡卡由用户手动打卡产生）");
   }
 
   private Long seedAuthor(
@@ -249,7 +213,6 @@ public class CommunitySeeder implements CommandLineRunner {
       Map<String, Object> media,
       Instant createdAt,
       int likes,
-      int comments,
       int coins,
       int shares) {
     if (posts.findFirstBySlug(slug).isPresent()) {
@@ -267,51 +230,11 @@ public class CommunitySeeder implements CommandLineRunner {
     }
     e.setStatus("visible");
     e.setLikeCount(likes);
-    e.setCommentCount(comments);
+    // commentCount 不预置（展示口径从 post_comments 实算；静态假数会让「46 条评论」点开为空）
     e.setCoinCount(coins);
     e.setShareCount(shares);
     e.setCreatedAt(createdAt);
     e.setUpdatedAt(createdAt);
-    posts.save(e);
-  }
-
-  private void seedCheckin(
-      Long authorId,
-      LocalDate date,
-      double overall,
-      double pron,
-      double gram,
-      double fluency,
-      int turns,
-      int durationS,
-      int likes,
-      int comments,
-      int coins) {
-    // (author_id, checkin_date) 幂等（kind='checkin' 部分唯一）
-    if (posts.findFirstByAuthorIdAndCheckinDate(authorId, date).isPresent()) {
-      return;
-    }
-    PostEntity e = new PostEntity();
-    e.setAuthorId(authorId);
-    e.setKind("checkin");
-    e.setTitle("今日打卡");
-    e.setStatus("visible");
-    e.setCheckinDate(date);
-    e.setCheckinSnapshot(
-        writeJson(
-            Map.of(
-                "overall", overall,
-                "pron", pron,
-                "gram", gram,
-                "fluency", fluency,
-                "turns", turns,
-                "duration_s", durationS,
-                "practice_count", 1)));
-    e.setLikeCount(likes);
-    e.setCommentCount(comments);
-    e.setCoinCount(coins);
-    e.setCreatedAt(date.atTime(18, 0).toInstant(java.time.ZoneOffset.UTC));
-    e.setUpdatedAt(e.getCreatedAt());
     posts.save(e);
   }
 

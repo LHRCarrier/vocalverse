@@ -13,8 +13,6 @@ import com.vocalverse.content.ListeningMaterialEntity;
 import com.vocalverse.content.ListeningMaterialRepository;
 import com.vocalverse.content.LrcEntity;
 import com.vocalverse.content.LrcRepository;
-import com.vocalverse.content.ScenarioEntity;
-import com.vocalverse.content.ScenarioRepository;
 import com.vocalverse.content.SongEntity;
 import com.vocalverse.content.SongRepository;
 import com.vocalverse.support.AbstractConsoleApiTest;
@@ -35,7 +33,6 @@ class PublishValidationTest extends AbstractConsoleApiTest {
   @Autowired private SongRepository songs;
   @Autowired private LrcRepository lrcs;
   @Autowired private ListeningMaterialRepository materials;
-  @Autowired private ScenarioRepository scenarios;
 
   private JsonNode postJson(String path, String token, String body) throws Exception {
     return json(
@@ -90,23 +87,6 @@ class PublishValidationTest extends AbstractConsoleApiTest {
     m.setCreatedAt(now);
     m.setUpdatedAt(now);
     return materials.save(m).getId();
-  }
-
-  private Long seedScenario(String openingLine, String targetCorpus) {
-    Instant now = Instant.now();
-    ScenarioEntity s = new ScenarioEntity();
-    s.setTitle("S" + System.nanoTime());
-    s.setSceneType("cafe");
-    s.setDifficulty(1);
-    s.setSystemPrompt("prompt");
-    s.setOpeningLine(openingLine);
-    s.setTargetCorpus(targetCorpus);
-    s.setInterestTags("[]");
-    s.setPromptVersion(1);
-    s.setStatus("draft");
-    s.setCreatedAt(now);
-    s.setUpdatedAt(now);
-    return scenarios.save(s).getId();
   }
 
   // ------------------------------------------------------------------ 46011
@@ -209,49 +189,6 @@ class PublishValidationTest extends AbstractConsoleApiTest {
             "{\"status\":\"published\"}");
     assertEquals(ConsoleErrorCodes.PUBLISH_VALIDATION_FAILED, r.path("code").asInt(), r.toString());
     assertTrue(r.path("data").path("violations").toString().contains("transcript"), r.toString());
-  }
-
-  /** 场景语料不足 3 条 → 46011；语料按 `English|中文` 权威格式计数（与 Python 同口径）。 */
-  @Test
-  void scenario_with_too_few_corpus_items_cannot_publish() throws Exception {
-    String token = seedAdminAndLogin(uniqueName("cso"), "operator");
-    // 只有 1 条合法语料行 + 1 行无 | 的噪音行
-    Long id = seedScenario("Hi there", "How are you?|你好吗？\nno pipe here");
-
-    JsonNode r =
-        postJson(
-            "/api/v1/console/content/scenarios/" + id + "/publish",
-            token,
-            "{\"status\":\"published\"}");
-    assertEquals(ConsoleErrorCodes.PUBLISH_VALIDATION_FAILED, r.path("code").asInt(), r.toString());
-    assertTrue(r.path("data").path("violations").toString().contains("targetCorpus"), r.toString());
-
-    // 补到 3 条 → 成功
-    ScenarioEntity s = scenarios.findById(id).orElseThrow();
-    s.setTargetCorpus("a|1\nb|2\nc|3");
-    s.setUpdatedAt(Instant.now());
-    scenarios.save(s);
-    JsonNode ok =
-        postJson(
-            "/api/v1/console/content/scenarios/" + id + "/publish",
-            token,
-            "{\"status\":\"published\"}");
-    assertEquals(0, ok.path("code").asInt(), ok.toString());
-  }
-
-  /** 语料解析口径自证：与 app/practice/corpus.py 一致（只认含 `|` 且短语非空的行）。 */
-  @Test
-  void corpus_counting_matches_python_parser_semantics() {
-    assertEquals(0, PublishService.countCorpusItems(null));
-    assertEquals(0, PublishService.countCorpusItems(""));
-    assertEquals(0, PublishService.countCorpusItems("no pipes at all\nsecond line"));
-    assertEquals(0, PublishService.countCorpusItems("|only gloss"), "| 前没有短语的行 Python 也会跳过");
-    assertEquals(3, PublishService.countCorpusItems("a|1\nb|2\nc|3"));
-    assertEquals(2, PublishService.countCorpusItems("a|1\n\n  \nb|2"), "空行不计");
-    assertEquals(
-        3,
-        PublishService.countCorpusItems("How are you?|你好吗？\nFine; thanks|很好；谢谢\nBye|再见"),
-        "中文释义里的分号不得被当成条目分隔（与 Python splitlines 口径一致）");
   }
 
   /** 非法 status → 46007（而不是静默忽略）。 */

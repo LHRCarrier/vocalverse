@@ -12,6 +12,7 @@ import IconSettings from '~icons/tabler/settings'
 import { authorDisplay, timeAgo } from '@/api/community'
 import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
+import MobileUnreadBadge from '@/components/mobile/MobileUnreadBadge.vue'
 import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { useMessagesStore } from '@/stores/messages'
 import { useUiStore } from '@/stores/ui'
@@ -47,6 +48,7 @@ function unreadText(n: number): string {
       <template #actions>
         <button class="u-topbar__act" type="button" title="新消息" aria-label="新消息" @click="newMessage">
           <IconMail />
+          <MobileUnreadBadge :count="messages.unreadTotal" />
         </button>
         <button class="u-topbar__act" type="button" title="私信设置" aria-label="私信设置" @click="messageSettings">
           <IconSettings />

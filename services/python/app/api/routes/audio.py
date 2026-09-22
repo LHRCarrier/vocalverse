@@ -32,7 +32,7 @@ from app.audio.base import (
     get_tts_client,
 )
 from app.audio.textproc.normalize import normalize_for_tts
-from app.audio.tts import tts_synthesize_cached
+from app.audio.tts_cache import provider_of, tts_synthesize_cached
 from app.audio.upload import validate_audio_bytes
 from app.console.trace.recorder import span, trace
 from app.core.auth import get_current_user_id
@@ -98,14 +98,23 @@ async def tts(
     text = normalize_for_tts(text, language="en")
     # docs/19 P0-4 / R-06：TTS 桶此前漏计（限流只覆盖 /turns 依赖），此处接线且先校验后扣
     # docs/44 P1-B：缓存为统一出入口（命中不触上游；桶仍是端点限流，命中亦计数防滥用）
+    # 2026-09 重构：provider 取自**实际客户端**（``tts.provider_id``），不再读 settings——
+    # 配置与实际解析结果可能不一致（auto 链/降级），读 settings 会让缓存键与响应头撒谎。
+    actual_provider = provider_of(client)
     await consume("tts", settings.tts_rate_per_hour, user_id)
     try:
-        audio_bytes = await tts_synthesize_cached(
-            client, text, voice, rate, provider=(settings.tts_provider or "edge")
-        )
+        audio_bytes = await tts_synthesize_cached(client, text, voice, rate)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"tts synthesis failed: {exc}") from exc
-    return ok(TTSResult(audio_bytes=audio_bytes.hex(), length=len(audio_bytes)))
+    return ok(
+        TTSResult(
+            audio_bytes=audio_bytes.hex(),
+            length=len(audio_bytes),
+            # 容器元数据（本地引擎出 WAV、云端出 MP3）：前端不再一律按 mp3 猜
+            media_type=getattr(client, "media_type", "audio/mpeg") or "audio/mpeg",
+            provider=actual_provider,
+        )
+    )
 
 
 @router.post("/llm/chat")

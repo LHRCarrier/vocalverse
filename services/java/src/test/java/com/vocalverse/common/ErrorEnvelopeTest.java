@@ -78,12 +78,18 @@ class ErrorEnvelopeTest extends AbstractAdminApiTest {
         40101);
   }
 
+  /**
+   * 未匹配路由的兜底 404 也必须是 Envelope（NoResourceFoundException → 40401）。
+   *
+   * <p>旧管理端退役前本用例打的是 {@code GET /api/v1/admin/users/{id}}（缺用户 → ResponseStatusException 404）；
+   * 该面已整体删除，故改为覆盖同一条全局兜底分支的未匹配路由形态。
+   */
   @Test
-  void adminNotFound_isEnvelope40401() throws Exception {
-    String admin = seedAdminAndLogin();
+  void unknownRoute_isEnvelope40401() throws Exception {
+    String token = registerUser("j08_nf");
     assertEnvelope(
         mockMvc
-            .perform(get("/api/v1/admin/users/99999999").header("Authorization", "Bearer " + admin))
+            .perform(get("/api/v1/not-a-route/99999999").header("Authorization", "Bearer " + token))
             .andReturn(),
         404,
         40401);

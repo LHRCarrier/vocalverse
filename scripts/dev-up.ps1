@@ -20,6 +20,14 @@
 # 控制台需要 **Java 与 Python 都在**（它有两个上游代理：/manage→8080、/api/v1→8000），
 # 所以它只能跟三端一起起，不能单独起。
 #
+# OmniVoice 边车（本地克隆音色 · services/omnivoice-sidecar）**默认就尝试起**——
+# 它是 TTS 引擎链 auto 的首位（omnivoice → kitten → edge），起不来会自动回落，所以
+# 「带上它」对任何人都没有副作用：
+#   pwsh -File scripts/dev-up.ps1 start -NoVoice         # 不想起边车（省 GPU）
+# 起不来的两种情形（缺 python 环境 / 缺权重）**只打印一条可读提示并继续**，不阻塞三端：
+#   装环境：python -m venv .venv-omnivoice; pip install omnivoice torch soundfile
+#   下权重：pwsh -File scripts/fetch-omnivoice-weights.ps1     # 默认下到 <仓库>/data/models
+#
 # 数据库/缓存：start 里自动拉起——5432/6379 未监听时执行
 # `docker compose up -d postgres redis` 并等待 healthy（2026-09-05，
 # 修「电脑睡眠/重启后容器被引擎杀掉 → Java 起不来」的坑）；
@@ -29,7 +37,9 @@ param(
     [ValidateSet("start", "stop", "status")]
     [string]$Action = "start",
     # 是否连带管理端控制台（:5174）。见上方用法说明。
-    [switch]$WithConsole
+    [switch]$WithConsole,
+    # 不起 OmniVoice 边车（:8765）。默认会尝试起——见上方用法说明。
+    [switch]$NoVoice
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,11 +47,13 @@ $Root = Split-Path -Parent $PSScriptRoot
 $LogDir = Join-Path $Root "local\dev-logs"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
-# 受管端口（status / stop 都遍历它）。三端恒定；控制台按 -WithConsole 追加 ——
+# 受管端口（status / stop 都遍历它）。三端恒定；控制台按 -WithConsole 追加，
+# 边车按 -NoVoice 剔除 ——
 # **这里是一处真源**：此前三处各写一遍 `8000, 8080, 5173`，加第四端必然漏掉其中一处
 # （漏 status 就"看不到它在跑"，漏 stop 就"杀了三端还剩一个占着端口"）。
 $Ports = @(8000, 8080, 5173)
 if ($WithConsole) { $Ports += 5174 }
+if (-not $NoVoice) { $Ports += 8765 }
 
 # 控制台密钥自检（仅 -WithConsole 时）：见根 `.env.example` 的长注释 ——
 # Java 读 VOICEVERSE_CONSOLE_JWT_SECRET、Python 读 APP_CONSOLE_JWT_SECRET，两者必须同值；
@@ -142,6 +154,45 @@ function Start-Detached($Name, [string]$Cmd, [string]$WorkDir) {
     Write-Host ("  [{0}] detached started -> {1}" -f $Name, (Split-Path $out -Leaf))
 }
 
+# ── OmniVoice 边车（本地克隆音色 · services/omnivoice-sidecar）──────────────────
+# 设计原则：**带上它，但永不阻塞**。本地克隆音色在 TTS 引擎链里是首位但**可选**
+# （起不来会自动回落 kitten/edge），所以缺环境/缺权重时只打印一条可读提示并继续，
+# 绝不因为它是可选档而拖住三端启动。
+# 「该用哪个 python / 权重在哪 / 什么算完整」的**真源在 scripts/lib/omnivoice.ps1**，
+# 与 scripts/start-omnivoice-sidecar.ps1 共用（各写一遍必然漂移）。
+. (Join-Path $PSScriptRoot 'lib/omnivoice.ps1')
+
+function Start-VoiceSidecar {
+    if ((Get-PortPid 8765).Count -gt 0) { Write-Host "  已在运行，跳过。"; return $true }
+
+    $py = Resolve-OmnivoicePython
+    if (-not $py) {
+        Write-Host "  ⏭ 跳过：没找到装了 omnivoice 的 python（本地克隆音色是可选档，TTS 会自动回落 edge）。"
+        Write-Host "     任选其一："
+        Write-Host "     ① 复用已有环境：`$env:OMNIVOICE_PYTHON = '<装了 omnivoice 的 python.exe>'"
+        Write-Host "     ② 新建：python -m venv .venv-omnivoice;"
+        Write-Host "             .\.venv-omnivoice\Scripts\pip install omnivoice torch soundfile"
+        Write-Host "     探测过的位置见 scripts/lib/omnivoice.ps1（真源）；详见 services/omnivoice-sidecar/README.md"
+        return $false
+    }
+
+    $cache = Resolve-OmnivoiceCache
+    if (-not $cache) {
+        Write-OmnivoiceWeightsHint
+        return $false
+    }
+
+    $env:OMNIVOICE_HF_CACHE = $cache
+    # 8 GB 卡的关键开关；必须在本进程设好再交给子进程继承（CUDA 初始化之前生效）。
+    if (-not $env:PYTORCH_CUDA_ALLOC_CONF) { $env:PYTORCH_CUDA_ALLOC_CONF = 'expandable_segments:True' }
+    $server = Join-Path $Root 'services/omnivoice-sidecar/server.py'
+    Start-Detached "omnivoice-8765" "& '$py' '$server' --host 127.0.0.1 --port 8765" $Root
+    Write-Host "      python：$py"
+    Write-Host "      权重：  $cache"
+    Write-Host "      模型加载约 7~8s；/health 先可用，ok=true 表示就绪"
+    return $true
+}
+
 function Test-Health($Name, [string]$Url, [string]$Kind = "json") {
     try {
         if ($Kind -eq "json") { $r = Invoke-RestMethod -Uri $Url -TimeoutSec 4; return ($r -ne $null) }
@@ -215,6 +266,9 @@ switch ($Action) {
         if ($WithConsole) {
             Write-Host "  health: console="(Test-Health console "http://localhost:5174" "web")""
         }
+        if (-not $NoVoice) {
+            Write-Host "  health: voice(8765)="(Test-Health voice "http://127.0.0.1:8765/health")""
+        }
         break
     }
     "stop" {
@@ -270,19 +324,27 @@ switch ($Action) {
             } elseif ((Get-PortPid 5174).Count -gt 0) { Write-Host "  已在运行，跳过。" }
         }
 
-        Write-Host "== 健康等待（python≈8s / vite≈10s / java≈30-60s）=="
+        $VoiceTried = $false
+        if (-not $NoVoice) {
+            Write-Host "== 启动 OmniVoice 边车 :8765（本地克隆音色 · 可选，缺环境/权重会跳过）=="
+            $VoiceTried = Start-VoiceSidecar
+        }
+
+        Write-Host "== 健康等待（python≈8s / vite≈10s / java≈30-60s / 边车≈10s）=="
         $deadline = (Get-Date).AddSeconds(120)
-        $py = $false; $vt = $false; $jv = $false; $cs = -not $WithConsole
-        while ((Get-Date) -lt $deadline -and -not ($py -and $vt -and $jv -and $cs)) {
+        $py = $false; $vt = $false; $jv = $false; $cs = -not $WithConsole; $vc = -not $VoiceTried
+        while ((Get-Date) -lt $deadline -and -not ($py -and $vt -and $jv -and $cs -and $vc)) {
             if (-not $py) { $py = Test-Health py "http://127.0.0.1:8000/readyz" }
             if (-not $vt) { $vt = Test-Health vite "http://localhost:5173" "web" }
             if (-not $jv) { $jv = Test-Health java "http://127.0.0.1:8080/api/v1/ping" }
             if (-not $cs) { $cs = Test-Health console "http://localhost:5174" "web" }
-            if (-not ($py -and $vt -and $jv -and $cs)) { Start-Sleep -Seconds 3 }
+            if (-not $vc) { $vc = Test-Health voice "http://127.0.0.1:8765/health" }
+            if (-not ($py -and $vt -and $jv -and $cs -and $vc)) { Start-Sleep -Seconds 3 }
         }
         Write-Host ("  python(8000): {0}  vite(5173): {1}  java(8080): {2}" -f $py, $vt, $jv)
         if ($WithConsole) { Write-Host ("  console(5174): {0}" -f $cs) }
-        if (-not ($py -and $vt -and $jv -and $cs)) {
+        if ($VoiceTried) { Write-Host ("  voice(8765): {0}" -f $vc) }
+        if (-not ($py -and $vt -and $jv -and $cs -and $vc)) {
             Write-Host "  ⚠️ 有服务未就绪，看日志：local/dev-logs/*.err.log（数据库容器看上方 [docker] 提示 / docker compose ps）"
         }
         Write-Host "  完成。服务与终端已解耦：关终端不再提示 Terminate batch job。"

@@ -4,19 +4,17 @@
  * 2026-09-09 组长拍板：/m/me「我的」页面舍弃（信息收敛进抽屉）——用户卡保留，菜单：
  *   ① 我的学习（**抽屉内展开四个模块**：单词/社区足迹/发音/练习 → /m/learn/:module，组长反馈 2026-09-09 v2）
  *   ② 通知（→ /m/notifications 通知中心）
- *   ③ 设置与隐私（抽屉内展开子项：帮助与反馈/数据与隐私/关于声语界，演示帧 toast，M3 接真实页）
+ *   ③ 设置与隐私（抽屉内展开子项：帮助与反馈/数据与隐私/关于声语界 → /m/settings/:section，docs/53 P5 ④）
  * 展开项右侧 chevron 在展开时旋转 180°（下拉指示与功能一致）。
  */
 import { reactive } from 'vue'
 import MobileAvatar from '@/components/mobile/MobileAvatar.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import { useProgressStore } from '@/stores/progress'
-import { useUiStore } from '@/stores/ui'
 
 import type { MeView } from '@/stores/auth'
 
 const progress = useProgressStore()
-const ui = useUiStore()
 
 const props = defineProps<{
   open: boolean
@@ -69,9 +67,9 @@ const items: MenuItem[] = [
     label: '设置与隐私',
     path: null,
     children: [
-      { icon: 'info', label: '帮助与反馈', path: null },
-      { icon: 'heart', label: '数据与隐私', path: null },
-      { icon: 'wave', label: '关于声语界', path: null },
+      { icon: 'info', label: '帮助与反馈', path: '/m/settings/help' },
+      { icon: 'heart', label: '数据与隐私', path: '/m/settings/privacy' },
+      { icon: 'wave', label: '关于声语界', path: '/m/settings/about' },
     ],
   },
 ]
@@ -85,13 +83,9 @@ function toggle(key: string) {
 
 function go(item: MenuItem, child?: MenuChild) {
   const path = child?.path ?? item.path
-  if (path) {
-    emit('navigate', path)
-    opens[item.label] = false // 子项点击后收起面板
-    return
-  }
-  ui.showToast(`「${child?.label ?? item.label}」M3 上线后开放`)
-  opens[item.label] = false
+  if (!path) return
+  emit('navigate', path)
+  opens[item.label] = false // 子项点击后收起面板
 }
 </script>
 

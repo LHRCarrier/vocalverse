@@ -73,6 +73,43 @@ class InternalCheckinApiTest extends AbstractAdminApiTest {
   }
 
   @Test
+  void checkin_explicit_practice_count_is_written_not_incremented() throws Exception {
+    // 手动打卡（2026-09-21 改版）：practiceCount 由调用方显式回传 → 按值写入，重复调用幂等
+    registerUser("checkin_manual");
+    Long userId = users.findByUsernameIgnoreCase("checkin_manual").orElseThrow().getId();
+    String day = "2026-09-07";
+
+    MvcResult r1 =
+        mockMvc
+            .perform(
+                post("/internal/checkin")
+                    .header("Authorization", "Bearer " + SERVICE_TOKEN)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        checkinBody(userId, day, 80.0, 82.0, 78.0, 79.0, 6, 200, 3)
+                            .getBytes(StandardCharsets.UTF_8)))
+            .andReturn();
+    assertEquals(0, json(r1).path("code").asInt(), json(r1).toString());
+    long postId = json(r1).path("data").asLong();
+
+    MvcResult r2 =
+        mockMvc
+            .perform(
+                post("/internal/checkin")
+                    .header("Authorization", "Bearer " + SERVICE_TOKEN)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        checkinBody(userId, day, 80.0, 82.0, 78.0, 79.0, 6, 200, 3)
+                            .getBytes(StandardCharsets.UTF_8)))
+            .andReturn();
+    assertEquals(0, json(r2).path("code").asInt(), json(r2).toString());
+
+    PostEntity post = posts.findById(postId).orElseThrow();
+    JsonNode snap = objectMapper.readTree(post.getCheckinSnapshot());
+    assertEquals(3, snap.path("practice_count").asInt()); // 不是 4/6：显式值覆盖，不自增
+  }
+
+  @Test
   void checkin_requires_service_token() throws Exception {
     MvcResult r =
         mockMvc
@@ -116,5 +153,21 @@ class InternalCheckinApiTest extends AbstractAdminApiTest {
         "{\"userId\":%d,\"practiceDate\":\"%s\",\"sessionId\":100,\"snapshot\":"
             + "{\"overall\":%.1f,\"pron\":%.1f,\"gram\":%.1f,\"fluency\":%.1f,\"turns\":%d,\"durationS\":%d}}",
         userId, day, overall, pron, gram, flu, turns, dur);
+  }
+
+  private static String checkinBody(
+      long userId,
+      String day,
+      double overall,
+      double pron,
+      double gram,
+      double flu,
+      int turns,
+      int dur,
+      int practiceCount) {
+    return String.format(
+        "{\"userId\":%d,\"practiceDate\":\"%s\",\"sessionId\":100,\"snapshot\":"
+            + "{\"overall\":%.1f,\"pron\":%.1f,\"gram\":%.1f,\"fluency\":%.1f,\"turns\":%d,\"durationS\":%d,\"practiceCount\":%d}}",
+        userId, day, overall, pron, gram, flu, turns, dur, practiceCount);
   }
 }

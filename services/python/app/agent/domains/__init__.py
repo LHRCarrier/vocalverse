@@ -1,13 +1,9 @@
-"""Agent 领域层（docs/26 domains：learner 学习者画像，后续 memory/persona 入此）。"""
+"""Agent 领域层（docs/26 domains）。
+
+2026-09-21（酒馆迁移）：学习者画像（learner）随英语场景对话移除——画像消费方
+（context_builder 静态 system + user 尾部 [context]）已删除；后续新增领域逻辑入此。
+"""
 
 from __future__ import annotations
 
-from app.agent.domains.learner import (
-    LearnerProfile,
-    build_profile,
-    get_rendered,
-    invalidate,
-    render,
-)
-
-__all__ = ["LearnerProfile", "build_profile", "get_rendered", "invalidate", "render"]
+__all__: list[str] = []

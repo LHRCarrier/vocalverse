@@ -50,3 +50,13 @@ def song_cover_dir() -> Path:
     `/api/v1/songs/covers/*`），同名文件互不干扰。
     """
     return seed_dir() / "song-covers"
+
+
+def voices_dir() -> Path:
+    """`data/seed/voices`：OmniVoice 音色参考件（`VOICES.json` + wav，随仓库分发）。
+
+    音色 = 参考件字节 + 参考文本 + seed，参考件就是**音色身份本体**；`.gitignore` 对
+    `data/seed/voices/**` 开了窄豁免（否则会被 `*.wav` 规则吞掉，队友 clone 下来边车
+    合成不出任何声音）。模型权重（约 3.3 GB）**不入库**，仍按运行时路径引用。
+    """
+    return seed_dir() / "voices"

@@ -179,7 +179,8 @@ function onSseEvent(e: SseStreamEvent) {
       break
     case 'turn_end': {
       sending.value = false
-      progress.addXp(5) // 完成一次自由对话回合 +5 XP（演示规则；M3 后端加权）
+      // 回合完成 → 重拉服务端 XP（free_chat_turn 已被后端埋点记账；docs/53 P5 ③）
+      void progress.refresh()
       const reply = currentAssistant.value?.text ?? ''
       if (reply) {
         history.value.push({ role: 'assistant', content: reply })

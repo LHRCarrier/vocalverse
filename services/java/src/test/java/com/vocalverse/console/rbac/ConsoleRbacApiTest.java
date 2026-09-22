@@ -245,7 +245,7 @@ class ConsoleRbacApiTest extends AbstractConsoleApiTest {
     assertTrue(adminRoles.findByCode(superRoleCode()).isPresent(), "super 角色必须仍然存在");
   }
 
-  /** 权限目录端点按 module 分组返回，总条数 = 35。 */
+  /** 权限目录端点按 module 分组返回，总条数 = 36（2026-09-21 酒馆场景卡三码复用后）。 */
   @Test
   void permissions_endpoint_groups_by_module() throws Exception {
     String token = seedAdminAndLogin(uniqueName("csu"), superRoleCode());
