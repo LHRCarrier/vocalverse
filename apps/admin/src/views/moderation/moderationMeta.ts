@@ -185,18 +185,22 @@ export function targetText(row: Pick<ModerationCaseRow, 'targetType' | 'targetId
 /**
  * `snapshot.ai` → 一行可读证据（无证据返回 null）。
  *
- * 审核员决定前必须看到「这单为什么自动进来」：违规概率、类型、严重度、模型版本。这里只做展示，
- * 不做门禁——判定阈值已经在服务端生效过，前端再判一次会形成第二个真源。
+ * 审核员决定前必须看到「这单为什么自动进来 + 违反了哪一条」：违规概率、条款号（docs/59）、
+ * 类型、严重度、模型版本。这里只做展示，不做门禁——判定阈值已经在服务端生效过，
+ * 前端再判一次会形成第二个真源。
  */
 export function aiEvidenceText(snapshot: ModerationSnapshot | null | undefined): string | null {
   const ai = snapshot?.ai
   if (!ai) return null
   const parts: string[] = []
   if (typeof ai.violation === 'number') parts.push(`违规概率 ${Math.round(ai.violation * 100)}%`)
-  if (typeof ai.category === 'string') parts.push(`类型 ${reasonCodeText(ai.category)}`)
+  if (typeof ai.category === 'string') {
+    const clause = typeof ai.clause === 'string' && ai.clause !== 'none' ? `（${ai.clause}）` : ''
+    parts.push(`类型 ${reasonCodeText(ai.category)}${clause}`)
+  }
   if (typeof ai.severity === 'number') parts.push(`严重度 ${ai.severity.toFixed(2)}/3`)
-  if (typeof ai.categoryConfidence === 'number') {
-    parts.push(`类型置信 ${ai.categoryConfidence.toFixed(2)}`)
+  if (typeof ai.clauseConfidence === 'number') {
+    parts.push(`条款置信 ${ai.clauseConfidence.toFixed(2)}`)
   }
   if (typeof ai.model === 'string' && ai.model) parts.push(ai.model)
   return parts.length > 0 ? parts.join(' · ') : null

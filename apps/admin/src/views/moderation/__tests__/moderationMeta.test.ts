@@ -54,21 +54,30 @@ describe('趋势序列口径（v1 把 pending 当「新建」画）', () => {
 })
 
 describe('自动送审证据展示（snapshot.ai）', () => {
-  it('完整证据 → 一行可读文本（概率/类型/严重度/模型）', () => {
+  it('完整证据 → 一行可读文本（概率/条款号/类型/严重度/模型）', () => {
     const snap: ModerationSnapshot = {
       ai: {
         model: 'jev-1.13.0',
         violation: 0.962,
+        clause: 'R2',
         category: 'abuse',
-        categoryConfidence: 0.81,
+        clauseConfidence: 0.81,
         severity: 1.96,
       },
     }
     const text = aiEvidenceText(snap)
     expect(text).toContain('违规概率 96%')
-    expect(text).toContain('类型 辱骂骚扰')
+    expect(text).toContain('类型 辱骂骚扰（R2）')
     expect(text).toContain('严重度 1.96/3')
     expect(text).toContain('jev-1.13.0')
+  })
+
+  it('clause=none 不显示条款号（兼容上游异常/旧数据）', () => {
+    const text = aiEvidenceText({
+      ai: { violation: 0.8, clause: 'none', category: 'other', severity: 1 },
+    })
+    expect(text).toContain('类型 其他')
+    expect(text).not.toContain('none')
   })
 
   it('举报/人工单（无 ai）→ null；不伪造证据', () => {

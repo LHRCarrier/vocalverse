@@ -8,14 +8,18 @@ export type ModerationStatus = 'pending' | 'approved' | 'rejected' | 'escalated'
 /**
  * Jev（TypeSafe System One）自动送审证据（docs/58 §3.3）——`snapshot.ai`。
  *
- * 只有 `source='auto'` 的单才有；`violation` 是送给 Jev 的违规概率，`threshold` 是当时的建单阈值。
- * 审核员据此判断「这单为什么自动进来」，也为事后调阈值留下可对账的凭据（不保留正文）。
+ * 只有 `source='auto'` 的单才有；`violation` 是送给 Jev 的违规概率，`clause` 是命中的
+ * 《社区规范》条款号（R1~R9，见 docs/59），`category` 是条款映射出的原因码。
+ * 审核员据此判断「这单为什么自动进来、违反哪一条」，也为事后调阈值留下可对账的凭据（不保留正文）。
  */
 export interface ModerationAiEvidence {
   model?: string
   violation?: number
+  /** 命中的规范条款号（R1~R9；none = 未命中） */
+  clause?: string
   category?: string
-  categoryConfidence?: number
+  /** 条款分类的置信度（choice 分布导出） */
+  clauseConfidence?: number
   severity?: number
   severityConfidence?: number
   latencyMs?: number
