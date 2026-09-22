@@ -109,9 +109,9 @@ async function mountView() {
   return wrapper
 }
 
-/** 切到某个分段（歌曲/收藏；2026-09-22 第三轮起只有这两档） */
+/** 切到某个分类（推荐/收藏；2026-09-23 起为 QQ 式横滑 tab） */
 async function switchTab(w: Awaited<ReturnType<typeof mountView>>, label: string) {
-  const btn = w.findAll('.u-segment button').find((b) => b.text().includes(label))
+  const btn = w.findAll('.m-sing-cat').find((b) => b.text().includes(label))
   expect(btn, `分段「${label}」应存在`).toBeTruthy()
   await btn!.trigger('click')
   await flushPromises()
@@ -285,7 +285,7 @@ describe('MobileSingView · 收藏', () => {
 describe('MobileSingView · 放弃重录（录音态复位）', () => {
   /** 打开某个歌的跟唱面板并进入录音态 */
   async function startRecording(w: Awaited<ReturnType<typeof mountView>>) {
-    await rowOf(w, 'Twinkle')!.get('button.m-sing-row__hit').trigger('click')
+    await rowOf(w, 'Twinkle')!.get('button.m-sing-row__sing').trigger('click')
     await flushPromises()
     // 2026-09-22 深色录唱页：中心主钮只有图标 → 按 aria-label 定位（旧版按可见文案会取不到）
     const start = w.findAll('button').find((b) => (b.attributes('aria-label') ?? '') === '开始跟唱')
@@ -345,7 +345,7 @@ describe('MobileSingView · 放弃重录（录音态复位）', () => {
    */
   it('中心键：开始 → 暂停 → 继续（aria-label 三态）', async () => {
     const w = await mountView()
-    await rowOf(w, 'Twinkle')!.get('button.m-sing-row__hit').trigger('click')
+    await rowOf(w, 'Twinkle')!.get('button.m-sing-row__sing').trigger('click')
     await flushPromises()
     expect(w.find('button[aria-label="开始跟唱"]').exists()).toBe(true)
 
@@ -367,7 +367,7 @@ describe('MobileSingView · 放弃重录（录音态复位）', () => {
 
   it('底部一行显示「歌名 · 已录 / 全长」；未录音时为 00:00 / 全长（契约 duration_s）', async () => {
     const w = await mountView()
-    await rowOf(w, 'Twinkle')!.get('button.m-sing-row__hit').trigger('click')
+    await rowOf(w, 'Twinkle')!.get('button.m-sing-row__sing').trigger('click')
     await flushPromises()
     const foot = w.find('.m-sing-foot')
     expect(foot.exists()).toBe(true)
@@ -434,7 +434,7 @@ describe('MobileSingView · 跟唱面板视口锚定（P0-4）', () => {
   it('打开面板锁 body 滚动，关闭后还原（卸载也还原）', async () => {
     const w = await mountView()
     expect(document.body.style.overflow).toBe('')
-    await rowOf(w, 'Twinkle')!.get('button.m-sing-row__hit').trigger('click')
+    await rowOf(w, 'Twinkle')!.get('button.m-sing-row__sing').trigger('click')
     await flushPromises()
     expect(w.find('.m-sing-sheet').exists()).toBe(true)
     expect(document.body.style.overflow).toBe('hidden')
@@ -444,7 +444,7 @@ describe('MobileSingView · 跟唱面板视口锚定（P0-4）', () => {
     expect(document.body.style.overflow).toBe('')
 
     // 面板开着直接卸载 → 不得把整页锁死
-    await rowOf(w, 'Twinkle')!.get('button.m-sing-row__hit').trigger('click')
+    await rowOf(w, 'Twinkle')!.get('button.m-sing-row__sing').trigger('click')
     await flushPromises()
     expect(document.body.style.overflow).toBe('hidden')
     w.unmount()

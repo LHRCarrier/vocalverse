@@ -141,8 +141,8 @@ export function installApiMocks() {
   })
 }
 
-/** 打开某歌的跟唱面板 */
+/** 打开某歌的跟唱面板（2026-09-23 起：行点击=试听，进面板走行内「去跟唱」药丸） */
 export async function openSheet(w: Awaited<ReturnType<typeof mountView>>, title = 'Twinkle') {
-  await rowOf(w, title)!.get('button.m-sing-row__hit').trigger('click')
+  await rowOf(w, title)!.get('button.m-sing-row__sing').trigger('click')
   await flushPromises()
 }

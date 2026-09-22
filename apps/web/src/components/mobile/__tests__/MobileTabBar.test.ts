@@ -107,12 +107,17 @@ describe('MobileTabBar（双场景分组）', () => {
     expect(links[2].attributes('aria-label')).toBe('笔记') // 中央对称
   })
 
-  it('学习场景内全部显示学习组（free-chat/sing/notes/learn:module）', async () => {
-    for (const p of ['/m/free-chat', '/m/sing', '/m/notes', '/m/learn/speaking']) {
+  it('学习场景内全部显示学习组（free-chat/notes/learn:module）', async () => {
+    for (const p of ['/m/free-chat', '/m/notes', '/m/learn/speaking']) {
       const wrapper = await mountAt(p)
       expect(wrapper.find('.u-tabbar').exists(), p).toBe(true)
       expect(wrapper.find('a[aria-label="返回社区"]').exists(), p).toBe(true)
     }
+  })
+
+  it('唱吧（2026-09-23 起页内自带 SingTabBar）：全局底栏不再覆盖', async () => {
+    const wrapper = await mountAt('/m/sing')
+    expect(wrapper.find('.u-tabbar').exists()).toBe(false)
   })
 
   it('酒馆（2026-09-22 改沉浸页）：全局底栏隐藏，页内导航自带出口', async () => {

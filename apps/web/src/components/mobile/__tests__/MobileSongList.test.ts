@@ -198,17 +198,34 @@ describe('MobileSongList · 结构与滚动容器', () => {
 })
 
 describe('MobileSongList · 行交互与下标', () => {
-  it('点行 → emit open(songId, index)（下标即上游 onItemSelect 的第二参数）', async () => {
+  it('点行 → emit preview(songId, index)（2026-09-23 原型口径：行=试听，下标即上游 onItemSelect 的第二参数）', async () => {
     const w = mountList()
     await w.findAll('button.m-sing-row__hit')[2].trigger('click')
-    expect(w.emitted('open')?.[0]).toEqual([3, 2])
+    expect(w.emitted('preview')?.[0]).toEqual([3, 2])
+    expect(w.emitted('open')).toBeUndefined()
   })
 
-  it('点收藏 → emit favorite(song)，且**不会**顺带触发 open（两颗独立按钮，嵌套 button 无效）', async () => {
+  it('点「去跟唱」药丸 → emit open(songId, index)（行内独立按钮，不触发试听）', async () => {
+    const w = mountList()
+    await w.findAll('button.m-sing-row__sing')[1].trigger('click')
+    expect(w.emitted('open')?.[0]).toEqual([2, 1])
+    expect(w.emitted('preview')).toBeUndefined()
+  })
+
+  it('activeId 命中该行 → 叠加在播音波（`.m-sing-row.is-active`）', () => {
+    const w = mountList({ activeId: 2 })
+    const rows = w.findAll('.m-sing-row')
+    expect(rows[1].classes()).toContain('is-active')
+    expect(rows[1].find('.m-sing-row__wave').exists()).toBe(true)
+    expect(rows[0].find('.m-sing-row__wave').exists()).toBe(false)
+  })
+
+  it('点收藏 → emit favorite(song)，且**不会**顺带触发试听/跟唱（三颗独立按钮，嵌套 button 无效）', async () => {
     const w = mountList()
     await w.findAll('button.m-sing-fav')[1].trigger('click')
     expect(w.emitted('favorite')?.[0]).toEqual([songs[1]])
     expect(w.emitted('open')).toBeUndefined()
+    expect(w.emitted('preview')).toBeUndefined()
   })
 
   it('悬停 / 聚焦把选中态挪到该行（键盘与鼠标共用同一个 selectedIndex）', async () => {
@@ -256,14 +273,14 @@ describe('MobileSongList · 键盘导航（上游 enableArrowNavigation）', () 
     expect(selectedIndex(w)).toBe('1')
   })
 
-  it('Enter 打开选中行（带下标）；无选中时什么也不做', async () => {
+  it('Enter 试听选中行（带下标）；无选中时什么也不做', async () => {
     const w = mountList()
     setListVisible(w, true)
     await press('Enter') // 初始 -1 → 无选中，不应 emit
-    expect(w.emitted('open')).toBeUndefined()
+    expect(w.emitted('preview')).toBeUndefined()
     await press('ArrowDown')
     await press('Enter')
-    expect(w.emitted('open')?.[0]).toEqual([1, 0])
+    expect(w.emitted('preview')?.[0]).toEqual([1, 0])
   })
 
   it('别处已 preventDefault 的按键不抢（跟唱面板的方向键优先）', async () => {

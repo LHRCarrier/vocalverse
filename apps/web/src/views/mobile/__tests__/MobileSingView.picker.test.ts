@@ -81,10 +81,10 @@ describe('/m/sing · 顶栏选曲入口与切歌', () => {
     expect(sing.currentSong?.title).toBe('Mary Had a Little Lamb')
     expect(document.body.querySelector('.m-sing-pick__list')).toBeNull() // 弹层收起
     expect(w.find('.m-sing-song').text()).toBe('Mary Had a Little Lamb') // 跟唱面板开的是新歌
-    expect(entry.attributes('aria-label')).toContain('Mary Had a Little Lamb') // 入口语义跟着更新
+    expect(w.find('.m-sing-search__text').text()).toContain('Mary Had a Little Lamb') // 胶囊文案跟着更新（入口语义）
   })
 
-  it('跟唱面板底部「选曲」键：面板盖住顶栏时也能一步开列表并切歌（六键 / 两组各半宽）', async () => {
+  it('跟唱面板底部「选曲」键：面板盖住顶栏时也能一步开列表并切歌（七键 / 两组各半宽）', async () => {
     const w = await mountView()
     const sing = useSingStore()
 
@@ -92,7 +92,7 @@ describe('/m/sing · 顶栏选曲入口与切歌', () => {
 
     // 键位：左右两组各占一半宽度（主钮恒居中，见 SingActionBar 文件头注释）
     expect(w.findAll('.m-sing-dock__group')).toHaveLength(2)
-    expect(w.findAll('.m-sing-dock__key')).toHaveLength(5) // 原唱 / 曲线 / 选曲 / 重录 / 完成
+    expect(w.findAll('.m-sing-dock__key')).toHaveLength(6) // 原唱 / 曲线 / 选曲 / 伴奏 / 重录 / 完成
     expect(w.findAll('.m-sing-dock__main')).toHaveLength(1)
     expect(w.find('.m-sing-dock button[aria-label="选择跟唱曲目"]').text()).toContain('选曲')
 

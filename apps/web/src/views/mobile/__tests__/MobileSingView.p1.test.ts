@@ -233,15 +233,15 @@ describe('MobileSingView · 歌单屏状态与文案', () => {
     expect(w.find('.m-sing-foot').text()).toContain('03:00')
   })
 
-  it('精选卡已抽成组件；meta = 歌手 · 专辑 + 时长（「N 句 · 可跟唱」已下架）', async () => {
+  it('英雄卡（2026-09-23 原型）：卡 1 = 本周精选（歌手 · 专辑 + 时长）；分类 = 推荐 / 收藏', async () => {
     const w = await mountView()
-    expect(w.find('.m-feat').exists()).toBe(true) // SingFeaturedCard 根节点
-    expect(w.find('.m-feat__artist').text()).toBe('Traditional · 童谣精选集')
-    expect(w.find('.m-feat__facts').text()).toBe('00:30')
+    expect(w.find('.m-sing-hero').exists()).toBe(true) // SingHeroCards 根节点
+    expect(w.find('.m-sing-hero__artist').text()).toBe('Traditional')
     expect(w.text()).not.toContain('6 句')
     expect(w.text()).not.toContain('可跟唱')
-    const segs = w.findAll('.u-segment button').map((b) => b.text())
-    expect(segs).toEqual(['歌曲', '收藏'])
+    // 原型 6 项：前两项接真（推荐/收藏），后四项保留原型视觉、点击提示后续版本
+    const cats = w.findAll('.m-sing-cat').map((b) => b.text())
+    expect(cats).toEqual(['推荐', '收藏', '乐馆', '听书', '伴奏库', '热歌榜'])
     expect(w.text()).not.toContain('短歌')
     expect(w.text()).not.toContain('热门')
   })
@@ -272,7 +272,7 @@ describe('MobileSingView · 时间轴一致性（歌曲轴）', () => {
     expect(w.find('.m-sing-foot__times').text()).toBe('00:12 / 00:30')
   })
 
-  it('跟唱：底部时间/引导条走针 = 首句起点（开口前冻结），轨迹偏移随首帧人声回锚', async () => {
+  it('跟唱（清唱模式 · 关伴奏）：底部时间/引导条走针 = 首句起点（开口前冻结），轨迹偏移随首帧人声回锚', async () => {
     const detail = vi.mocked(singApi.fetchSongDetail).getMockImplementation()!
     vi.mocked(singApi.fetchSongDetail).mockImplementationOnce(async (id) => ({
       ...(await detail(id)),
@@ -283,6 +283,7 @@ describe('MobileSingView · 时间轴一致性（歌曲轴）', () => {
     }))
     const w = await mountView()
     await openSheet(w)
+    await btn(w, '跟唱伴奏').trigger('click') // 关伴奏 → 清唱模式（2026-09-22 新增开关）
     await btn(w, '开始跟唱').trigger('click')
     await flushPromises()
     await rafTick()
@@ -297,7 +298,7 @@ describe('MobileSingView · 时间轴一致性（歌曲轴）', () => {
     expect(lane.props('offsetMs')).toBe(21_980) // 500ms 才开口 → 轨迹整体前移回锚
   })
 
-  it('跟唱开口后：走针按歌曲轴推进（= 首句起点 + 已开口时长）', async () => {
+  it('跟唱（清唱模式）开口后：走针按歌曲轴推进（= 首句起点 + 已开口时长）', async () => {
     const detail = vi.mocked(singApi.fetchSongDetail).getMockImplementation()!
     vi.mocked(singApi.fetchSongDetail).mockImplementationOnce(async (id) => ({
       ...(await detail(id)),
@@ -307,6 +308,7 @@ describe('MobileSingView · 时间轴一致性（歌曲轴）', () => {
     }))
     const w = await mountView()
     await openSheet(w)
+    await btn(w, '跟唱伴奏').trigger('click') // 关伴奏 → 走「首句锚点」路径
     await btn(w, '开始跟唱').trigger('click')
     await flushPromises()
     await rafTick()
@@ -315,5 +317,43 @@ describe('MobileSingView · 时间轴一致性（歌曲轴）', () => {
     await flushPromises()
     await rafTick()
     expect(lane.props('clockMs') as number).toBeGreaterThan(22_480)
+  })
+
+  /**
+   * 伴奏模式（2026-09-22 用户口径「伴奏是唱的时候放的」）：
+   * 录音开始即从 0 播 `songs.instrumental_url`；底部时间/歌词/走针跟**伴奏位置**走
+   * （前奏也算歌曲轴的一部分，不再是「等开口才动」）。
+   */
+  it('跟唱（伴奏模式 · 默认开）：开始即从 0 播伴奏轨，底部时间跟伴奏位置走', async () => {
+    const detail = vi.mocked(singApi.fetchSongDetail).getMockImplementation()!
+    vi.mocked(singApi.fetchSongDetail).mockImplementationOnce(async (id) => ({
+      ...(await detail(id)),
+      instrumental_url: '/data/audio/demo_twinkle_instrumental.wav',
+    }))
+    const w = await mountView()
+    await openSheet(w)
+    expect(w.find('button[aria-label="跟唱伴奏"]').attributes('aria-pressed')).toBe('true') // 默认开
+
+    await btn(w, '开始跟唱').trigger('click')
+    await flushPromises()
+    await rafTick()
+    expect(clientApi.loadAudioBlob).toHaveBeenCalledWith('/api/v1/audio/demo_twinkle_instrumental.wav')
+    expect(audioInstances).toHaveLength(1) // 只有伴奏一路（原唱已先停）
+    // 伴奏轮：歌曲轴 = 录音轴 → 轨迹偏移必须为 0（此前按首句锚点算 → 整条轨迹横移）
+    expect(w.findComponent({ name: 'LivePitchChart' }).props('offsetMs')).toBe(0)
+
+    audioInstances[0].currentTime = 5 // 模拟伴奏走到 00:05
+    await rafTick()
+    expect(w.find('.m-sing-foot__times').text()).toBe('00:05 / 00:30')
+  })
+
+  it('伴奏模式关掉后：录音期间不放任何音频（清唱）', async () => {
+    const w = await mountView()
+    await openSheet(w)
+    await btn(w, '跟唱伴奏').trigger('click')
+    expect(w.find('button[aria-label="跟唱伴奏"]').attributes('aria-pressed')).toBe('false')
+    await btn(w, '开始跟唱').trigger('click')
+    await flushPromises()
+    expect(audioInstances).toHaveLength(0)
   })
 })

@@ -55,11 +55,29 @@ describe('MobileSongRow（歌单行 + 收藏按钮）', () => {
     expect(fav.attributes('title')).toBe('取消收藏')
   })
 
-  it('主点击区 emit open(songId)（与收藏按钮分离）', async () => {
+  it('主点击区 emit preview(song)（2026-09-23 原型：行=试听；与收藏/去跟唱分离）', async () => {
     const w = mount(MobileSongRow, { props: { song: song() } })
     await w.get('button.m-sing-row__hit').trigger('click')
-    expect(w.emitted('open')?.[0]).toEqual([7])
+    expect(w.emitted('preview')?.[0]).toEqual([song()])
+    expect(w.emitted('open')).toBeUndefined()
     expect(w.emitted('favorite')).toBeUndefined()
+  })
+
+  it('「去跟唱」药丸键 emit open(songId)（行内独立按钮，不触发试听）', async () => {
+    const w = mount(MobileSongRow, { props: { song: song() } })
+    const pill = w.get('button.m-sing-row__sing')
+    expect(pill.text()).toContain('去跟唱')
+    await pill.trigger('click')
+    expect(w.emitted('open')?.[0]).toEqual([7])
+    expect(w.emitted('preview')).toBeUndefined()
+  })
+
+  it('在播（active）：行加 is-active，封面叠加音波；未在播无音波', () => {
+    const on = mount(MobileSongRow, { props: { song: song(), active: true } })
+    expect(on.get('.m-sing-row').classes()).toContain('is-active')
+    expect(on.find('.m-sing-row__wave').exists()).toBe(true)
+    const off = mount(MobileSongRow, { props: { song: song() } })
+    expect(off.find('.m-sing-row__wave').exists()).toBe(false)
   })
 })
 
@@ -84,7 +102,7 @@ describe('MobileSongRow · 状态徽标整体下架（2026-09-22 第五轮）', 
     const { resolve } = require('node:path') as typeof import('node:path')
     const css = readFileSync(resolve(process.cwd(), 'src/styles/mobile-sing.css'), 'utf-8')
     const rule = (sel: string, next: string) => css.slice(css.indexOf(sel), css.indexOf(next))
-    // 行高 72px = 封面 56 + 上下 8（QQ 音乐式紧凑行）
+    // 行高 68px = 封面 52 + 上下 8（QQ 音乐式紧凑行）
     const row = rule('.m-sing-row {', '.m-sing-row__hit {')
     expect(row).toContain('padding: 8px 12px 8px 20px')
     // 时长不参与文本宽度分配（副文只省略中间）
@@ -129,15 +147,16 @@ describe('MobileSongRow · 专辑封面（2026-09-22）', () => {
     expect(w.find('.m-sing-row__cover svg').exists()).toBe(true)
   })
 
-  it('样式契约：封面 56×56/圆角 12 在本页作用域内定义 + 图片铺满（读源文件，改回即红）', () => {
+  it('样式契约：封面 52×52/圆角 10 在本页作用域内定义 + 图片铺满（读源文件，改回即红）', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { readFileSync } = require('node:fs') as typeof import('node:fs')
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { resolve } = require('node:path') as typeof import('node:path')
     const css = readFileSync(resolve(process.cwd(), 'src/styles/mobile-sing.css'), 'utf-8')
     const cover = css.slice(css.indexOf('.m-sing-row__cover {'), css.indexOf('.m-sing-row__cover img {'))
-    expect(cover).toContain('width: 56px')
-    expect(cover).toContain('border-radius: 12px')
+    expect(cover).toContain('width: 52px')
+    expect(cover).toContain('border-radius: 10px')
+    expect(cover).toContain('position: relative') // 音波叠层的定位上下文
     expect(cover).toContain('overflow: hidden') // 圆角裁切
     const imgRule = css.slice(css.indexOf('.m-sing-row__cover img {'))
     expect(imgRule.slice(0, imgRule.indexOf('}'))).toContain('object-fit: cover')
