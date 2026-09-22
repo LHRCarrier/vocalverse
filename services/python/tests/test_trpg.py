@@ -365,7 +365,7 @@ def test_panel_crud_snapshot_and_dice(client, auth_headers):
         headers=auth_headers,
     ).json()
     assert roll["code"] == 0
-    assert "pc.主角.hp=7" in roll["data"]["summary"]
+    assert "主角 HP 7（-5）" in roll["data"]["summary"]  # 判定卡用展示名（docs/57 §3.1）
     state = client.get(base, headers=auth_headers).json()["data"]
     hp = next(f for f in state["facts"] if f["key"] == "pc.主角.hp")
     assert hp["value"] == "7"
@@ -512,7 +512,7 @@ def test_turn_with_tool_calls(client, auth_headers, monkeypatch):
     cards = [e["trpg_sys"] for e in events if e["type"] == "system"]
     assert cards == ["open", "scene", "dice"]
     dice_card = next(e for e in events if e["type"] == "system" and e["trpg_sys"] == "dice")
-    assert "pc.主角.hp=7" in dice_card["payload"]["text"]
+    assert "主角 HP 7（-5）" in dice_card["payload"]["text"]
     text = "".join(e["text"] for e in events if e["type"] == "text_delta")
     assert "剑锋划过" in text
 
@@ -610,8 +610,8 @@ def test_narrative_refresh_and_clear_messages(client, auth_headers):
 # ---------------------------------------------------------------------------
 
 
-def _tool_call(name: str, call_id: str, **args) -> dict:
-    return {"id": call_id, "name": name, "arguments": json.dumps(args, ensure_ascii=False)}
+def _tool_call(tool: str, call_id: str, **args) -> dict:
+    return {"id": call_id, "name": tool, "arguments": json.dumps(args, ensure_ascii=False)}
 
 
 class ScriptedRounds:
@@ -712,7 +712,7 @@ def test_turn_tick_clock_full_and_ending_card(client, auth_headers, monkeypatch)
 
 
 def test_turn_character_enter_and_exit(client, auth_headers, monkeypatch):
-    """enter_character → character arriving + 实体 pending；exit_character → departed/cleared。"""
+    """enter_character → character active（不再 pending/arriving）；exit → departed/cleared。"""
     campaign_id = _create_campaign(client, auth_headers)
     base = f"/api/v1/trpg/campaigns/{campaign_id}"
     rounds = [
@@ -737,12 +737,12 @@ def test_turn_character_enter_and_exit(client, auth_headers, monkeypatch):
     events = _sse_events(client, campaign_id, auth_headers, text="我环顾酒馆")
     characters = [e for e in events if e["type"] == "character"]
     assert len(characters) == 1
-    assert characters[0]["name"] == "老陈" and characters[0]["status"] == "arriving"
+    assert characters[0]["name"] == "老陈" and characters[0]["status"] == "active"
     assert characters[0]["kind"] == "npc" and characters[0]["note"] == "酒馆老板"
 
     entities = client.get(base, headers=auth_headers).json()["data"]["entities"]
     chen = next(e for e in entities if e["name"] == "老陈")
-    assert chen["pending"] is True and chen["status"] == "active"  # arriving↔pending=True
+    assert chen["pending"] is False and chen["status"] == "active"  # 发现即在场（docs/57 §3.1）
 
     events = _sse_events(client, campaign_id, auth_headers, text="我目送他离开")
     characters = [e for e in events if e["type"] == "character"]
@@ -791,6 +791,17 @@ def test_turn_attack_hit_miss_and_hp_writeback(client, auth_headers, monkeypatch
     assert attacks[1]["hit"] is False and attacks[1]["damage"] == 0
     assert attacks[1]["target_hp"] == 7  # 未命中不写状态
     assert _facts(client, campaign_id, auth_headers)["npc.地精.hp"] == "7"
+
+    # 战报卡（docs/57 §3.1）：命中/失手都落 trpg_sys=dice 系统卡，刷新后战斗痕迹仍在
+    state = client.get(f"/api/v1/trpg/campaigns/{campaign_id}", headers=auth_headers).json()["data"]
+    card_texts = [
+        m["payload"]["text"]
+        for m in state["messages"]
+        if m["kind"] == "system" and m["payload"].get("trpg_sys") == "dice"
+    ]
+    assert any("命中" in t and "造成 3 点伤害" in t and "剩余 HP 7" in t for t in card_texts)
+    assert any("失手" in t for t in card_texts)
+    assert all("npc.地精" not in t and "pc.主角" not in t for t in card_texts)  # 不泄露内部键
 
 
 def test_turn_use_item_decrement_and_exhausted(client, auth_headers, monkeypatch):
@@ -879,6 +890,318 @@ def test_turn_encounter_start_turn_end(client, auth_headers, monkeypatch):
     assert ends and ends[0]["outcome"] == "击退地精"
     facts = _facts(client, campaign_id, auth_headers)
     assert facts["encounter.main.status"] == "done"
+
+
+def test_turn_roll_dice_quest_tick_paths(client, auth_headers, monkeypatch):
+    """roll_dice 带 quest（docs/57 §3.1）：成功+1/大成功+2、失败推威胁钟、已结算/无 quest 不推。"""
+    from app.trpg import state as st
+
+    headers = {"X-Test-User-Id": "7"}  # 独立用户：不吃 user 1 的 llm 限流桶
+    campaign_id = _create_campaign(client, headers)
+    quest = "找回羊皮卷"
+    threat = "蚀影逼近"
+    idle = "无事发生"
+    settled = "旧日恩怨"
+    fresh = "新线索"
+    st.set_quest_facts(campaign_id, quest, progress="1/6", kind="positive")
+    st.set_quest_facts(campaign_id, threat, progress="1/6", kind="threat")
+    st.set_quest_facts(campaign_id, idle, progress="1/6", kind="positive")
+    st.set_quest_facts(campaign_id, settled, progress="2/6", kind="positive", status="done")
+    rounds = [
+        [
+            (
+                "tool_calls",
+                [
+                    # 成功且余量 ≥5 → +2
+                    _tool_call("roll_dice", "d1", dice="d20", modifier=50, vs=1, quest=quest),
+                    # 失败 → 威胁钟 +1
+                    _tool_call("roll_dice", "d2", dice="d20", modifier=-50, vs=100, quest=threat),
+                    # 失败 → 正向钟不变
+                    _tool_call("roll_dice", "d3", dice="d20", modifier=-50, vs=100, quest=idle),
+                    # 已结算任务不再推进
+                    _tool_call("roll_dice", "d4", dice="d20", modifier=50, vs=1, quest=settled),
+                    # 无钟 → 按默认 6 格播种后推进
+                    _tool_call("roll_dice", "d5", dice="d20", modifier=50, vs=1, quest=fresh),
+                    # 不带 quest → 无 quest 事件（旧行为回归）
+                    _tool_call("roll_dice", "d6", dice="d20", modifier=50, vs=1),
+                ],
+            )
+        ],
+        [("delta", "浪潮般的攻防告一段落。")],
+    ]
+    llm = ScriptedRounds(rounds)
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: llm)
+
+    events = _sse_events(client, campaign_id, headers, text="我迎难而上")
+    quests = {e["quest"]: e for e in events if e["type"] == "quest"}
+    assert set(quests) == {quest, threat, idle, fresh}
+    assert quests[quest]["progress"] == "3/6"  # 1 + 2（余量 ≥5）
+    assert quests[quest]["reason"] and "大成功" in quests[quest]["reason"]
+    assert quests[quest]["kind"] == "positive" and quests[quest]["full"] is False
+    assert quests[threat]["progress"] == "2/6" and quests[threat]["kind"] == "threat"
+    assert quests[idle]["progress"] == "1/6"  # 正向钟不受挫
+    assert quests[fresh]["progress"] == "2/6"  # 无钟按 6 格播种 +2
+    assert quests[fresh]["segments"] == 6 and quests[fresh]["kind"] == "positive"
+    assert settled not in quests
+
+    facts = _facts(client, campaign_id, headers)
+    assert facts[f"quest.{quest}.progress"] == "3/6"
+    assert facts[f"quest.{threat}.progress"] == "2/6"
+    assert facts[f"quest.{idle}.progress"] == "1/6"
+    assert facts[f"quest.{settled}.progress"] == "2/6"
+    assert facts[f"quest.{fresh}.progress"] == "2/6"
+
+
+def test_turn_roll_dice_quest_small_margin_ticks_once(client, auth_headers, monkeypatch):
+    """余量 <5 的成功只 +1（骰值固定 → 确定性）。"""
+    from app.trpg import dice as dice_rules
+    from app.trpg import state as st
+
+    headers = {"X-Test-User-Id": "7"}
+    campaign_id = _create_campaign(client, headers)
+    quest = "试探虚实"
+    st.set_quest_facts(campaign_id, quest, progress="0/6", kind="positive")
+    monkeypatch.setattr(dice_rules.random, "randint", lambda low, high: 10)  # d20 → 11
+    rounds = [
+        [("tool_calls", [_tool_call("roll_dice", "d1", dice="d20", vs=9, quest=quest)])],
+        [("delta", "你看清了对方的虚实。")],
+    ]
+    llm = ScriptedRounds(rounds)
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: llm)
+
+    events = _sse_events(client, campaign_id, headers, text="我试探他")
+    quests = [e for e in events if e["type"] == "quest"]
+    assert quests and quests[-1]["progress"] == "1/6"  # 11 vs 9 → 余量 2 → +1
+    assert quests[-1]["reason"] and "大成功" not in quests[-1]["reason"]
+    assert _facts(client, campaign_id, headers)[f"quest.{quest}.progress"] == "1/6"
+
+
+def test_turn_grant_item_create_increment_owner_and_validation(client, auth_headers, monkeypatch):
+    """grant_item：新建/累加、默认持有者、无效 qty 拒绝；不发新 SSE 事件类型。"""
+    from app.trpg import state as st
+
+    headers = {"X-Test-User-Id": "7"}
+    campaign_id = _create_campaign(client, headers)
+    st.ensure_entity(campaign_id, "pc", "主角")
+    rounds = [
+        [
+            (
+                "tool_calls",
+                [
+                    _tool_call("grant_item", "g1", name="短剑", qty=1, effect="hp+3"),
+                    _tool_call("grant_item", "g2", name="短剑", qty=2, consumable=False),
+                    _tool_call("grant_item", "g3", name="罗盘", qty=1, owner="主角"),
+                ],
+            )
+        ],
+        [("delta", "你把战利品收进背包。")],
+    ]
+    llm = ScriptedRounds(rounds)
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: llm)
+
+    events = _sse_events(client, campaign_id, headers, text="我搜刮尸体")
+    assert not any(e["type"] == "item" for e in events)  # 无新事件类型（前端刷事实表）
+    facts = _facts(client, campaign_id, headers)
+    assert facts["item.短剑.qty"] == "3"  # 1 + 2 累加
+    assert facts["item.短剑.owner"] == "pc.主角"  # 默认持首 PC
+    assert facts["item.短剑.effect"] == "hp+3"
+    assert facts["item.短剑.consumable"] == "false"
+    assert facts["item.罗盘.qty"] == "1" and facts["item.罗盘.owner"] == "pc.主角"
+
+    invalid = ScriptedRounds(
+        [
+            [("tool_calls", [_tool_call("grant_item", "g4", name="毒药", qty=0)])],
+            [("delta", "……")],
+        ]
+    )
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: invalid)
+    _sse_events(client, campaign_id, headers, text="我拿毒药")
+    assert any("1~99" in text for text in invalid.tool_texts)
+    assert "item.毒药.qty" not in _facts(client, campaign_id, headers)
+
+
+def test_turn_grant_item_owner_fallback_pc_fact_and_none(client, auth_headers, monkeypatch):
+    """无 PC 实体时：唯一 pc.* 事实主体成为默认持有者；完全无 PC 则不写 owner。"""
+    headers = {"X-Test-User-Id": "7"}
+    campaign_id = _create_campaign(client, headers)
+    base = f"/api/v1/trpg/campaigns/{campaign_id}"
+    client.post(
+        f"{base}/facts/edit",
+        json={"key": "pc.洛可.hp", "value": "10"},
+        headers=headers,
+    )
+    rounds = [
+        [("tool_calls", [_tool_call("grant_item", "g1", name="干粮", qty=3)])],
+        [("delta", "干粮入袋。")],
+    ]
+    llm = ScriptedRounds(rounds)
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: llm)
+    _sse_events(client, campaign_id, headers, text="我拿干粮")
+    facts = _facts(client, campaign_id, headers)
+    assert facts["item.干粮.qty"] == "3" and facts["item.干粮.owner"] == "pc.洛可"
+
+    # 完全无 PC 信息 → owner 键不落（前端按未知持有者处理）
+    bare_id = _create_campaign(client, headers, name="无人酒馆")
+    bare_rounds = [
+        [("tool_calls", [_tool_call("grant_item", "g2", name="破布", qty=1)])],
+        [("delta", "一块破布。")],
+    ]
+    bare_llm = ScriptedRounds(bare_rounds)
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: bare_llm)
+    _sse_events(client, bare_id, headers, text="我捡起破布")
+    bare_facts = _facts(client, bare_id, headers)
+    assert bare_facts["item.破布.qty"] == "1" and "item.破布.owner" not in bare_facts
+
+
+def test_lazy_registered_entity_is_active(client, auth_headers):
+    """提取器懒注册实体不再 pending（docs/57 §3.1）：发现即 active。"""
+    from app.trpg.facts import FactOp
+    from app.trpg.state import upsert_facts
+
+    campaign_id = _create_campaign(client, auth_headers)
+    results = upsert_facts(
+        campaign_id, [FactOp(op="create", key="rel.莉亚.attitude", value="友好")]
+    )
+    assert results[0]["action"] == "create"
+    state = client.get(f"/api/v1/trpg/campaigns/{campaign_id}", headers=auth_headers).json()["data"]
+    lia = next(e for e in state["entities"] if e["name"] == "莉亚")
+    assert lia["pending"] is False and lia["status"] == "active"
+
+
+def test_settle_endpoint_owner_idempotent_and_finished_state(client, auth_headers):
+    """确定性结算端点：owner 校验 / 幂等（同 payload、一张结局卡）/ finished 状态外露。"""
+    from app.trpg import state as st
+
+    campaign_id = _create_campaign(client, auth_headers)
+    base = f"/api/v1/trpg/campaigns/{campaign_id}"
+    quest = "寻找失落的戒指"
+    client.post(f"{base}/tasks", json={"title": quest}, headers=auth_headers)
+    st.set_quest_facts(campaign_id, quest, progress="6/6", kind="positive")
+
+    other = {"X-Test-User-Id": "2"}
+    denied = client.post(f"{base}/quests/settle", json={"quest": quest}, headers=other)
+    assert denied.status_code == 404
+
+    invalid = client.post(
+        f"{base}/quests/settle", json={"quest": quest, "outcome": "epic"}, headers=auth_headers
+    )
+    assert invalid.status_code == 422 and invalid.json()["code"] == 47001
+    blank = client.post(f"{base}/quests/settle", json={"quest": "  "}, headers=auth_headers)
+    assert blank.status_code == 422 and blank.json()["code"] == 47001
+
+    first = client.post(
+        f"{base}/quests/settle", json={"quest": quest}, headers=auth_headers
+    ).json()["data"]
+    assert first["quest"] == quest and first["outcome"] == "strong"
+    assert first["title"] and first["text"] and first["epilogue"] and first["finished"] is True
+
+    state = client.get(base, headers=auth_headers).json()["data"]
+    assert state["campaign"]["finished"] is True
+    assert state["campaign"]["finished_at"]
+    endings = [
+        m
+        for m in state["messages"]
+        if m["kind"] == "system" and m["payload"].get("trpg_sys") == "ending"
+    ]
+    assert len(endings) == 1 and endings[0]["payload"]["quest"] == quest
+    assert _facts(client, campaign_id, auth_headers)[f"quest.{quest}.status"] == "done"
+
+    second = client.post(
+        f"{base}/quests/settle", json={"quest": quest}, headers=auth_headers
+    ).json()["data"]
+    for key in ("quest", "outcome", "title", "text", "epilogue"):
+        assert second[key] == first[key]
+    assert second["finished"] is True
+    state = client.get(base, headers=auth_headers).json()["data"]
+    endings = [
+        m
+        for m in state["messages"]
+        if m["kind"] == "system" and m["payload"].get("trpg_sys") == "ending"
+    ]
+    assert len(endings) == 1  # 幂等：不落第二张结局卡
+
+
+def test_settle_endpoint_explicit_outcome_syncs_task_row(client, auth_headers):
+    """显式 outcome=miss → failed；任务行同步；结算后 finished 可在状态里读回。"""
+    campaign_id = _create_campaign(client, auth_headers)
+    base = f"/api/v1/trpg/campaigns/{campaign_id}"
+    quest = "未竟之约"
+    client.post(f"{base}/tasks", json={"title": quest}, headers=auth_headers)
+
+    data = client.post(
+        f"{base}/quests/settle", json={"quest": quest, "outcome": "miss"}, headers=auth_headers
+    ).json()["data"]
+    assert data["outcome"] == "miss" and data["finished"] is True
+    assert _facts(client, campaign_id, auth_headers)[f"quest.{quest}.status"] == "failed"
+    state = client.get(base, headers=auth_headers).json()["data"]
+    task = next(t for t in state["tasks"] if t["title"] == quest)
+    assert task["status"] == "failed"
+    assert state["campaign"]["finished_at"]
+
+
+def test_settle_endpoint_synthesizes_card_for_extractor_done_quest(client, auth_headers):
+    """已 done 但无结局卡（如提取器置位）→ 结算端点补渲染并落一张卡（重复调用仍幂等）。"""
+    from app.trpg import state as st
+
+    campaign_id = _create_campaign(client, auth_headers)
+    base = f"/api/v1/trpg/campaigns/{campaign_id}"
+    quest = "被提取器完结的任务"
+    st.set_quest_facts(campaign_id, quest, progress="4/6", kind="positive", status="done")
+
+    first = client.post(
+        f"{base}/quests/settle", json={"quest": quest}, headers=auth_headers
+    ).json()["data"]
+    assert first["finished"] is True and first["title"] and first["text"]
+    state = client.get(base, headers=auth_headers).json()["data"]
+    endings = [
+        m
+        for m in state["messages"]
+        if m["kind"] == "system" and m["payload"].get("trpg_sys") == "ending"
+    ]
+    assert len(endings) == 1
+
+    second = client.post(
+        f"{base}/quests/settle", json={"quest": quest}, headers=auth_headers
+    ).json()["data"]
+    assert second["title"] == first["title"] and second["outcome"] == first["outcome"]
+    state = client.get(base, headers=auth_headers).json()["data"]
+    endings = [
+        m
+        for m in state["messages"]
+        if m["kind"] == "system" and m["payload"].get("trpg_sys") == "ending"
+    ]
+    assert len(endings) == 1  # 补卡后幂等：不再落第二张
+
+
+def test_complete_quest_idempotent_no_second_ending(client, auth_headers, monkeypatch):
+    """complete_quest 二次结算：幂等文本「已结算」、不新发 ending 事件/系统卡。"""
+    headers = {"X-Test-User-Id": "7"}
+    campaign_id = _create_campaign(client, headers)
+    base = f"/api/v1/trpg/campaigns/{campaign_id}"
+    quest = "止息怪谈"
+    rounds = [
+        [("tool_calls", [_tool_call("complete_quest", "q1", quest=quest, outcome="weak")])],
+        [("delta", "风停在屋檐上。")],
+        [("tool_calls", [_tool_call("complete_quest", "q2", quest=quest)])],
+        [("delta", "你合上了笔记本。")],
+    ]
+    llm = ScriptedRounds(rounds)
+    monkeypatch.setattr("app.api.routes.trpg.get_llm_client", lambda: llm)
+
+    first_events = _sse_events(client, campaign_id, headers, text="我收尾这一段")
+    assert any(e["type"] == "ending" for e in first_events)
+    second_events = _sse_events(client, campaign_id, headers, text="再结算一次")
+    assert not any(e["type"] == "ending" for e in second_events)  # 防重：无第二张结局卡/事件
+    assert any("已结算" in text for text in llm.tool_texts)
+
+    state = client.get(base, headers=headers).json()["data"]
+    endings = [
+        m
+        for m in state["messages"]
+        if m["kind"] == "system" and m["payload"].get("trpg_sys") == "ending"
+    ]
+    assert len(endings) == 1 and endings[0]["payload"]["outcome"] == "weak"
+    assert _facts(client, campaign_id, headers)[f"quest.{quest}.status"] == "done"
 
 
 # ---------------------------------------------------------------------------

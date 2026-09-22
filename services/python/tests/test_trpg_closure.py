@@ -79,6 +79,42 @@ def test_progress_render_ending_templates():
     assert progress.is_full("6/6") is True and progress.is_full("5/6") is False
 
 
+def test_progress_roll_tick_delta_rule():
+    """掷骰 → 进度格数（docs/57 §3.1）：成功 +1、余量≥5 +2；失败只推威胁钟。"""
+    assert progress.roll_tick_delta("success", 1, "positive") == 1
+    assert progress.roll_tick_delta("success", 4, "threat") == 1
+    assert progress.roll_tick_delta("success", 5, "positive") == 2
+    assert progress.roll_tick_delta("success", 12, "threat") == 2
+    assert progress.roll_tick_delta("failure", -3, "threat") == 1
+    assert progress.roll_tick_delta("failure", -3, "positive") == 0
+    assert progress.roll_tick_delta(None, None, "positive") == 0  # 无 vs 不判定
+
+
+def test_progress_plan_settlement():
+    """结算计划（纯函数，工具与路由共用）：显式档位优先；已结算幂等兜底。"""
+    auto = progress.plan_settlement("找戒指", progress="6/6", kind="positive")
+    assert auto.outcome == "strong" and auto.status == "done"
+    assert "找戒指" in auto.title and auto.text and auto.epilogue
+
+    explicit = progress.plan_settlement("找戒指", requested="weak", progress="6/6", kind="positive")
+    assert explicit.outcome == "weak" and explicit.status == "done"
+
+    failed = progress.plan_settlement("找戒指", requested="miss", progress="6/6")
+    assert failed.outcome == "miss" and failed.status == "failed"
+
+    threat = progress.plan_settlement("蚀影", progress="6/6", kind="threat")
+    assert threat.outcome == "miss"
+
+    settled_done = progress.plan_settlement(
+        "找戒指", status="done", progress="1/6", kind="positive"
+    )
+    assert settled_done.outcome == "weak"  # 已 done 但无卡：不判 miss
+    settled_failed = progress.plan_settlement("找戒指", status="failed")
+    assert settled_failed.outcome == "miss"
+    # 显式档位不覆盖已结算状态（幂等路径不受 requested 影响）
+    assert progress.plan_settlement("找戒指", requested="strong", status="failed").outcome == "miss"
+
+
 # ---------------------------------------------------------------------------
 # encounter：参战者键 / 先攻 / 回绕 / 战报文案
 # ---------------------------------------------------------------------------
@@ -146,6 +182,30 @@ def test_encounter_attack_report_no_formula():
     assert "没有造成实质伤害" in plain
     turn_text = encounter.format_turn_report(["pc.主角", "npc.地精"], 1, 2)
     assert "第 2 轮" in turn_text and "地精" in turn_text
+
+
+def test_encounter_state_change_display_names():
+    """判定卡摘要去内部键（docs/57 §3.1）：``pc.主角.hp`` → ``主角 HP``。"""
+    assert encounter.state_key_label("pc.主角.hp") == "主角 HP"
+    assert encounter.state_key_label("npc.地精.hp") == "地精 HP"
+    assert encounter.state_key_label("weird") == "weird"
+    assert encounter.state_key_label("item.药水.qty") == "药水 数量"
+    assert encounter.format_state_change("pc.主角.hp", "7", -5) == "主角 HP 7（-5）"
+    assert encounter.format_state_change("npc.地精.hp", "3", -2) == "地精 HP 3（-2）"
+    assert "pc." not in encounter.format_state_change("pc.主角.hp", "7", -5)
+
+
+def test_encounter_attack_card_wording():
+    """战报卡：命中/失手玩家语言，含伤害与剩余 HP，无内部键。"""
+    hit = encounter.format_attack_card(
+        "pc.洛可", "npc.地精", hit=True, damage=7, target_hp=3, weapon="短剑"
+    )
+    assert "命中" in hit and "造成 7 点伤害" in hit and "剩余 HP 3" in hit
+    assert "pc." not in hit and "npc." not in hit
+    miss = encounter.format_attack_card("pc.洛可", "npc.地精", hit=False)
+    assert "失手" in miss and "pc." not in miss and "npc." not in miss
+    plain = encounter.format_attack_card("pc.洛可", "npc.地精", hit=True, damage=0)
+    assert "命中" in plain and "没有造成实质伤害" in plain
 
 
 # ---------------------------------------------------------------------------
@@ -266,3 +326,35 @@ def test_snapshot_includes_npc_state_line():
     assert "PC：HP 12" in snapshot
     assert "地精：HP 7｜状态 受伤" in snapshot
     assert "路人" not in snapshot  # 非法域不进快照
+
+
+# ---------------------------------------------------------------------------
+# 场景卡模板：道具种子（docs/57 §3.1）
+# ---------------------------------------------------------------------------
+
+
+def test_card_template_accepts_item_facts_without_owner():
+    """模板可预置道具（qty/effect/consumable），但 owner 由系统解析、非法数量丢弃。"""
+    from app.trpg.cards import normalize_card
+
+    card = normalize_card(
+        {
+            "title": "道具种子卡",
+            "template": {
+                "facts": [
+                    {"key": "item.治疗药水.qty", "value": "2"},
+                    {"key": "item.治疗药水.effect", "value": "hp+5"},
+                    {"key": "item.治疗药水.consumable", "value": "true"},
+                    {"key": "item.治疗药水.owner", "value": "pc.主角"},
+                    {"key": "item.治疗药水.qty", "value": "abc"},
+                    {"key": "item.铁剑.mana", "value": "9"},  # 属性不在白名单 → 丢
+                ]
+            },
+        }
+    )
+    facts = card["template"]["facts"]
+    keys = [f["key"] for f in facts]
+    assert keys.count("item.治疗药水.qty") == 1
+    assert "item.治疗药水.effect" in keys and "item.治疗药水.consumable" in keys
+    assert "item.治疗药水.owner" not in keys
+    assert "item.铁剑.mana" not in keys

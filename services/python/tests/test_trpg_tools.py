@@ -28,13 +28,14 @@ def test_builtin_tools_order_and_schema_shape():
         "roll_dice",
         "set_scene",
         "show_portrait",
-        # 闭环九件（docs/56 §3；顺序 = BUILTIN_TOOL_ORDER）
+        # 闭环十件（docs/56 §3 + docs/57 §3.1 grant_item；顺序 = BUILTIN_TOOL_ORDER）
         "tick_clock",
         "complete_quest",
         "enter_character",
         "exit_character",
         "attack",
         "use_item",
+        "grant_item",
         "start_encounter",
         "next_turn",
         "end_encounter",
