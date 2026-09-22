@@ -26,6 +26,7 @@ import {
   timeAgo,
   unfollowUser,
 } from '@/api/community'
+import MobileAvatar from '@/components/mobile/MobileAvatar.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
@@ -247,9 +248,13 @@ const hasFollows = computed(() => followList.value.length > 0)
         class="u-msg__row"
         :aria-label="`与 ${c.peer.nickname} 的对话`"
       >
-        <span class="u-msg__ava" :style="{ background: c.peer.tint ?? '#37546e' }">
-          {{ c.peer.nickname.slice(0, 1) }}
-        </span>
+        <MobileAvatar
+          class="u-notif-ava"
+          :src="c.peer.avatarUrl"
+          :name="c.peer.nickname"
+          :tint="c.peer.tint"
+          size="md"
+        />
         <span class="u-msg__body">
           <span class="u-msg__who">
             <strong>{{ c.peer.nickname }}<span class="u-msg__lv">LV{{ c.peer.level.slice(1) }}</span></strong>
@@ -305,9 +310,13 @@ const hasFollows = computed(() => followList.value.length > 0)
             :key="r.author.id"
             class="u-msg__row u-notif__rec"
           >
-            <span class="u-msg__ava" :style="{ background: r.author.tint ?? '#37546e' }">{{
-              r.author.nickname.slice(0, 1)
-            }}</span>
+            <MobileAvatar
+              class="u-notif-ava"
+              :src="r.author.avatarUrl"
+              :name="r.author.nickname"
+              :tint="r.author.tint"
+              size="md"
+            />
             <span class="u-msg__body">
               <span class="u-msg__who">
                 <strong>{{ r.author.nickname }}</strong>
@@ -329,9 +338,13 @@ const hasFollows = computed(() => followList.value.length > 0)
 
         <h3 v-if="followingFeed.length" class="u-notif__recs-title">关注动态</h3>
         <section v-for="p in followingFeed" :key="p.id" class="u-msg__row">
-          <span class="u-msg__ava" :style="{ background: p.author.tint ?? '#37546e' }">{{
-            p.author.nickname.slice(0, 1)
-          }}</span>
+          <MobileAvatar
+            class="u-notif-ava"
+            :src="p.author.avatarUrl"
+            :name="p.author.nickname"
+            :tint="p.author.tint"
+            size="md"
+          />
           <span class="u-msg__body">
             <span class="u-msg__who">
               <strong>{{ p.author.nickname }}</strong>
@@ -352,3 +365,11 @@ const hasFollows = computed(() => followList.value.length > 0)
     </div>
   </div>
 </template>
+
+<style scoped>
+/* 会话 / 推荐关注 / 关注动态行：真实头像（MobileAvatar md=40px）补齐既有 44px 行基线 */
+.u-notif-ava {
+  width: 44px;
+  height: 44px;
+}
+</style>

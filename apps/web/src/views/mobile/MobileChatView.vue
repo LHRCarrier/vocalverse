@@ -13,6 +13,7 @@ import { useRoute, useRouter } from 'vue-router'
 import IconInfoCircle from '~icons/tabler/info-circle'
 
 import { timeAgo } from '@/api/community'
+import MobileAvatar from '@/components/mobile/MobileAvatar.vue'
 import MobileIcon from '@/components/mobile/MobileIcon.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMessagesStore } from '@/stores/messages'
@@ -33,9 +34,6 @@ const listEl = ref<HTMLElement | null>(null)
 const peer = computed(() => messages.conversations.find((c) => c.peer.id === peerId)?.peer ?? null)
 const title = computed(() => peer.value?.nickname ?? '私信')
 const level = computed(() => peer.value?.level ?? '')
-const avatarLetter = computed(() =>
-  (auth.me?.nickname ?? auth.me?.username ?? '同').slice(0, 1).toUpperCase(),
-)
 
 function scrollBottom(behavior: ScrollBehavior = 'auto') {
   void nextTick(() => listEl.value?.scrollTo({ top: listEl.value.scrollHeight, behavior }))
@@ -79,7 +77,12 @@ onUnmounted(() => {
   <div class="u-phone u-chat-page">
     <header class="u-chat__top">
       <button class="u-topbar__ava" type="button" title="账户菜单" aria-label="账户菜单" @click="ui.openDrawer()">
-        {{ avatarLetter }}
+        <MobileAvatar
+          :src="auth.me?.avatarUrl"
+          :name="auth.me?.nickname ?? auth.me?.username"
+          :tint="auth.me?.tint"
+          size="sm"
+        />
       </button>
       <strong class="u-chat__name">
         {{ title }}<span v-if="level" class="u-msg__lv">LV{{ level.slice(1) }}</span>

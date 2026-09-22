@@ -10,6 +10,7 @@ import IconMail from '~icons/tabler/mail'
 import IconSettings from '~icons/tabler/settings'
 
 import { authorDisplay, timeAgo } from '@/api/community'
+import MobileAvatar from '@/components/mobile/MobileAvatar.vue'
 import MobileSkeleton from '@/components/mobile/MobileSkeleton.vue'
 import MobileTopBar from '@/components/mobile/MobileTopBar.vue'
 import MobileUnreadBadge from '@/components/mobile/MobileUnreadBadge.vue'
@@ -69,9 +70,13 @@ function unreadText(n: number): string {
         class="u-msg__row"
         :aria-label="`与 ${c.peer.nickname} 的对话`"
       >
-        <span class="u-msg__ava" :style="{ background: c.peer.tint ?? '#37546e' }">
-          {{ c.peer.nickname.slice(0, 1) }}
-        </span>
+        <MobileAvatar
+          class="u-msg-ava"
+          :src="c.peer.avatarUrl"
+          :name="c.peer.nickname"
+          :tint="c.peer.tint"
+          size="md"
+        />
         <span class="u-msg__body">
           <span class="u-msg__who">
             <strong>{{ c.peer.nickname }}<span class="u-msg__lv">LV{{ c.peer.level.slice(1) }}</span></strong>
@@ -89,3 +94,11 @@ function unreadText(n: number): string {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* 会话行：真实头像（MobileAvatar md=40px）补齐既有 44px 行基线 */
+.u-msg-ava {
+  width: 44px;
+  height: 44px;
+}
+</style>
