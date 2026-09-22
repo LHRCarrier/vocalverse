@@ -138,7 +138,8 @@ public class CommunityService {
     // 多取一条判 hasMore（docs/37 §5 keyset 约定）；DESC 排序由 Pageable 携带（Criteria 执行）
     PageRequest pageable =
         PageRequest.of(0, pageSize + 1, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
-    List<PostEntity> rows = posts.feed(normalized, authorFilter, c.ts(), c.id(), pageable);
+    // actorId 兼作 viewerId：社区流只展示自己的打卡卡（他人打卡不进流，2026-09-22 组长口径）
+    List<PostEntity> rows = posts.feed(normalized, authorFilter, actorId, c.ts(), c.id(), pageable);
     boolean hasMore = rows.size() > pageSize;
     List<PostEntity> page = hasMore ? rows.subList(0, pageSize) : rows;
     List<CommunityPostView> views = buildViews(page, actorId);

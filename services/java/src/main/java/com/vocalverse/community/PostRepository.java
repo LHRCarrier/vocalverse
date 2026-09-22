@@ -45,9 +45,12 @@ public interface PostRepository
    *
    * <p>作者视图同样过滤 hidden：docs/50 §6.2 联动硬点 3「{@code hidden} 对作者也隐藏」—— 作者改从「我的帖子」的 hidden
    * 状态位看到处置结果，而不是继续在正常列表里看到被封的内容。
+   *
+   * <p>{@code viewerId}（2026-09-22 组长口径）：社区流**只展示自己的打卡卡**——他人 checkin 不进流（ {@code kind <> 'checkin'
+   * OR author_id = viewerId}）；自己的打卡卡保留（打卡入口与连续天数在流里可见）。
    */
   default List<PostEntity> feed(
-      String domain, Long authorId, Instant ts, Long id, Pageable pageable) {
+      String domain, Long authorId, Long viewerId, Instant ts, Long id, Pageable pageable) {
     return findAll(
             (root, query, cb) -> {
               List<jakarta.persistence.criteria.Predicate> ps = new ArrayList<>();
@@ -57,6 +60,12 @@ public interface PostRepository
               }
               if (authorId != null) {
                 ps.add(cb.equal(root.get("authorId"), authorId));
+              }
+              if (viewerId != null) {
+                ps.add(
+                    cb.or(
+                        cb.notEqual(root.get("kind"), "checkin"),
+                        cb.equal(root.get("authorId"), viewerId)));
               }
               if (ts != null) {
                 ps.add(
