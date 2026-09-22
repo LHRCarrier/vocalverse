@@ -11,7 +11,7 @@
       "audio_url": "/data/audio/song_twinkle.wav",
       "vocal_ref_url": null,
       "lrc_url": "/data/seed/lrc/twinkle.lrc",
-      "cover_url": null,
+      "cover_url": "/api/v1/songs/covers/twinkle.svg",
       "interest_tags": "[\"nursery\", \"classic\"]",
       "source": "original",
       "status": "published",
@@ -58,7 +58,7 @@
       "audio_url": "/data/audio/song_ode_to_joy.wav",
       "vocal_ref_url": null,
       "lrc_url": "/data/seed/lrc/ode-to-joy.lrc",
-      "cover_url": null,
+      "cover_url": "/api/v1/songs/covers/ode-to-joy.svg",
       "interest_tags": "[\"classic\", \"anthem\"]",
       "source": "original",
       "status": "published",
@@ -95,7 +95,7 @@
       "audio_url": "/data/audio/song_mary_lamb.wav",
       "vocal_ref_url": null,
       "lrc_url": "/data/seed/lrc/mary-lamb.lrc",
-      "cover_url": null,
+      "cover_url": "/api/v1/songs/covers/mary-lamb.svg",
       "interest_tags": "[\"nursery\", \"easy\"]",
       "source": "original",
       "status": "published",
@@ -119,6 +119,265 @@
           "offset_ms": 14820,
           "end_offset_ms": 19720,
           "text": "The lamb was sure to go."
+        }
+      ]
+    },
+    {
+      "title": "Row, Row, Row Your Boat",
+      "artist": "Traditional · 合成旋律（公有领域童谣）",
+      "level": 1,
+      "duration_s": 14,
+      "bpm": 100.0,
+      "musical_key": "C",
+      "audio_url": "/data/audio/song_row_your_boat.wav",
+      "vocal_ref_url": null,
+      "lrc_url": "/data/seed/lrc/row-your-boat.lrc",
+      "cover_url": "/api/v1/songs/covers/row-your-boat.svg",
+      "interest_tags": "[\"nursery\", \"round\"]",
+      "source": "original",
+      "status": "published",
+      "lines": [
+        {
+          "offset_ms": 0,
+          "end_offset_ms": 3700,
+          "text": "Row, row, row your boat,"
+        },
+        {
+          "offset_ms": 3700,
+          "end_offset_ms": 7400,
+          "text": "Gently down the stream."
+        },
+        {
+          "offset_ms": 7400,
+          "end_offset_ms": 9960,
+          "text": "Merrily, merrily, merrily, merrily,"
+        },
+        {
+          "offset_ms": 9960,
+          "end_offset_ms": 13660,
+          "text": "Life is but a dream."
+        }
+      ]
+    },
+    {
+      "title": "London Bridge Is Falling Down",
+      "artist": "Traditional · 合成旋律（公有领域童谣）",
+      "level": 1,
+      "duration_s": 19,
+      "bpm": 100.0,
+      "musical_key": "C",
+      "audio_url": "/data/audio/song_london_bridge.wav",
+      "vocal_ref_url": null,
+      "lrc_url": "/data/seed/lrc/london-bridge.lrc",
+      "cover_url": "/api/v1/songs/covers/london-bridge.svg",
+      "interest_tags": "[\"nursery\", \"classic\"]",
+      "source": "original",
+      "status": "published",
+      "lines": [
+        {
+          "offset_ms": 0,
+          "end_offset_ms": 4940,
+          "text": "London Bridge is falling down,"
+        },
+        {
+          "offset_ms": 4940,
+          "end_offset_ms": 9880,
+          "text": "Falling down, falling down,"
+        },
+        {
+          "offset_ms": 9880,
+          "end_offset_ms": 14820,
+          "text": "London Bridge is falling down,"
+        },
+        {
+          "offset_ms": 14820,
+          "end_offset_ms": 19140,
+          "text": "My fair lady."
+        }
+      ]
+    },
+    {
+      "title": "Old MacDonald Had a Farm",
+      "artist": "Traditional · 合成旋律（公有领域童谣）",
+      "level": 1,
+      "duration_s": 17,
+      "bpm": 100.0,
+      "musical_key": "C",
+      "audio_url": "/data/audio/song_old_macdonald.wav",
+      "vocal_ref_url": null,
+      "lrc_url": "/data/seed/lrc/old-macdonald.lrc",
+      "cover_url": "/api/v1/songs/covers/old-macdonald.svg",
+      "interest_tags": "[\"nursery\", \"animals\"]",
+      "source": "original",
+      "status": "published",
+      "lines": [
+        {
+          "offset_ms": 0,
+          "end_offset_ms": 4940,
+          "text": "Old MacDonald had a farm,"
+        },
+        {
+          "offset_ms": 4940,
+          "end_offset_ms": 8640,
+          "text": "E-I-E-I-O."
+        },
+        {
+          "offset_ms": 8640,
+          "end_offset_ms": 13580,
+          "text": "And on his farm he had a cow,"
+        },
+        {
+          "offset_ms": 13580,
+          "end_offset_ms": 17280,
+          "text": "E-I-E-I-O."
+        }
+      ]
+    },
+    {
+      "title": "Baa, Baa, Black Sheep",
+      "artist": "Traditional · 合成旋律（公有领域童谣）",
+      "level": 1,
+      "duration_s": 20,
+      "bpm": 100.0,
+      "musical_key": "C",
+      "audio_url": "/data/audio/song_baa_baa_black_sheep.wav",
+      "vocal_ref_url": null,
+      "lrc_url": "/data/seed/lrc/baa-baa-black-sheep.lrc",
+      "cover_url": "/api/v1/songs/covers/baa-baa-black-sheep.svg",
+      "interest_tags": "[\"nursery\", \"easy\"]",
+      "source": "original",
+      "status": "published",
+      "lines": [
+        {
+          "offset_ms": 0,
+          "end_offset_ms": 4940,
+          "text": "Baa, baa, black sheep,"
+        },
+        {
+          "offset_ms": 4940,
+          "end_offset_ms": 9880,
+          "text": "Have you any wool?"
+        },
+        {
+          "offset_ms": 9880,
+          "end_offset_ms": 14820,
+          "text": "Yes sir, yes sir, three bags full."
+        },
+        {
+          "offset_ms": 14820,
+          "end_offset_ms": 19760,
+          "text": "One for my master and one for my dame."
+        }
+      ]
+    },
+    {
+      "title": "Jingle Bells",
+      "artist": "Traditional · 合成旋律（公有领域民谣）",
+      "level": 2,
+      "duration_s": 20,
+      "bpm": 100.0,
+      "musical_key": "C",
+      "audio_url": "/data/audio/song_jingle_bells.wav",
+      "vocal_ref_url": null,
+      "lrc_url": "/data/seed/lrc/jingle-bells.lrc",
+      "cover_url": "/api/v1/songs/covers/jingle-bells.svg",
+      "interest_tags": "[\"holiday\", \"classic\"]",
+      "source": "original",
+      "status": "published",
+      "lines": [
+        {
+          "offset_ms": 0,
+          "end_offset_ms": 4920,
+          "text": "Jingle bells, jingle bells,"
+        },
+        {
+          "offset_ms": 4920,
+          "end_offset_ms": 9820,
+          "text": "Jingle all the way."
+        },
+        {
+          "offset_ms": 9820,
+          "end_offset_ms": 14800,
+          "text": "Oh what fun it is to ride"
+        },
+        {
+          "offset_ms": 14800,
+          "end_offset_ms": 19720,
+          "text": "In a one-horse open sleigh."
+        }
+      ]
+    },
+    {
+      "title": "Hot Cross Buns",
+      "artist": "Traditional · 合成旋律（公有领域童谣）",
+      "level": 1,
+      "duration_s": 10,
+      "bpm": 100.0,
+      "musical_key": "C",
+      "audio_url": "/data/audio/song_hot_cross_buns.wav",
+      "vocal_ref_url": null,
+      "lrc_url": "/data/seed/lrc/hot-cross-buns.lrc",
+      "cover_url": "/api/v1/songs/covers/hot-cross-buns.svg",
+      "interest_tags": "[\"nursery\", \"short\"]",
+      "source": "original",
+      "status": "published",
+      "lines": [
+        {
+          "offset_ms": 0,
+          "end_offset_ms": 2460,
+          "text": "Hot cross buns,"
+        },
+        {
+          "offset_ms": 2460,
+          "end_offset_ms": 4920,
+          "text": "Hot cross buns,"
+        },
+        {
+          "offset_ms": 4920,
+          "end_offset_ms": 7480,
+          "text": "One a penny, two a penny,"
+        },
+        {
+          "offset_ms": 7480,
+          "end_offset_ms": 9940,
+          "text": "Hot cross buns."
+        }
+      ]
+    },
+    {
+      "title": "Frère Jacques",
+      "artist": "Traditional · 合成旋律（公有领域民谣）",
+      "level": 2,
+      "duration_s": 20,
+      "bpm": 100.0,
+      "musical_key": "C",
+      "audio_url": "/data/audio/song_frere_jacques.wav",
+      "vocal_ref_url": null,
+      "lrc_url": "/data/seed/lrc/frere-jacques.lrc",
+      "cover_url": "/api/v1/songs/covers/frere-jacques.svg",
+      "interest_tags": "[\"folk\", \"round\"]",
+      "source": "original",
+      "status": "published",
+      "lines": [
+        {
+          "offset_ms": 0,
+          "end_offset_ms": 4960,
+          "text": "Frère Jacques, Frère Jacques,"
+        },
+        {
+          "offset_ms": 4960,
+          "end_offset_ms": 9880,
+          "text": "Dormez-vous? Dormez-vous?"
+        },
+        {
+          "offset_ms": 9880,
+          "end_offset_ms": 14920,
+          "text": "Sonnez les matines, sonnez les matines."
+        },
+        {
+          "offset_ms": 14920,
+          "end_offset_ms": 19840,
+          "text": "Ding dang dong, ding dang dong."
         }
       ]
     }

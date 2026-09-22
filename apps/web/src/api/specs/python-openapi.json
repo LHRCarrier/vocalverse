@@ -1125,6 +1125,45 @@
         }
       }
     },
+    "/api/v1/songs/covers/{name}": {
+      "get": {
+        "tags": [
+          "singing"
+        ],
+        "summary": "Song Cover",
+        "description": "歌曲封面图（**公开**端点，无鉴权）。\n\n为什么公开：封面是**非隐私的内容资产**，且 `<img src>` 不会带 Authorization 头 ——\n与书封 `reading.py /covers/{name}` 完全同款处置，风险面同样被三重收窄：\n只读、只服务 `data/seed/song-covers/` 下的白名单文件名、目录穿越由 `_SAFE_COVER_NAME` 挡掉。\n\n资产位置：`data/seed/song-covers/`（随仓库分发的程序生成矢量图，`.gitignore` 已豁免\n`data/seed/**`）。`songs.cover_url` 存**站点相对路径**（如 `/api/v1/songs/covers/twinkle.svg`，\n文件名 = `scripts/setup-assets.py` 的 slug），前端必须过 `mediaUrl()`\n拼 `PYTHON_BASE`——打包壳里页面源是 `https://localhost`，相对路径会打到壳自身资源服务器（404）。",
+        "operationId": "song_cover_api_v1_songs_covers__name__get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "歌曲封面图文件（image/*）",
+            "content": {
+              "image/*": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sessions/{session_id}/audio": {
       "post": {
         "tags": [

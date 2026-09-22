@@ -2,6 +2,8 @@
 
 - ``GET /api/v1/songs``：已发布歌曲列表（唱吧选歌；含 pitch_ref_status 就绪门禁与行数）；
 - ``GET /api/v1/songs/{id}``：歌曲详情（逐句 LRC + 每句参考旋律 f0s——D3 双序列图数据源）；
+- ``GET /api/v1/songs/covers/{name}``：歌曲封面图（**公开**静态资产，`data/seed/song-covers/`；
+  2026-09-22 加，与书封 `reading.py /covers/{name}` 同款）；
 - ``PUT /api/v1/songs/{id}/favorite`` / ``DELETE /api/v1/songs/{id}/favorite``：收藏/取消收藏
   （2026-09-10；幂等，见 app/sing/favorites.py）；列表与详情的 ``favorited`` 即其读侧；
 - ``POST /api/v1/sessions/{id}/audio``：整首音频上传（multipart）→ 建评分任务；
@@ -15,11 +17,15 @@ sing 桶 5/h + ise 桶（发音抽样）在 service 层 consume；错误码 4090
 from __future__ import annotations
 
 import asyncio
+import mimetypes
+import re
 
 from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 
 from app.core.auth import get_current_user_id
+from app.core.paths import song_cover_dir
 from app.core.response import BizError, Envelope, ok
 from app.db import get_session_factory
 from app.models import Lrc, Song, SongPitchRef
@@ -147,6 +153,41 @@ async def add_song_favorite(song_id: int, user_id: int = Depends(get_current_use
 async def remove_song_favorite(song_id: int, user_id: int = Depends(get_current_user_id)):
     """取消收藏（幂等：未收藏时调用同样返回 favorited=false）。"""
     return ok(await asyncio.to_thread(set_song_favorite, user_id, song_id, False))
+
+
+#: 歌曲封面文件名白名单（与 reading.py `_SAFE_COVER_NAME` 同款安全口径：只允许字母数字 . _ -，
+#: 防目录穿越——`<img src>` 无法带 Authorization，公开端点必须自己把住路径）
+_SAFE_COVER_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+@router.get(
+    "/songs/covers/{name}",
+    response_class=FileResponse,
+    # 声明真实响应体：不写的话 OpenAPI 会按默认 `application/json` + 空 schema 出契约，
+    # 而这里实际回的是图片二进制（与 reading.py /covers、practice.py /audio 同口径）。
+    responses={200: {"description": "歌曲封面图文件（image/*）", "content": {"image/*": {}}}},
+)
+async def song_cover(name: str) -> FileResponse:
+    """歌曲封面图（**公开**端点，无鉴权）。
+
+    为什么公开：封面是**非隐私的内容资产**，且 `<img src>` 不会带 Authorization 头 ——
+    与书封 `reading.py /covers/{name}` 完全同款处置，风险面同样被三重收窄：
+    只读、只服务 `data/seed/song-covers/` 下的白名单文件名、目录穿越由 `_SAFE_COVER_NAME` 挡掉。
+
+    资产位置：`data/seed/song-covers/`（随仓库分发的程序生成矢量图，`.gitignore` 已豁免
+    `data/seed/**`）。`songs.cover_url` 存**站点相对路径**（如 `/api/v1/songs/covers/twinkle.svg`，
+    文件名 = `scripts/setup-assets.py` 的 slug），前端必须过 `mediaUrl()`
+    拼 `PYTHON_BASE`——打包壳里页面源是 `https://localhost`，相对路径会打到壳自身资源服务器（404）。
+    """
+    if not _SAFE_COVER_NAME.match(name) or ".." in name:
+        raise BizError(400, 40001, "bad cover name")
+    path = song_cover_dir() / name
+    if not path.is_file():
+        raise BizError(404, 40401, f"song cover missing: {name}")
+    media_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    return FileResponse(
+        path, media_type=media_type, headers={"Cache-Control": "public, max-age=86400"}
+    )
 
 
 @router.post("/sessions/{session_id}/audio", response_model=Envelope[SubmitAck])

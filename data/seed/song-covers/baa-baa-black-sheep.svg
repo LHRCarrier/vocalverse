@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Baa, Baa, Black Sheep">
+<defs>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F2E9D8"/><stop offset="1" stop-color="#8FA3B8"/></linearGradient>
+<radialGradient id="gl" cx="0.5" cy="0.34" r="0.72"><stop offset="0" stop-color="#fff" stop-opacity="0.20"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="512" height="512" fill="url(#g)"/>
+<rect width="512" height="512" fill="url(#gl)"/><circle cx="240" cy="252" r="72" fill="#2C3444" opacity=".95"/>
+<circle cx="186" cy="212" r="36" fill="#2C3444" opacity=".95"/>
+<circle cx="296" cy="210" r="34" fill="#2C3444" opacity=".95"/>
+<circle cx="330" cy="222" r="30" fill="#3A4456" opacity=".95"/>
+<circle cx="352" cy="238" r="4" fill="#F2E9D8"/>
+<path d="M206 322h14v52h-14zM272 322h14v52h-14z" fill="#2C3444" opacity=".8"/>
+<path d="M0 428q128-46 256 0t256 0v84H0z" fill="#6B7C8F" opacity=".4"/>
+</svg>

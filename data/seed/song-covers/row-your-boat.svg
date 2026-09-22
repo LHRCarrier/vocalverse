@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Row, Row, Row Your Boat">
+<defs>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2AA6A6"/><stop offset="1" stop-color="#1C4E80"/></linearGradient>
+<radialGradient id="gl" cx="0.5" cy="0.34" r="0.72"><stop offset="0" stop-color="#fff" stop-opacity="0.20"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="512" height="512" fill="url(#g)"/>
+<rect width="512" height="512" fill="url(#gl)"/><path d="M256 116l80 138h-80z" fill="#FFFFFF" opacity=".92"/>
+<path d="M244 128v126h-72z" fill="#FFFFFF" opacity=".7"/>
+<path d="M140 268h236l-30 46H166z" fill="#0E2A47"/>
+<g stroke="#BFF0F0" stroke-width="9" stroke-linecap="round" opacity=".95">
+<path d="M96 352q40-20 80 0t80 0 80 0 80 0"/>
+<path d="M76 404q40-20 80 0t80 0 80 0 80 0" opacity=".7"/>
+</g>
+<path d="M0 452q128-30 256 0t256 0v60H0z" fill="#07223C" opacity=".5"/>
+</svg>
