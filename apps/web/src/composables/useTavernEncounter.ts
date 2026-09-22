@@ -4,7 +4,8 @@
  * 数据来源：
  * - 遭遇：事实 `encounter.{id}.status|order|turn|round`（order 为 JSON 数组字符串）+
  *   `encounter` SSE 事件增量；参战者 HP 取 `npc.{名}.hp` / `pc.{名}.hp`；
- * - 道具：事实 `item.{名}.qty|owner|effect|consumable`（docs/56 §2，owner 为 `pc.{名}`）。
+ * - 道具：事实 `item.{名}.qty|owner|effect|consumable`（docs/56 §2，owner 为 `pc.{名}`），
+ *   外加 `pc.{名}.inventory` 字符串兜底（旧场景卡只有行囊串，没有 `item.*` 事实）。
  *
  * `item_used` 不是 SSE 事件（docs/56 §5）：道具数量变化靠回合结束的状态刷新回落。
  */
@@ -43,16 +44,12 @@ export interface TavernItem {
   consumable: boolean
 }
 
-/** 建议行动（通用文本动作，经 session.sendText 走 DM 工具循环） */
-export const TAVERN_SUGGESTIONS: ReadonlyArray<{ label: string; text: string }> = [
-  { label: '观察', text: '我仔细观察四周' },
-  { label: '交谈', text: '我试着与对方交谈' },
-  { label: '前进', text: '我继续向前推进' },
-]
-
 const ENCOUNTER_KEY_RE = /^encounter\.(.+)\.(status|order|turn|round)$/
 const ITEM_KEY_RE = /^item\.(.+)\.(qty|owner|effect|consumable)$/
 const HP_KEY_RE = /^(npc|pc)\.(.+)\.hp$/
+const INVENTORY_KEY_RE = /^pc\.(.+)\.inventory$/
+/** 治疗/回复类效果（含此类效果的消耗品不能当武器，docs/57 §3.2） */
+const HEAL_EFFECT_RE = /回复|恢复|治疗|回血|生命|血量|愈合|heal|hp/i
 
 function intOrNull(value: string | null | undefined): number | null {
   const num = Number(String(value ?? '').trim())
@@ -144,6 +141,19 @@ function parseItems(facts: TrpgFactItem[]): Map<string, TavernItem> {
   return map
 }
 
+/** 行囊字符串 → 物品名列表（中英文逗号/分号/顿号/斜杠通吃，去空） */
+export function splitInventory(value: string | null | undefined): string[] {
+  return String(value ?? '')
+    .split(/[,;，；、/]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+/** 武器候选：非消耗品且非治疗类效果（药水不能当武器，docs/57 §3.2） */
+export function isWeapon(item: TavernItem): boolean {
+  return !item.consumable && !HEAL_EFFECT_RE.test(item.effect ?? '')
+}
+
 export function useTavernEncounter(state: Ref<TrpgState | null>) {
   const overlay = ref<Partial<TavernEncounter> | null>(null)
   const hpOverrides = ref(new Map<string, string>())
@@ -214,12 +224,28 @@ export function useTavernEncounter(state: Ref<TrpgState | null>) {
       }))
   })
 
-  /** 持有者可用的道具（qty>0；owner 为 `pc.{自己}` 或无主时按玩家背包处理） */
+  /** 行囊事实值：自己的 `pc.{名}.inventory` 优先，否则任意 PC 行囊（旧场景卡兜底） */
+  function inventoryValue(): string | null {
+    const facts = state.value?.facts ?? []
+    const ownerKey = self.value ? `pc.${self.value.name}.inventory` : null
+    if (ownerKey) {
+      const own = facts.find((f) => f.key === ownerKey)
+      if (own) return own.value
+    }
+    return facts.find((f) => INVENTORY_KEY_RE.test(f.key))?.value ?? null
+  }
+
+  /** 持有者可用的道具：`item.*`（qty>0，owner 为自己/无主）+ `pc.*.inventory` 字符串兜底 */
   const items = computed<TavernItem[]>(() => {
     const ownerKey = self.value ? `pc.${self.value.name}` : null
-    return [...parseItems(state.value?.facts ?? []).values()]
+    const owned = [...parseItems(state.value?.facts ?? []).values()]
       .filter((item) => item.qty > 0)
       .filter((item) => !item.owner || (ownerKey ? item.owner === ownerKey : item.owner.startsWith('pc.')))
+    const known = new Set(owned.map((item) => item.name))
+    const fallback: TavernItem[] = splitInventory(inventoryValue())
+      .filter((name) => !known.has(name))
+      .map((name) => ({ name, qty: 1, owner: ownerKey, effect: null, consumable: false }))
+    return [...owned, ...fallback]
   })
 
   /** 应用 `encounter` 事件：四相增量（start/turn 覆盖序；attack 覆盖目标 HP；end 关闭） */
@@ -245,5 +271,5 @@ export function useTavernEncounter(state: Ref<TrpgState | null>) {
     overlay.value = current
   }
 
-  return { encounter, participants, attackTargets, items, suggestions: TAVERN_SUGGESTIONS, apply }
+  return { encounter, participants, attackTargets, items, apply }
 }

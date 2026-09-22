@@ -1,23 +1,25 @@
 <script setup lang="ts">
 /**
- * 酒馆 · 动作面板（docs/56 §6）：贴底栏上方的快速行动条（遭遇战况 / 攻击 / 道具 / 建议行动）。
+ * 酒馆 · 动作面板（docs/56 §6 + docs/57 §3.2）：
  *
- * 口径：**文本动作**（点按只发送台词，判定与状态由后端 DM 工具循环权威结算）——
- * - 攻击：先出小型确认（目标 + 可选武器，来自可用道具），确认后发「我攻击{目标}」；
- * - 道具：直接发「我使用{道具}」；
- * - 建议行动：观察/交谈/前进，直接发对应台词。
+ * - **常驻**：无实体/无道具时也给通用行动（观察/交谈/前进）；
+ * - 单行 chip：攻击（仅遭遇激活时由页面传入）/ 道具 / 情境建议 / 收尾；
+ *   横滑 + 两侧渐隐（CSS），点按行为：
+ *   - 情境建议 → 只填入输入框（`prefill`，与旧 dock「推荐行动」合并为一排）；
+ *   - 道具 → 直接发「我使用{道具}」+ 即时回执（`feedback` toast）；
+ *   - 攻击 → 二次确认（武器下拉排除消耗品/治疗品）→ 发送 + 回执；
+ *   - 收尾本幕 → 页面调确定性结算接口。
  * 遭遇进行中时顶部内嵌 TrpgEncounterCard（轮次/先攻序/HP）。
  */
 import { computed, ref } from 'vue'
 
 import IconFlask from '~icons/tabler/flask'
 import IconSword from '~icons/tabler/sword'
+import IconFlag from '~icons/tabler/flag-check'
 
-import type {
-  TavernEncounter,
-  TavernItem,
-  TavernParticipant,
-} from '@/composables/useTavernEncounter'
+import type { TavernQuickAction } from '@/composables/useTavernSuggestions'
+import type { TavernEncounter, TavernItem, TavernParticipant } from '@/composables/useTavernEncounter'
+import { isWeapon } from '@/composables/useTavernEncounter'
 
 import TrpgEncounterCard from './TrpgEncounterCard.vue'
 
@@ -25,10 +27,13 @@ const props = withDefaults(
   defineProps<{
     attackTargets?: TavernParticipant[]
     items?: TavernItem[]
-    quickActions?: readonly { label: string; text: string }[]
+    quickActions?: readonly TavernQuickAction[]
     encounter?: TavernEncounter | null
     participants?: TavernParticipant[]
+    /** 满格、可收尾的进行中任务（页面过滤后传入；空 = 不渲染收尾钮） */
+    settleable?: readonly { name: string }[]
     disabled?: boolean
+    settling?: boolean
   }>(),
   {
     attackTargets: () => [],
@@ -36,20 +41,30 @@ const props = withDefaults(
     quickActions: () => [],
     encounter: null,
     participants: () => [],
+    settleable: () => [],
     disabled: false,
+    settling: false,
   },
 )
 
-const emit = defineEmits<{ send: [text: string] }>()
+const emit = defineEmits<{
+  send: [text: string]
+  prefill: [text: string]
+  feedback: [message: string]
+  settle: [quest: string]
+}>()
 
 /** 待确认的攻击目标（null = 无确认面板） */
 const pendingTarget = ref<TavernParticipant | null>(null)
 const weapon = ref('')
 
-const weaponOptions = computed(() => props.items.map((item) => item.name))
+/** 武器候选：排除消耗品与治疗类道具（药水不能当武器） */
+const weaponOptions = computed(() => props.items.filter(isWeapon).map((item) => item.name))
+
+const canAct = computed(() => !props.disabled)
 
 function openAttack(target: TavernParticipant) {
-  if (props.disabled) return
+  if (!canAct.value) return
   pendingTarget.value = target
   weapon.value = ''
 }
@@ -61,16 +76,24 @@ function confirmAttack() {
   pendingTarget.value = null
   weapon.value = ''
   emit('send', line)
+  emit('feedback', `已出手 · ${line}`)
 }
 
 function useItem(item: TavernItem) {
-  if (props.disabled) return
-  emit('send', `我使用${item.name}`)
+  if (!canAct.value) return
+  const line = `我使用${item.name}`
+  emit('send', line)
+  emit('feedback', `已使用 · ${item.name}`)
 }
 
 function suggest(text: string) {
-  if (props.disabled) return
-  emit('send', text)
+  if (!canAct.value) return
+  emit('prefill', text)
+}
+
+function settle(quest: string) {
+  if (!canAct.value || props.settling) return
+  emit('settle', quest)
 }
 </script>
 
@@ -100,7 +123,7 @@ function suggest(text: string) {
     </div>
 
     <div v-else class="t-act-panel__row">
-      <span class="t-act-panel__label">⚡ 快速行动</span>
+      <span class="t-act-panel__label" aria-hidden="true">⚡ 行动</span>
       <button
         v-for="target in props.attackTargets"
         :key="`atk-${target.key}`"
@@ -123,12 +146,23 @@ function suggest(text: string) {
         @click="useItem(item)"
       >
         <IconFlask />
-        <span>{{ item.name }} ×{{ item.qty }}</span>
+        <span>{{ item.name }}<template v-if="item.qty > 1"> ×{{ item.qty }}</template></span>
+      </button>
+      <button
+        v-for="quest in props.settleable"
+        :key="`settle-${quest.name}`"
+        class="t-act-chip t-act-chip--settle"
+        type="button"
+        :disabled="props.disabled || props.settling"
+        @click="settle(quest.name)"
+      >
+        <IconFlag />
+        <span>收尾本幕 · {{ quest.name }}</span>
       </button>
       <button
         v-for="action in props.quickActions"
-        :key="`sug-${action.label}`"
-        class="t-act-chip"
+        :key="`sug-${action.kind}-${action.label}`"
+        class="t-act-chip t-act-chip--suggest"
         type="button"
         :disabled="props.disabled"
         @click="suggest(action.text)"

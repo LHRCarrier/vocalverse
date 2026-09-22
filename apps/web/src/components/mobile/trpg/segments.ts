@@ -86,6 +86,29 @@ export function sceneAtmosphere(scene: string | null | undefined): string {
 }
 
 /* ============================================================
+ * 判定 / 战报卡文案与档位（2026-09-22 · docs/57 §3.2）
+ * ============================================================ */
+
+/** 判定卡档位：命中/成功 → success；失手/未命中/失败 → failure（先判失败，避免「未命中」含「命中」误判） */
+export function diceOutcomeOf(text: string): 'success' | 'failure' | null {
+  const raw = String(text ?? '')
+  if (/失手|未命中|失败|落空/.test(raw)) return 'failure'
+  if (/命中|成功|得手/.test(raw)) return 'success'
+  return null
+}
+
+/**
+ * 玩家向文案兜底：内部键名 `pc.主角.hp=7` → `主角 HP 7`（后端已 prettify 时无匹配、原样返回）。
+ * 只处理 HP（战报卡最常见的内部键），不碰其余文本。
+ */
+export function prettifyDiceText(text: string): string {
+  return String(text ?? '').replace(
+    /\b(pc|npc)\.([^.=\s]+)\.hp\s*=\s*/g,
+    (_m, _kind: string, name: string) => `${name} HP `,
+  )
+}
+
+/* ============================================================
  * 消息渲染 token / 行 / 说话块（2026-09-22 从 TrpgMessageItem 抽出：
  * 纯函数便于单测，也让组件文件不超 fe-08 行数上限）
  * ============================================================ */

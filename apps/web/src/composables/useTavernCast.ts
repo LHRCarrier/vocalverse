@@ -26,9 +26,10 @@ export interface TavernCastMember {
   portraitUrl: string | null
 }
 
-/** 实体状态归一（后端实体表 → 前端三态） */
+/** 实体状态归一（后端实体表 → 前端三态）：PC 永不 arriving（docs/57 §3.2） */
 export function memberStatus(entity: TrpgEntityItem): TavernCastStatus {
   if (entity.status === 'cleared') return 'departed'
+  if (entity.kind === 'pc') return 'active'
   return entity.pending ? 'arriving' : 'active'
 }
 
@@ -100,11 +101,12 @@ export function useTavernCast(state: Ref<TrpgState | null>) {
   const arriving = computed(() => members.value.filter((m) => m.status === 'arriving'))
   const departed = computed(() => members.value.filter((m) => m.status === 'departed'))
 
-  /** 应用 `character` 事件：入场/在场/离场三态增量。 */
+  /** 应用 `character` 事件：入场/在场/离场三态增量（PC arriving 归一为 active）。 */
   function apply(e: TrpgCharacterEvent): void {
+    const status = e.kind === 'pc' && e.status === 'arriving' ? 'active' : e.status
     overlays.value.set(e.name, {
       kind: e.kind === 'pc' ? 'pc' : 'npc',
-      status: e.status,
+      status,
       note: e.note ?? null,
     })
   }

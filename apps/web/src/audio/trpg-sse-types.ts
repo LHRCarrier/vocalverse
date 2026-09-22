@@ -41,10 +41,10 @@ export interface TrpgAudioChunkEvent {
   offset?: number | null
 }
 
-/** 系统卡（开场/过场/判定）——与 trpg_messages.kind=system 同协议 */
+/** 系统卡（开场/过场/判定/尾声）——与 trpg_messages.kind=system 同协议 */
 export interface TrpgSystemCardEvent {
   type: 'system'
-  trpg_sys: 'open' | 'scene' | 'dice'
+  trpg_sys: 'open' | 'scene' | 'dice' | 'ending'
   payload: Record<string, unknown>
 }
 

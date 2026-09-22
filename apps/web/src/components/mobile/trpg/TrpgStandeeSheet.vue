@@ -32,8 +32,10 @@ const props = withDefaults(
     initialHero?: Hero
     /** 任意 NPC 主角（docs/56 §6：点击在场角色条/立绘事件打开；无图时回退内置素材→首字） */
     npc?: { name: string; kind: string; portraitUrl?: string | null; note?: string | null } | null
+    /** 该 NPC 的在场状态（docs/57 §3.2：在场/赶来中/已离场标记） */
+    status?: 'active' | 'arriving' | 'departed' | null
   }>(),
-  { scene: null, initialHero: 'dm', npc: null },
+  { scene: null, initialHero: 'dm', npc: null, status: null },
 )
 
 const emit = defineEmits<{ close: []; roll: [] }>()
@@ -60,6 +62,13 @@ const inventoryTags = computed(() =>
 
 const isDm = computed(() => hero.value === 'dm')
 const isNpc = computed(() => hero.value === 'npc' && props.npc != null)
+/** 展台状态标记（docs/57 §3.2）：仅在 NPC 档案且有状态时显示 */
+const statusText = computed(() => {
+  if (!isNpc.value || !props.status) return null
+  if (props.status === 'departed') return '已离场'
+  if (props.status === 'arriving') return '赶来中'
+  return '在场'
+})
 const heroName = computed(() =>
   isDm.value ? '守密人 (DM)' : isNpc.value ? (props.npc?.name ?? props.pcName) : props.pcName,
 )
@@ -123,7 +132,14 @@ const heroTraits = computed<string[]>(() => {
 
       <div class="t-standee__meta">
         <div class="t-standee__who">
-          <div class="t-standee__name">{{ heroName }}</div>
+          <div class="t-standee__name">
+            {{ heroName }}
+            <span
+              v-if="statusText"
+              class="t-standee__status"
+              :class="`is-${props.status}`"
+            >{{ statusText }}</span>
+          </div>
           <div class="t-standee__role">{{ heroRole }}</div>
         </div>
         <div class="t-standee__tabs" role="tablist" aria-label="档案切换">

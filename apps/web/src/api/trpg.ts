@@ -100,6 +100,19 @@ export interface TrpgState {
   snapshot: string
   narrative_summary?: string | null
   verify: TrpgVerifyResult
+  /** 本局是否已完结（任一任务结算后由后端置位，docs/57 §3.1） */
+  finished?: boolean
+  finished_at?: string | null
+}
+
+/** 确定性结算结果（`POST /campaigns/{id}/quests/settle`，幂等） */
+export interface TrpgSettleResult {
+  quest: string
+  outcome: 'strong' | 'weak' | 'miss'
+  title: string
+  text: string
+  epilogue: string
+  finished: boolean
 }
 
 export interface TrpgRollResult {
@@ -258,6 +271,21 @@ export function refreshNarrative(campaignId: number) {
   return post<{ narrative_summary: string }>(
     `/api/v1/trpg/campaigns/${campaignId}/narrative/refresh`,
   )
+}
+
+/**
+ * 确定性结算（docs/57 §3.1）：钟满/玩家主动收尾时直接调后端，
+ * 幂等——已结算任务返回既有结局，不新发结局卡。
+ */
+export function settleQuest(
+  campaignId: number,
+  quest: string,
+  outcome?: 'strong' | 'weak' | 'miss',
+) {
+  return post<TrpgSettleResult>(`/api/v1/trpg/campaigns/${campaignId}/quests/settle`, {
+    quest,
+    outcome,
+  })
 }
 
 // ---------------------------------------------------------------------------

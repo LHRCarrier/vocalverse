@@ -9,9 +9,6 @@ import { computed, ref } from 'vue'
 import {
   clearCampaignMessages,
   createCampaign,
-  createClue,
-  createTask,
-  editFact,
   fetchCampaignState,
   fetchCampaigns,
   setScene,
@@ -20,12 +17,14 @@ import {
   type TrpgState,
 } from '@/api/trpg'
 import type { TrpgSseEvent } from '@/audio/trpg-sse-types'
-import { MIN_RECORD_MS, VoiceRecorder, micErrorMessage } from '@/audio/recorder'
 import type { TavernAudio } from '@/composables/useTavernAudio'
 import { useTavernCast } from '@/composables/useTavernCast'
 import { useTavernConsole } from '@/composables/useTavernConsole'
+import { seedDemoCampaign } from '@/composables/useTavernDemo'
 import { useTavernEncounter } from '@/composables/useTavernEncounter'
 import { useTavernQuest } from '@/composables/useTavernQuest'
+import { useTavernRecorder } from '@/composables/useTavernRecorder'
+import { upsertEndingRow, useTavernSettle } from '@/composables/useTavernSettle'
 
 export interface TavernRow {
   role: 'user' | 'assistant'
@@ -47,8 +46,9 @@ export function useTavernSession(audio: TavernAudio) {
   const inputError = ref<string | null>(null)
   const bootError = ref<string | null>(null)
   const sending = ref(false)
-  const recording = ref(false)
   const statusHint = ref<string | null>(null)
+  /** 流式跟随用：每次 turn_end +1（视图据此保证一次滚底，docs/57 §3.2） */
+  const turnEndAt = ref(0)
   /**
    * 最近一次立绘展示信号（关键节点，docs/54 P1 骨架）：
    * 页面消费后调用 dismissPortrait()；图源未接时 url 为 null（页面按名字命中内置素材）。
@@ -63,7 +63,6 @@ export function useTavernSession(audio: TavernAudio) {
   /** 最近一条 DM 文本行的下标（系统卡可能在其后插入，音频块到达时不能靠 rows.length 反推） */
   const assistantRowIndex = ref<number | null>(null)
 
-  const recorder = new VoiceRecorder()
   let abort = new AbortController()
 
   const status = computed<'idle' | 'busy' | 'error'>(() => {
@@ -71,7 +70,14 @@ export function useTavernSession(audio: TavernAudio) {
     if (sending.value) return 'busy'
     return 'idle'
   })
-  const hp = computed(() => state.value?.facts.find((f) => f.key.endsWith('.hp'))?.value ?? null)
+  /** 玩家 HP 只认 `pc.*.hp`（敌人 `npc.*.hp` 只进遭遇卡，docs/57 §3.2）；有 PC 实体时优先同名键 */
+  const hp = computed(() => {
+    const facts = state.value?.facts ?? []
+    const pcEntity = state.value?.entities.find((e) => e.kind === 'pc')
+    const own = pcEntity ? facts.find((f) => f.key === `pc.${pcEntity.name}.hp`) : undefined
+    if (own) return own.value
+    return facts.find((f) => /^pc\..+\.hp$/.test(f.key))?.value ?? null
+  })
   const location = computed(
     () => state.value?.facts.find((f) => f.key.endsWith('.location'))?.value ?? null,
   )
@@ -112,6 +118,7 @@ export function useTavernSession(audio: TavernAudio) {
     assistantRowIndex.value = null
     inputError.value = null
     sending.value = false
+    settleDomain.reset()
     campaignId.value = id
     localStorage.setItem(STORAGE_KEY, String(id))
     try {
@@ -146,13 +153,7 @@ export function useTavernSession(audio: TavernAudio) {
     try {
       const created = await createCampaign(options.name)
       await setScene(created.id, options.scene)
-      if (options.demo) {
-        await editFact(created.id, 'pc.主角.hp', '12')
-        await editFact(created.id, 'pc.主角.location', '吧台')
-        await editFact(created.id, 'pc.主角.inventory', '短剑')
-        await createTask(created.id, '打听镇上的怪谈')
-        await createClue(created.id, '地下室里的暗门', '酒保提到过地下室的门', options.scene)
-      }
+      if (options.demo) await seedDemoCampaign(created.id, options.scene)
       campaigns.value = await fetchCampaigns()
       await selectCampaign(created.id)
     } catch (e) {
@@ -211,33 +212,16 @@ export function useTavernSession(audio: TavernAudio) {
     sendTurn(form, text)
   }
 
-  function toggleMic() {
-    if (sending.value) return
-    if (recording.value) {
-      if (recorder.state === 'recording') recorder.stop()
-      else recorder.cancel()
-      return
-    }
-    inputError.value = null
-    recording.value = true
-    void recorder.start(30_000).catch((e) => {
-      recording.value = false
-      inputError.value = micErrorMessage(e)
-    })
-  }
-
-  recorder.onStateChange = (s) => {
-    if (s !== 'recording') recording.value = false
-  }
-  recorder.onStop = (blob, _mime, durationMs) => {
-    if (durationMs < MIN_RECORD_MS) {
-      inputError.value = `录音太短（${(durationMs / 1000).toFixed(1)}s），请说满约 ${MIN_RECORD_MS / 1000} 秒后再点 ■ 停止`
-      return
-    }
-    const form = new FormData()
-    form.append('audio', blob, 'recording.webm')
-    sendTurn(form, '🎙 语音行动…')
-  }
+  /** 语音输入（录音状态机在 useTavernRecorder）：有效录音 → multipart 回合 */
+  const { recording, toggleMic } = useTavernRecorder({
+    sending,
+    setError: (message) => { inputError.value = message },
+    sendAudio: (blob) => {
+      const form = new FormData()
+      form.append('audio', blob, 'recording.webm')
+      sendTurn(form, '🎙 语音行动…')
+    },
+  })
 
   function onSseEvent(e: TrpgSseEvent) {
     switch (e.type) {
@@ -266,19 +250,32 @@ export function useTavernSession(audio: TavernAudio) {
         }
         break
       case 'system':
-        rows.value.push({
-          role: 'assistant',
-          kind: 'system',
-          content: '',
-          payload: { trpg_sys: e.trpg_sys, ...e.payload },
-        })
+        if (e.trpg_sys === 'ending') {
+          upsertEndingRow(rows, { trpg_sys: 'ending', ...e.payload })
+        } else {
+          rows.value.push({
+            role: 'assistant',
+            kind: 'system',
+            content: '',
+            payload: { trpg_sys: e.trpg_sys, ...e.payload },
+          })
+        }
         break
       /* 闭环事件（docs/56 §5）：本层只做委派，派生在各自领域 composable */
       case 'quest':
         questDomain.apply(e)
         break
       case 'ending':
+        // 尾声兜底（docs/57 §3.2）：系统卡未落/落晚时，实时事件也要有卡可看（同任务去重）
         questDomain.applyEnding(e)
+        upsertEndingRow(rows, {
+          trpg_sys: 'ending',
+          quest: e.quest,
+          outcome: e.outcome,
+          title: e.title,
+          text: e.text,
+          epilogue: e.epilogue,
+        })
         break
       case 'character':
         castDomain.apply(e)
@@ -301,6 +298,7 @@ export function useTavernSession(audio: TavernAudio) {
           currentAssistant.value.live = false
           currentAssistant.value.speakable = true
         }
+        turnEndAt.value += 1
         break
       case 'error':
         inputError.value = `酒馆提示：${e.code}`
@@ -332,6 +330,18 @@ export function useTavernSession(audio: TavernAudio) {
   const castDomain = useTavernCast(state)
   const encounterDomain = useTavernEncounter(state)
 
+  /** 确定性结算（docs/57 §3.1/§3.2；编排在 useTavernSettle） */
+  const settleDomain = useTavernSettle({
+    campaignId,
+    rows,
+    state,
+    applyEnding: questDomain.applyEnding,
+    sendFallback: sendText,
+    refresh: refreshState,
+    setError: (message) => { inputError.value = message },
+    onSettled: () => { statusHint.value = '本幕已收尾' },
+  })
+
   function dispose() {
     abort.abort()
     audio.flush()
@@ -352,15 +362,18 @@ export function useTavernSession(audio: TavernAudio) {
     bootError,
     sending,
     recording,
+    settling: settleDomain.settling,
     statusHint,
     portrait,
     status,
     hp,
+    finished: settleDomain.finished,
     location,
     inventory,
     activeTasks,
     danglingCount,
     npcNames,
+    turnEndAt,
     dismissPortrait,
     boot,
     refreshCampaigns,
@@ -371,6 +384,7 @@ export function useTavernSession(audio: TavernAudio) {
     restartCampaign,
     sendText,
     toggleMic,
+    settleQuest: settleDomain.settle,
     dispose,
     quest: questDomain,
     cast: castDomain,

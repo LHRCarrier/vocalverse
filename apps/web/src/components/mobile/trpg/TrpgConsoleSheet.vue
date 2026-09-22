@@ -10,6 +10,8 @@ import MobileIcon from '@/components/mobile/MobileIcon.vue'
 
 import type { TrpgClueItem, TrpgFactItem, TrpgEventItem, TrpgTaskItem } from '@/api/trpg'
 
+type Tab = 'state' | 'facts' | 'quests' | 'dice'
+
 const props = withDefaults(
   defineProps<{
     open: boolean
@@ -22,8 +24,10 @@ const props = withDefaults(
     clues: TrpgClueItem[]
     events: TrpgEventItem[]
     dangling: Array<{ type: string; title: string }>
+    /** 打开时定位的 tab（迷你状态条「线索入口」直达任务线索页） */
+    initialTab?: Tab
   }>(),
-  { scene: null, narrativeSummary: null },
+  { scene: null, narrativeSummary: null, initialTab: 'state' },
 )
 
 const emit = defineEmits<{
@@ -39,7 +43,6 @@ const emit = defineEmits<{
   'refresh-narrative': []
 }>()
 
-type Tab = 'state' | 'facts' | 'quests' | 'dice'
 const tab = ref<Tab>('state')
 const factFilter = ref<'all' | 'state' | 'fact'>('all')
 
@@ -63,9 +66,9 @@ const filteredFacts = computed(() =>
 const stateFacts = computed(() => props.facts.filter((f) => f.kind === 'state'))
 
 watch(
-  () => props.open,
-  (open) => {
-    if (open) tab.value = 'state'
+  [() => props.open, () => props.initialTab],
+  ([open]) => {
+    if (open) tab.value = props.initialTab
   },
 )
 

@@ -6440,6 +6440,32 @@ button.u-notes__card {
   font-weight: 900;
 }
 
+/* 展台状态标记（docs/57 §3.2：在场/赶来中/已离场） */
+.t-standee__status {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 800;
+  vertical-align: 2px;
+}
+
+.t-standee__status.is-active {
+  background: #e8f6ec;
+  color: #1f7a45;
+}
+
+.t-standee__status.is-arriving {
+  background: var(--t-amber-soft);
+  color: var(--t-amber-dark);
+}
+
+.t-standee__status.is-departed {
+  background: #ececec;
+  color: #777;
+}
+
 .t-standee__role {
   margin-top: 2px;
   color: var(--t-amber-dark);
@@ -7121,13 +7147,56 @@ button.u-notes__card {
 .t-clock {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  row-gap: 3px;
   padding: 7px 11px;
   border: 1.5px solid var(--t-line-strong);
   border-left: 4px solid var(--t-amber);
   border-radius: 10px;
   background: var(--t-card);
   box-shadow: var(--t-shadow);
+}
+
+/* 语义标签（docs/57 §3.2：威胁钟不靠颜色也能读懂） */
+.t-clock__kind {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.t-clock__kind svg {
+  width: 12px;
+  height: 12px;
+}
+
+.t-clock--positive .t-clock__kind {
+  background: var(--t-amber-soft);
+  color: var(--t-amber-dark);
+}
+
+.t-clock--threat .t-clock__kind {
+  background: var(--t-hp-soft);
+  color: #b4281a;
+}
+
+.t-clock__stage {
+  color: var(--t-ink-light);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/* tick reason（docs/57 §3.2：推进/恶化的原因可见） */
+.t-clock__reason {
+  flex-basis: 100%;
+  color: var(--t-ink-light);
+  font-size: 10.5px;
+  line-height: 1.4;
 }
 
 .t-clock--threat {
@@ -7382,6 +7451,15 @@ button.u-notes__card {
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
+  /* 横滑渐隐边缘（docs/57 §3.2）：两端 12px 淡出，提示可滑动而不是硬切 */
+  mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
 }
 
 .t-act-panel__row::-webkit-scrollbar {
@@ -7430,6 +7508,17 @@ button.u-notes__card {
   border-color: rgba(212, 136, 26, 0.4);
   background: var(--t-amber-soft);
   color: var(--t-amber-dark);
+}
+
+.t-act-chip--settle {
+  border-color: var(--t-amber);
+  background: var(--t-amber);
+  color: #fffdf8;
+  font-weight: 800;
+}
+
+.t-act-chip--settle:disabled {
+  opacity: 0.5;
 }
 
 .t-act-chip__hp {
@@ -7482,9 +7571,181 @@ button.u-notes__card {
   color: #fff;
 }
 
-/* 动作面板展开时给消息流让位（避免末条消息被固定 dock 压住） */
-.t-page--actions .u-content--dock {
-  padding-bottom: 300px;
+/* 游玩态：正文底部留白覆盖 迷你条 + 动作面板 + 输入 dock + 页内导航（docs/57 §3.2） */
+.t-page--play .u-content--dock {
+  padding-bottom: 272px;
+}
+
+/* 展开完整钟条/在场条时再让位（避免末条消息被固定 dock 压住） */
+.t-page--play.t-page--bars .u-content--dock {
+  padding-bottom: 452px;
+}
+
+/* ---- 已完结条（docs/57 §3.2：结算后 ~ 开新篇章） ---- */
+.t-finished {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1.5px solid rgba(212, 136, 26, 0.55);
+  border-radius: 12px;
+  background: var(--t-amber-soft);
+}
+
+.t-finished__text {
+  color: var(--t-amber-dark);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.t-finished__btn {
+  flex: none;
+  min-height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--u-r-pill);
+  background: var(--t-amber);
+  color: #fffdf8;
+  font-family: var(--u-font);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* ---- 迷你状态条（docs/57 §3.2 · VN-HUD：小、可忽略、开箱即见） ---- */
+.t-mini {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--t-line);
+  background: rgba(244, 239, 230, 0.92);
+  backdrop-filter: blur(14px);
+}
+
+.t-mini__quest {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  border: none;
+  background: transparent;
+  font-family: var(--u-font);
+  cursor: pointer;
+}
+
+.t-mini__kind {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 9.5px;
+  font-weight: 800;
+}
+
+.t-mini__kind svg {
+  width: 11px;
+  height: 11px;
+}
+
+.t-mini__kind.is-positive {
+  background: var(--t-amber-soft);
+  color: var(--t-amber-dark);
+}
+
+.t-mini__kind.is-threat {
+  background: var(--t-hp-soft);
+  color: #b4281a;
+}
+
+.t-mini__name {
+  min-width: 0;
+  flex: 1;
+  color: var(--t-teal-dark);
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.t-mini__pips {
+  flex: none;
+  display: inline-flex;
+  gap: 2px;
+}
+
+.t-mini__pip {
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--t-line-strong);
+  border-radius: 2px;
+}
+
+.t-mini__pip.is-lit {
+  border-color: var(--t-amber);
+  background: var(--t-amber);
+}
+
+.t-mini__num {
+  flex: none;
+  color: var(--t-ink-light);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.t-mini__num.is-full {
+  color: var(--t-amber-dark);
+}
+
+.t-mini__cast,
+.t-mini__clue {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 30px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--t-ink-light);
+  font-family: var(--u-font);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.t-mini__cast svg,
+.t-mini__clue svg {
+  width: 13px;
+  height: 13px;
+}
+
+.t-mini__caret {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--t-ink-mid);
+  cursor: pointer;
+}
+
+.t-mini__caret svg {
+  width: 16px;
+  height: 16px;
 }
 
 /* ---- 尾声卡（docs/56 §6：结局标题/档位徽标/正文/后日谈；系统卡分支）---- */

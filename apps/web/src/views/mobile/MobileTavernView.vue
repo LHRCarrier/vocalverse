@@ -3,15 +3,21 @@
  * 移动端 · 酒馆（TRPG 跑团）——ai4u 酒馆模块迁移版（docs/52）
  *
  * 玩法闭环：场景卡开局 → 打字/语音说行动 → DM 流式叙述（逐句 TTS）→ 系统卡 → 主持台抽屉。
- * 2026-09-22 按设计稿（local/trpg-redesign.html）改版：副本任务卡 + 立绘抽屉 + 页内底栏
- * （大堂/酒馆跑团/角色卡/纪事）→ **沉浸页**（全局底栏移出）；出口 = 顶栏「离开」→ /m/learn。
+ * 2026-09-22 设计稿改版 + docs/57 §3.2「状态搬进玩家视线」：
+ * - 大钟条/在场条不再常驻正文流，改迷你状态条（dock 上方一行，点开才展开完整条）；
+ * - 动作面板常驻且与 dock 推荐行动合并为一排；流式节流跟随 + turn_end 兜底滚底；
+ * - 钟满可「收尾本幕」（确定性结算接口）+ 已完结条「开新篇章」；实时 ending 事件兜底渲染。
  * 立绘/属性为占位（docs/54 规划），语音链路（ASR + 逐句 TTS + 卡拉OK）保留。
  */
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useTavernDock } from '@/composables/useTavernDock'
+import { useTavernCardFlow } from '@/composables/useTavernCardFlow'
+import { useTavernScrollFollow } from '@/composables/useTavernScroll'
+import { useTavernStandee } from '@/composables/useTavernStandee'
+import { useTavernSuggestions } from '@/composables/useTavernSuggestions'
 import { useTavernAudio } from '@/composables/useTavernAudio'
-import type { TavernCastMember } from '@/composables/useTavernCast'
 import { useTavernCards } from '@/composables/useTavernCards'
 import { useTavernMarks } from '@/composables/useTavernMarks'
 import { useTavernMessageActions } from '@/composables/useTavernMessageActions'
@@ -21,16 +27,13 @@ import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 
 import MobileArt from '@/components/mobile/MobileArt.vue'
-import TrpgActionPanel from '@/components/mobile/trpg/TrpgActionPanel.vue'
 import TrpgBottomBar from '@/components/mobile/trpg/TrpgBottomBar.vue'
 import TrpgCampaignPicker from '@/components/mobile/trpg/TrpgCampaignPicker.vue'
 import TrpgCardSheet from '@/components/mobile/trpg/TrpgCardSheet.vue'
-import TrpgCastBar from '@/components/mobile/trpg/TrpgCastBar.vue'
 import TrpgConsoleSheet from '@/components/mobile/trpg/TrpgConsoleSheet.vue'
 import TrpgMessageActions from '@/components/mobile/trpg/TrpgMessageActions.vue'
 import TrpgMessageItem from '@/components/mobile/trpg/TrpgMessageItem.vue'
 import TrpgOnboarding from '@/components/mobile/trpg/TrpgOnboarding.vue'
-import TrpgQuestBar from '@/components/mobile/trpg/TrpgQuestBar.vue'
 import TrpgSettingsSheet from '@/components/mobile/trpg/TrpgSettingsSheet.vue'
 import TrpgStageHeader from '@/components/mobile/trpg/TrpgStageHeader.vue'
 import TrpgStandeeSheet from '@/components/mobile/trpg/TrpgStandeeSheet.vue'
@@ -58,11 +61,8 @@ const {
   loadPrefs,
   savePrefs,
   generateFromKeywords,
-  saveDraft,
-  createManual,
   updateCardFields,
   removeCard,
-  startFromCard,
   clearDraft,
 } = tavernCards
 const {
@@ -88,23 +88,49 @@ const {
 const marks = useTavernMarks()
 const translations = useTavernTranslations()
 const msgActions = useTavernMessageActions(rows, audio, marks, translations)
-const consoleOpen = ref(false)
 const pickerOpen = ref(false)
 const settingsOpen = ref(false)
 const cardsOpen = ref(false)
-const standeeOpen = ref(false)
-const standeeHero = ref<'dm' | 'pc' | 'npc'>('dm')
-/** 立绘展台聚焦的任意角色（NPC 点击 / portrait 事件；null = 只看 DM/PC 档案） */
-const standeeNpc = ref<{ name: string; kind: string; portraitUrl: string | null; note?: string | null } | null>(null)
+
+/* ---- 场景卡流程 / 立绘展台（实现拆在对应 composable，docs/57 §3.2） ---- */
+const cardFlow = useTavernCardFlow({
+  cards: tavernCards,
+  refreshCampaigns: session.refreshCampaigns,
+  selectCampaign: session.selectCampaign,
+  open: () => { cardsOpen.value = true },
+  close: () => { cardsOpen.value = false },
+})
+const standee = useTavernStandee({
+  portrait: session.portrait,
+  dismissPortrait: session.dismissPortrait,
+  toast: (message) => ui.showToast(message),
+  roll: session.onRoll,
+})
+/** 展台开合/聚焦 ref 提为顶层绑定（模板里自动解包；对象上的方法仍走 standee.*） */
+const { open: standeeOpen, hero: standeeHero, npc: standeeNpc } = standee
 
 /* ---- 闭环领域数据（docs/56 §6：useTavernSession 暴露的三个域 composable） ---- */
-const { quests: questClocks } = session.quest
-const { members: castMembers } = session.cast
-const { encounter: activeEncounter, participants: encounterParticipants } = session.encounter
-const { attackTargets, items: usableItems, suggestions: quickActions } = session.encounter
-const hasQuickActions = computed(
-  () => activeEncounter.value != null || attackTargets.value.length > 0 || usableItems.value.length > 0,
-)
+const { quests: questClocks, activeQuests, ending } = session.quest
+const { members: castMembers, present: castPresent, arriving: castArriving } = session.cast
+const { encounter: activeEncounter, participants: encounterParticipants, attackTargets, items: usableItems } = session.encounter
+
+/** 动态推荐行动（docs/57 §3.2）：场景/在场/任务变化即刷新 */
+const quickActions = useTavernSuggestions({
+  scene: computed(() => state.value?.scene),
+  present: computed(() => castPresent.value.map((m) => ({ name: m.name, kind: m.kind }))),
+  quests: computed(() => {
+    const clocks = activeQuests.value.map((q) => ({ name: q.name, status: q.status }))
+    if (clocks.length) return clocks
+    // 无进度钟时退化为卡片任务（旧剧本只有 tasks 表）
+    return (state.value?.tasks ?? [])
+      .filter((t) => t.status === 'active')
+      .map((t) => ({ name: t.title, status: 'active' }))
+  }),
+  encounter: computed(() => activeEncounter.value),
+})
+
+/** 满格可收尾任务（已完结后不再出现收尾钮；攻击 chip 的遭遇门控在 TrpgBottomBar） */
+const settleableQuests = computed(() => (session.finished.value ? [] : activeQuests.value.filter((q) => q.full)))
 
 /** 副本任务卡「目标」行：全部 active 任务用 ` / ` 连接（对原型 mission-deck 的目标行） */
 const goalText = computed(
@@ -114,20 +140,25 @@ const clueCount = computed(() => state.value?.clues.length ?? 0)
 
 watch(campaignId, (id) => { marks.load(id); translations.clear() }, { immediate: true })
 
+/* ---- 流式跟随滚动 + dock 状态（docs/57 §3.2；实现分别拆在对应 composable） ---- */
+const scrollFollow = useTavernScrollFollow({
+  rows,
+  turnEndAt: session.turnEndAt,
+  ending,
+})
+const { stripExpanded, dockPrefill, consoleOpen, consoleTab, toggleStrip, onPrefill, openConsole, onSettle } =
+  useTavernDock({
+    settle: session.settleQuest,
+    toast: (message) => ui.showToast(message),
+    pinToBottom: () => scrollFollow.pinToBottom(),
+  })
+
 onMounted(() => { void session.boot(); void loadPrefs(); void loadCards() })
 
 onUnmounted(() => session.dispose())
 
-/** 会话滚到底：滚动容器是 window（.u-phone 为文档流，不是内部 scrollport）；
- *  此前对 .t-log 调 scrollTo 无效 → 新消息会被固定 dock 压住（2026-09-22 实测修复）。 */
-function scrollToLatest(smooth = true) {
-  window.scrollTo({ top: document.documentElement.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
-}
-
-watch(() => rows.value.length, async () => {
-  await nextTick()
-  scrollToLatest(false)
-})
+/** 用户发送（dock/动作面板）→ 重新吸附跟随 */
+function onSend(text: string) { scrollFollow.reengage(); session.sendText(text) }
 
 async function onSwitch(id: number) { pickerOpen.value = false; await session.switchCampaign(id) }
 
@@ -137,60 +168,13 @@ async function onRestart() { pickerOpen.value = false; await session.restartCamp
 async function onPrefsUpdate(patch: Parameters<typeof savePrefs>[0]) {
   if (patch.voice_enabled === false) audio.flush() // 关语音即时静音（服务端随后不再合成）
   await savePrefs(patch)
-}
-
-/* ---- 场景卡 ---- */
-function openCards() { cardsOpen.value = true; void loadCards() }
-
-async function onStartCard(id: number) {
-  const newCampaignId = await startFromCard(id)
-  if (newCampaignId == null) return
-  cardsOpen.value = false
-  await session.refreshCampaigns()
-  await session.selectCampaign(newCampaignId)
-}
-
-async function onSaveDraftAndStart() {
-  const card = await saveDraft()
-  if (card) await onStartCard(card.id)
-}
-
-async function onCreateCard(payload: { title: string; scene: string; opening_line: string }) {
-  const card = await createManual(payload)
-  if (card) await onStartCard(card.id)
-}
-
-/* ---- 角色立绘 / 属性检定 ---- */
-function openStandee(hero: 'dm' | 'pc' | 'npc') { standeeHero.value = hero; standeeOpen.value = true }
-
-/** 聚焦任意角色开立绘展台（在场角色条点选 / portrait 事件；立绘回退在展台内完成） */
-function openStandeeFor(name: string, kind: string, url: string | null, note: string | null = null) {
-  standeeNpc.value = { name, kind, portraitUrl: url, note }
-  openStandee('npc')
-}
-
-const onCastSelect = (member: TavernCastMember) => openStandeeFor(member.name, member.kind, member.portraitUrl, member.note)
-
-/** 立绘事件（关键节点信号）：开立绘展台聚焦该角色，消费后清空 */
-watch(
-  () => session.portrait.value,
-  (portrait) => {
-    if (!portrait) return
-    openStandeeFor(portrait.entity, portrait.kind, portrait.url)
-    session.dismissPortrait()
-  },
-)
-
-/** 立绘抽屉「属性检定」→ 现有 D20 桌骰（真实请求；属性系统为占位，见组件注释） */
-function onStandeeRoll() {
-  standeeOpen.value = false
-  ui.showToast('🎲 检定已触发')
-  void session.onRoll({ dice: 'd20' })
-}
-</script>
+}</script>
 
 <template>
-  <div class="u-phone t-page" :class="{ 't-page--actions': hasQuickActions }">
+  <div
+    class="u-phone t-page"
+    :class="{ 't-page--play': stage === 'play', 't-page--bars': stage === 'play' && stripExpanded }"
+  >
     <div
       class="v-line"
       :class="`v-line--${status}`"
@@ -200,18 +184,18 @@ function onStandeeRoll() {
     <TrpgTopBar
       :stage="stage"
       @leave="router.push('/m/learn')"
-      @standee="openStandee('dm')"
+      @standee="standee.openStandee('dm')"
       @settings="settingsOpen = true"
-      @cards="openCards"
+      @cards="cardFlow.openCards"
       @picker="pickerOpen = true"
-      @console="consoleOpen = true"
+      @console="openConsole('state')"
     />
 
     <div class="u-content u-content--dock">
       <TrpgOnboarding
         v-if="stage === 'onboarding'"
         :has-cards="cardList.length > 0"
-        @open-cards="openCards"
+        @open-cards="cardFlow.openCards"
         @demo="session.startDemo"
         @create="session.startCustom"
       />
@@ -250,9 +234,7 @@ function onStandeeRoll() {
           :status="status"
         />
 
-        <TrpgQuestBar :quests="questClocks" />
-        <TrpgCastBar :members="castMembers" @select="onCastSelect" />
-
+        <!-- 大钟条/在场条默认不占正文流（迷你状态条展开时才在 dock 上方出现） -->
         <div class="t-log">
           <TrpgMessageItem
             v-for="(m, i) in rows"
@@ -272,7 +254,7 @@ function onStandeeRoll() {
             :highlight="msgActions.highlightFor(i)"
             @actions="msgActions.open(i)"
             @translate="translations.toggle(i, m.content)"
-            @standee="openStandee($event === 'user' ? 'pc' : 'dm')"
+            @standee="standee.openStandee($event === 'user' ? 'pc' : 'dm')"
           />
           <div v-if="rows.length === 0" class="u-empty u-empty--center">
             <div class="u-empty__art"><MobileArt name="wave" :size="96" /></div>
@@ -284,24 +266,38 @@ function onStandeeRoll() {
       </template>
     </div>
 
-    <!-- 底部控制区：dock（推荐行动/骰钮/语音/发送）+ 页内 4 项导航（设计稿 dock + bottom-nav） -->
+    <!-- 底部控制区：已完结条 / 展开钟条 / 动作面板 / 迷你状态条 / 输入 dock / 页内导航 -->
     <TrpgBottomBar
       v-if="stage === 'play'"
       :sending="sending"
       :recording="recording"
-      @send="session.sendText"
+      :prefill="dockPrefill"
+      :finished="session.finished.value"
+      :strip-expanded="stripExpanded"
+      :quests="questClocks"
+      :cast-members="castMembers"
+      :present-count="castPresent.length"
+      :arriving-count="castArriving.length"
+      :clue-count="clueCount"
+      :attack-targets="attackTargets"
+      :items="usableItems"
+      :quick-actions="quickActions"
+      :encounter="activeEncounter"
+      :participants="encounterParticipants"
+      :settleable="settleableQuests"
+      :settling="session.settling.value"
+      :disabled="sending"
+      @send="onSend"
       @toggle-mic="session.toggleMic"
       @roll="session.onRoll({ dice: 'd20' })"
-    >
-      <template #panel>
-        <TrpgActionPanel
-          v-if="hasQuickActions"
-          :attack-targets="attackTargets" :items="usableItems" :quick-actions="quickActions"
-          :encounter="activeEncounter" :participants="encounterParticipants" :disabled="sending"
-          @send="session.sendText"
-        />
-      </template>
-    </TrpgBottomBar>
+      @prefill="onPrefill"
+      @feedback="ui.showToast($event)"
+      @settle="onSettle"
+      @toggle-strip="toggleStrip"
+      @open-console="openConsole"
+      @cast-select="standee.onCastSelect"
+      @new-chapter="pickerOpen = true"
+    />
 
     <TrpgConsoleSheet
       v-if="state"
@@ -315,6 +311,7 @@ function onStandeeRoll() {
       :clues="state.clues"
       :events="state.events"
       :dangling="state.verify?.dangling ?? []"
+      :initial-tab="consoleTab"
       @close="consoleOpen = false"
       @edit-fact="session.onEditFact"
       @delete-fact="session.onDeleteFact"
@@ -363,11 +360,11 @@ function onStandeeRoll() {
       :error="cardError"
       :lang="prefs.lang"
       @close="cardsOpen = false"
-      @start="onStartCard"
+      @start="cardFlow.onStartCard"
       @generate="generateFromKeywords"
-      @save-draft="onSaveDraftAndStart"
+      @save-draft="cardFlow.onSaveDraftAndStart"
       @clear-draft="clearDraft"
-      @create="onCreateCard"
+      @create="cardFlow.onCreateCard"
       @update="updateCardFields"
       @remove="removeCard"
     />
@@ -378,7 +375,7 @@ function onStandeeRoll() {
       :current-id="campaignId"
       @close="pickerOpen = false"
       @switch="onSwitch"
-      @new-campaign="pickerOpen = false; openCards()"
+      @new-campaign="pickerOpen = false; cardFlow.openCards()"
       @restart="onRestart"
     />
 
@@ -395,8 +392,9 @@ function onStandeeRoll() {
       :npcs="[...npcNames]"
       :initial-hero="standeeHero"
       :npc="standeeNpc"
+      :status="standeeNpc?.status ?? null"
       @close="standeeOpen = false"
-      @roll="onStandeeRoll"
+      @roll="standee.onRoll"
     />
   </div>
 </template>

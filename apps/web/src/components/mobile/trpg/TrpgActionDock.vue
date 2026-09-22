@@ -1,11 +1,12 @@
 <script setup lang="ts">
 /**
- * 酒馆 · 输入 dock（2026-09-22 按设计稿 dock-control 改版）：
- * - 推荐行动 chips：**点击快速填入输入框**（设计稿行为，不再直接发送）；
- * - 输入条：骰钮（快速投骰 D20）+ 文本 + 语音（ASR）+ 发送；
+ * 酒馆 · 输入 dock（2026-09-22 按设计稿 dock-control 改版；2026-09-22 晚 docs/57 §3.2）：
+ * - 只保留输入职责：骰钮（快速投骰 D20）+ 文本 + 语音（ASR）+ 发送；
+ *   「推荐行动」相关 chip 已合并到 TrpgActionPanel（全站只有一排建议行动）；
+ * - `prefill`：动作面板点建议 chips 时由页面注入台词（填入 + 聚焦，不直接发送）；
  * - Enter 发送；处理中/录音中禁用；录音态显示提示。语音链路（录音→ASR→逐句 TTS）原样保留。
  */
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 import IconCube from '~icons/tabler/cube'
 import IconSend from '~icons/tabler/send'
@@ -18,8 +19,10 @@ const props = withDefaults(
     recording?: boolean
     /** 语音输入上限（秒），提示文案用 */
     maxSeconds?: number
+    /** 外部注入的填入请求（seq 递增以重复触发同一文案） */
+    prefill?: { text: string; seq: number } | null
   }>(),
-  { sending: false, recording: false, maxSeconds: 30 },
+  { sending: false, recording: false, maxSeconds: 30, prefill: null },
 )
 
 const emit = defineEmits<{
@@ -31,17 +34,15 @@ const emit = defineEmits<{
 const text = ref('')
 const inputEl = ref<HTMLInputElement | null>(null)
 
-const QUICK_ACTIONS = [
-  { icon: '👁️', label: '观察四周', action: '我仔细观察四周' },
-  { icon: '💬', label: '找人搭话', action: '我试着和店里的人搭话' },
-  { icon: '⚔️', label: '握紧武器', action: '我握紧武器，准备应对' },
-]
-
-function fill(action: string) {
-  if (props.sending || props.recording) return
-  text.value = action
-  inputEl.value?.focus()
-}
+watch(
+  () => props.prefill?.seq,
+  () => {
+    const incoming = props.prefill?.text
+    if (!incoming || props.sending || props.recording) return
+    text.value = incoming
+    inputEl.value?.focus()
+  },
+)
 
 function send() {
   const value = text.value.trim()
@@ -55,26 +56,6 @@ function send() {
   <div class="t-dock-wrap">
     <div v-if="recording" class="t-dock-state" role="status">
       聆听中… 点击 ■ 停止并发送（最长 {{ maxSeconds }} 秒）
-    </div>
-
-    <div class="t-quick">
-      <div class="t-quick__label">
-        <span>⚡ 推荐行动</span>
-        <span class="t-quick__hint">点击快速填入</span>
-      </div>
-      <div class="t-quick__row">
-        <button
-          v-for="item in QUICK_ACTIONS"
-          :key="item.action"
-          class="t-quick__chip"
-          type="button"
-          :disabled="sending || recording"
-          @click="fill(item.action)"
-        >
-          <span aria-hidden="true">{{ item.icon }}</span>
-          {{ item.label }}
-        </button>
-      </div>
     </div>
 
     <div class="t-input-bar">

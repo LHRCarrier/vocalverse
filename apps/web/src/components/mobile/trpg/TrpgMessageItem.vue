@@ -17,7 +17,7 @@ import IconCrown from '~icons/tabler/crown'
 import MobileAvatar from '@/components/mobile/MobileAvatar.vue'
 
 import { TAVERN_ART, npcAvatar } from './art'
-import { buildTrpgLines, groupTrpgParts, tokenizeTrpg } from './segments'
+import { buildTrpgLines, diceOutcomeOf, groupTrpgParts, prettifyDiceText, tokenizeTrpg } from './segments'
 import TrpgEndingCard from './TrpgEndingCard.vue'
 
 const props = withDefaults(
@@ -70,13 +70,12 @@ const openTasks = computed<string[]>(() => {
   const raw = scenePayload.value.tasks
   return Array.isArray(raw) ? raw.map((x) => String(x)) : []
 })
-const diceLines = computed(() => String(scenePayload.value.text ?? '').split('\n').filter(Boolean))
-const diceOutcome = computed<'success' | 'failure' | null>(() => {
-  const text = String(scenePayload.value.text ?? '')
-  if (text.includes('成功')) return 'success'
-  if (text.includes('失败')) return 'failure'
-  return null
-})
+const diceLines = computed(() =>
+  prettifyDiceText(String(scenePayload.value.text ?? ''))
+    .split('\n')
+    .filter(Boolean),
+)
+const diceOutcome = computed(() => diceOutcomeOf(String(scenePayload.value.text ?? '')))
 
 /* ---------------- 长按 → 操作菜单 ---------------- */
 const LONG_PRESS_MS = 420
