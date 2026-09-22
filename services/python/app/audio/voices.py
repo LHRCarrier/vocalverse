@@ -20,6 +20,9 @@ logger = logging.getLogger("vocalverse.audio.voices")
 #: 默认音色（全站兜底；前端也读这个值，不再各写一份）
 DEFAULT_VOICE = "en-US-JennyNeural"
 
+#: 中文默认音色（酒馆 DM 输出 zh 且用户未选音色时的兜底；docs/52 §12.2）
+ZH_DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"
+
 
 @dataclass(frozen=True)
 class VoiceSpec:
@@ -47,7 +50,19 @@ EDGE_VOICES: tuple[VoiceSpec, ...] = (
     VoiceSpec("en-US-GuyNeural", "Guy · 美式男声", "edge", ("en-US",)),
     VoiceSpec("en-GB-SoniaNeural", "Sonia · 英式女声", "edge", ("en-GB",)),
     VoiceSpec("en-GB-RyanNeural", "Ryan · 英式男声", "edge", ("en-GB",)),
+    # 中文档（酒馆 DM lang=zh 的默认音色也在本目录内，前端选择器数据驱动、无需另写一份）
+    VoiceSpec("zh-CN-XiaoxiaoNeural", "晓晓 · 中文女声", "edge", ("zh-CN",)),
 )
+
+
+def default_voice_for_lang(lang: str | None) -> str:
+    """按 DM 输出语言取默认音色（zh → :data:`ZH_DEFAULT_VOICE`；其余 → :data:`DEFAULT_VOICE`）。
+
+    仅当用户没有显式指定 ``voice_name`` 时使用（用户选择永远优先）。
+    """
+    if str(lang or "").strip().lower().startswith("zh"):
+        return ZH_DEFAULT_VOICE
+    return DEFAULT_VOICE
 
 
 def _kitten_voices(settings: Any) -> list[VoiceSpec]:
@@ -107,4 +122,11 @@ def list_voices(settings: Any = None) -> list[VoiceSpec]:
     return out
 
 
-__all__ = ["DEFAULT_VOICE", "EDGE_VOICES", "VoiceSpec", "list_voices"]
+__all__ = [
+    "DEFAULT_VOICE",
+    "EDGE_VOICES",
+    "ZH_DEFAULT_VOICE",
+    "VoiceSpec",
+    "default_voice_for_lang",
+    "list_voices",
+]

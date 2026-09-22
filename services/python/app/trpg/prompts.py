@@ -61,6 +61,10 @@ def build_dm_system_prompt(
         "12. 道具来源：战利品、购买、搜刮、拾取、任务奖励等任何玩家获得物品的情形，必须调用"
         " grant_item（qty 为本次获得数量 1~99，可带 effect/consumable），禁止只在叙述里给物品；"
         "同一道具再次获得会累加数量，不要自己改写数量。",
+        "13. 敌方伤害同样必须落表：NPC/敌人攻击、偷袭、陷阱等对玩家造成伤害时，必须调用"
+        " attack（attacker=NPC 名、target=玩家角色名、damage=伤害点数）或 roll_dice 的 effects"
+        " 写回 HP——数值以系统写回为准，严禁只在正文里描述「你中箭了/血洇透了衣料」而不调用工具；"
+        "玩家的攻击目标只能是当前在场的 NPC（玩家角色不能攻击自己）。",
     ]
     return "\n".join(lines)
 

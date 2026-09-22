@@ -11,6 +11,8 @@ SNAPSHOT_CLUE_MAX = 8
 SNAPSHOT_FACT_REL_MAX = 6
 #: 快照 NPC 状态行上限（docs/56 §C：敌方 HP 进 DM 上下文/面板，按最近提及截断）
 SNAPSHOT_NPC_MAX = 6
+#: 快照「行囊」道具条目上限（P1-3：道具对 DM 可见；防 20 件杂物塞爆快照）
+SNAPSHOT_ITEM_MAX = 6
 #: 叙事事实提取频率：每 2 个玩家回合一次（P2-27 战斗一轮内状态变化频繁）
 EXTRACT_EVERY_ROUNDS = 2
 #: 单次提取最多应用操作数（P2-39 写频率系统级强制）
@@ -65,7 +67,7 @@ SYSTEM_ONLY_PROPERTIES = frozenset(
 )
 
 #: 域 → 实体 kind（P2-42 实体注册：rel→npc / quest→task / clue→clue / pc→pc；
-#: docs/56 §2：item→task（实体登记用）、encounter 不登记实体）
+#: docs/56 §2：item→task（实体登记用）、encounter 不登记实体——缺省无映射即不注册）
 DOMAIN_ENTITY_KIND: dict[str, str] = {
     "rel": "npc",
     "quest": "task",
@@ -75,6 +77,11 @@ DOMAIN_ENTITY_KIND: dict[str, str] = {
     "npc": "npc",
     "item": "task",
 }
+
+#: 保留实体名（内部键式命名不得成为实体）：``main`` 是 encounter 事实的固定 id
+#: （``encounter.main.*``），曾因 ``DOMAIN_ENTITY_KIND`` 缺省回退 ``"npc"`` 被误注册成
+#: 幻影实体 ``npc.main``（P1-5）。注册/查找/展示三处统一过滤。
+RESERVED_ENTITY_NAMES: frozenset[str] = frozenset({"main"})
 
 #: 属性 → 值词对照表（P2-35 矛盾检测：摘要出现反向词且提到该实体 → 判定矛盾）
 OPPOSITE_PAIRS: tuple[tuple[str, str], ...] = (

@@ -166,7 +166,7 @@ def _require_campaign(campaign_id: int, user_id: int):
 
 @router.get("/campaigns")
 async def list_campaigns(user_id: int = Depends(get_current_user_id)):
-    """我的剧本列表（按最近活跃倒序）。"""
+    """我的剧本列表（按最近活跃倒序；``finished``/``finished_at`` 供大堂页显示「已完结」）。"""
     rows = await asyncio.to_thread(st.list_campaigns, user_id)
     return ok(
         [
@@ -175,6 +175,8 @@ async def list_campaigns(user_id: int = Depends(get_current_user_id)):
                 "name": r.name,
                 "last_active_at": r.last_active_at.isoformat() if r.last_active_at else None,
                 "create_time": r.created_at.isoformat() if r.created_at else None,
+                "finished": r.finished_at is not None,
+                "finished_at": r.finished_at.isoformat() if r.finished_at else None,
             }
             for r in rows
         ]

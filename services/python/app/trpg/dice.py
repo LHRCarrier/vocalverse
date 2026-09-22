@@ -116,6 +116,21 @@ def format_dice_text(r: DiceResult) -> str:
     return f"掷出 {total_text}，对抗 {r.vs}，{outcome_text}"
 
 
+def format_roll_faces(r: DiceResult) -> str:
+    """骰面明细（判定卡）：``d20=14`` / ``2d6=3+4`` / ``d20=14 +2 = 16``（有 modifier 时）。
+
+    只含骰子自身信息，不含任何内部状态键（docs/57 §3.1 去内部键）；无骰面（道具效果
+    等纯增量场合）返回空串。
+    """
+    if not r.rolls:
+        return ""
+    spec = f"{r.count}d{r.sides}" if r.count != 1 else f"d{r.sides}"
+    faces = "+".join(str(x) for x in r.rolls)
+    if r.modifier:
+        return f"{spec}={faces} {r.modifier:+d} = {r.total}"
+    return f"{spec}={faces}"
+
+
 def delta_value(current: str | None, delta: int) -> str | None:
     """State 增量算术（只增量不覆盖用户手改）；current 非纯数字（如 '3/12'）返回 None。
 

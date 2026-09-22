@@ -14,7 +14,7 @@ import asyncio
 import logging
 
 from app.trpg import encounter as encounter_rules
-from app.trpg.constants import ENTITY_NAME_MAX, STATE_DOMAINS
+from app.trpg.constants import ENTITY_NAME_MAX, RESERVED_ENTITY_NAMES, STATE_DOMAINS
 from app.trpg.dice import DiceEffect, DiceResult, parse_dice
 from app.trpg.facts import parse_key
 from app.trpg.state import (
@@ -22,6 +22,7 @@ from app.trpg.state import (
     find_entity,
     find_pc_entity,
     get_fact_value,
+    list_entities,
     persist_system_card,
 )
 from app.trpg.tools.registry import ToolArgs, ToolOutcome, ToolSpec, register
@@ -39,7 +40,9 @@ ATTACK_SCHEMA: dict = {
         "name": "attack",
         "description": (
             "发起一次攻击（跑团专用）。系统负责命中判定与 HP 写回，你只拿结果叙事。"
-            "target 是目标角色名或 npc.名 / pc.名；attacker 缺省为玩家角色。"
+            "target 是当前在场的 NPC 角色名（玩家角色不能攻击自己，玩家攻击目标只能是 NPC）。"
+            "attacker 缺省为玩家角色；**NPC/敌人反击玩家时必须显式传 attacker=NPC名、"
+            "target=玩家角色名**，这样伤害才会写回玩家 HP——禁止只在正文里描述玩家受伤。"
             "weapon 写武器/招式名；damage 写命中后的伤害点数（或 effects 给状态增量）。"
             "目标还没有 HP 记录时可以传 target_hp 先建档。"
             "禁止在正文里复述命中公式——叙述结果即可；未命中就是未命中。"
@@ -47,8 +50,13 @@ ATTACK_SCHEMA: dict = {
         "parameters": {
             "type": "object",
             "properties": {
-                "target": {"type": "string", "description": "目标：角色名或 npc.名 / pc.名"},
-                "attacker": {"type": "string", "description": "可选：攻击者（默认玩家角色）"},
+                "target": {"type": "string", "description": "目标：在场 NPC 角色名（或 npc.名）"},
+                "attacker": {
+                    "type": "string",
+                    "description": (
+                        "可选：攻击者（默认玩家角色）；NPC 反击玩家时必填 NPC 名（或 npc.名）"
+                    ),
+                },
                 "weapon": {"type": "string", "description": "可选：武器/招式（叙事用）"},
                 "vs": {"type": "integer", "description": "对抗值（默认 12）"},
                 "modifier": {"type": "integer", "description": "命中调整值（默认 0，范围 -50~50）"},
@@ -76,15 +84,32 @@ ATTACK_SCHEMA: dict = {
 }
 
 
-def _resolve_entity(campaign_id: int, raw: str) -> tuple[str, str] | None:
-    """解析目标为 ``(kind, name)``；规范化键（npc./pc.）或实体表名字。"""
+def _resolve_entity(campaign_id: int, raw: str) -> dict | None:
+    """角色解析（P1-5）：只认实体表里的 npc/pc（保留名/未登记 → None）。
+
+    前缀 ``npc.名`` / ``pc.名`` 只用于 kind 一致性校验，不再凭前缀凭空构造键——
+    ``main`` 这类 encounter 内部 id 即便残留在实体表也不会被解析为目标。
+    """
     parsed = encounter_rules.parse_participant(raw)
-    if parsed is not None:
-        return parsed
-    entity = find_entity(campaign_id, raw)
+    name = parsed[1] if parsed is not None else raw
+    if name in RESERVED_ENTITY_NAMES:
+        return None
+    entity = find_entity(campaign_id, name)
     if entity is None:
         return None
-    return str(entity["kind"]), str(entity["name"])
+    if parsed is not None and str(entity["kind"]) != parsed[0]:
+        return None
+    return entity
+
+
+def _target_options(campaign_id: int) -> str:
+    """当前在场可攻击的 NPC 展示名（错误文本给模型/玩家可读候选）。"""
+    names = [
+        str(e["name"])
+        for e in list_entities(campaign_id)
+        if str(e["kind"]) == "npc" and e.get("status") == "active"
+    ]
+    return "、".join(names) if names else "（当前没有在场 NPC）"
 
 
 def _valid_effects(raw: object) -> list[DiceEffect] | None:
@@ -123,17 +148,56 @@ async def handle(args: ToolArgs, campaign_id: int) -> ToolOutcome:
     target_raw = str(args.get("target") or "").strip()[:ENTITY_NAME_MAX]
     if not target_raw:
         return {"text": "请提供攻击目标（target 参数）。"}
-    resolved = await asyncio.to_thread(_resolve_entity, campaign_id, target_raw)
-    if resolved is None:
+    target_entity = await asyncio.to_thread(_resolve_entity, campaign_id, target_raw)
+    if target_entity is None:
         return {
             "text": (
-                f"攻击目标「{target_raw}」不在本局实体表里——若刚登场，请先用 enter_character "
-                "登记；本回合该攻击尚未生效，请如实告诉玩家。"
+                f"攻击目标「{target_raw}」不在本局实体表里——本回合该攻击尚未生效，请如实告诉玩家。"
+                f"当前在场可攻击目标：{_target_options(campaign_id)}。"
+                "若目标刚登场，请先用 enter_character 登记。"
             )
         }
-    target_kind, target_name = resolved
+    target_kind = str(target_entity["kind"])
+    target_name = str(target_entity["name"])
     target_key = f"{target_kind}.{target_name}"
     hp_key = f"{target_key}.hp"
+
+    # 攻击者：显式指定（NPC 反击必须显式）> 最近提及的 PC 实体 > 玩家
+    attacker_raw = str(args.get("attacker") or "").strip()[:ENTITY_NAME_MAX]
+    if attacker_raw:
+        attacker_entity = await asyncio.to_thread(_resolve_entity, campaign_id, attacker_raw)
+        if attacker_entity is None:
+            return {
+                "text": (
+                    f"攻击者「{attacker_raw}」不在本局实体表里——本回合该攻击尚未生效。"
+                    "NPC 反击请先 enter_character / start_encounter 登记该 NPC，"
+                    "再传 attacker=<NPC名>。"
+                )
+            }
+        attacker_kind = str(attacker_entity["kind"])
+        attacker = f"{attacker_kind}.{attacker_entity['name']}"
+    else:
+        pc = await asyncio.to_thread(find_pc_entity, campaign_id)
+        attacker_kind = "pc" if pc is not None else "player"
+        attacker = f"pc.{pc['name']}" if pc is not None else "玩家"
+
+    # 目标合法性（P1-5）：目标必须在场；玩家（PC/默认玩家）不能攻击 PC（含自己）；
+    # NPC 攻击者可打 PC（敌方反击写玩家 HP，docs/57 P1-4）。
+    if str(target_entity.get("status")) != "active":
+        return {
+            "text": (
+                f"攻击目标「{target_name}」当前不在场（已离场或尚未登场）——"
+                f"本回合该攻击尚未生效。当前在场可攻击目标：{_target_options(campaign_id)}。"
+            )
+        }
+    if target_kind == "pc" and attacker_kind != "npc":
+        return {
+            "text": (
+                f"不能攻击玩家自己的角色「{target_name}」——玩家角色的攻击目标只能是当前在场的"
+                f" NPC；当前在场可攻击目标：{_target_options(campaign_id)}。"
+                "若这是 NPC 反击，请传 attacker=<NPC名>、target=<玩家角色名>。"
+            )
+        }
 
     raw_vs = args.get("vs", DEFAULT_VS)
     if isinstance(raw_vs, bool) or not isinstance(raw_vs, (int, float)) or raw_vs < 1:
@@ -148,18 +212,6 @@ async def handle(args: ToolArgs, campaign_id: int) -> ToolOutcome:
     if roll is None:
         return {"text": "命中参数非法：modifier 需在 -50~50 之间，vs 为正整数。"}
 
-    # 攻击者：显式指定 > 最近提及的 PC 实体 > 玩家
-    attacker_raw = str(args.get("attacker") or "").strip()[:ENTITY_NAME_MAX]
-    if attacker_raw:
-        attacker_resolved = await asyncio.to_thread(_resolve_entity, campaign_id, attacker_raw)
-        attacker = (
-            f"{attacker_resolved[0]}.{attacker_resolved[1]}"
-            if attacker_resolved is not None
-            else f"pc.{attacker_raw}"
-        )
-    else:
-        pc = await asyncio.to_thread(find_pc_entity, campaign_id)
-        attacker = f"pc.{pc['name']}" if pc is not None else "玩家"
     weapon = str(args.get("weapon") or "").strip()[:40] or None
 
     hit = roll.outcome == "success"

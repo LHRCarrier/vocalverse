@@ -25,6 +25,7 @@ from app.audio.duration import audio_duration_seconds
 from app.audio.textproc.normalize import normalize_for_tts
 from app.audio.textproc.sentence_splitter import StreamSentenceSplitter
 from app.audio.tts_cache import tts_synthesize_cached
+from app.audio.voices import default_voice_for_lang
 from app.console.trace.recorder import span
 from app.core.config import get_settings
 from app.models.trpg import TrpgCampaign
@@ -249,7 +250,7 @@ async def stream_turn(
 
     # DM 回复逐句 TTS（前端排队播放；失败逐句降级为无音频；用户关闭语音则不合成）
     if voice_enabled:
-        async for chunk in _tts_chunks(tts, content, voice_name):
+        async for chunk in _tts_chunks(tts, content, voice_name, lang=lang):
             yield chunk
 
     await asyncio.to_thread(st.touch_campaign, campaign_id)
@@ -404,11 +405,15 @@ async def _post_system_row(campaign_id: int, trpg_sys: str, payload: dict) -> No
 
 
 async def _tts_chunks(
-    tts: TTSClient, content: str, voice_name: str | None = None
+    tts: TTSClient, content: str, voice_name: str | None = None, lang: str = "zh"
 ) -> AsyncIterator[ev.AudioChunk]:
-    """DM 回复逐句 TTS（并发合成、按序下发；逐句失败静默跳过，绝不阻塞回合）。"""
+    """DM 回复逐句 TTS（并发合成、按序下发；逐句失败静默跳过，绝不阻塞回合）。
+
+    音色优先级：用户显式 ``voice_name`` > 按 DM 输出语言 ``lang`` 的默认音色
+    （zh → 中文音色 / en → Jenny；见 :func:`app.audio.voices.default_voice_for_lang`）。
+    """
     settings = get_settings()
-    voice = (voice_name or "").strip() or settings.tts_voice
+    voice = (voice_name or "").strip() or default_voice_for_lang(lang)
     splitter = StreamSentenceSplitter()
     sentences = splitter.push(content) + splitter.flush()
     sentences = [s for s in sentences if any(c.isalnum() for c in s)][:TTS_MAX_SENTENCES]
@@ -426,7 +431,7 @@ async def _tts_chunks(
 
     tasks: dict[int, asyncio.Task] = {}
     for i, (sentence, _) in enumerate(located):
-        tasks[i] = asyncio.create_task(_tts_one(tts, sentence, voice, settings.tts_rate))
+        tasks[i] = asyncio.create_task(_tts_one(tts, sentence, voice, settings.tts_rate, lang))
     for i, (sentence, offset) in enumerate(located):
         url, duration = await tasks[i]
         if url:
@@ -434,10 +439,10 @@ async def _tts_chunks(
 
 
 async def _tts_one(
-    tts: TTSClient, sentence: str, voice: str, rate: str
+    tts: TTSClient, sentence: str, voice: str, rate: str, lang: str = "zh"
 ) -> tuple[str | None, float | None]:
     try:
-        text = normalize_for_tts(sentence, language="en")
+        text = normalize_for_tts(sentence, language=lang)
         data = await tts_synthesize_cached(tts, text, voice, rate)
         if not data:
             return None, None
