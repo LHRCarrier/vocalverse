@@ -32,7 +32,6 @@ from app.trpg import events as ev
 from app.trpg import state as st
 from app.trpg.dice import format_dice_text, parse_dice
 from app.trpg.service import stream_turn
-from app.trpg.tools import set_scene
 
 router = APIRouter(prefix="/api/v1/trpg", tags=["trpg"])
 logger = logging.getLogger("vocalverse")
@@ -359,7 +358,7 @@ async def set_campaign_scene(
     scene = body.scene.strip()[:40]
     if not scene:
         raise BizError(http_status=422, code=47001, message="场景名不能为空")
-    await asyncio.to_thread(set_scene, campaign_id, scene)
+    await asyncio.to_thread(st.set_scene, campaign_id, scene)
     return ok({"ok": True})
 
 
