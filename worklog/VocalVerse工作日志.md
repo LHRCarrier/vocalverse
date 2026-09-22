@@ -3,6 +3,22 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 PR #39 审查与合并（唱吧跟唱链路与选曲集成 · sync-2026-09-18）· 1 op
+
+> 归属：PR 审查 + 集成合并（跨 Web / Python / Java 三端）；分支侧两轮解冲突记录见 PR 与下一条。
+> 审查结论已按 AGENTS 落到 PR（approve review，含可复现命令与三条非阻断发现）。
+
+- **审查证据**：
+  - CI：PR head `f4e80ee` 上 python-ci / frontend-ci / java-ci / secret-scan 全 pass（admin-ci 未触发，diff 无 `apps/admin/**`）；
+  - 本地预演合并（`tmp-merge-pr39`）：**零冲突、零删除**（91 A / 65 M / 0 D），main 侧改动全保留（抽查 `docs/58`、`docs/59`、审核包、`admin-ci.yml` 与 main 无差异；两份 worklog 并存）；
+  - **契约语义校验**：合并后 `python-openapi.json` == `app.openapi()`（trpg settle/portrait 与 songs/covers 双侧都在），`pnpm gen:api` 后生成类型零漂移；
+  - **合并结果三方门禁复跑**：web `typecheck` + `test:run`（610 passed）+ `build` + `check-bundle`；python `ruff check/format` + `pytest`（**825 passed, 4 skipped**）；java `mvn verify -DskipITs`（**186 passed** + spotless）——全绿。
+- **合并**：`gh pr merge 39 --merge --match-head-commit f4e80ee` → merge commit `0974365`；合并后 main 上契约复验 in sync=True；push(main) CI 全绿（frontend / java / python / docker-build / secret-scan）。
+- **非阻断发现**（已写进 PR review，待后续单独 PR）：① `apps/web` 旧管理端残留——`views/admin` 五页 + `api/admin.ts` + `api/mock/m3-data.ts`（220 行 mock）无路由引用，与 `docs/50 §15.5`「旧管理端已退役」冲突；② 零引用 WIP 组件（`components/sing/{PitchAlignmentChart,SingScorePanel}`、`components/stats/*`、`ShareCard`、`api/recommend.ts`）；③ `web-prototypes/` 新增 1.81MB `app-demo.mp4`（归档目录不参与门禁，口径与 main 原有 15 个二进制一致）。
+- **踩坑**：本地首轮 web typecheck 报 `MobileSongList.vue(188) TS7006`，实为**新依赖 `motion` 未安装**（`pnpm install --frozen-lockfile` 后转绿；CI 先 install 故不受影响）——**PR 新增依赖后，本地跑门禁前必须先 install**。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-22 PR #39 解冲突：两轮合并 main（合计 132 提交）+ 原型归档就地取代 · 3 op
 
 > 归属：仓库全局（合并/归档/门禁）。PR：https://github.com/LHRCarrier/vocalverse/pull/39
