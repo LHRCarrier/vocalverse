@@ -20,6 +20,8 @@ ClockKind = Literal["positive", "threat"]
 DEFAULT_SEGMENTS = 6
 #: 单次 tick 上限（docs/56 §3：delta 1~3，与 BitD 位置/效果档对齐）
 TICK_DELTA_MAX = 3
+#: 掷骰判定的「大成功」余量（docs/57 §3.1：成功 +1，total-vs ≥5 再 +1）
+ROLL_MARGIN_BONUS = 5
 #: 自动判定的比例分界（positive：≥0.66 强 / ≥0.25 弱 / 否则失；threat 反转）
 _STRONG_RATIO = 0.66
 _WEAK_RATIO = 0.25
@@ -109,6 +111,70 @@ def judge_outcome(current: int, segments: int, kind: str = "positive") -> Outcom
     if ratio >= _WEAK_RATIO:
         return "weak"
     return "miss"
+
+
+def roll_tick_delta(outcome: str | None, margin: int | None, kind: str) -> int:
+    """掷骰判定 → 进度钟格数（docs/57 §3.1「推进靠规则不靠自觉」）。
+
+    - 成功：+1；余量（total-vs）≥ :data:`ROLL_MARGIN_BONUS` 再 +1；
+    - 失败：威胁钟 +1（正向钟不变——挫折只对倒计时有意义）；
+    - 未判定（无 vs / 非法 outcome）：0（保持旧行为，不推进）。
+    """
+    if outcome == "success":
+        return 2 if int(margin or 0) >= ROLL_MARGIN_BONUS else 1
+    if outcome == "failure":
+        return 1 if normalize_kind(kind) == "threat" else 0
+    return 0
+
+
+@dataclass(frozen=True)
+class SettlementPlan:
+    """一次结算的纯规则产物（工具与路由共用的唯一结算逻辑；落库由 state 门面做）。"""
+
+    outcome: Outcome
+    status: str  # done | failed
+    title: str
+    text: str
+    epilogue: str
+
+
+def _settled_done_outcome(parsed: tuple[int, int], kind: str | None) -> Outcome:
+    """已 done（但结局卡缺失）时的档位兜底：进度判 miss 说明是弱收束，提升为 weak。"""
+    judged = judge_outcome(parsed[0], parsed[1], normalize_kind(kind))
+    return "weak" if judged == "miss" else judged
+
+
+def plan_settlement(
+    quest: str,
+    *,
+    requested: str | None = None,
+    progress: str | None = None,
+    kind: str | None = None,
+    stage: str | None = None,
+    status: str | None = None,
+) -> SettlementPlan:
+    """结算计划（纯函数，零 DB；docs/57 §3.1 确定性结算）。
+
+    - ``status`` 已是 done/failed → 幂等：failed 判 miss、done 按进度兜底（不再新判定）；
+    - ``requested`` 为合法档位时优先（玩家/路由显式指定）；
+    - 否则按 ``progress`` 比例自动判定（威胁钟反转）；
+    - 尾声三件套由 :func:`render_ending` 模板渲染。
+    """
+    parsed = parse_progress(progress) or (0, DEFAULT_SEGMENTS)
+    if status in ("done", "failed"):
+        outcome: Outcome = "miss" if status == "failed" else _settled_done_outcome(parsed, kind)
+    elif requested in ("strong", "weak", "miss"):
+        outcome = requested  # type: ignore[assignment]
+    else:
+        outcome = judge_outcome(parsed[0], parsed[1], normalize_kind(kind))
+    ending = render_ending(quest, outcome, stage=stage)
+    return SettlementPlan(
+        outcome=outcome,
+        status="failed" if outcome == "miss" else "done",
+        title=ending["title"],
+        text=ending["text"],
+        epilogue=ending["epilogue"],
+    )
 
 
 #: 结局模板（零 LLM：结局标题/正文/后日谈由服务器模板渲染，quest 名格式化进文案）

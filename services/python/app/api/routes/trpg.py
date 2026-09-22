@@ -30,6 +30,7 @@ from app.practice import events as practice_events
 from app.trpg import cards as card_domain
 from app.trpg import events as ev
 from app.trpg import state as st
+from app.trpg.constants import ENTITY_NAME_MAX
 from app.trpg.dice import format_dice_text, parse_dice
 from app.trpg.service import stream_turn
 
@@ -126,6 +127,13 @@ class EntityPortrait(BaseModel):
     media_id: str
 
 
+class QuestSettle(BaseModel):
+    """确定性结算（docs/57 §3.1）：quest 必填；outcome 可省 → 按进度自动判定。"""
+
+    quest: str
+    outcome: str | None = None
+
+
 def _media_owned_by(public_id: str, user_id: int) -> bool:
     """媒体归属校验：public_id 命中且 owner 为调用者且 ready；否则 False（不泄露存在性）。"""
     from sqlalchemy import select
@@ -199,6 +207,8 @@ async def get_campaign_state(
                 "id": campaign.id,
                 "name": campaign.name,
                 "narrative_summary": campaign.narrative_summary,
+                "finished": campaign.finished_at is not None,
+                "finished_at": campaign.finished_at.isoformat() if campaign.finished_at else None,
             },
             "messages": history,
             **state,
@@ -212,6 +222,38 @@ async def clear_messages(campaign_id: int, user_id: int = Depends(get_current_us
     _require_campaign(campaign_id, user_id)
     removed = await asyncio.to_thread(st.clear_messages, campaign_id)
     return ok({"removed": removed})
+
+
+# ---------------------------------------------------------------------------
+# 确定性结算（docs/57 §3.1：与 complete_quest 工具共用逻辑；幂等 + 落结局卡）
+# ---------------------------------------------------------------------------
+@router.post("/campaigns/{campaign_id}/quests/settle")
+async def settle_quest(
+    campaign_id: int, body: QuestSettle, user_id: int = Depends(get_current_user_id)
+):
+    """结算任务（owner 校验）。已 done/failed → 幂等返回既有结局（不再落卡）。
+
+    响应 ``data={quest, outcome, title, text, epilogue, finished}``。
+    """
+    _require_campaign(campaign_id, user_id)
+    quest = body.quest.strip()
+    if not quest or len(quest) > ENTITY_NAME_MAX:
+        raise BizError(http_status=422, code=47001, message="任务名不能为空且最长 60 字")
+    outcome = (body.outcome or "").strip().lower() or None
+    if outcome is not None and outcome not in ("strong", "weak", "miss"):
+        raise BizError(http_status=422, code=47001, message="outcome 需为 strong|weak|miss")
+
+    result = await asyncio.to_thread(st.settle_quest, campaign_id, quest, outcome)
+    ending = {
+        "quest": quest,
+        "outcome": result["outcome"],
+        "title": result["title"],
+        "text": result["text"],
+        "epilogue": result["epilogue"],
+    }
+    if not result["existing"]:
+        await asyncio.to_thread(st.persist_system_card, campaign_id, "ending", ending)
+    return ok({**ending, "finished": result["finished"]})
 
 
 @router.post("/campaigns/{campaign_id}/turns")

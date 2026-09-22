@@ -1,6 +1,7 @@
 """start_encounter：开启遭遇战（系统排先攻序；docs/56 §3）。
 
-- 参战者键规范化 ``pc.名`` / ``npc.名``（裸名查实体表，查不到按 npc 并注册 pending）；
+- 参战者键规范化 ``pc.名`` / ``npc.名``（裸名查实体表，查不到按 npc 并注册为 active；
+  docs/57 §3.1：发现即在场，不再标 pending）；
 - 先攻序 = 每参战者一枚 d20（系统骰，模型不参与）+ 声明序定平手；
 - 事实落 ``encounter.main.status/order/turn/round``（order 为 JSON 数组字符串）。
 """
@@ -58,7 +59,7 @@ async def handle(args: ToolArgs, campaign_id: int) -> ToolOutcome:
         if parsed is None:
             continue
         kind, name = parsed
-        await asyncio.to_thread(ensure_entity, campaign_id, kind, name, pending=True)
+        await asyncio.to_thread(ensure_entity, campaign_id, kind, name, pending=False)
 
     order = await asyncio.to_thread(encounter_rules.initiative_order, keys)
     await asyncio.to_thread(

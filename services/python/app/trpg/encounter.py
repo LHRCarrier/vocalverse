@@ -15,6 +15,7 @@ import json
 from dataclasses import dataclass
 
 from app.trpg.dice import parse_dice
+from app.trpg.facts import parse_key
 
 #: 参战者键前缀（pc/npc；hp 事实键 = ``{participant}.hp``）
 PARTICIPANT_KINDS: tuple[str, ...] = ("pc", "npc")
@@ -169,3 +170,53 @@ def display_name(key: str) -> str:
     """参战者键 → 展示名（``npc.地精`` → ``地精``）；非法键原样返回。"""
     parsed = parse_participant(key)
     return parsed[1] if parsed is not None else str(key or "某人")
+
+
+#: 状态属性 → 玩家可读标签（判定卡摘要用；未登记属性回退属性名）
+_PROP_LABELS: dict[str, str] = {
+    "hp": "HP",
+    "qty": "数量",
+    "inventory": "持有",
+    "location": "位置",
+    "progress": "进度",
+    "current": "场景",
+}
+
+
+def state_key_label(key: str) -> str:
+    """事实键 → 玩家可读标签（``pc.主角.hp`` → ``主角 HP``）；非法键原样返回。"""
+    parsed = parse_key(key)
+    if parsed is None:
+        return str(key or "")
+    prop = _PROP_LABELS.get(parsed.property, parsed.property)
+    if parsed.entity is None:
+        return prop
+    if parsed.domain in PARTICIPANT_KINDS:
+        return f"{display_name(f'{parsed.domain}.{parsed.entity}')} {prop}"
+    return f"{parsed.entity} {prop}"
+
+
+def format_state_change(key: str, value: str, delta: int) -> str:
+    """判定卡的状态变化条目（去内部键：``主角 HP 7（-5）``，docs/57 §3.1）。"""
+    return f"{state_key_label(key)} {value}（{delta:+d}）"
+
+
+def format_attack_card(
+    attacker: str,
+    target: str,
+    *,
+    hit: bool,
+    damage: int = 0,
+    target_hp: int | None = None,
+    weapon: str | None = None,
+) -> str:
+    """战报卡文本（「命中/失手」玩家语言；数值只到伤害与剩余 HP，无公式/内部键）。"""
+    attacker_name = display_name(attacker)
+    target_name = display_name(target)
+    weapon_text = f"用{weapon.strip()}" if (weapon or "").strip() else ""
+    if not hit:
+        return f"{attacker_name}{weapon_text}失手了——{target_name}闪身避开。"
+    if damage > 0:
+        hp_text = f"，{target_name}剩余 HP {target_hp}" if target_hp is not None else ""
+        return f"{attacker_name}{weapon_text}命中{target_name}，造成 {damage} 点伤害{hp_text}。"
+    return f"{attacker_name}{weapon_text}命中{target_name}，但没有造成实质伤害。"

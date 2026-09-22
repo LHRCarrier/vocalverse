@@ -4,7 +4,8 @@
 - 所有写路径收敛于此：LLM 提取（``upsert_facts``）/ 规则直写（``apply_dice_delta``）/
   DM 场景切换（``set_scene``）/ 用户编辑删除（``edit_fact`` / ``delete_fact``）；
 - 读路径墓碑过滤统一：``user_deleted_at IS NULL``（P2-35 防提取复活）；
-- 实体注册（P2-42）：LLM 发现未知实体 → pending=True 懒确认；系统/DM 写不设 pending；
+- 实体注册（P2-42，2026-09-22 修订）：LLM 发现未知实体 → **直接 active**（pending=False，
+  docs/57 §3.1）；``pending`` 仅作为未来确认流/立绘任务的预留标志（当前无生产者）；
 - 骰子直写（P2-41）：任一 delta 落表失败抛错——调用方转错误文本，杜绝「文本成功但 HP 未落表」；
 - 叙事摘要（P2-45）：由结构化状态模板渲染（非对话压缩），永远与事实表一致。
 
@@ -30,8 +31,10 @@ from app.models.trpg import (
     TrpgMessage,
     TrpgTask,
 )
+from app.trpg import progress as progress_rules
 from app.trpg.constants import DOMAIN_ENTITY_KIND, STATE_DOMAINS
 from app.trpg.dice import DiceResult, delta_value
+from app.trpg.encounter import format_state_change, state_key_label
 from app.trpg.facts import Adjudication, FactOp, FactRowLike, adjudicate_upsert, parse_key
 from app.trpg.snapshot import (
     SnapshotClue,
@@ -121,7 +124,7 @@ def has_messages(campaign_id: int) -> bool:
 # 实体注册（P2-42）
 # ---------------------------------------------------------------------------
 def ensure_entity(campaign_id: int, kind: str, name: str, pending: bool = False) -> int:
-    """实体注册：已存在刷新 last_mentioned_at；不存在则创建。"""
+    """实体注册：已存在刷新 last_mentioned_at；不存在则创建（缺省 active，pending=False）。"""
     db = get_session_factory()()
     try:
         row = db.execute(
@@ -174,7 +177,11 @@ def find_entity(campaign_id: int, name: str, kinds: tuple[str, ...] = ("npc", "p
 
 
 def cleanup_idle_entities(campaign_id: int, idle_ms: float) -> int:
-    """待确认实体懒清理（P2-42）：超窗未提及 → cleared（防积压）。"""
+    """待确认实体懒清理（P2-42 预留路径）：超窗未提及 → cleared（防积压）。
+
+    2026-09-22 起（docs/57 §3.1）不再有正常的 ``pending=True`` 生产者（发现即 active），
+    本函数保留给未来的「未知实体确认流」；当前调用即空转（返回 0），无副作用。
+    """
     db = get_session_factory()()
     try:
         cutoff = datetime.now(UTC) - timedelta(milliseconds=idle_ms)
@@ -344,7 +351,7 @@ def _register_entity_in_db(db, campaign_id: int, kind: str, name: str) -> None:
         return
     db.add(
         TrpgEntity(
-            campaign_id=campaign_id, kind=kind, name=name, pending=True, last_mentioned_at=now
+            campaign_id=campaign_id, kind=kind, name=name, pending=False, last_mentioned_at=now
         )
     )
 
@@ -402,7 +409,10 @@ def _sync_task_clue_from_op(db, campaign_id: int, op: FactOp) -> None:
 # 规则直写（P2-41/44）
 # ---------------------------------------------------------------------------
 def apply_dice_delta(campaign_id: int, dice: DiceResult) -> str:
-    """骰子结果落表：逐 delta 增量写 State 行 + 落一条事件日志；失败抛错（调用方转错误文本）。"""
+    """骰子结果落表：逐 delta 增量写 State 行 + 落一条事件日志；失败抛错（调用方转错误文本）。
+
+    摘要用**展示名**（``主角 HP 7（-5）``，docs/57 §3.1：判定卡不再暴露内部键）。
+    """
     db = get_session_factory()()
     try:
         applied: list[str] = []
@@ -432,7 +442,7 @@ def apply_dice_delta(campaign_id: int, dice: DiceResult) -> str:
                         modality="fact",
                     )
                 )
-            applied.append(f"{d.key}={next_value}（{d.delta:+d}）")
+            applied.append(format_state_change(d.key, next_value, d.delta))
 
         round_no = (
             int(
@@ -444,7 +454,11 @@ def apply_dice_delta(campaign_id: int, dice: DiceResult) -> str:
             )
             + 1
         )
-        missing_note = f"（未建行跳过：{'，'.join(missing)}）" if missing else ""
+        missing_note = (
+            f"（未建行跳过：{'，'.join(state_key_label(key) for key in missing)}）"
+            if missing
+            else ""
+        )
         vs_note = ""
         if dice.vs is not None:
             outcome = "成功" if dice.outcome == "success" else "失败"
@@ -671,6 +685,48 @@ def set_item_facts(
     )
 
 
+def default_item_owner(campaign_id: int) -> str | None:
+    """道具默认持有者：最早登记的 PC 实体；无 PC 实体时取唯一的 ``pc.*`` 事实主体。
+
+    （grant_item 缺省 owner 来源；``pc.名`` 与 item.owner 契约一致。）
+    """
+    db = get_session_factory()()
+    try:
+        row = (
+            db.execute(
+                select(TrpgEntity)
+                .where(TrpgEntity.campaign_id == campaign_id, TrpgEntity.kind == "pc")
+                .order_by(TrpgEntity.id.asc())
+                .limit(1)
+            )
+            .scalars()
+            .first()
+        )
+        if row is not None:
+            return f"pc.{row.name}"
+        keys = (
+            db.execute(
+                select(TrpgFact.fact_key).where(
+                    TrpgFact.campaign_id == campaign_id,
+                    TrpgFact.fact_key.like("pc.%"),
+                    TrpgFact.user_deleted_at.is_(None),
+                )
+            )
+            .scalars()
+            .all()
+        )
+    finally:
+        db.close()
+    names: set[str] = set()
+    for key in keys:
+        parts = str(key).split(".")
+        if len(parts) == 3 and parts[0] == "pc" and parts[1]:
+            names.add(parts[1])
+    if len(names) == 1:
+        return f"pc.{names.pop()}"
+    return None
+
+
 def get_encounter(campaign_id: int, encounter_id: str = "main") -> dict:
     """读遭遇事实（status/order/turn/round；order 在此解码为列表，工具不经手 JSON）。"""
     from app.trpg.encounter import decode_order
@@ -822,7 +878,10 @@ def set_entity_presence(
 
 
 def mark_entity_arriving(campaign_id: int, kind: str, name: str) -> None:
-    """登场中：注册（pending 懒确认）并保持 active——前端按 pending 显示「正在赶来」。"""
+    """登场中（**预留**）：注册并标记 pending=True——「正在赶来」只留给未来的立绘任务。
+
+    2026-09-22 起正常登场路径不再调用本函数（enter_character 直接 active，docs/57 §3.1）。
+    """
     ensure_entity(campaign_id, kind, name, pending=True)
     set_entity_presence(campaign_id, kind, name, pending=True, status="active")
 
@@ -888,6 +947,131 @@ def mark_campaign_finished(campaign_id: int) -> None:
             db.commit()
     finally:
         db.close()
+
+
+def campaign_finished_at(campaign_id: int) -> datetime | None:
+    """一局收尾时间（None=尚在冒险中；GET state 的 finished/finished_at 数据源）。"""
+    db = get_session_factory()()
+    try:
+        row = db.get(TrpgCampaign, campaign_id)
+        return row.finished_at if row is not None else None
+    finally:
+        db.close()
+
+
+def get_ending_payload(campaign_id: int, quest: str) -> dict | None:
+    """读已落库的结局系统卡 payload（幂等结算返回「既有结局」的数据源）。
+
+    返回 ``{quest, outcome, title, text, epilogue}``（剥掉 trpg_sys）；无卡/字段残缺 → None。
+    """
+    db = get_session_factory()()
+    try:
+        rows = (
+            db.execute(
+                select(TrpgMessage)
+                .where(
+                    TrpgMessage.campaign_id == campaign_id,
+                    TrpgMessage.kind == "system",
+                )
+                .order_by(TrpgMessage.id.desc())
+            )
+            .scalars()
+            .all()
+        )
+    finally:
+        db.close()
+    for row in rows:
+        payload = row.payload if isinstance(row.payload, dict) else {}
+        if payload.get("trpg_sys") != "ending" or payload.get("quest") != quest:
+            continue
+        ending = {
+            key: payload.get(key) for key in ("quest", "outcome", "title", "text", "epilogue")
+        }
+        if not all(isinstance(ending[key], str) and ending[key] for key in ending):
+            return None
+        return ending
+    return None
+
+
+def persist_system_card(campaign_id: int, trpg_sys: str, payload: dict) -> None:
+    """系统卡落库（kind=system + payload.trpg_sys；与 service._post_system_row 同协议）。"""
+    add_message(
+        campaign_id,
+        "assistant",
+        "",
+        kind="system",
+        payload={"trpg_sys": trpg_sys, **payload},
+        meta={"trpg_sys": trpg_sys},
+    )
+
+
+def settle_quest(campaign_id: int, quest: str, outcome: str | None = None) -> dict:
+    """确定性结算门面（complete_quest 工具与 settle 路由共用；docs/57 §3.1）。
+
+    规则算术在 :mod:`app.trpg.progress`（纯函数），此处只做「读状态 → 落表 → 组装返回」：
+    - 未结算：判定档位（显式 outcome 优先，否则按进度/威胁钟自动）→ ``quest.status`` 落表
+      → 营地 ``finished_at`` 置位；
+    - 已 done/failed：**幂等**——已有结局卡则原样返回其 payload；无卡（如提取器直接置 done）
+      则补渲染一张（``existing=False``，由调用方决定落卡）。
+    返回 ``{quest, outcome, status, title, text, epilogue, settled, existing, finished}``。
+    """
+    state = get_quest_state(campaign_id, quest)
+    status = state.get("status")
+    if status in ("done", "failed"):
+        existing = get_ending_payload(campaign_id, quest)
+        finished = campaign_finished_at(campaign_id) is not None
+        if not finished:
+            # 收敛：已结算但收尾标记缺失（历史数据/异常路径）→ 补置位，保证 finished 语义可信
+            mark_campaign_finished(campaign_id)
+            finished = True
+        if existing is not None:
+            return {
+                "quest": quest,
+                "status": status,
+                "settled": False,
+                "existing": True,
+                "finished": finished,
+                **existing,
+            }
+        plan = progress_rules.plan_settlement(
+            quest,
+            progress=state.get("progress"),
+            kind=state.get("kind"),
+            stage=state.get("stage"),
+            status=status,
+        )
+        return {
+            "quest": quest,
+            "settled": False,
+            "existing": False,
+            "finished": finished,
+            "outcome": plan.outcome,
+            "status": plan.status,
+            "title": plan.title,
+            "text": plan.text,
+            "epilogue": plan.epilogue,
+        }
+
+    plan = progress_rules.plan_settlement(
+        quest,
+        requested=outcome,
+        progress=state.get("progress"),
+        kind=state.get("kind"),
+        stage=state.get("stage"),
+    )
+    set_quest_facts(campaign_id, quest, status=plan.status)
+    mark_campaign_finished(campaign_id)
+    return {
+        "quest": quest,
+        "settled": True,
+        "existing": False,
+        "finished": True,
+        "outcome": plan.outcome,
+        "status": plan.status,
+        "title": plan.title,
+        "text": plan.text,
+        "epilogue": plan.epilogue,
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -28,6 +28,7 @@ from app.models.base import (
     TrpgLangs,
 )
 from app.models.trpg import TrpgScenarioCard
+from app.trpg import items as item_rules
 from app.trpg.constants import DOMAIN_PROPERTIES
 from app.trpg.facts import FactOp, parse_key
 from app.trpg.state import (
@@ -127,6 +128,12 @@ def _normalize_template(raw: dict) -> dict:
                 continue
             if parsed.domain == "scene":  # 场景单值由 scene 字段承载，模板不重复
                 continue
+            if parsed.domain == "item":
+                # docs/57 §3.1：场景卡可预置道具（qty|effect|consumable），但持有者由系统解析
+                if parsed.property == "owner":
+                    continue
+                if parsed.property == "qty" and not (item_rules.parse_qty(value) or 0):
+                    continue
             modality = (
                 item.get("modality")
                 if item.get("modality") in ("fact", "claim", "rumor")

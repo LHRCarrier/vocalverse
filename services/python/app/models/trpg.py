@@ -179,8 +179,8 @@ class TrpgClue(TimestampMixin, Base):
 class TrpgEntity(TimestampMixin, Base):
     """实体注册表（``(campaign_id, kind, name)`` 幂等键）。
 
-    pending=True 为 LLM 发现的懒确认实体（默认可用；超窗未提及 → status=cleared）；
-    **在场映射**（docs/56 §B，不加新枚举/约束）：arriving↔pending=true、departed↔status=cleared。
+    pending 为未来确认流/立绘任务的预留标志（2026-09-22 起发现即 active，不再据此显示
+    「正在赶来」，docs/57 §3.1）；**在场映射**：active / cleared(=departed) 由 status 表达。
     """
 
     __tablename__ = "trpg_entities"

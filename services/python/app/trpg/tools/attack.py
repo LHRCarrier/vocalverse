@@ -11,13 +11,22 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from app.trpg import encounter as encounter_rules
 from app.trpg.constants import ENTITY_NAME_MAX, STATE_DOMAINS
 from app.trpg.dice import DiceEffect, DiceResult, parse_dice
 from app.trpg.facts import parse_key
-from app.trpg.state import apply_dice_delta, find_entity, find_pc_entity, get_fact_value
+from app.trpg.state import (
+    apply_dice_delta,
+    find_entity,
+    find_pc_entity,
+    get_fact_value,
+    persist_system_card,
+)
 from app.trpg.tools.registry import ToolArgs, ToolOutcome, ToolSpec, register
+
+logger = logging.getLogger("vocalverse")
 
 #: 默认对抗值（docs/56 §3：vs 缺省 12）
 DEFAULT_VS = 12
@@ -214,6 +223,19 @@ async def handle(args: ToolArgs, campaign_id: int) -> ToolOutcome:
     )
     if notes:
         report = f"{report}{''.join(notes)}"
+    # 战报系统卡（docs/57 §3.1）：命中/失手都留痕，刷新后仍能看到战斗经过
+    card_text = encounter_rules.format_attack_card(
+        attacker,
+        target_key,
+        hit=hit,
+        damage=damage_done,
+        target_hp=hp_after,
+        weapon=weapon,
+    )
+    try:
+        await asyncio.to_thread(persist_system_card, campaign_id, "dice", {"text": card_text})
+    except Exception as exc:  # noqa: BLE001 - 卡片失败不影响攻击结果
+        logger.warning("酒馆战报卡落库失败（campaign=%s）：%s", campaign_id, exc)
     return {
         "text": report,
         "status_stage": "rolling",

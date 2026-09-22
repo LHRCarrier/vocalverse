@@ -46,15 +46,21 @@ def build_dm_system_prompt(
         "同一场景对同一角色至多一次，不要每回合调用。"
     )
     lines += [
-        "8. 进度钟：只在「克服了有意义的障碍」或「遭受重大挫折」时调用 tick_clock（delta 1~3，"
-        "受挫用负数），禁止每回合推进；进度以系统记录为准，严禁在正文里自行编造进度数值。",
+        "8. 进度与判定绑定：需要判定时调用 roll_dice，**凡是推进主线障碍的判定必须带上 quest 参数**"
+        "（任务名）——系统会按成败自动推进进度钟：成功 +1（余量≥5 再 +1），失败推进威胁钟 +1；"
+        "只在克服有意义的障碍/遭受挫折时判定，禁止每回合都判定推进；"
+        "进度以系统记录为准，严禁在正文里编造进度数值。",
         "9. 结算：当故事走到结局、玩家主动收尾、或进度钟已满时调用 complete_quest 结算"
-        "（outcome 可省略，由进度自动判定）；结算后用尾声叙述收束，不要再为已结算的任务新开主线。",
+        "（outcome 可省略，由进度自动判定）；结算后用尾声叙述收束。"
+        "**已结算的任务不得继续推进或再次结算**，需要新目标时另开新任务/新篇章。",
         "10. 人物进出场：关键角色首次出现时调用 enter_character（可带 note），明确退场时调用"
         " exit_character；只在对话里被提到、没有实际登场的路人不要调用。",
         "11. 战斗与道具：冲突开始时调用 start_encounter（先攻序由系统排），战斗内每次攻击调用"
         " attack、行动结束调用 next_turn、战斗收场调用 end_encounter；使用道具必须调用 use_item。"
         "HP/数量等数值一律以系统写回为准，严禁在正文里自行结算或编造数值。",
+        "12. 道具来源：战利品、购买、搜刮、拾取、任务奖励等任何玩家获得物品的情形，必须调用"
+        " grant_item（qty 为本次获得数量 1~99，可带 effect/consumable），禁止只在叙述里给物品；"
+        "同一道具再次获得会累加数量，不要自己改写数量。",
     ]
     return "\n".join(lines)
 
@@ -82,14 +88,17 @@ def build_card_prompt(theme: str, lang: str) -> str:
             '"tags":["≤4个标签"],"scene":"起始场景名（≤20字）",'
             '"opening_line":"DM 开场叙述：2-4 句，营造画面感，最后留一个钩子，≤300字",'
             '"template":{"pc_name":"主角","pc":{"hp":12,"location":"具体位置","inventory":"随身物"},'
-            '"facts":[{"key":"rel.角色名.attitude","value":"敌对|友善|中立","modality":"fact"}],'
+            '"facts":[{"key":"rel.角色名.attitude","value":"敌对|友善|中立","modality":"fact"},'
+            '{"key":"item.道具名.qty","value":"1"},{"key":"item.道具名.effect","value":"hp+5"}],'
             '"tasks":["任务1","任务2"],"clues":[{"title":"线索名","content":"线索内容","scene":"场景"}]}}',
             "模板规则：",
             "1) facts 的 key 只能是 rel.{NPC名}.attitude|trust|status、quest.{任务名}.status、"
-            "clue.{线索名}.found、pc.{PC名}.hp|location|inventory；",
+            "clue.{线索名}.found、pc.{PC名}.hp|location|inventory、"
+            "item.{道具名}.qty|effect|consumable（effect 写数值约定如 hp+5）；"
+            "item 不要写 owner——持有者由系统在发放时解析；",
             "2) 最多 3 条 facts、2 条 tasks、2 条 clues；没有就留空数组；",
             "3) 数值状态（HP）只写在 template.pc 里，不要写成 facts；",
-            "4) 词条要具体、可直接被 DM 使用（NPC 有名字、线索指向剧情）。",
+            "4) 词条要具体、可直接被 DM 使用（NPC 有名字、线索指向剧情；道具给玩家能用上的东西）。",
         ]
     )
 

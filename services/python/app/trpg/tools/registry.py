@@ -38,8 +38,8 @@ class ToolSpec:
 
 _REGISTRY: dict[str, ToolSpec] = {}
 
-#: 内置工具下发顺序（基础三件 + docs/56 §3 闭环九件）：与导入顺序解耦，保证模型工具面稳定
-#: （顺序稳定 = prompt 缓存友好 / 测试可断言）。
+#: 内置工具下发顺序（基础三件 + docs/56 §3 闭环九件 + docs/57 §3.1 grant_item）：
+#: 与导入顺序解耦，保证模型工具面稳定（顺序稳定 = prompt 缓存友好 / 测试可断言）。
 BUILTIN_TOOL_ORDER: tuple[str, ...] = (
     "roll_dice",
     "set_scene",
@@ -50,6 +50,7 @@ BUILTIN_TOOL_ORDER: tuple[str, ...] = (
     "exit_character",
     "attack",
     "use_item",
+    "grant_item",
     "start_encounter",
     "next_turn",
     "end_encounter",
