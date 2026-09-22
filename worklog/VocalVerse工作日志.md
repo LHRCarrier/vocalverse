@@ -3,6 +3,24 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 演示数据切片六（社区视频帖 · B 站素材 → 本地媒体 → 13 条视频帖）· 1 op
+
+> 归属：演示数据准备（gitignored `local/演示数据/`；素材是商用版权内容，**只落本地，不入 git / 不上生产**）。
+> 用户口径：指定 3 条 B 站视频 + 同类再补 10 条，「中文标题翻译成英文进数据」。
+
+- **外部素材**：新增 `fetch_bili_videos.py`——uv 自动拉 yt-dlp 2026.08.19 + imageio-ffmpeg 自包含 ffmpeg（本机没装 ffmpeg 也能合流）；
+  480p avc1 + m4a 合流（浏览器/WebView 兼容），封面走 view API 兜底，按目录幂等跳过；产物 `videos/<nn>-<bvid>/{video.mp4,cover.jpg,meta.json}`，
+  13 条共 ~203MB（最长 362s，< 600s 上限）。
+- **入库**：`seed_videos.py` 经 `app.media.service.create` 注册 13 video + 13 image（内容寻址落盘；`GET /api/v1/media` 实测 Range/206 可拖拽）
+  → 13 条 `kind='video'` 帖（slug `vv-bili-<bvid>` 幂等；英文标题 + 原创英文正文 + 静态计数）+ 6 条评论；作者分派给 6 位创作者账号。
+- **验证**：连跑两次幂等（第二次 13 条全「已存在」）；feed API 返回 url/coverUrl/durationS；Playwright 实测帖子详情 `<video>` 播放（currentTime 前进、duration 56s）；
+  截图 `local/演示数据/_验收截图/社区首页-视频帖.png`、`视频帖详情-播放中.png`。
+- **顺带发现（未修 · 影响演示稳定性，建议演示前定夺）**：Java 对**过期 JWT 返回 403**（Python 返 401），而前端静默续期钩子只认 401
+  （`apps/web/src/api/client.ts`）→ App 页面开着超过 1 小时后，社区接口直接 403「加载失败」，需刷新页面才恢复（刷新时 bootstrap 续期成功，已实测）。
+  修法二选一：① Java `SecurityConfig` 加 `AuthenticationEntryPoint` 返 401（推荐，语义也更正确）；② 前端把 401/403 一起纳入续期判定。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-22 演示数据切片二~五（学习 / 唱吧 / 酒馆 / 阅读 · 4 子代理并行）· 1 op
 
 > 归属：演示数据准备（gitignored `local/演示数据/`，四份 seed 脚本幂等可复现）；主演示号 `luna`（user_id=18）。
