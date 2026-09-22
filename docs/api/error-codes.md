@@ -3,6 +3,8 @@
 > 登记纪律：新增错误码按 4xxxx（4 开头业务）与 5xxxx（服务）分段，先在本表登记后提交 PR（本表 = 代码全集，2026-09-07 补齐 409xx/41001/42202 与 40301 语义；2026-09-06 社区 S1 段：40402/40302/42203/40904；2026-09-09 社区 S3 媒体段：40403/41501/42205 + 拓宽 41301；**2026-09-10 管理端控制台段：46001~46015**，见 docs/50 §10.4 与 docs/51 裁决表）。
 >
 > **发出点对账（2026-09-10 · P0-5 修复）**：本表此前有 3 个码**全仓零 raise**（40101/42901/50003），属"契约虚设"。现：`40101`/`42901` 由全局 `http_error_handler`（`app/main.py`）把 `HTTPException(401/429)` 翻译为 envelope（**新增 handler，未新增码**，映射表见 `docs/api/envelope.md`）；`50003` 由唱歌评分任务失败态回带（`app/sing/service.py:_run_attempt`，异常细节只进日志）；`50002` 另用于「任务态丢失」兜底。前端映射：`apps/web/src/api/sing.ts:singFailureMessage`（按码不按字符串）。
+>
+> **2026-09-22 补记**：Java 侧此前**未配 `AuthenticationEntryPoint`**，匿名/过期令牌落到默认 `Http403ForbiddenEntryPoint` → 403（前端「401 静默续期」钩子只认 401，access token 过期后页面表现为「加载失败 HTTP 403」，刷新才恢复）。现 `SecurityConfig` 补 entry point：**匿名 / 令牌无效或过期 = 401 + Envelope{40101}**（与 `JwtAuthFilter` 同码同形）；「已认证但无权」仍 403。测试断言同步改为 401（AuthFlowTest / CommunityApiTest / TicketApiTest / UserMeApiTest）。
 
 | code | HTTP | 含义 | 处理 |
 |---|---|---|---|
