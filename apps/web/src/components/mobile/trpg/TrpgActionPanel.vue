@@ -4,15 +4,16 @@
  *
  * - **常驻**：无实体/无道具时也给通用行动（观察/交谈/前进）；
  * - 单行 chip：攻击（仅遭遇激活时由页面传入）/ 道具 / 情境建议 / 收尾；
- *   横滑 + 两侧渐隐（CSS），点按行为：
+ *   横滑 + 溢出感知（N7）：仅在溢出侧渐隐，右侧还有内容时叠一枚」提示（不拦截点击），点按行为：
  *   - 情境建议 → 只填入输入框（`prefill`，与旧 dock「推荐行动」合并为一排）；
  *   - 道具 → 直接发「我使用{道具}」+ 即时回执（`feedback` toast）；
  *   - 攻击 → 二次确认（武器下拉排除消耗品/治疗品）→ 发送 + 回执；
  *   - 收尾本幕 → 页面调确定性结算接口。
  * 遭遇进行中时顶部内嵌 TrpgEncounterCard（轮次/先攻序/HP）。
  */
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
+import IconChevronRight from '~icons/tabler/chevron-right'
 import IconFlask from '~icons/tabler/flask'
 import IconSword from '~icons/tabler/sword'
 import IconFlag from '~icons/tabler/flag-check'
@@ -21,6 +22,7 @@ import type { TavernQuickAction } from '@/composables/useTavernSuggestions'
 import type { TavernEncounter, TavernItem, TavernParticipant } from '@/composables/useTavernEncounter'
 import { isWeapon } from '@/composables/useTavernEncounter'
 
+import { computeRowScrollState, type RowScrollState } from './panelScroll'
 import TrpgEncounterCard from './TrpgEncounterCard.vue'
 
 const props = withDefaults(
@@ -53,6 +55,35 @@ const emit = defineEmits<{
   feedback: [message: string]
   settle: [quest: string]
 }>()
+
+const rowEl = ref<HTMLElement | null>(null)
+const scrollState = ref<RowScrollState>({ overflowing: false, fadeStart: false, fadeEnd: false })
+
+function syncRowScroll() {
+  if (rowEl.value) scrollState.value = computeRowScrollState(rowEl.value)
+}
+
+async function refreshOverflow() {
+  await nextTick()
+  syncRowScroll()
+}
+
+/** chip 集合变化（道具/建议/目标/收尾）→ 重算溢出；窗口缩放同样 */
+watch(
+  () => [
+    props.attackTargets.length,
+    props.items.length,
+    props.settleable.length,
+    props.quickActions.length,
+    props.encounter != null,
+  ],
+  () => void refreshOverflow(),
+)
+onMounted(() => {
+  void refreshOverflow()
+  window.addEventListener('resize', refreshOverflow)
+})
+onUnmounted(() => window.removeEventListener('resize', refreshOverflow))
 
 /** 待确认的攻击目标（null = 无确认面板） */
 const pendingTarget = ref<TavernParticipant | null>(null)
@@ -122,53 +153,63 @@ function settle(quest: string) {
       </button>
     </div>
 
-    <div v-else class="t-act-panel__row">
-      <span class="t-act-panel__label" aria-hidden="true">⚡ 行动</span>
-      <button
-        v-for="target in props.attackTargets"
-        :key="`atk-${target.key}`"
-        class="t-act-chip t-act-chip--attack"
-        type="button"
-        :disabled="props.disabled"
-        @click="openAttack(target)"
+    <div v-else class="t-act-panel__scroll">
+      <div
+        ref="rowEl"
+        class="t-act-panel__row"
+        :class="{ 'is-fade-start': scrollState.fadeStart, 'is-fade-end': scrollState.fadeEnd }"
+        @scroll.passive="syncRowScroll"
       >
-        <IconSword />
-        <span>攻击 {{ target.name }}</span>
-        <span v-if="target.hp != null" class="t-act-chip__hp">HP {{ target.hp }}</span>
-      </button>
-      <button
-        v-for="item in props.items"
-        :key="`item-${item.name}`"
-        class="t-act-chip t-act-chip--item"
-        type="button"
-        :disabled="props.disabled"
-        :title="item.effect ?? undefined"
-        @click="useItem(item)"
-      >
-        <IconFlask />
-        <span>{{ item.name }}<template v-if="item.qty > 1"> ×{{ item.qty }}</template></span>
-      </button>
-      <button
-        v-for="quest in props.settleable"
-        :key="`settle-${quest.name}`"
-        class="t-act-chip t-act-chip--settle"
-        type="button"
-        :disabled="props.disabled || props.settling"
-        @click="settle(quest.name)"
-      >
-        <IconFlag />
-        <span>收尾本幕 · {{ quest.name }}</span>
-      </button>
-      <button
-        v-for="action in props.quickActions"
-        :key="`sug-${action.kind}-${action.label}`"
-        class="t-act-chip t-act-chip--suggest"
-        type="button"
-        :disabled="props.disabled"
-        @click="suggest(action.text)"
-      >
-        {{ action.label }}
-      </button>
+        <span class="t-act-panel__label" aria-hidden="true">⚡ 行动</span>
+        <button
+          v-for="target in props.attackTargets"
+          :key="`atk-${target.key}`"
+          class="t-act-chip t-act-chip--attack"
+          type="button"
+          :disabled="props.disabled"
+          @click="openAttack(target)"
+        >
+          <IconSword />
+          <span>攻击 {{ target.name }}</span>
+          <span v-if="target.hp != null" class="t-act-chip__hp">HP {{ target.hp }}</span>
+        </button>
+        <button
+          v-for="item in props.items"
+          :key="`item-${item.name}`"
+          class="t-act-chip t-act-chip--item"
+          type="button"
+          :disabled="props.disabled"
+          :title="item.effect ?? undefined"
+          @click="useItem(item)"
+        >
+          <IconFlask />
+          <span>{{ item.name }}<template v-if="item.qty > 1"> ×{{ item.qty }}</template></span>
+        </button>
+        <button
+          v-for="quest in props.settleable"
+          :key="`settle-${quest.name}`"
+          class="t-act-chip t-act-chip--settle"
+          type="button"
+          :disabled="props.disabled || props.settling"
+          @click="settle(quest.name)"
+        >
+          <IconFlag />
+          <span>收尾本幕 · {{ quest.name }}</span>
+        </button>
+        <button
+          v-for="action in props.quickActions"
+          :key="`sug-${action.kind}-${action.label}`"
+          class="t-act-chip t-act-chip--suggest"
+          type="button"
+          :disabled="props.disabled"
+          @click="suggest(action.text)"
+        >
+          {{ action.label }}
+        </button>
+      </div>
+      <span v-if="scrollState.fadeEnd" class="t-act-panel__more" aria-hidden="true">
+        <IconChevronRight />
+      </span>
     </div>
   </div>
 </template>

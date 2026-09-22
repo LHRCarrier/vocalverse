@@ -50,6 +50,16 @@ const HP_KEY_RE = /^(npc|pc)\.(.+)\.hp$/
 const INVENTORY_KEY_RE = /^pc\.(.+)\.inventory$/
 /** 治疗/回复类效果（含此类效果的消耗品不能当武器，docs/57 §3.2） */
 const HEAL_EFFECT_RE = /回复|恢复|治疗|回血|生命|血量|愈合|heal|hp/i
+/**
+ * 内部实体名（docs/57 P1-5 目标泄漏：`攻击 main`）：
+ * 这些名字是引擎内部键（遭遇 id/叙述者），不得渲染成攻击目标。
+ */
+const INTERNAL_ENTITY_NAMES = new Set(['main', 'dm', 'gm', 'narrator'])
+
+/** 是否为内部实体名（大小写/空白宽容；供攻击目标过滤与单测） */
+export function isInternalEntityName(name: string): boolean {
+  return INTERNAL_ENTITY_NAMES.has(String(name ?? '').trim().toLowerCase())
+}
 
 function intOrNull(value: string | null | undefined): number | null {
   const num = Number(String(value ?? '').trim())
@@ -208,18 +218,22 @@ export function useTavernEncounter(state: Ref<TrpgState | null>) {
     })
   })
 
-  /** 可攻击的在场目标（npc/pc 且未离场；排除玩家自身 PC） */
+  /**
+   * 可攻击目标（docs/57 P1-5）：
+   * **只列在场的 NPC**——排除玩家自身 PC、其他 PC（同行者本人）、正在赶来（pending）、
+   * 已离场（cleared）与内部实体名（`main` 等，避免 `攻击 main` 泄漏）。
+   */
   const attackTargets = computed<TavernParticipant[]>(() => {
     const hpFacts = parseHp(state.value?.facts ?? [])
     const selfName = self.value?.name ?? null
     return (state.value?.entities ?? [])
-      .filter((e) => (e.kind === 'npc' || e.kind === 'pc') && e.status !== 'cleared')
-      .filter((e) => e.name !== selfName)
+      .filter((e) => e.kind === 'npc' && e.status !== 'cleared' && !e.pending)
+      .filter((e) => e.name !== selfName && !isInternalEntityName(e.name))
       .map((e) => ({
-        key: `${e.kind}.${e.name}`,
-        kind: e.kind === 'pc' ? ('pc' as const) : ('npc' as const),
+        key: `npc.${e.name}`,
+        kind: 'npc' as const,
         name: e.name,
-        hp: hpFacts.get(`${e.kind}.${e.name}`) ?? null,
+        hp: hpFacts.get(`npc.${e.name}`) ?? null,
         current: false,
       }))
   })

@@ -337,7 +337,8 @@ export function useTavernSession(audio: TavernAudio) {
     state,
     applyEnding: questDomain.applyEnding,
     sendFallback: sendText,
-    refresh: refreshState,
+    // 结算后同时刷状态与列表（列表 finished/finished_at 供大堂「已完结」分组）
+    refresh: async () => { await refreshState(); await refreshCampaigns() },
     setError: (message) => { inputError.value = message },
     onSettled: () => { statusHint.value = '本幕已收尾' },
   })

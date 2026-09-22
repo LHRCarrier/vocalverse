@@ -14,6 +14,9 @@ export interface TrpgCampaignItem {
   name: string
   last_active_at?: string | null
   create_time?: string | null
+  /** 本局是否已完结（列表契约，2026-09-22 起：供大堂「已完结」分组） */
+  finished?: boolean
+  finished_at?: string | null
 }
 
 export interface TrpgFactItem {
@@ -89,7 +92,14 @@ export interface TrpgVerifyResult {
 }
 
 export interface TrpgState {
-  campaign: { id: number; name: string; narrative_summary?: string | null }
+  campaign: {
+    id: number
+    name: string
+    narrative_summary?: string | null
+    /** 本局是否已完结（权威位置，docs/57 P1-2：刷新后已完结条/收尾门控靠它） */
+    finished?: boolean
+    finished_at?: string | null
+  }
   messages: TrpgMessageItem[]
   facts: TrpgFactItem[]
   tasks: TrpgTaskItem[]
@@ -100,7 +110,7 @@ export interface TrpgState {
   snapshot: string
   narrative_summary?: string | null
   verify: TrpgVerifyResult
-  /** 本局是否已完结（任一任务结算后由后端置位，docs/57 §3.1） */
+  /** @deprecated 旧契约顶层字段；权威位置是 `campaign.finished`（读取保留兼容，写入不再使用） */
   finished?: boolean
   finished_at?: string | null
 }

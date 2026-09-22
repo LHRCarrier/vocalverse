@@ -22,6 +22,11 @@ export function upsertEndingRow(rows: Ref<TavernRow[]>, payload: Record<string, 
   else rows.value.push({ role: 'assistant', kind: 'system', content: '', payload })
 }
 
+/** 已完结读取（docs/57 P1-2）：新契约 `campaign.finished` 优先，旧顶层字段仅兼容 */
+export function isCampaignFinished(state: TrpgState | null | undefined): boolean {
+  return state?.campaign?.finished === true || state?.finished === true
+}
+
 export interface TavernSettleDeps {
   campaignId: Ref<number | null>
   rows: Ref<TavernRow[]>
@@ -39,7 +44,13 @@ export function useTavernSettle(deps: TavernSettleDeps) {
   const settling = ref(false)
   /** 本地结算标记：settle 成功即置位（避免 refresh 竞态把「已完结」闪没） */
   const settledLocal = ref(false)
-  const finished = computed(() => settledLocal.value || deps.state.value?.finished === true)
+  /**
+   * 已完结判定（docs/57 P1-2）：权威位置是 `state.campaign.finished`（刷新后仍在）；
+   * 顶层 `state.finished` 只作旧契约兼容读取。
+   */
+  const finished = computed(
+    () => settledLocal.value || isCampaignFinished(deps.state.value),
+  )
 
   function reset() {
     settledLocal.value = false
@@ -70,10 +81,13 @@ export function useTavernSettle(deps: TavernSettleDeps) {
         epilogue: result.epilogue,
       })
       if (deps.state.value) {
+        const finishedAt = new Date().toISOString()
         deps.state.value = {
           ...deps.state.value,
+          // 权威字段写 `campaign.finished`（docs/57 P1-2）；顶层仅旧契约兼容
+          campaign: { ...deps.state.value.campaign, finished: result.finished, finished_at: finishedAt },
           finished: result.finished,
-          finished_at: new Date().toISOString(),
+          finished_at: finishedAt,
         }
       }
       deps.onSettled()
