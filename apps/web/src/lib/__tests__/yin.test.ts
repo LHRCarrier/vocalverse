@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { centOf, createYinDetector, detectPitch, midiOf, noteNameOf } from '@/lib/yin'
+import { centOf, createYinDetector, detectPitch, midiOf, noteNameOf, YIN_THRESHOLD, YIN_WINDOW_SIZE } from '@/lib/yin'
 
 function tone(hz: number, sr = 48000, n = 2048, amp = 0.5): Float32Array {
   const a = new Float32Array(n)
@@ -94,6 +94,86 @@ describe('yin · createYinDetector（复用缓冲 · 实时 Worker 链路，2026
     expect(det.buffers.d).toBe(d0)
     expect(det.buffers.cmndf).toBe(c0)
     expect(d0.length).toBe(det.tauMax + 1)
+  })
+})
+
+describe('yin · 灵敏度参数（2026-09-21：阈值 0.1→0.22、窗 2048→4096，实测见 local/yin-sensitivity.mjs）', () => {
+  it('默认阈值/窗长即新值（单一来源，AnalyserNode 与 Worker 共用）', () => {
+    expect(YIN_THRESHOLD).toBe(0.22)
+    expect(YIN_WINDOW_SIZE).toBe(4096)
+    expect(createYinDetector(48000).n).toBe(YIN_WINDOW_SIZE)
+  })
+
+  it('检出对阈值单调（放宽只会多检出），且存在档位体现 0.10→0.22 的增益', () => {
+    // 拟人声：弱正弦 + 周期抖动 + 低通隆隆声 + 白噪 + 50Hz 工频（复刻 local/yin-sensitivity.mjs）
+    const build = (toneAmp: number, noiseAmp: number) => {
+      const N = YIN_WINDOW_SIZE
+      const a = new Float32Array(N)
+      let s = 987654321
+      const rnd = () => {
+        s = (s * 1103515245 + 12345) & 0x7fffffff
+        return (s / 0x7fffffff) * 2 - 1
+      }
+      let lp = 0
+      let ph = 0
+      for (let i = 0; i < N; i += 1) {
+        const t = i / 48000
+        lp += 0.05 * (rnd() - lp)
+        ph += (2 * Math.PI * 220 * (1 + 0.04 * rnd())) / 48000
+        const hum = noiseAmp * 0.5 * (Math.sin(2 * Math.PI * 50 * t) + 0.5 * Math.sin(2 * Math.PI * 100 * t))
+        a[i] = toneAmp * (1 + 0.3 * Math.sin(2 * Math.PI * 5 * t)) * Math.sin(ph) + noiseAmp * lp + noiseAmp * 0.5 * rnd() + hum
+      }
+      return a
+    }
+    const strict = createYinDetector(48000, YIN_WINDOW_SIZE, 0.1)
+    const relaxed = createYinDetector(48000, YIN_WINDOW_SIZE, YIN_THRESHOLD)
+    const TRIALS = 12
+    const SCALES = [0.002, 0.006, 0.012, 0.02, 0.04, 0.1]
+    let foundGain = false
+    let prevStrict = -1
+    for (const noise of SCALES) {
+      let strictHits = 0
+      let relaxedHits = 0
+      for (let k = 0; k < TRIALS; k += 1) {
+        const buf = build(0.05, noise)
+        if (strict.detect(buf)) strictHits += 1
+        if (relaxed.detect(buf)) relaxedHits += 1
+      }
+      // 单调性：阈值更高 → 检出数不可能更少（detectPitch 的判据是"存在 tau 使 cmndf < 阈值"）
+      expect(relaxedHits).toBeGreaterThanOrEqual(strictHits)
+      // 噪声越大越难检出（同阈值下应单调不增）
+      if (prevStrict >= 0) expect(strictHits).toBeLessThanOrEqual(prevStrict)
+      prevStrict = strictHits
+      if (relaxedHits > strictHits) foundGain = true
+    }
+    // 必须存在某个噪声档位，放宽阈值真的多检出了（否则这次调参就是无效的）
+    expect(foundGain).toBe(true)
+  })
+
+  it('加长窗提升弱信号检出（同阈值下 4096 ≥ 2048）', () => {
+    const N = 2048
+    const short = createYinDetector(48000, N, YIN_THRESHOLD)
+    const long = createYinDetector(48000, YIN_WINDOW_SIZE, YIN_THRESHOLD)
+    expect(long.n).toBeGreaterThan(short.n)
+    // 窗长决定内层累加长度：更长窗对同一周期信号积分更多，检出不应更差
+    const tone = (hz: number, n: number) => {
+      const a = new Float32Array(n)
+      for (let i = 0; i < n; i += 1) a[i] = 0.5 * Math.sin((2 * Math.PI * hz * i) / 48000)
+      return a
+    }
+    expect(short.detect(tone(220, N))).not.toBeNull()
+    expect(long.detect(tone(220, YIN_WINDOW_SIZE))).not.toBeNull()
+  })
+
+  it('放大幅度不改变结果（CMNDF 归一化 → 增益对 YIN 无效）', () => {
+    const det = createYinDetector(48000)
+    const big = tone(440, 48000, YIN_WINDOW_SIZE, 0.5)
+    const small = tone(440, 48000, YIN_WINDOW_SIZE, 0.05)
+    const a = det.detect(big)
+    const b = det.detect(small)
+    expect(a).not.toBeNull()
+    expect(b).not.toBeNull()
+    expect(a!.f0.toFixed(6)).toBe(b!.f0.toFixed(6))
   })
 })
 

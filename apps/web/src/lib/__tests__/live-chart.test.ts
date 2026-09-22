@@ -6,7 +6,10 @@
 import { describe, expect, it } from 'vitest'
 
 import type { SongDetail } from '@/api/sing'
-import { createFrameRing, flattenRefF0s, REF_HOP_MS, renderChart } from '@/lib/live-chart'
+import { createFrameRing, eachSilenceSpan, flattenRefF0s, REF_HOP_MS, renderChart, scoreColorOf } from '@/lib/live-chart'
+
+/** 与 renderChart 内部一致的纵轴映射（h = 120） */
+const y2f = (f: number) => 6 + (1 - (Math.log2(f) - Math.log2(65)) / (Math.log2(800) - Math.log2(65))) * (120 - 24)
 
 function line(seq: number, startMs: number, f0s: number[]) {
   return {
@@ -112,16 +115,112 @@ describe('live-chart · flattenRefF0s', () => {
   })
 })
 
+describe('live-chart · eachSilenceSpan（没出声 → 底部灰线，2026-09-18 需求）', () => {
+  const spans = (ring: ReturnType<typeof createFrameRing>, from: number, to: number, now: number) => {
+    const out: Array<[number, number]> = []
+    eachSilenceSpan(ring, from, to, now, (a, b) => out.push([a, b]))
+    return out
+  }
+
+  it('尚无任何浊音帧：从录音开头画到当前（now>阈值）', () => {
+    expect(spans(createFrameRing(8), 0, 1000, 1000)).toEqual([[0, 1000]])
+  })
+
+  it('短于阈值不画（刚开始 200ms 未出声 / 正常换气）', () => {
+    expect(spans(createFrameRing(8), 0, 200, 200)).toEqual([])
+  })
+
+  it('首帧之前的空白段（起唱晚）', () => {
+    const r = createFrameRing(8)
+    r.push(500, 440)
+    expect(spans(r, 0, 600, 600)).toEqual([[0, 500]])
+  })
+
+  it('帧间空隙 > 阈值 → 一段；< 阈值 → 不画', () => {
+    const long = createFrameRing(8)
+    long.push(0, 440)
+    long.push(1500, 440)
+    long.push(1560, 440)
+    expect(spans(long, 0, 1560, 1560)).toEqual([[0, 1500]])
+    const short = createFrameRing(8)
+    short.push(0, 440)
+    short.push(120, 440)
+    expect(spans(short, 0, 120, 120)).toEqual([])
+  })
+
+  it('末帧之后仍在静音：延伸到 now（灰线实时增长）', () => {
+    const r = createFrameRing(8)
+    r.push(0, 440)
+    r.push(60, 440)
+    expect(spans(r, 0, 3000, 3000)).toEqual([[60, 3000]])
+  })
+
+  it('按可见窗与 t>=0 裁剪（窗口早于录音 / 晚于 now 均不越界）', () => {
+    const r = createFrameRing(8)
+    r.push(900, 440)
+    expect(spans(r, 1000, 5000, 2000)).toEqual([[1000, 2000]]) // 左沿被 from 裁、右沿被 now 裁
+    expect(spans(createFrameRing(8), -5000, 2000, 1000)).toEqual([[0, 1000]]) // t<0 不画
+  })
+
+  it('综合：起唱晚 + 中间长静音 + 末尾静音（三段）', () => {
+    const r = createFrameRing(8)
+    r.push(400, 440)
+    r.push(460, 440)
+    r.push(2000, 440)
+    // 段落边界取「相邻浊音帧之间」（段起点 = 前一帧时刻，段终点 = 后一帧时刻）
+    expect(spans(r, 0, 2600, 2600)).toEqual([
+      [0, 400],
+      [460, 2000],
+      [2000, 2600],
+    ])
+  })
+})
+
 describe('live-chart · renderChart（假 ctx 冒烟：不抛错、不依赖 DOM）', () => {
+  /** 记录每次「确有路径的」stroke 的颜色与末点 y（空路径的 stroke 在 canvas 上不画，不计） */
+  function makeRecorder() {
+    const strokes: Array<{ color: string; y: number }> = []
+    const fills: Array<{ color: string; radius: number }> = []
+    const calls: Record<string, number> = {}
+    const state = { strokeStyle: '', fillStyle: '', lastY: 0, lastR: 0, pathOpen: false }
+    const g = new Proxy(
+      {},
+      {
+        get(_t, prop) {
+          if (prop === 'strokeStyle') return state.strokeStyle
+          if (prop === 'fillStyle') return state.fillStyle
+          return (...args: unknown[]) => {
+            const name = String(prop)
+            calls[name] = (calls[name] ?? 0) + 1
+            if (prop === 'beginPath') state.pathOpen = false
+            if (prop === 'moveTo' || prop === 'lineTo' || prop === 'quadraticCurveTo') {
+              state.pathOpen = true
+              state.lastY = Number(args[args.length - 1])
+            }
+            if (prop === 'arc') state.lastR = Number(args[2])
+            if (prop === 'stroke' && state.pathOpen) strokes.push({ color: state.strokeStyle, y: state.lastY })
+            if (prop === 'fill') fills.push({ color: state.fillStyle, radius: state.lastR })
+          }
+        },
+        set(_t, prop, value) {
+          if (prop === 'strokeStyle') state.strokeStyle = String(value)
+          if (prop === 'fillStyle') state.fillStyle = String(value)
+          return true
+        },
+      },
+    ) as unknown as CanvasRenderingContext2D
+    return { g, strokes, fills, calls }
+  }
+
   it('空环/空参考也能画（首帧即安全）', () => {
-    const g = new Proxy({}, { get: () => () => {}, set: () => true }) as unknown as CanvasRenderingContext2D
+    const { g } = makeRecorder()
     expect(() =>
       renderChart(g, { w: 340, h: 120, x1: 1000, playheadT: 500, headAlpha: 1, refF0s: new Float32Array(0), ring: createFrameRing(10) }),
     ).not.toThrow()
   })
 
   it('有数据 + 静音淡出路径也安全', () => {
-    const g = new Proxy({}, { get: () => () => {}, set: () => true }) as unknown as CanvasRenderingContext2D
+    const { g } = makeRecorder()
     const ring = createFrameRing(10)
     for (let i = 0; i < 10; i += 1) ring.push(900 + i * 60, 220 + i)
     expect(() =>
@@ -135,5 +234,100 @@ describe('live-chart · renderChart（假 ctx 冒烟：不抛错、不依赖 DOM
         ring,
       }),
     ).not.toThrow()
+  })
+
+  it('静音段确实画成底部灰线（颜色 #b9bdbc、y = h - 9）', () => {
+    const { g, strokes } = makeRecorder()
+    const ring = createFrameRing(10)
+    ring.push(1000, 440) // 0~1000ms 未出声
+    renderChart(g, { w: 340, h: 120, x1: 2000, playheadT: 1100, headAlpha: 1, refF0s: new Float32Array(0), ring })
+    const gray = strokes.filter((s) => s.color === '#b9bdbc')
+    expect(gray.length).toBeGreaterThan(0)
+    expect(gray.every((s) => s.y === 120 - 9)).toBe(true)
+  })
+
+  it('无静音段时不画灰线（连续出声）', () => {
+    const { g, strokes } = makeRecorder()
+    const ring = createFrameRing(32) // 容量须大于帧数，否则最旧帧被覆盖 → 首帧前被误判为静音
+    for (let i = 0; i < 20; i += 1) ring.push(i * 60, 440)
+    renderChart(g, { w: 340, h: 120, x1: 1200, playheadT: 1140, headAlpha: 1, refF0s: new Float32Array(0), ring })
+    expect(strokes.filter((s) => s.color === '#b9bdbc')).toHaveLength(0)
+  })
+
+  it('折线圆角化：多点轨迹用 quadraticCurveTo（不再逐段 lineTo）', () => {
+    const { g, calls } = makeRecorder()
+    const ring = createFrameRing(16)
+    for (let i = 0; i < 5; i += 1) ring.push(i * 60, 220 + i * 10)
+    renderChart(g, { w: 340, h: 120, x1: 1000, playheadT: 300, headAlpha: 1, refF0s: new Float32Array(0), ring })
+    expect(calls.quadraticCurveTo ?? 0).toBeGreaterThan(0)
+  })
+
+  it('头部插值点替代原始末点（只影响最后一段：轨迹末端 y = 插值点对应的 y）', () => {
+    const build = () => {
+      const r = createFrameRing(16)
+      r.push(0, 220)
+      r.push(60, 220)
+      r.push(120, 220)
+      return r
+    }
+    const withHead = makeRecorder()
+    renderChart(withHead.g, {
+      w: 340,
+      h: 120,
+      x1: 1000,
+      playheadT: 200,
+      headAlpha: 1,
+      refF0s: new Float32Array(0),
+      ring: build(),
+      head: { t: 180, f: 440 },
+    })
+    const raw = makeRecorder()
+    renderChart(raw.g, {
+      w: 340,
+      h: 120,
+      x1: 1000,
+      playheadT: 200,
+      headAlpha: 1,
+      refF0s: new Float32Array(0),
+      ring: build(),
+    })
+    const lastY = (s: Array<{ color: string; y: number }>) => s.filter((x) => x.color === '#e07a3f').at(-1)!.y
+    expect(lastY(withHead.strokes)).toBeCloseTo(y2f(440), 0)
+    expect(lastY(raw.strokes)).toBeCloseTo(y2f(220), 0)
+    expect(Math.abs(lastY(withHead.strokes) - lastY(raw.strokes))).toBeGreaterThan(10)
+  })
+
+  it('静音段不画橙线：轨迹不随静音渐隐（各段同为实心），且静音后不残留橙点', () => {
+    const ring = createFrameRing(16)
+    for (let i = 0; i < 8; i += 1) ring.push(i * 60, 220 + i * 5)
+    // headAlpha 随静音降到 0（组件侧 1 → 0，历时 FADE_MS）
+    const silent = makeRecorder()
+    renderChart(silent.g, { w: 340, h: 120, x1: 1000, playheadT: 600, headAlpha: 0, refF0s: new Float32Array(0), ring })
+    // 轨迹本体仍画（历史保留），但**没有**橙点 fill
+    expect(silent.strokes.some((s) => s.color === '#e07a3f')).toBe(true)
+    expect(silent.fills.filter((f) => f.color === '#e07a3f')).toHaveLength(0)
+    // 出声时橙点在
+    const singing = makeRecorder()
+    renderChart(singing.g, { w: 340, h: 120, x1: 1000, playheadT: 600, headAlpha: 1, refF0s: new Float32Array(0), ring })
+    const dots = singing.fills.filter((f) => f.color === '#e07a3f')
+    expect(dots).toHaveLength(1)
+    expect(dots[0].radius).toBe(3)
+  })
+})
+
+describe('live-chart · scoreColorOf（读数颜色：低分暖橙 → 中分青 → 高分绿）', () => {
+  it('null → 中性灰；0/50/100 命中三个锚点色', () => {
+    expect(scoreColorOf(null)).toBe('#999999')
+    expect(scoreColorOf(0)).toBe('rgb(176,106,59)')
+    expect(scoreColorOf(50)).toBe('rgb(44,127,143)')
+    expect(scoreColorOf(100)).toBe('rgb(31,122,77)')
+  })
+
+  it('越界值被夹到 0~100；中间值连续（不跳变）', () => {
+    expect(scoreColorOf(-20)).toBe(scoreColorOf(0))
+    expect(scoreColorOf(180)).toBe(scoreColorOf(100))
+    const a = scoreColorOf(60)
+    const b = scoreColorOf(61)
+    expect(a).not.toBe(b)
   })
 })
