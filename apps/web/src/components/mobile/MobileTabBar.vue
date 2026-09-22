@@ -7,11 +7,13 @@
  * 场景归属：社区 = home/search/notifications(含会话)/report；学习 = learn(含 :module 详情)/notes/tavern/free-chat/sing；
  * 沉浸页 compose 无底部栏。2026-09-05 晚 8：练习 → 学习更名（路由 /m/learn）；09-09 /m/me 舍弃（收敛进抽屉）；
  * 私信收敛进通知中心。2026-09-21：场景对话 /m/chat → 酒馆 /m/tavern（ai4u TRPG 迁移，docs/52）。
+ * 2026-09-22：酒馆按设计稿改**沉浸页**（页内自带 4 项导航 TrpgGameNav：大堂/酒馆跑团/角色卡/纪事，
+ * 出口在顶栏「离开」钮）→ /m/tavern 移出学习组，全局底栏不再覆盖（group 返回 null 即不渲染）。
+ * 同日：酒馆入口图标与页内导航统一（组长反馈）——beer → stack-2（设计稿 tavern 图标，三层紧贴）。
  */
 import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
-import IconBeer from '~icons/tabler/beer'
 import IconBell from '~icons/tabler/bell'
 import IconBook from '~icons/tabler/book'
 import IconHome from '~icons/tabler/home'
@@ -20,6 +22,7 @@ import IconMicrophone from '~icons/tabler/microphone'
 import IconMusic from '~icons/tabler/music'
 import IconPlus from '~icons/tabler/plus'
 import IconSearch from '~icons/tabler/search'
+import IconStack2 from '~icons/tabler/stack-2'
 
 import MobileUnreadBadge from '@/components/mobile/MobileUnreadBadge.vue'
 import { useMessagesStore } from '@/stores/messages'
@@ -51,7 +54,6 @@ const group = computed<null | 'community' | 'learn'>(() => {
     p.startsWith('/m/learn/') ||
     p === '/m/checkin' ||
     p === '/m/notes' ||
-    p === '/m/tavern' ||
     p === '/m/free-chat' ||
     p === '/m/sing' ||
     /* 读书域（docs/45 §6）：书架/书详情/生词本属学习组；阅读器保持沉浸（null） */
@@ -61,7 +63,7 @@ const group = computed<null | 'community' | 'learn'>(() => {
   ) {
     return 'learn'
   }
-  return null // /m/compose 沉浸页
+  return null // /m/compose（发帖）· /m/tavern（2026-09-22 起页内导航）
 })
 </script>
 
@@ -116,7 +118,7 @@ const group = computed<null | 'community' | 'learn'>(() => {
       title="酒馆"
       aria-label="酒馆"
     >
-      <IconBeer />
+      <IconStack2 />
     </RouterLink>
     <RouterLink to="/m/notes" class="u-tab--main" title="笔记" aria-label="笔记">
       <IconBook />

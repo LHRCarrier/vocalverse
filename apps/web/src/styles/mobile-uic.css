@@ -5409,8 +5409,43 @@ button.u-notes__card {
 
 /* ============================================================
  * 酒馆（TRPG 跑团 · ai4u 迁移，docs/52 · 2026-09-21）
- * 复用 u-* 基础件（气泡/输入栏/按钮）；t-* 为酒馆专属：状态带/系统卡/主持台/开局引导
+ * 2026-09-22 按设计稿（local/trpg-redesign.html）改版：羊皮纸底 + 琥珀主色 + 暗茶色，
+ * 副本任务卡 / 消息头像框 + NPC 插片 / 页内底栏 / 角色立绘抽屉。
+ * 复用 u-* 基础件（气泡/抽屉/按钮）；t-* 为酒馆专属；主题变量 --t-* 仅本页（.t-page）生效。
  * ============================================================ */
+
+.t-page {
+  --t-paper: #f4efe6;
+  --t-card: #fffdf8;
+  --t-ink: #1a2426;
+  --t-ink-mid: #384a4d;
+  --t-ink-light: #6c7d80;
+  --t-teal-dark: #173338;
+  --t-teal-deep: #214349;
+  --t-teal-soft: #e7eeed;
+  --t-amber: #d4881a;
+  --t-amber-dark: #a35e06;
+  --t-amber-soft: #f9eedb;
+  --t-hp: #d24c3e;
+  --t-hp-soft: #fce8e6;
+  --t-line: rgba(28, 43, 45, 0.16);
+  --t-line-strong: rgba(28, 43, 45, 0.28);
+  --t-shadow: 0 4px 16px rgba(23, 51, 56, 0.08);
+  /* 纸面底纹换羊皮纸点格（覆盖 .u-phone 的墨色点阵） */
+  background-color: var(--t-paper);
+  background-image:
+    radial-gradient(rgba(26, 36, 38, 0.08) 5%, transparent 6%),
+    radial-gradient(rgba(198, 178, 150, 0.5) 5%, transparent 6%);
+  background-position:
+    0 0,
+    24px 24px;
+  background-size: 48px 48px;
+}
+
+/* 酒馆内容区：贴合设计稿的 14px 边距（底部仍为 dock 预留 216px） */
+.t-page .u-content--dock {
+  padding: 10px 14px 216px;
+}
 
 /* ---- 组件件补充（移动端语境）---- */
 .text-input {
@@ -5436,49 +5471,88 @@ button.u-notes__card {
   font-size: 13px;
 }
 
-/* ---- 状态带 ---- */
-.t-stage {
+/* 酒馆印章（设计稿 tavern-seal）：暗茶圆 + 琥珀环 + 三层图标 + 在线点，点击开立绘 */
+.t-seal {
   position: relative;
-  background: var(--u-card);
-  border-radius: var(--u-r-card);
-  padding: 14px 14px 12px;
-  margin: 0 0 12px;
-  box-shadow: var(--u-shadow-float);
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--t-amber);
+  border-radius: 50%;
+  background: var(--t-teal-deep);
+  color: #fff7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(212, 136, 26, 0.3);
+}
+
+.t-seal svg {
+  width: 20px;
+  height: 20px;
+}
+
+.t-seal__dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--t-paper);
+  border-radius: 50%;
+  background: #10b981;
+}
+
+/* ---- 副本任务卡（设计稿 mission-deck：暗色副本横幅 + 状态条）---- */
+.t-stage {
+  background: var(--t-card);
+  border: 1.5px solid var(--t-line-strong);
+  border-radius: 18px;
+  margin: 0 0 14px;
+  box-shadow: var(--t-shadow);
   overflow: hidden;
 }
 
-.t-stage__bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: #7b8794;
+.t-quest {
+  padding: 12px 14px 11px;
+  background: linear-gradient(135deg, #162c30 0%, #0e1d20 100%);
+  color: #fffdf8;
 }
 
-.t-stage--warm .t-stage__bar {
-  background: #e08a5b;
-}
-
-.t-stage--cold .t-stage__bar {
-  background: #4f6d7a;
-}
-
-.t-stage--green .t-stage__bar {
-  background: #5f8d5a;
-}
-
-.t-stage__row {
+.t-quest__top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  margin-bottom: 5px;
 }
 
-.t-stage__title {
+.t-quest__badge {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid rgba(212, 136, 26, 0.45);
+  border-radius: 12px;
+  background: rgba(212, 136, 26, 0.2);
+  color: #f8b855;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.t-quest__atmo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: #8ca8aa;
+  font-size: 10.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.t-quest__titlerow {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -5502,30 +5576,128 @@ button.u-notes__card {
   background: #5f8d5a;
 }
 
-.t-stage__name {
+.t-quest__title {
   flex: 0 1 auto;
   min-width: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.t-stage__scene {
+.t-quest__scene {
   flex: none;
-  font-size: 12px;
-  color: var(--u-sub);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #b5cacb;
+  font-size: 11px;
 }
 
-.t-stage__meta {
+.t-quest__goal {
   display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  color: #e2eaea;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.t-quest__goal-mark {
+  color: var(--t-amber);
+}
+
+.t-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px 10px;
+  background: #faf6ef;
+  border-top: 1px solid var(--t-line);
+  font-size: 11.5px;
+}
+
+.t-strip__hp {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  flex: none;
+  padding: 4px 9px;
+  border: 1px solid rgba(210, 76, 62, 0.3);
+  border-radius: 6px;
+  background: var(--t-hp-soft);
+  color: #b4281a;
+  font-weight: 700;
+}
+
+.t-strip__bar {
+  display: block;
+  width: 34px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(210, 76, 62, 0.2);
+  overflow: hidden;
+}
+
+.t-strip__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--t-hp);
+}
+
+.t-strip__pill {
+  max-width: 100%;
+  padding: 4px 9px;
+  border: 1px solid var(--t-line);
+  border-radius: 6px;
+  background: var(--t-card);
+  color: var(--t-ink);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.t-strip__pill--wrap {
+  border-radius: 8px;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.t-strip__pill--warn {
+  background: #fdf0cf;
+}
+
+.t-strip__inv {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding-top: 7px;
+  border-top: 1px dashed rgba(28, 43, 45, 0.12);
+  color: var(--t-ink-light);
+  font-size: 11px;
+}
+
+.t-strip__inv-label {
+  color: var(--t-amber-dark);
+  font-weight: 700;
+}
+
+.t-strip__inv-tag {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(28, 43, 45, 0.05);
+  color: var(--t-ink-mid);
+  font-size: 10.5px;
 }
 
 .t-stage__ai {
+  flex: none;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -5538,14 +5710,6 @@ button.u-notes__card {
 
 .t-stage__ai--error {
   background: var(--u-error);
-}
-
-.t-stage__stats {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
 }
 
 .t-chip {
@@ -5577,20 +5741,152 @@ button.u-notes__card {
   background: #fdf0cf;
 }
 
-.t-stage__atmo {
-  flex-basis: 100%;
-  margin-top: 2px;
-  text-align: right;
-  font-size: 11px;
-  color: var(--u-sub);
-}
-
-/* ---- 消息流 ---- */
+/* ---- 消息流（设计稿 dialog-stream：头像框 + 说话人 meta + 气泡）---- */
 .t-log {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   padding-bottom: 8px;
+}
+
+/* 行与气泡：行内自带 14px 间距，覆盖 u-chat 的 margin */
+.t-page .t-msg {
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 0;
+}
+
+.t-msg__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.u-chat--user .t-msg__body {
+  flex: 0 1 auto;
+  max-width: 84%;
+  align-items: flex-end;
+}
+
+.t-msg__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  min-width: 0;
+}
+
+.u-chat--user .t-msg__meta {
+  justify-content: flex-end;
+}
+
+.t-msg__name {
+  font-weight: 700;
+  color: var(--t-teal-dark);
+}
+
+.t-msg__name--me {
+  color: var(--t-amber-dark);
+}
+
+.t-msg__role {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--t-teal-soft);
+  color: var(--t-teal-deep);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.t-msg__role--me {
+  background: var(--t-amber-soft);
+  color: var(--t-amber-dark);
+}
+
+.t-msg__link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--t-amber-dark);
+  font-family: var(--u-font);
+  font-size: 10px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* 头像框：可点开角色立绘（设计稿 avatar-frame） */
+.t-ava-frame {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 2px solid #1c2b2d;
+  border-radius: 12px;
+  background: #e8dfcf;
+  color: #fff7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 8px rgba(28, 43, 45, 0.18);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.t-ava-frame--dm {
+  background: var(--t-teal-deep);
+}
+
+.t-ava-frame img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.t-ava-frame--dm svg {
+  width: 22px;
+  height: 22px;
+}
+
+.t-ava-frame--me .u-ava {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* 气泡：设计稿无尾巴；DM 米白卡 / 玩家暗茶色 */
+.t-page .t-bubble {
+  flex: none; /* 列向 flex 下禁止纵向拉伸 */
+  position: relative;
+}
+
+.t-page .t-bubble::before {
+  display: none;
+}
+
+.t-page .t-bubble:not(.u-bubble--user) {
+  background: var(--t-card);
+  border: 1.5px solid var(--t-line-strong);
+  border-radius: 4px 16px 16px 16px;
+  box-shadow: 0 2px 6px rgba(28, 43, 45, 0.05);
+  color: var(--t-ink);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+.t-page .u-bubble--user {
+  background: linear-gradient(145deg, #1d2b2e 0%, #152224 100%);
+  border: 1.5px solid #283c40;
+  border-radius: 16px 4px 16px 16px;
+  color: #faf6ef;
+  font-size: 13.5px;
+  line-height: 1.65;
 }
 
 .t-card {
@@ -5659,10 +5955,6 @@ button.u-notes__card {
   white-space: pre-line;
 }
 
-.t-ava--dm {
-  background: var(--u-dark-teal);
-}
-
 .t-seg {
   margin: 0;
   white-space: pre-line;
@@ -5673,13 +5965,74 @@ button.u-notes__card {
   margin-top: 8px;
 }
 
-.t-seg--npc .t-seg__npc {
-  display: inline-block;
-  margin-right: 6px;
-  padding: 2px 8px;
-  border-radius: var(--u-r-pill);
-  background: var(--u-track);
-  font-size: 12px;
+/* NPC whisper 卡（设计稿 npc-whisper-card）：独立于 DM 气泡的第 ③ 种说话人呈现 */
+.t-page .t-npc-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1.5px dashed rgba(212, 136, 26, 0.45);
+  border-radius: 12px;
+  background: #faf5eb;
+}
+
+.t-npc-card__ava {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border: 2px solid var(--t-amber);
+  border-radius: 10px;
+  background: var(--t-teal-deep);
+  color: #fff7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
+  overflow: hidden;
+}
+
+.t-npc-card__ava img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.t-npc-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.t-npc-card__name {
+  margin-bottom: 2px;
+  color: var(--t-teal-dark);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.t-npc-card__line {
+  color: var(--t-ink-mid);
+  font-size: 12.5px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* 整行引号（设计稿 dm-quote）：琥珀左条 + 淡琥珀底 */
+.t-seg--quote {
+  padding: 6px 10px;
+  border-left: 2px solid var(--t-amber);
+  border-radius: 3px;
+  background: rgba(212, 136, 26, 0.08);
+  color: var(--t-amber-dark);
+  font-weight: 700;
+}
+
+/* 行内引语（人物说话）：荧光笔式「画重点」（整行引号走上方块状样式） */
+.t-tok--quote {
+  background: rgba(212, 136, 26, 0.16);
+  color: var(--t-amber-dark);
   font-weight: 700;
 }
 
@@ -5704,27 +6057,45 @@ button.u-notes__card {
   font-size: 12px;
 }
 
-/* ---- 消息翻译（X 式右上角文字按钮）---- */
+/* ---- 消息翻译（设计稿 bubble-footer：标注状态 + 译文按钮）---- */
 .t-msg .u-bubble {
   position: relative;
 }
 
+.t-msg__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(28, 43, 45, 0.07);
+}
+
+.t-msg__foot-space {
+  flex: 1;
+}
+
+/* 纯 NPC 台词消息（无旁白气泡）的脚注兜底：不画气泡边框 */
+.t-msg__foot--bare {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
 .t-tr {
-  position: absolute;
-  top: 6px;
-  right: 8px;
   padding: 2px 6px;
   border: none;
   border-radius: var(--u-r-chip);
   background: transparent;
-  color: var(--u-sub);
+  color: var(--t-ink-light); /* 对原型 .text-act-btn / --ink-light（原 --u-sub 暖灰偏色） */
   font-family: var(--u-font);
   font-size: 11px;
   cursor: pointer;
 }
 
 .t-tr.is-on {
-  color: var(--u-accent);
+  color: var(--t-amber-dark); /* 译文态（「原文」）用酒馆琥珀，不用全局蓝 accent */
   font-weight: 700;
 }
 
@@ -5735,11 +6106,6 @@ button.u-notes__card {
 .t-seg--error {
   color: var(--u-sub);
   font-size: 13px;
-}
-
-/* DM 气泡为翻译按钮让出右上角空间 */
-.t-msg:not(.u-chat--user) .u-bubble--ai {
-  padding-top: 22px;
 }
 
 /* ---- 逐词高亮（卡拉OK：语音朗读时按进度点亮）+ 长按操作 ---- */
@@ -5783,7 +6149,6 @@ button.u-notes__card {
 
 .t-mark {
   display: inline-block;
-  margin-top: 8px;
   font-size: 11px;
   color: var(--u-sub);
 }
@@ -5824,44 +6189,422 @@ button.u-notes__card {
   background: var(--u-track);
 }
 
-/* ---- 输入 dock（位于 u-chat-dock 内）---- */
+/* ---- 输入 dock（设计稿 dock-control：推荐行动 chips + 骰钮 + 输入 + 语音 + 发送）---- */
+/* 沉浸页：dock 直贴页内底栏（52px，同设计稿 bottom-nav 高），面板自带模糊底 */
+.t-page .u-chat-dock {
+  bottom: 52px;
+  padding: 0;
+  gap: 0;
+}
+
 .t-dock-wrap {
   width: 100%;
   margin: 0;
+  padding: 8px 12px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(244, 239, 230, 0.95);
+  backdrop-filter: blur(18px);
+  border-top: 1px solid var(--t-line);
 }
 
 .t-dock-state {
   margin-bottom: 6px;
   padding: 8px 12px;
   border-radius: var(--u-r-pill);
-  background: var(--u-track);
-  color: var(--u-sub);
+  background: var(--t-teal-soft);
+  color: var(--t-ink-mid);
   font-size: 12px;
   text-align: center;
 }
 
-/* 快捷行动：两行内自动折行（旧版横向滚动会把末个芯片裁一半，手机上像坏了） */
 .t-quick {
+  padding-bottom: 7px;
+}
+
+.t-quick__label {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  padding-bottom: 8px;
+  padding: 0 2px 4px;
+  color: var(--t-ink-light);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.t-quick__hint {
+  font-weight: 400;
+}
+
+/* 单行横滑（设计稿 quick-chips-scroll）：芯片不换行，横向滚动 */
+.t-quick__row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.t-quick__row::-webkit-scrollbar {
+  display: none;
 }
 
 .t-quick__chip {
   flex: none;
-  padding: 8px 12px;
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 11px;
+  border: 1px solid var(--t-line-strong);
   border-radius: var(--u-r-pill);
-  background: var(--u-card);
-  color: var(--u-ink);
+  background: var(--t-card);
+  color: var(--t-teal-dark);
   font-family: var(--u-font);
-  font-size: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(23, 51, 56, 0.06);
   cursor: pointer;
 }
 
 .t-quick__chip:disabled {
   opacity: 0.5;
+}
+
+.t-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 7px;
+  border: 1.5px solid var(--t-line-strong);
+  border-radius: 24px;
+  background: var(--t-card);
+}
+
+.t-input-bar__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--t-ink);
+  font-family: var(--u-font);
+  font-size: 13.5px;
+  outline: none;
+}
+
+.t-input-bar__btn,
+.t-input-bar__send {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--t-ink-mid);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.t-input-bar__btn svg,
+.t-input-bar__send svg {
+  width: 19px;
+  height: 19px;
+}
+
+.t-input-bar__btn--dice {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(212, 136, 26, 0.3);
+  background: var(--t-amber-soft);
+  color: var(--t-amber-dark);
+}
+
+.t-input-bar__btn.is-rec {
+  background: var(--t-hp-soft);
+  color: var(--t-hp);
+}
+
+.t-input-bar__send {
+  background: var(--t-teal-deep);
+  color: #fffdf8;
+}
+
+.t-input-bar__btn:disabled,
+.t-input-bar__send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ---- 页内底栏（设计稿 bottom-nav：大堂/酒馆跑团/角色卡/纪事；高 52px 无侧边距，对原型样式）---- */
+.t-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  width: 100%;
+  max-width: 480px;
+  height: 52px;
+  padding: 0 0 env(safe-area-inset-bottom);
+  background: rgba(255, 253, 248, 0.98);
+  border-top: 1px solid var(--t-line);
+  z-index: 6;
+}
+
+.t-nav__item {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: none;
+  background: transparent;
+  color: var(--t-ink-light);
+  font-family: var(--u-font);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.t-nav__item svg {
+  width: 20px;
+  height: 20px;
+}
+
+.t-nav__item--on {
+  color: var(--t-teal-deep);
+}
+
+.t-nav__item--on::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 24px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--t-amber);
+}
+
+/* ---- 角色立绘 / 档案展台抽屉（设计稿 standee-sheet）---- */
+.t-standee__panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 88%;
+  max-height: 88%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--t-card);
+  border: 2px solid var(--t-teal-deep);
+  border-bottom: none;
+  border-radius: 26px 26px 0 0;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.t-standee__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px 10px;
+  background: #f7f1e5;
+  border-bottom: 1px solid var(--t-line);
+}
+
+.t-standee__title {
+  color: var(--t-teal-dark);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.t-standee__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px 9px;
+  border-bottom: 1px solid var(--t-line);
+}
+
+.t-standee__name {
+  color: var(--t-teal-dark);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.t-standee__role {
+  margin-top: 2px;
+  color: var(--t-amber-dark);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.t-standee__tabs {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--t-line);
+  border-radius: 18px;
+  background: #efe7da;
+}
+
+.t-standee__tabs button {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--t-ink-mid);
+  font-family: var(--u-font);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.t-standee__tabs button.is-on {
+  background: var(--t-teal-deep);
+  color: #fffdf8;
+}
+
+.t-standee__traits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #faf6ef;
+  border-bottom: 1px dashed var(--t-line);
+}
+
+.t-standee__traits-label {
+  color: var(--t-ink-light);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.t-standee__trait {
+  padding: 3px 8px;
+  border: 1px solid rgba(212, 136, 26, 0.45);
+  border-radius: 6px;
+  background: var(--t-card);
+  color: var(--t-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.t-standee__stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(212, 136, 26, 0.12) 0%, transparent 70%),
+    linear-gradient(180deg, #fbf8f1 0%, #efe8da 100%);
+}
+
+/* 设计稿全身立绘（public/tavern/*.webp）：高度撑满、漂浮动画、投影 */
+.t-standee__img {
+  height: 98%;
+  max-height: 100%;
+  width: auto;
+  max-width: 90%;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 18px rgba(23, 51, 56, 0.25));
+  animation: t-standee-float 4s ease-in-out infinite alternate;
+}
+
+@keyframes t-standee-float {
+  0% {
+    transform: translateY(0);
+  }
+
+  100% {
+    transform: translateY(-5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-standee__img {
+    animation: none;
+  }
+}
+
+.t-standee__details {
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+  background: var(--t-card);
+  border-top: 1.5px solid var(--t-line);
+}
+
+.t-standee__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.t-standee__stat {
+  padding: 6px 4px;
+  border: 1px solid var(--t-line);
+  border-radius: 8px;
+  background: #faf6ef;
+  text-align: center;
+}
+
+.t-standee__stat-lbl {
+  color: var(--t-ink-light);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.t-standee__stat-val {
+  margin-top: 2px;
+  color: var(--t-teal-dark);
+  font-size: 13.5px;
+  font-weight: 900;
+}
+
+.t-standee__hint {
+  margin: 8px 0;
+  color: var(--t-ink-light);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.t-standee__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.t-standee__btn {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 10px;
+  font-family: var(--u-font);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.t-standee__btn--sec {
+  border: 1px solid rgba(212, 136, 26, 0.4);
+  background: var(--t-amber-soft);
+  color: var(--t-amber-dark);
+}
+
+.t-standee__btn--pri {
+  border: none;
+  background: var(--t-teal-deep);
+  color: #fffdf8;
 }
 
 /* ---- 主持台 / 剧本选择（底部抽屉）---- */
