@@ -3,6 +3,33 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 闭环复评（R2）+ 二次修复后端段：语言语音/结算幂等/道具可见/攻击目标 · 2 op
+
+> 归属：复评为全局（结论追加 `docs/57 §6`）；本段为 **Python 后端**修复。UI 段（大堂/角色卡/纪事）见安卓日志。
+
+- **复评（同口径双视角子代理）**：DoD ①真局触发 **部分 PASS**（T3 quest 事实+SSE+判定卡、T5 attack 战报卡且刷新仍在；
+  但 2 回合窗口未达标、`item.*`/敌 HP 仍 0）；②结算 **FAIL**（刷新丢已完结 + 幂等失效）；③状态可见 **PASS**（阅读区 13%→48%）；
+  ④在场语义 **PASS（新局）**；⑤道具来源 **FAIL**（DM 当面否认持有）。报告 `local/ux-review/*-r2.md`。
+- **语言/语音 bug（用户报）**：根因 `config.tts_voice` 写死 `en-US-JennyNeural` 且 `_tts_chunks` 不看 `lang` →
+  切中文后语音仍是英文音色。修复：`voices.default_voice_for_lang`（zh→`zh-CN-XiaoxiaoNeural`），
+  `stream_turn` 把 lang 传入 `_tts_chunks`（显式 `voice_name` 优先）。
+  另经真机复现：**文本语言切换本就正常**（en/zh 双向 DM 跟随，PUT /preferences 200）——用户感知应为语音语言。
+- **结算幂等（P1-1，最硬）**：`_sync_task_clue_from_op` 用 `scalar_one_or_none` 查任务，重复任务行（场景卡 tasks +
+  同名 `quest.*` 事实双写）→ `MultipleResultsFound` → 整批回滚 → 二次结算再发结局卡。
+  修复：容忍重复（保最早/清多余）+ `create_task` 按标题 upsert + 结果只在提交后追加。
+- **道具可见（P1-3）**：DM 快照补「行囊」行（`item.*` 优先、`pc.*.inventory` 兜底，上限 6）→ DM 不再否认持有、`use_item` 可被自然触发。
+- **攻击目标（P1-5/N5）**：根因 `DOMAIN_ENTITY_KIND.get(domain, "npc")` 把 `encounter.main.*` 注册成 `npc.main`；
+  已修（encounter 不注册 + `RESERVED_ENTITY_NAMES` 过滤）；`attack` 只接受在场 npc/pc，拒自身/其他 PC/离场/内部名，错误文本列可用目标。
+- **NPC 反击（P1-4）**：prompt 规则 13——敌方伤害必须走 `attack(attacker=NPC, target=PC)` 或 `roll_dice effects`。
+- **判定卡骰面（N4）**：`/roll` 摘要补骰面（`d20=14 +2 = 16 vs 12 成功`）。
+- **契约**：`GET /campaigns` 列表项补 `finished/finished_at`（供大堂「已完结」分组）。
+- **测试**：新增 14 例回归（语音按语言/重复行幂等/快照行囊/攻击目标矩阵/骰面格式/列表 finished）；
+  **825 passed, 4 skipped**；ruff check/format 绿。
+- **遗留（写入 docs/57 §6.3）**：正钟推进经济学偏慢、阅读区 48%→55% 未达、旧局 legacy pending 仍显「赶来」、
+  折叠态不显示 tick reason、并发双击无 DB 唯一约束。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-22 审核判据条款化：社区规范落 docs/59 → Jev 按 R1~R9 判定 + 管理端证据展示条款号 · 1 op
 
 > 归属：Java 后端（判定契约）+ 管理端控制台（证据展示）；**App 侧规范页与侧栏入口见安卓日志同日条**。
