@@ -111,6 +111,26 @@
 
 —— 执行人：LHRCarrier（AI 代工），2026-09-22
 
+## 2026-09-22 `songs.album` 字段（唱吧卡片歌曲信息 · 迁移 0022 + 双端契约）· 1 op
+
+> 归属：`songs` 内容库（Java 独占写）+ Python 契约（`SongSummary`）。评分/选歌/提取链路零语义变化（纯展示字段）。
+> UI 侧（歌单行/精选卡/选曲弹层版式）与本地演示数据记录见 `worklog/安卓开发日志.md`（同日置顶，混合条目已按 AGENTS 拆分）。
+
+- **背景**：用户口径「卡片上应该是歌曲信息」——歌单卡片此前只有「歌手 + 练习元数据（难度 Lx / 句数）」，没有专辑字段，故补 `songs.album`。
+- **改动**：
+  - 迁移 **0022**（`services/python/alembic/versions/0022_song_album.py`）：`songs.album VARCHAR(128) NULL`；历史行 NULL、零迁移风险（可空列无默认值）。
+  - Python：`models/content.py` Song.album；`sing/schemas.py` SongSummary.album（可空）；`api/routes/singing.py::_song_summary` 带出。
+  - Java：`SongEntity.album`；`SongSeeder` 播种 `album` + **空值回填**（老库重启即补齐；只补 NULL、不覆盖管理员编辑过的值——「只增不改」语义保留，注释与用例写明）。
+  - 种子：`scripts/setup-assets.py` 10 首补 album（童谣精选集 / 古典小品集 / 节日欢歌 / 民谣与轮唱）→ 重跑生成 `data/seed/songs.json`（diff 仅 10 行 album，音频/LRC 确定性重建无漂移）。
+  - 契约：由 `app.openapi()` 重导出 `apps/web/src/api/specs/python-openapi.json`（LF / indent 2 / 无 BOM，与 CI 对账口径一致）→ `pnpm gen:api`；Java 快照无变化（console `SongRow` DTO 未动）。
+- **验证**：
+  - Python `uv run ruff check/format --check` 通过；`uv run pytest -q` **825 passed / 4 skipped**；快照回读 `== app.openapi()`（CI 同款判据）；
+  - Java `mvn -q test -Dtest=SongSeederTest` **4/4**（新增「album 播种」+「空值回填且不覆盖」两断言；用例末尾还原种子值，防共享 H2 串扰）；
+  - 前端 `python-api.d.ts` 出现 `album?: string | null`（生成产物入库）。
+- **文档**：docs/10 §songs 表、docs/21 §3.6 已登记；ADR 口径见 docs/06「修订（2026-09-22 第四轮）」。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-22 PR #39 审查与合并（唱吧跟唱链路与选曲集成 · sync-2026-09-18）· 1 op
 
 > 归属：PR 审查 + 集成合并（跨 Web / Python / Java 三端）；分支侧两轮解冲突记录见 PR 与下一条。
