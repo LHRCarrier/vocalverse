@@ -111,3 +111,12 @@ services/python/.models-cache/
 
 # --- Java 本地访问日志（2026-09-10 手机联调排障开启） ---
 services/java/logs/
+
+# --- Playwright 产物（本地探针/CLI 生成，不入库；2026-09-22） ---
+# `.playwright-cli/`：playwright-cli 的页面快照（YAML），仓库根会随用随生成；
+# 其余为 @playwright/test 默认输出目录（万一以后接入测试，产物同样不该入库）。
+.playwright-cli/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
