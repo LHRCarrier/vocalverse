@@ -5,11 +5,12 @@
  * （`.u-dark-card__art{right:20px;top:16px;width:104px}`）→ 长 artist 把 meta 挤成两行，
  * 第二行读作「句 · 可跟唱」，行数「6」正好被插画盖住。
  *
- * 本用例锁三件事：
- * 1. **结构**：meta 排在标题之后（不再与插画抢同一条横向带）+ 拆成「歌手 · 专辑 / 时长」两段；
- * 2. **文案**：2026-09-22 第四轮（用户口径「卡片上应该是歌曲信息」）——meta = 歌手 · 专辑，
- *    facts = 时长；「N 句 · 可跟唱」下架（就绪态由 chip 与说明行表达）；
- * 3. **样式契约**（读组件源文件）：meta 左段可省略、时长段永不省略。
+ * 本用例锁四件事：
+ * 1. **结构**：meta 排在标题之后 + 拆成「歌手 · 专辑 / 时长」两段；
+ * 2. **文案**：meta = 歌手 · 专辑，facts = 时长；「N 句 · 可跟唱」下架；
+ *    第六轮（用户口径）再删说明段——「一次最多 3 分钟，逐句评分。」不再上卡；
+ * 3. **卡带**：封面贴纸（`cover_url`，图裂退音符）+ 双卷轴转动（keyframes + 动效分级降级）；
+ * 4. **样式契约**（读组件源文件）：meta 左段可省略、时长段永不省略；卡带 `flex:none` 不绝对定位（防压字回归）。
  */
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -27,6 +28,7 @@ const song = (over: Partial<SongSummary> = {}): SongSummary => ({
   pitch_ref_status: 'ready',
   expected_lines: 6,
   favorited: false,
+  cover_url: '/api/v1/songs/covers/twinkle.svg',
   ...over,
 })
 
@@ -50,21 +52,19 @@ describe('SingFeaturedCard · 信息分层', () => {
     expect(w.find('.m-feat__artist').text()).not.toContain('·')
   })
 
-  it('未就绪：chip 变「参考旋律提取中」，desc 同步换文案（时长仍照常显示）', () => {
+  it('未就绪：chip 变「参考旋律提取中」（时长仍照常显示）', () => {
     const w = mountCard({ pitch_ref_status: 'building' })
     expect(w.text()).toContain('参考旋律提取中')
     expect(w.find('.m-feat__facts').text()).toBe('00:30')
-    expect(w.text()).toContain('参考旋律生成中')
   })
 
-  it('文案精简（2026-09-22 二次优化）：删掉与页面重复的评分清单与实现词，只留约束 + 一句价值', () => {
-    const ready = mountCard()
-    const desc = ready.find('.m-feat__desc').text()
-    expect(desc).toBe('一次最多 3 分钟，逐句评分。')
-    expect(desc).toContain('3 分钟') // 硬约束保留（别处没有的信息）
-    // 修复前必失败：旧文案含评分维度清单（与页面副标题/页脚公式重复）与实现词
-    expect(ready.text()).not.toContain('音准/节奏/发音')
-    expect(ready.text()).not.toContain('D3')
+  it('说明段下架（2026-09-22 第六轮用户口径）：不再有 desc 段落与「一次最多 3 分钟」文案', () => {
+    const w = mountCard()
+    expect(w.find('.m-feat__desc').exists()).toBe(false)
+    expect(w.text()).not.toContain('一次最多')
+    expect(w.text()).not.toContain('逐句评分')
+    expect(w.text()).not.toContain('音准/节奏/发音')
+    expect(w.text()).not.toContain('D3')
   })
 
   it('CTA：点「去跟唱」emit open(song.id)', async () => {
@@ -77,6 +77,33 @@ describe('SingFeaturedCard · 信息分层', () => {
 
   it('artist 缺失 → 署名回落「歌单」（专辑照常拼在后面）', () => {
     expect(mountCard({ artist: null }).find('.m-feat__artist').text()).toBe('歌单 · 童谣精选集')
+  })
+})
+
+describe('SingFeaturedCard · 卡带（第六轮）', () => {
+  it('卡带贴纸渲染封面（cover_url 过 mediaUrl）；窗口内两个卷轴', () => {
+    const w = mountCard()
+    const tape = w.find('.m-feat__tape')
+    expect(tape.exists()).toBe(true)
+    expect(tape.attributes('aria-hidden')).toBe('true') // 装饰视觉：读屏只播标题
+    const img = w.find('.m-feat__tape-label img')
+    expect(img.exists()).toBe(true)
+    expect(img.attributes('src')).toContain('twinkle.svg')
+    expect(img.attributes('alt')).toBe('')
+    expect(w.findAll('.m-feat__reel').length).toBe(2)
+  })
+
+  it('无封面 → 贴纸位退音符图标（不留破图）', () => {
+    const w = mountCard({ cover_url: null })
+    expect(w.find('.m-feat__tape-label img').exists()).toBe(false)
+    expect(w.find('.m-feat__tape-label svg').exists()).toBe(true)
+  })
+
+  it('图裂（资产缺失/离线）→ 退音符图标', async () => {
+    const w = mountCard()
+    await w.find('.m-feat__tape-label img').trigger('error')
+    expect(w.find('.m-feat__tape-label img').exists()).toBe(false)
+    expect(w.find('.m-feat__tape-label svg').exists()).toBe(true)
   })
 })
 
@@ -101,7 +128,7 @@ describe('SingFeaturedCard · 版式契约（插画压字回归护栏）', () =>
     const artist = style.slice(style.indexOf('.m-feat__artist {'), style.indexOf('.m-feat__facts {'))
     expect(artist).toContain('text-overflow: ellipsis')
     expect(artist).toContain('min-width: 0')
-    const facts = style.slice(style.indexOf('.m-feat__facts {'), style.indexOf('.m-feat__desc {'))
+    const facts = style.slice(style.indexOf('.m-feat__facts {'), style.indexOf('.m-feat__tape {'))
     expect(facts).toContain('flex: none')
     expect(facts).toContain('white-space: nowrap')
   })
@@ -113,7 +140,6 @@ describe('SingFeaturedCard · 版式契约（插画压字回归护栏）', () =>
     const style = src.slice(src.indexOf('<style scoped>'))
     expect(style).not.toContain('radial-gradient')
     const card = style.slice(style.indexOf('.m-feat {'), style.indexOf('.m-feat .u-chip {'))
-    expect(card).toContain('padding: 18px 24px')
     expect(card).toContain('background: #15181c') // 中性深灰面（覆盖 `.u-dark-card` 浅底与 teal 渐变）
     expect(card).toContain('border: 1px solid rgba(255, 255, 255, 0.08)') // 发丝分隔
     expect(card).toContain('box-shadow: 0 10px 30px rgba(16, 20, 24, 0.18)') // 适度投影（层次感）
@@ -132,21 +158,40 @@ describe('SingFeaturedCard · 版式契约（插画压字回归护栏）', () =>
     expect(src).not.toContain('u-chip--teal') // 旧的实心青底胶囊变体不再使用
   })
 
-  it('信息层次（色阶 4 档）：曲名 > 关键属性 > 说明 > 署名', () => {
+  it('信息层次（色阶）：曲名 > 时长 > 歌曲信息；标题两行截断', () => {
     const style = src.slice(src.indexOf('<style scoped>'))
-    const desc = style.slice(style.indexOf('.m-feat__desc {'), style.indexOf('.m-feat__cta {'))
-    expect(desc).toContain('font-size: 13px')
-    expect(desc).toContain('line-height: 1.5')
-    expect(desc).toContain('rgba(255, 255, 255, 0.62)')
-    // 时长（次强属性）比歌曲信息亮一档且半粗
-    const facts = style.slice(style.indexOf('.m-feat__facts {'), style.indexOf('.m-feat__desc {'))
+    const facts = style.slice(style.indexOf('.m-feat__facts {'), style.indexOf('.m-feat__tape {'))
     expect(facts).toContain('rgba(255, 255, 255, 0.78)')
     expect(facts).toContain('font-weight: 600')
     const artist = style.slice(style.indexOf('.m-feat__artist {'), style.indexOf('.m-feat__facts {'))
     expect(artist).toContain('rgba(255, 255, 255, 0.55)')
-    // 标题仍是卡片里最大的一档（20px/600），与属性行（12px）差 8px 形成明显层级
+    // 标题仍是卡片里最大的一档（20px/600），并限两行防窄列下卡片过高
     const title = style.slice(style.indexOf('.m-feat__title {'), style.indexOf('.m-feat__meta {'))
     expect(title).toContain('font-size: 20px')
     expect(title).toContain('font-weight: 600')
+    expect(title).toContain('-webkit-line-clamp: 2')
+  })
+
+  it('卡带布局不做绝对定位（防「插画压字」回归）：右列 flex:none，左列可伸缩', () => {
+    const style = src.slice(src.indexOf('<style scoped>'))
+    const body = style.slice(style.indexOf('.m-feat__body {'), style.indexOf('.m-feat__info {'))
+    expect(body).toContain('display: flex')
+    expect(body).not.toContain('position: absolute')
+    const info = style.slice(style.indexOf('.m-feat__info {'), style.indexOf('.m-feat .u-chip {'))
+    expect(info).toContain('flex: 1')
+    expect(info).toContain('min-width: 0')
+    const tape = style.slice(style.indexOf('.m-feat__tape {'), style.indexOf('.m-feat__tape-label {'))
+    expect(tape).toContain('flex: none')
+    expect(tape).not.toContain('position: absolute') // 绝对定位只允许在卡带内部的贴纸/窗口
+  })
+
+  it('动效分级契约：卷轴转动 + `data-motion=off` 停转 / `low` 放缓', () => {
+    const style = src.slice(src.indexOf('<style scoped>'))
+    expect(style).toContain('@keyframes m-feat-spin')
+    const reel = style.slice(style.indexOf('.m-feat__reel {'), style.indexOf('.m-feat__reel::after'))
+    expect(reel).toContain('animation: m-feat-spin')
+    expect(reel).toContain('linear infinite')
+    expect(style).toContain("html[data-motion='off'] .m-feat__reel")
+    expect(style).toContain("html[data-motion='low'] .m-feat__reel")
   })
 })
