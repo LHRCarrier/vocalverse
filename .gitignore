@@ -102,6 +102,10 @@ Thumbs.db
 !data/seed/voices/
 !data/seed/voices/**
 
+# 本地演示曲封面（local/_import_demo_songs.py 复制进 song-covers 的商用曲目封面）：
+# data/seed/** 默认豁免入库，这里按前缀再排除——商用资产绝不进 git（docs/06 §9.7）。
+data/seed/song-covers/local-demo-*
+
 # HF 模型下载缓存（构建上下文预下载用；红线禁止提交，2026-09-07）
 services/python/.models-cache/
 
