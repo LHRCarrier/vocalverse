@@ -9,7 +9,8 @@
  *   与行高同步缩放，行内留白比例保持；
  * - **靠透明度渐隐表达远近**（视频里没有模糊）：焦点句最亮 + 加粗 + 略放大，越远越淡（`.is-dim-0..3`）；
  * - **无游标态（未播放/未开口）每行都取 1 级**：打开面板即可读完整首歌，不再是一片 0.2 的灰雾；
- * - 时间数字在左上（取代传统进度条；无游标时不渲染）；焦点句的**已唱部分**用绿色推进（颜色即进度）。
+ * - 时间数字在左上（取代传统进度条；无游标时不渲染）；焦点句的**已唱部分**用绿色推进（颜色即进度）——
+ *   有参考旋律时按**音符段**推进（拖长音慢慢填、快速过字迅速填、休止保持），无旋律数据回退按句长线性推进。
  *
  * 交互：
  * - 自动跟随：演唱到下一句时平滑滚到下一句居中（逐句）；
@@ -32,6 +33,8 @@ import {
   lineDistance,
   lineProgress,
   nearestLineIndex,
+  noteSpans,
+  spanProgress,
   toLyricLines,
 } from '@/lib/sing-lyrics'
 
@@ -60,9 +63,21 @@ const rowsCap = computed(() => Math.min(lines.value.length + 1, 7))
 const current = computed(() => (props.timeMs == null ? -1 : activeLineIndex(lines.value, props.timeMs)))
 /** 拖动时视口中心最近的行（「始终聚焦中心的句子」） */
 const centerIdx = ref(-1)
-const progress = computed(() =>
-  props.timeMs == null || current.value < 0 ? 0 : lineProgress(lines.value, current.value, props.timeMs),
-)
+/**
+ * 句内**逐字进度**（2026-09-22 用户口径「整句对得上，但唱得有快有慢，唱到哪个字对不上」）：
+ * 有参考旋律（`pitch_ref.midi`）时按**音符段**推进——拖长音慢慢填、快速过字迅速填、
+ * 休止保持；无旋律数据（老数据/未提取）回退按句长线性推进（原口径）。
+ */
+const spansByLine = computed(() => lines.value.map((l) => noteSpans(l.midi)))
+const progress = computed(() => {
+  if (props.timeMs == null || current.value < 0) return 0
+  const line = lines.value[current.value]
+  const spans = spansByLine.value[current.value] ?? []
+  return (
+    spanProgress(spans, line.text.length, props.timeMs - line.startMs) ??
+    lineProgress(lines.value, current.value, props.timeMs)
+  )
+})
 const clockText = computed(() => formatClock(props.timeMs))
 /** 当前句已唱比例（0~1）→ 裁剪右侧未唱部分（clip-path 只影响绘制，不触发布局） */
 const fillClip = computed(() => `inset(0 ${(1 - progress.value) * 100}% 0 0)`)

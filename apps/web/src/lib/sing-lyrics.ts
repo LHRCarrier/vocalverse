@@ -12,6 +12,9 @@
  * 强行映射要来回换单位。语义保持一致（空隙保持上一句、早于首句返回 -1），便于对照阅读。
  *
  * 纯函数、零 DOM、零副作用（组件层只渲染）——与仓库「对轴逻辑放纯函数」约定一致。
+ *
+ * 2026-09-22 增：**句内逐字节奏**（`noteSpans` / `spanProgress`）——按参考旋律的音符段推进
+ * 已唱高亮，取代「按整句时长线性推进」（用户口径：整句对得上，但唱得有快有慢、唱到哪个字对不上）。
  */
 
 /** 归一后的歌词行（毫秒；`endMs` 已推断，必定 > startMs） */
@@ -20,10 +23,18 @@ export interface LyricLine {
   startMs: number
   endMs: number
   text: string
+  /**
+   * 参考旋律逐帧 MIDI（行内相对时间，hop = {@link MIDI_HOP_MS}；负值/null = 无音高）。
+   * 2026-09-22 新增：句内**逐字节奏**的数据源（见 {@link noteSpans}/{@link spanProgress}）。
+   */
+  midi: (number | null)[] | null
 }
 
 /** 末句缺 `end_ms` 且无下一句可推断时的兜底句长（ms） */
 const FALLBACK_LINE_MS = 2000
+
+/** 后端 `pitch_ref.midi` 的逐帧间隔（ms）——与 `REF_HOP_MS`（引导条）/ pyin 提取 hop 同口径 */
+export const MIDI_HOP_MS = 32
 
 /** 后端下发的原始行（`end_ms`/`text` 可选；容忍 null/undefined 字段与 null 元素） */
 export interface RawLyricLine {
@@ -31,6 +42,8 @@ export interface RawLyricLine {
   start_ms?: number | null
   end_ms?: number | null
   text?: string | null
+  /** 参考旋律（只需 `midi`；其余字段与逐字节奏无关） */
+  pitch_ref?: { midi?: (number | null)[] | null } | null
 }
 
 /** 容错入参（与 audio/word-timeline.ts 的 `RawWord[] | null | undefined` 同口径） */
@@ -56,7 +69,7 @@ export function toLyricLines(lines: RawLyricLines): LyricLine[] {
     const nextStart = ok[i + 1]?.start_ms ?? null
     let endMs = explicit != null && explicit > startMs ? explicit : (nextStart ?? startMs + FALLBACK_LINE_MS)
     if (endMs <= startMs) endMs = startMs + FALLBACK_LINE_MS // 末句与下一句同刻的退化保护
-    return { seq: l.seq ?? i + 1, startMs, endMs, text: l.text ?? '' }
+    return { seq: l.seq ?? i + 1, startMs, endMs, text: l.text ?? '', midi: l.pitch_ref?.midi ?? null }
   })
 }
 
@@ -80,6 +93,102 @@ export function lineProgress(lines: LyricLine[], index: number, tMs: number): nu
   const span = line.endMs - line.startMs
   if (span <= 0) return 0
   return Math.min(1, Math.max(0, (tMs - line.startMs) / span))
+}
+
+/** 行内音符段（相对行首的 ms） */
+export interface NoteSpan {
+  startMs: number
+  endMs: number
+}
+
+/**
+ * 逐帧 MIDI → **音符段**（行内相对 ms）——句内逐字节奏的数据源（2026-09-22）。
+ *
+ * 用户口径：「整句对得上，但唱得有快有慢，句内唱到哪个字对不上」——按整句时长线性推进
+ * 会把「拖长音」和「快速过字」涂成同一速度。改为按参考旋律的音符结构推进：
+ * - 同音连续帧成段、换音即分段（音符边界 = 字推进的节拍点）；
+ * - 无音高帧（休止/换气）断开；
+ * - 抖动碎音（< `minNoteMs`）并入前段（pyin 的 32ms 跳音不当作音符）；
+ * - 短间隙（< `maxGapMs`，塞音/快速换气）不拆段（避免推进出现微停顿）。
+ *
+ * 纯函数（可单测）；无/空 MIDI → 空数组（调用方回退 {@link lineProgress}）。
+ */
+export function noteSpans(
+  midi: (number | null)[] | null | undefined,
+  hopMs: number = MIDI_HOP_MS,
+  minNoteMs = 96,
+  maxGapMs = 120,
+): NoteSpan[] {
+  const raw: { startMs: number; endMs: number; midi: number }[] = []
+  let cur: { startMs: number; endMs: number; midi: number } | null = null
+  for (let i = 0; i < (midi?.length ?? 0); i += 1) {
+    const v = midi![i]
+    const t = i * hopMs
+    if (v == null || v < 0) {
+      if (cur) {
+        raw.push(cur)
+        cur = null
+      }
+      continue
+    }
+    if (cur && cur.midi === v) {
+      cur.endMs = t + hopMs
+      continue
+    }
+    if (cur) raw.push(cur)
+    cur = { startMs: t, endMs: t + hopMs, midi: v }
+  }
+  if (cur) raw.push(cur)
+
+  // 短碎音并入前段（只在近邻时；跨长休止的孤立短音保留）
+  const merged: NoteSpan[] = []
+  for (const s of raw) {
+    const prev = merged[merged.length - 1]
+    if (s.endMs - s.startMs < minNoteMs && prev && s.startMs - prev.endMs <= maxGapMs) {
+      prev.endMs = s.endMs
+    } else {
+      merged.push({ startMs: s.startMs, endMs: s.endMs })
+    }
+  }
+
+  // 短间隙不拆段（只并「有空隙」的近邻；相邻不同音仍保留各自边界 = 音符节拍点）
+  const out: NoteSpan[] = []
+  for (const s of merged) {
+    const prev = out[out.length - 1]
+    if (prev && s.startMs > prev.endMs && s.startMs - prev.endMs < maxGapMs) prev.endMs = s.endMs
+    else out.push({ ...s })
+  }
+  return out
+}
+
+/**
+ * 句内**逐字进度** 0..1（`tMs` = 行内相对时间）：把行文本按音符段均分，逐段推进——
+ * - 段内：按段内时间线性推进该段负责的字（拖长音 = 一个字慢慢填，快速过字 = 迅速填完）；
+ * - 段间空隙（休止/换气）：保持上一段末尾的进度，不空跑；
+ * - 首音之前：0（行首休止时不抢跑）。
+ *
+ * 无音符数据 → null（调用方回退 {@link lineProgress}）。
+ */
+export function spanProgress(
+  spans: readonly NoteSpan[],
+  charCount: number,
+  tMs: number,
+): number | null {
+  if (!spans.length || charCount <= 0) return null
+  const m = spans.length
+  const charAt = (i: number) => Math.floor((i * charCount) / m)
+  let idx = -1
+  for (let i = 0; i < m; i += 1) {
+    if (spans[i].startMs <= tMs) idx = i
+    else break
+  }
+  if (idx < 0) return 0
+  const s = spans[idx]
+  const c0 = charAt(idx)
+  const c1 = charAt(idx + 1)
+  const span = s.endMs - s.startMs
+  const frac = span > 0 ? Math.min(1, Math.max(0, (tMs - s.startMs) / span)) : 1
+  return Math.min(1, Math.max(0, (c0 + (c1 - c0) * frac) / charCount))
 }
 
 /** 歌词游标所需的时钟输入 */
