@@ -10,6 +10,16 @@ on:
     paths:
       - "apps/admin/**"
       - ".github/workflows/admin-ci.yml"
+  # push(main) 兜底（2026-09-22 补）：本仓团队直接向 main 提交并推送，
+  # 而另外三条前端/后端 workflow（frontend-ci / python-ci / java-ci）都有 push(main)。
+  # 缺这条的实测后果：管理端改动推到 main 后 **一次 CI 都不跑**（2026-09-22 用
+  # `gh run list --workflow admin-ci` 实证：上次运行停在 2026-09-14，而期间 main 上有
+  # 多个 apps/admin 提交）。与 pull_request 同 paths，避免控制台改动触发用户端构建。
+  push:
+    branches: [main]
+    paths:
+      - "apps/admin/**"
+      - ".github/workflows/admin-ci.yml"
   workflow_dispatch:
 
 concurrency:
