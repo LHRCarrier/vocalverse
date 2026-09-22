@@ -3,6 +3,36 @@
 > 团队可见的工作记录（入库）。负责维护：LHRCarrier（组长）；其他成员需补充时经 PR 追加到 `VocalVerse工作日志.md`。
 > 用途：按日记录项目关键改动、验证结果与踩坑；新记录追加在最上方。正式决策看 `docs/06-技术框架决策.md`（ADR 唯一权威）。
 
+## 2026-09-22 演示数据包（切片一 · 通知 + 关注互动 · `local/演示数据/`）· 1 op
+
+> 归属：演示数据准备（gitignored `local/演示数据/`，不入库；交接队友按 README 一条命令复现）+ 三个移动端页面真实头像接入（UI 部分见安卓日志同日置顶）。
+> 目的：明日演示视频——把测试数据换成「像真实用户」的数据。SOP：`local/演示数据/SOP-演示数据制作.md`。
+
+- **用户口径**：「弄个演示账号（模拟真实用户），推荐关注里的账号也做成真实的（头像要有，自己去网上找）」；
+  数据全部落 `local/演示数据/`，**seed 跑一次可复现**（给队友）。
+- **产出**（`local/演示数据/`）：
+  - `seed_demo.py` 一键 seed（幂等，连跑两次零重复计数）；`personas.json` 14 账号名册；
+    `social.json` 内容（3 帖 / 14 关注 / 14 互动 / 10 评论 / 5 私信）；`avatars/` 14 张（真人 randomuser.me + 插画 DiceBear）；
+    `README.md` 交接说明；`_验收截图/` 5 张；`SOP-演示数据制作.md`。
+  - 主演示号 **`luna`**（Luna @luna_en / demo123456，L3）；既有账号网名化：青少年初级→Momo、老年高级→老周、
+    demo_reco_*→Kevin/Cathy/阿哲、林浩然→Leo，全部补齐 @handle + 头像（推荐关注列表不再出现测试名）。
+  - 清理：`verify_fec1fdb5` 验证流程测试号（含其唱歌测试残留）、2 条空标题 test 帖及测试评论。
+- **技术口径**：口令哈希优先 pgcrypto `crypt(..., gen_salt('bf',10))`（$2a$，Spring BCryptPasswordEncoder 可验签），
+  无权限时回退复用库内既有 BCrypt 哈希；头像经 `app.media.service.create` 落盘（`data/media` 内容寻址 + `media_assets`）回填 `avatar_url`；
+  互动按 Java 写方语义双写 `post_likes` + `post_interactions` 并维护计数器；通知聚合按 (post, action, UTC 日) 复算。
+- **验证**：接口实测（notifications 聚合「Momo 等 4 人」「Teacher Lee 等 2 人」「Mia in Boston 等 3 人」、
+  follows 7 条、recommendations 13 人全带 handle/avatar、following-feed 正常、conversations 未读 2、mine=true 3 帖）；
+  Playwright 截图 5 张；前端门禁 `lint/typecheck/test:run(673)/build` 全绿。
+- **踩坑**：① `python -m json.tool` 在 cp936 控制台把 UTF-8 响应解成乱码（`—` 变 `鈥?`）→ 误判「接口乱码」；
+  实为控制台解码问题，DB/接口数据均正确——核数据一律 `io.open(..., encoding='utf-8')` 或 psql `encode(convert_to(...),'hex')`。
+  ② Java 路径不一致：auth 在 `/auth/login`（无 `/api/v1` 前缀），社区在 `/api/v1/community/**`——curl 联调别想当然。
+- **纪律**：脚本是「跑一次即弃」的演示引导（落 gitignored `local/`，沿用 seed 单写豁免先例）；
+  若这批数据长期化，须移植为 Java `CommandLineRunner`（README 已写明）。
+- **已知边界（下一批）**：Luna 学习数据为空（attempts / 打卡 / XP / 生词本 / 批注 / 唱吧报告）→ 学习页画像与唱吧报告仍空；
+  酒馆测试局待清理；种子曲库实际入库 3/10 首。
+
+—— 执行人：LHRCarrier（AI 代工），2026-09-22
+
 ## 2026-09-22 PR #39 审查与合并（唱吧跟唱链路与选曲集成 · sync-2026-09-18）· 1 op
 
 > 归属：PR 审查 + 集成合并（跨 Web / Python / Java 三端）；分支侧两轮解冲突记录见 PR 与下一条。
