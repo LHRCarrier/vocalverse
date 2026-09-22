@@ -409,6 +409,12 @@ describe('MobileSongList · 样式契约守卫', () => {
     return readFileSync(resolve(process.cwd(), 'src/styles/mobile-sing.css'), 'utf-8') as string
   }
 
+  it('选中态：圆角浅底、无左侧蓝条（2026-09-23 用户口径，改回即红）', () => {
+    const start = css().indexOf('.m-sing-list__item.is-selected {')
+    const rule = css().slice(start, css().indexOf('}', start))
+    expect(rule).toContain('border-radius: 12px')
+    expect(rule).not.toContain('inset 2px 0 0')
+  })
   it('滚动区必须同时有 max-height 与 overflow-y（少一个就退回「随内容长高」）', () => {
     const block = css().slice(
       css().indexOf('.m-sing-list__scroll {'),
