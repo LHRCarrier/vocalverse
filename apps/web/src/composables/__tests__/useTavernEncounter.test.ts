@@ -4,6 +4,7 @@ import { nextTick, ref } from 'vue'
 import type { TrpgEntityItem, TrpgFactItem, TrpgState } from '@/api/trpg'
 import {
   decodeOrder,
+  isInternalEntityName,
   isWeapon,
   parseParticipantKey,
   splitInventory,
@@ -88,12 +89,32 @@ describe('useTavernEncounter · 遭遇（facts + encounter 事件）', () => {
     expect(parts[2]!.hp).toBeNull()
   })
 
-  it('attackTargets：在场 npc/pc 且排除自己与已离场；items：仅自己持有且 qty>0', () => {
+  it('attackTargets：只列在场 NPC（排除自己/已离场）；items：仅自己持有且 qty>0', () => {
     const encounter = useTavernEncounter(ref(makeState(ENCOUNTER_FACTS, ENTITIES)))
     expect(encounter.attackTargets.value.map((t) => t.name)).toEqual(['地精', '莉亚'])
     expect(encounter.attackTargets.value[0]!.hp).toBe('7')
+    expect(encounter.attackTargets.value.every((t) => t.kind === 'npc')).toBe(true)
     expect(encounter.items.value.map((i) => i.name)).toEqual(['治疗药水'])
     expect(encounter.items.value[0]!.qty).toBe(2)
+  })
+
+  it('attackTargets 目标过滤（docs/57 P1-5）：内部名 main、同行 PC、赶来中与已离场都不出', () => {
+    const encounter = useTavernEncounter(
+      ref(
+        makeState([], [
+          entity({ id: 1, kind: 'pc', name: '主角' }),
+          entity({ id: 2, name: '地精' }),
+          entity({ id: 3, name: 'main' }),
+          entity({ id: 4, kind: 'pc', name: '洛可' }),
+          entity({ id: 5, name: '迟到者', pending: true }),
+          entity({ id: 6, name: '幽灵', status: 'cleared' }),
+        ]),
+      ),
+    )
+    expect(encounter.attackTargets.value.map((t) => t.name)).toEqual(['地精'])
+    expect(isInternalEntityName('main')).toBe(true)
+    expect(isInternalEntityName('MAIN')).toBe(true)
+    expect(isInternalEntityName('地精')).toBe(false)
   })
 
   it('行囊字符串兜底：只有 `pc.*.inventory`（没有 item.* 事实）也能出道具 chip', () => {

@@ -147,9 +147,12 @@ describe('酒馆结算闭环（docs/57 §3.2）', () => {
     expect(settle.exists()).toBe(true)
     expect(settle.text()).toContain('收尾本幕 · 寻找戒指')
 
+    const campaignsBefore = mocks.fetchCampaigns.mock.calls.length
     await settle.trigger('click')
     await flushPromises()
     expect(mocks.settleQuest).toHaveBeenCalledWith(1, '寻找戒指', undefined)
+    // 结算后同时刷列表（大堂「已完结」分组靠列表 finished）
+    expect(mocks.fetchCampaigns.mock.calls.length).toBeGreaterThan(campaignsBefore)
 
     // 实时返回的结局走同一渲染路径（不用等系统卡）
     expect(wrapper.find('.t-ending').text()).toContain('圆满结局')
@@ -166,8 +169,27 @@ describe('酒馆结算闭环（docs/57 §3.2）', () => {
     expect(wrapper.find('[role="dialog"][aria-label="选择剧本"]').exists()).toBe(true)
   })
 
-  it('刷新恢复：state.finished=true → 已完结条常驻（无需 SSR 结局卡）', async () => {
-    mocks.fetchCampaignState.mockResolvedValue(baseState({ finished: true, finished_at: '2026-09-22T12:00:00Z' }))
+  it('刷新恢复：state.campaign.finished=true（权威契约）→ 已完结条常驻、收尾钮不回潮', async () => {
+    mocks.fetchCampaignState.mockResolvedValue(
+      baseState({
+        campaign: {
+          id: 1,
+          name: '迷雾酒馆',
+          narrative_summary: '',
+          finished: true,
+          finished_at: '2026-09-22T12:00:00Z',
+        },
+      }),
+    )
+    const wrapper = await mountView()
+    expect(wrapper.find('.t-finished').exists()).toBe(true)
+    expect(wrapper.find('.t-act-chip--settle').exists()).toBe(false)
+  })
+
+  it('旧契约兼容：仅顶层 finished=true 也认已完结（不因后端灰度闪断）', async () => {
+    mocks.fetchCampaignState.mockResolvedValue(
+      baseState({ finished: true, finished_at: '2026-09-22T12:00:00Z' }),
+    )
     const wrapper = await mountView()
     expect(wrapper.find('.t-finished').exists()).toBe(true)
     expect(wrapper.find('.t-act-chip--settle').exists()).toBe(false)

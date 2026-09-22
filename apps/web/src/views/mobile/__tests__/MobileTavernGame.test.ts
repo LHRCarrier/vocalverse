@@ -141,21 +141,21 @@ beforeEach(() => {
 })
 
 describe('酒馆设计稿改版（页内底栏 / 立绘抽屉 / dock）', () => {
-  it('页内底栏：4 项导航渲染，占位项 toast 提示后续版本', async () => {
+  it('页内底栏：4 项导航渲染，当前项标记 aria-current（不再是占位 toast）', async () => {
     const wrapper = await mountView()
     for (const label of ['大堂', '酒馆跑团', '角色卡', '纪事']) {
       expect(wrapper.find(`button[aria-label="${label}"]`).exists(), label).toBe(true)
     }
 
+    const current = wrapper.find('button[aria-label="酒馆跑团"]')
+    expect(current.attributes('aria-current')).toBe('page')
+    expect(current.classes()).toContain('t-nav__item--on')
+    expect(wrapper.find('button[aria-label="大堂"]').attributes('aria-current')).toBeUndefined()
+
     const ui = useUiStore()
     await wrapper.find('button[aria-label="大堂"]').trigger('click')
-    expect(ui.toastText).toContain('大堂')
-    expect(ui.toastText).toContain('后续版本开放')
-
-    await wrapper.find('button[aria-label="角色卡"]').trigger('click')
-    expect(ui.toastText).toContain('角色卡')
-    await wrapper.find('button[aria-label="纪事"]').trigger('click')
-    expect(ui.toastText).toContain('纪事')
+    expect(ui.toastText).not.toContain('后续版本开放')
+    expect(wrapper.find('.t-hall').exists()).toBe(true)
   })
 
   it('副本任务卡：目标取 active 首任务；行囊事实拆成标签；HP 分数画条', async () => {
@@ -310,6 +310,31 @@ describe('酒馆设计稿改版（页内底栏 / 立绘抽屉 / dock）', () => 
     await panel.find('.t-act-chip--item').trigger('click')
     await flushPromises()
     expect(mocks.streamTrpgTurn).toHaveBeenCalled()
+  })
+
+  it('展开迷你条：停靠区变高时做滚动补偿（N8，不盖住正文）', async () => {
+    const scrollBySpy = vi.fn()
+    vi.stubGlobal('scrollBy', scrollBySpy)
+    const rect = (height: number) =>
+      ({ x: 0, y: 0, top: 0, left: 0, right: 390, bottom: height, width: 390, height, toJSON: () => ({}) }) as DOMRect
+    const rectSpy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        // 停靠区展开后（迷你条 is-open）高度 240 → 420，差值 180 应被滚动补偿
+        const expanded = !!this.classList?.contains('u-chat-dock') && !!this.querySelector('.t-mini.is-open')
+        return rect(expanded ? 420 : 240)
+      })
+    try {
+      const wrapper = await mountView()
+      await wrapper.find('.t-mini__caret').trigger('click')
+      await flushPromises()
+      expect(wrapper.classes()).toContain('t-page--bars')
+      expect(scrollBySpy).toHaveBeenCalledWith({ top: 180, behavior: 'auto' })
+      wrapper.unmount()
+    } finally {
+      rectSpy.mockRestore()
+      vi.unstubAllGlobals()
+    }
   })
 
   it('迷你状态条线索入口：直达主持台「任务线索」页', async () => {

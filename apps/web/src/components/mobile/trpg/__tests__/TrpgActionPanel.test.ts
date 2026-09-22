@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 
 import TrpgActionPanel from '@/components/mobile/trpg/TrpgActionPanel.vue'
+import { computeRowScrollState } from '@/components/mobile/trpg/panelScroll'
 import type {
   TavernEncounter,
   TavernItem,
@@ -123,6 +124,68 @@ describe('TrpgActionPanel · 常驻快速行动条（docs/57 §3.2）', () => {
     expect(card.text()).toContain('当前：地精')
     expect(card.find('.t-enc__pip.is-current').text()).toContain('地精')
     expect(card.text()).toContain('HP 7')
+  })
+
+  it('chip 行溢出（N7）：右侧有内容 → 渐隐 + chevron 提示；滑到末端后提示消失', async () => {
+    const wrapper = mount(TrpgActionPanel, {
+      props: {
+        quickActions: [
+          { kind: 'observe', label: '观察酒馆', text: '我仔细观察酒馆' },
+          { kind: 'talk', label: '与莉亚交谈', text: '我试着与莉亚交谈' },
+          { kind: 'advance', label: '推进寻找戒指', text: '我继续推进：寻找戒指' },
+        ],
+      },
+    })
+    const row = wrapper.find('.t-act-panel__row')
+    const el = row.element as HTMLElement
+    Object.defineProperty(el, 'scrollWidth', { value: 600, configurable: true })
+    Object.defineProperty(el, 'clientWidth', { value: 300, configurable: true })
+    Object.defineProperty(el, 'scrollLeft', { value: 0, configurable: true, writable: true })
+
+    await row.trigger('scroll')
+    expect(row.classes()).toContain('is-fade-end')
+    expect(row.classes()).not.toContain('is-fade-start')
+    expect(wrapper.find('.t-act-panel__more').exists()).toBe(true)
+
+    el.scrollLeft = 300
+    await row.trigger('scroll')
+    expect(row.classes()).toContain('is-fade-start')
+    expect(row.classes()).not.toContain('is-fade-end')
+    expect(wrapper.find('.t-act-panel__more').exists()).toBe(false)
+  })
+
+  it('chip 行不溢出（N7）：不给渐隐/提示（避免硬切误伤与常驻噪声）', async () => {
+    const wrapper = mount(TrpgActionPanel, { props: { quickActions: [{ kind: 'observe', label: '观察', text: '我仔细观察' }] } })
+    const row = wrapper.find('.t-act-panel__row')
+    Object.defineProperty(row.element, 'scrollWidth', { value: 300, configurable: true })
+    Object.defineProperty(row.element, 'clientWidth', { value: 300, configurable: true })
+    await row.trigger('scroll')
+    expect(row.classes()).not.toContain('is-fade-end')
+    expect(row.classes()).not.toContain('is-fade-start')
+    expect(wrapper.find('.t-act-panel__more').exists()).toBe(false)
+  })
+
+  it('溢出几何纯函数：只在真的溢出且该侧有内容时置位', () => {
+    expect(computeRowScrollState({ scrollLeft: 0, scrollWidth: 600, clientWidth: 300 })).toEqual({
+      overflowing: true,
+      fadeStart: false,
+      fadeEnd: true,
+    })
+    expect(computeRowScrollState({ scrollLeft: 150, scrollWidth: 600, clientWidth: 300 })).toEqual({
+      overflowing: true,
+      fadeStart: true,
+      fadeEnd: true,
+    })
+    expect(computeRowScrollState({ scrollLeft: 300, scrollWidth: 600, clientWidth: 300 })).toEqual({
+      overflowing: true,
+      fadeStart: true,
+      fadeEnd: false,
+    })
+    expect(computeRowScrollState({ scrollLeft: 0, scrollWidth: 300, clientWidth: 300 })).toEqual({
+      overflowing: false,
+      fadeStart: false,
+      fadeEnd: false,
+    })
   })
 
   it('disabled 时道具/建议/收尾都不可点', async () => {
